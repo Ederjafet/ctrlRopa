@@ -1,7 +1,8 @@
 # ERP - Resumen ejecutivo
 
-Fecha de analisis: 2026-05-11  
-Alcance: Fase 0, solo analisis y documentacion. No se modifico codigo, logica ni base de datos.
+Fecha de analisis inicial: 2026-05-11  
+Ultima actualizacion: 2026-05-12  
+Alcance: Fase 0, Fase 1A y Fase 1B documentales.
 
 ## Estado general
 
@@ -9,7 +10,7 @@ Estado estimado: MEDIO, con modulos FRAGILES en flujos operativos de alto cambio
 
 El proyecto ya tiene una base util para crecer: frontend Expo/React Native con rutas por pantalla en `app/`, backend Spring Boot modular en `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa`, migraciones Flyway en `backend/control-ropa/src/main/resources/db/migration` y permisos centralizados por codigo en `PermissionCode.java`.
 
-La principal alerta enterprise es que aun no hay una capa homogenea de UX, validaciones, seguridad declarativa, auditoria funcional y regresion automatizada. Hay funcionalidades reales, pero todavia dependen de validaciones repetidas por pantalla/servicio y de convenciones no siempre aplicadas igual.
+La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de UX, validaciones, seguridad declarativa, auditoria funcional y regresion automatizada amplia. La Fase 1B reduce este riesgo al formalizar Definition of Done, checklist release, ownership, arquitectura objetivo y riesgos operativos.
 
 ## Hallazgos clave
 
@@ -19,14 +20,14 @@ La principal alerta enterprise es que aun no hay una capa homogenea de UX, valid
 - Proveedores ya existen en backend con `SupplierController.java`, `SupplierService.java` y migracion `V37__suppliers_and_batch_quality.sql`.
 - Lotes ya guardan proveedor, fecha de recepcion y calidad por `BatchService.java`, pero faltan filtros backend especificos por proveedor, estatus, fecha y calidad.
 - UX esta mejorando con componentes reutilizables como `AppButton`, `AppBottomModal`, `AppNoticeDropdown`, `AppScreen`, pero muchas pantallas siguen usando `Alert.alert` directo.
-- Hay problemas reales de codificación en textos: se detectaron cadenas visibles con mojibake en servicios frontend/backend.
-- El repositorio Git ya existe y la Fase 1A se trabaja sobre `feature/fase1a-estabilizacion-ux`; queda pendiente limpiar o ignorar `.tmp-pdf-images/`.
+- Hay riesgo recurrente de codificacion de textos; se requiere barrido de mojibake antes de release.
+- El repositorio Git ya existe y la Fase 1B se trabaja sobre `feature/fase1b-gobernanza-erp`; queda pendiente limpiar o ignorar `.tmp-pdf-images/` y `cambios_fase1a.diff`.
 
 ## Madurez ERP estimada
 
 | Area | Madurez |
 |---|---:|
-| Usuarios y permisos | 70% |
+| Usuarios y permisos | 72% |
 | Clientes | 60% |
 | Proveedores | 45% |
 | Inventario | 65% |
@@ -37,18 +38,20 @@ La principal alerta enterprise es que aun no hay una capa homogenea de UX, valid
 | Pagos | 60% |
 | Reportes | 50% |
 | Dashboard | 55% |
-| Auditoria | 35% |
+| Auditoria | 38% |
 | Seguridad | 65% |
-| QA | 35% |
-| UX homogenea | 40% |
-| Trazabilidad | 35% |
-| ERP readiness general | 52% |
+| QA | 42% |
+| UX homogenea | 45% |
+| Trazabilidad | 42% |
+| Gobernanza ERP | 58% |
+| ERP readiness general | 56% |
 
 ## Prioridad inmediata
 
-1. Congelar crecimiento funcional no critico.
-2. Homologar validaciones y notificaciones.
-3. Cerrar matriz de permisos por endpoint.
-4. Definir regresion minima por flujo critico.
+1. Mantener cambios pequenos, seguros y reversibles.
+2. Limpiar artefactos Git no rastreados antes de release.
+3. Cerrar matriz endpoint-permiso preliminar.
+4. Crear checklist de regresion manual por flujo critico.
 5. Reforzar auditoria funcional en operaciones sensibles.
-6. Corregir codificacion de textos de forma controlada en una fase posterior.
+6. Homologar UX en fases 2 y 3.
+

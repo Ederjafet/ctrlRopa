@@ -1,37 +1,23 @@
 # ERP - Definicion de hecho
 
-Una mejora ERP solo se considera terminada si cumple:
+Estado: documento historico/alias.
 
-1. Analisis documentado.
-2. Impacto identificado en frontend, backend, base de datos, permisos, QA y reportes.
-3. Implementacion pequena y reversible.
-4. Validaciones frontend/backend alineadas.
-5. Mensajes UX homologados.
-6. Permisos probados con usuario permitido y usuario no permitido.
-7. Auditoria definida para acciones sensibles.
-8. Pruebas ejecutadas y registradas.
-9. Regresion de flujos relacionados ejecutada.
-10. Documentacion actualizada.
-11. Checklist de release completado.
+El criterio canonico vigente para Definition of Done esta en:
 
-## Criterios por tipo
+- `docs/ERP_DEFINITION_OF_DONE.md`
 
-Pantalla:
+Este archivo se conserva para compatibilidad con la documentacion de Fase 0. En caso de diferencia, prevalece `ERP_DEFINITION_OF_DONE.md`.
 
-- Responsive web/mobile.
-- Sin textos tecnicos.
-- Sin botones que "no hagan nada".
-- Estados vacio/cargando/error/listo.
+## Regla vigente
 
-Endpoint:
+Ningun cambio ERP se considera terminado si no cumple:
 
-- Valida token, usuario activo, permiso y reglas de negocio.
-- Devuelve errores claros.
-- Tiene prueba o caso QA documentado.
-
-Base de datos:
-
-- Migracion reversible o segura.
-- Indices/llaves evaluados.
-- Impacto en datos existentes documentado.
+- Validacion frontend/backend segun impacto.
+- Revision de permisos cuando aplique.
+- UX homogenea.
+- Manejo amigable de errores.
+- QA de regresion proporcional.
+- Documentacion y bitacora actualizadas.
+- Rollback posible.
+- Revision de logs/auditoria si toca accion sensible.
 

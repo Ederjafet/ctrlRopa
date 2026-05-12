@@ -1,0 +1,93 @@
+# ERP - Release checklist
+
+## Pre-release
+
+### Git
+
+- Confirmar rama: `git branch --show-current`.
+- Confirmar estado: `git status --short`.
+- No liberar con archivos no rastreados salvo justificacion documentada.
+- Revisar diff: `git diff --stat` y `git diff`.
+- Confirmar base actualizada contra `develop`.
+
+### Alcance
+
+- Confirmar fase y objetivo.
+- Confirmar fuera de alcance.
+- Confirmar que no hay cambios accidentales en pagos, live, lotes, seguridad o base de datos.
+- Confirmar si hay migraciones. Si no debe haber, validar que `backend/control-ropa/src/main/resources/db/migration` no cambio.
+
+### Backup
+
+- Si hay migracion o cambio de datos: backup obligatorio de base.
+- Si no hay cambio de datos: registrar "no aplica".
+- Guardar version/JAR/APK/web build anterior si aplica.
+
+### Frontend
+
+- Ejecutar `npx.cmd tsc --noEmit`.
+- Ejecutar ESLint acotado o general.
+- Validar pantalla afectada en web.
+- Validar mobile si la pantalla es operativa.
+- Confirmar que los errores visibles son amigables.
+
+### Backend
+
+- Ejecutar `.\mvnw.cmd test`.
+- Validar arranque si cambio backend.
+- Revisar logs backend.
+- Validar que no existan errores de Flyway.
+
+### Permisos
+
+- Usuario con permiso puede ver y ejecutar.
+- Usuario sin permiso no ve o recibe acceso denegado amigable.
+- Backend devuelve 401/403 de forma controlada.
+
+### Smoke tests criticos
+
+- Login/logout.
+- Dashboard.
+- Clientes.
+- Inventario.
+- Lotes.
+- Live/reservas.
+- Venta puerta.
+- Pagos.
+- Paquetes/envios.
+- Reportes principales.
+
+## Release
+
+- Registrar version o identificador de cambio.
+- Registrar rama y commit.
+- Publicar artefacto o desplegar con ventana controlada.
+- Monitorear logs durante arranque.
+- Validar health check: `/api/health`.
+
+## Post-release
+
+- Ejecutar smoke test minimo.
+- Revisar logs frontend/backend.
+- Validar usuario operativo.
+- Validar usuario administrador.
+- Documentar incidentes.
+- Actualizar bitacora ERP.
+
+## Rollback
+
+- Identificar commit/artefacto anterior.
+- Revertir cambios de frontend si falla UX.
+- Revertir backend/JAR si falla API.
+- Revertir migracion solo si existe plan probado.
+- Confirmar sistema operativo despues de rollback.
+
+## Bloqueantes de release
+
+- Pruebas minimas fallidas sin justificacion.
+- Migracion no probada.
+- Error tecnico visible al usuario en flujo critico.
+- Archivos no rastreados que alteren build.
+- Cambio de seguridad sin matriz de permisos.
+- Cambio de pagos/caja sin regresion.
+
