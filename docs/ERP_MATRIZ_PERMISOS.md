@@ -47,3 +47,45 @@ Fuente: `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/security/acces
 - Proveedores usan `MANAGE_CATALOGS`, pero podria requerir permiso especifico ERP `MANAGE_SUPPLIERS`.
 - Logs tecnicos en `app/system-logs.tsx` deben quedar solo para perfil tecnico/administrador.
 
+## Matriz preliminar endpoint-permiso
+
+Esta matriz no cambia seguridad real. Solo documenta permiso esperado y riesgo si falta validacion.
+
+| Modulo | Endpoint critico | Permiso esperado | Riesgo si falta validacion |
+|---|---|---|---|
+| Auth | `POST /api/auth/login` | Publico controlado | Acceso indebido o bloqueo masivo si falla politica. |
+| Auth | `POST /api/auth/change-password` | Usuario autenticado | Cambio de password sin identidad valida. |
+| Usuarios | `POST /api/users`, `PUT /api/users/{id}` | `MANAGE_USERS` | Alta/modificacion indebida de usuarios. |
+| Usuarios | `PUT /api/users/{id}/roles`, `PUT /api/users/{id}/permissions` | `MANAGE_ROLES`/`MANAGE_USERS` | Escalamiento de privilegios. |
+| Roles | `POST /api/roles`, `PUT /api/roles/{id}/permissions` | `MANAGE_ROLES` | Permisos mal asignados a perfiles. |
+| Seguridad | `PUT /api/security/settings` | `MANAGE_SECURITY_SETTINGS` | Politicas de seguridad debilitadas. |
+| Sesiones | `POST /api/security/sessions/*` | Perfil tecnico/admin | Cierre o desbloqueo indebido de sesiones. |
+| Catalogos | `POST/PUT/PATCH /api/product-types|brands|sizes|payment-methods` | `MANAGE_CATALOGS` | Datos maestros incorrectos. |
+| Proveedores | `POST/PUT/PATCH /api/suppliers` | `MANAGE_CATALOGS` | Proveedores duplicados/inactivos usados en lotes. |
+| Lotes | `POST /api/batches/branch/{branchId}` | `MANAGE_INVENTORY` | Inventario originado por usuario no autorizado. |
+| Lotes | `PATCH /api/batches/{id}/receive` | `MANAGE_INVENTORY` | Recepcion/cantidad/calidad incorrecta. |
+| Lotes | `PUT /api/batches/{id}/classification` | `MANAGE_INVENTORY` | Clasificacion incorrecta. |
+| Lotes | `PATCH /api/batches/{id}/reconcile|cancel` | `MANAGE_INVENTORY` | Cierre/cancelacion indebida. |
+| Items | `POST /api/items`, `PUT /api/items/{id}` | `MANAGE_INVENTORY` | Alta/modificacion de prenda indebida. |
+| Live | `POST /api/lives/branch/{branchId}`, `PATCH /api/lives/{id}/activate|close` | `DO_LIVE_RESERVATION` | Captura de live indebida o cierre incorrecto. |
+| Reservas | `POST /api/reservations` | `DO_LIVE_RESERVATION` o `DO_DOOR_RESERVATION` segun canal | Reserva indebida o canal no autorizado. |
+| Reservas | `PATCH /api/reservations/{id}/cancel` | `CANCEL_RESERVATION` | Cancelacion sin autorizacion. |
+| Ventas | `POST /api/sales` | `DO_DOOR_SALE` | Venta e inventario afectados indebidamente. |
+| Ventas | `PATCH /api/sales/{saleId}/cancel` | `CANCEL_SALE` | Cancelacion financiera/inventario indebida. |
+| Pagos | `POST /api/payments*` | `REGISTER_PAYMENTS` | Diferencias de caja/saldo. |
+| Pagos | `PATCH /api/payments/{paymentId}/void` | `VOID_PAYMENT` | Anulacion indebida. |
+| Saldos | `POST /api/balance/apply-to-order` | `APPLY_CUSTOMER_BALANCE` | Saldo aplicado indebidamente. |
+| Paquetes | `POST/PATCH /api/customer-packages*` | `CREATE_CLOSE_CUSTOMER_PACKAGE` | Paquete incompleto o cerrado indebidamente. |
+| Envios | `POST/PATCH /api/shipments*` | `MANAGE_SHIPMENTS` | Despacho/entrega incorrecta. |
+| Transferencias | `POST /api/transfers` | `MANAGE_TRANSFERS` | Movimiento entre sucursales indebido. |
+| Transferencias | `PATCH /api/transfers/{id}/send` | `SEND_TRANSFERS` | Envio no autorizado. |
+| Transferencias | `PATCH /api/transfers/{id}/receive-item` | `RECEIVE_TRANSFERS` | Recepcion indebida. |
+| Reportes | `GET /api/reports/*` | `VIEW_REPORTS` | Exposicion de informacion operativa/financiera. |
+| Caja | `POST/PUT/PATCH /api/cash-closures*` | `MANAGE_CASH_CLOSURES` | Cierre de caja incorrecto. |
+| Logs | `GET /api/system/logs` | Perfil tecnico/admin | Exposicion de informacion tecnica. |
+
+## Pendientes Fase 4
+
+- Confirmar por prueba automatizada/manual que cada endpoint critico ejecuta validacion backend.
+- Separar permisos especificos para proveedores/logs si el modelo de roles lo requiere.
+- Definir perfiles: operativo, admin, soporte tecnico y auditor.

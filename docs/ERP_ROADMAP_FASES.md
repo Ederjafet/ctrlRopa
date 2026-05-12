@@ -32,6 +32,20 @@ Criterios de salida:
 - Release checklist creado.
 - Ownership matrix creada.
 - Riesgos operativos clasificados.
+- Regresion operacional documentada.
+- Smoke tests minimos documentados.
+- Release flow e incident response documentados.
+- Ambientes DEV/QA/STAGING/PROD definidos.
+
+Subfases completadas:
+
+- Fase 1A: estabilizacion UX minima.
+- Fase 1B: gobernanza ERP.
+- Fase 1C: regresion operacional y release flow.
+
+Siguiente subfase recomendada:
+
+- Fase 1D: datos QA, evidencia de regresion y usuarios por rol.
 
 ## Fase 2 - Homologacion UX/UI
 

@@ -113,3 +113,42 @@ Riesgos detectados:
 Siguiente fase sugerida:
 
 - Fase 1C: limpieza de artefactos Git, checklist de regresion manual inicial y matriz endpoint-permiso preliminar sin cambios de seguridad.
+
+## 2026-05-12 - Fase 1C
+
+Tipo: regresion operacional, smoke tests, release flow e incident response.
+
+Objetivo:
+
+- Formalizar regresion operacional ERP.
+- Definir smoke tests minimos pre/post-release.
+- Documentar flujo feature -> develop -> QA -> main.
+- Definir ambientes DEV/QA/STAGING/PROD.
+- Documentar respuesta a incidentes operativos.
+- Preparar matriz endpoint-permiso preliminar sin modificar seguridad real.
+
+Documentos creados:
+
+- `docs/ERP_QA_REGRESION_OPERACIONAL.md`
+- `docs/ERP_SMOKE_TESTS.md`
+- `docs/ERP_RELEASE_FLOW.md`
+- `docs/ERP_ENVIRONMENTS.md`
+- `docs/ERP_INCIDENT_RESPONSE.md`
+
+Documentos actualizados:
+
+- `docs/ERP_MATRIZ_PERMISOS.md`
+- `docs/ERP_MATRIZ_ENDPOINTS.md`
+- `docs/ERP_BITACORA_CAMBIOS.md`
+- `docs/ERP_ROADMAP_FASES.md`
+- `docs/ERP_RESUMEN_EJECUTIVO.md`
+
+Riesgos detectados:
+
+- `.tmp-pdf-images/`, `cambios_fase1a.diff` y `cambios_fase1b.diff` aparecen como no rastreados; no se tocaron.
+- La matriz endpoint-permiso sigue siendo preliminar y debe validarse en Fase 4 contra codigo/servicios.
+- Los flujos de pagos, ventas, live y lotes siguen siendo criticos y requieren regresion operacional antes de cualquier release.
+
+Siguiente fase sugerida:
+
+- Fase 1D: preparar datos QA y plantilla de evidencia de regresion por usuario/rol, sin tocar logica.

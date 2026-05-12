@@ -54,3 +54,36 @@ Fuente: controladores bajo `backend/control-ropa/src/main/java/com/hpsqsoft/ctrl
 
 Debe verificarse por prueba que cada endpoint sensible ejecuta validacion de permiso en su servicio. El filtro global no bloquea por ruta.
 
+## Endpoints criticos para regresion operacional
+
+| Endpoint | Criticidad | Permiso esperado | Validacion pendiente |
+|---|---|---|---|
+| `POST /api/auth/login` | CRITICA | Publico controlado | Bloqueo, credenciales invalidas, respuesta amigable. |
+| `POST /api/auth/logout` | ALTA | Usuario autenticado | Token/sesion valida. |
+| `POST /api/auth/change-password` | ALTA | Usuario autenticado | Politica password y sesion. |
+| `POST /api/users` | CRITICA | `MANAGE_USERS` | Alta solo admin. |
+| `PUT /api/users/{id}/roles` | CRITICA | `MANAGE_ROLES` | No escalamiento indebido. |
+| `PUT /api/security/settings` | CRITICA | `MANAGE_SECURITY_SETTINGS` | Solo admin seguridad. |
+| `POST /api/batches/branch/{branchId}` | ALTA | `MANAGE_INVENTORY` | Sucursal/proveedor/cantidad. |
+| `PATCH /api/batches/{id}/receive` | ALTA | `MANAGE_INVENTORY` | Calidad/cantidad/estado. |
+| `PATCH /api/batches/{id}/reconcile` | ALTA | `MANAGE_INVENTORY` | Clasificacion igual a recibido. |
+| `POST /api/lives/branch/{branchId}` | ALTA | `DO_LIVE_RESERVATION` | Canal/sucursal habilitada. |
+| `PATCH /api/lives/{id}/close` | ALTA | `DO_LIVE_RESERVATION` | Estado de live. |
+| `POST /api/reservations` | ALTA | Canal live/puerta | Cliente/prenda/precio/canal. |
+| `PATCH /api/reservations/{id}/cancel` | ALTA | `CANCEL_RESERVATION` | Motivo/autorizacion futura. |
+| `POST /api/sales` | CRITICA | `DO_DOOR_SALE` | Cliente/prenda/precio/pago/canal. |
+| `PATCH /api/sales/{saleId}/cancel` | CRITICA | `CANCEL_SALE` | Motivo y auditoria. |
+| `POST /api/payments` | CRITICA | `REGISTER_PAYMENTS` | Monto/metodo/origen. |
+| `PATCH /api/payments/{paymentId}/void` | CRITICA | `VOID_PAYMENT` | Motivo/auditoria. |
+| `POST /api/customer-packages` | ALTA | `CREATE_CLOSE_CUSTOMER_PACKAGE` | Cliente/sucursal. |
+| `PATCH /api/customer-packages/{id}/ready` | ALTA | `CREATE_CLOSE_CUSTOMER_PACKAGE` | Items/estado. |
+| `POST /api/shipments` | ALTA | `MANAGE_SHIPMENTS` | Sucursal/tipo. |
+| `PATCH /api/shipments/{id}/dispatch` | ALTA | `MANAGE_SHIPMENTS` | Paquetes listos. |
+| `POST /api/cash-closures` | CRITICA | `MANAGE_CASH_CLOSURES` | Sucursal/fecha unica. |
+| `PATCH /api/cash-closures/{id}/close` | CRITICA | `MANAGE_CASH_CLOSURES` | Totales/estado. |
+| `GET /api/reports/*` | MEDIA/ALTA | `VIEW_REPORTS` | Sucursal/fecha/perfil. |
+| `GET /api/system/logs` | ALTA | Perfil tecnico/admin | No visible a operativos. |
+
+## Nota Fase 1C
+
+Esta seccion es preparatoria. No implica cambios en `SecurityConfig.java`, `AccessService.java`, controladores ni servicios.
