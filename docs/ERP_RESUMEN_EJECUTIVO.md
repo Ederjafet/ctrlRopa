@@ -10,7 +10,7 @@ Estado estimado: MEDIO, con modulos FRAGILES en flujos operativos de alto cambio
 
 El proyecto ya tiene una base util para crecer: frontend Expo/React Native con rutas por pantalla en `app/`, backend Spring Boot modular en `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa`, migraciones Flyway en `backend/control-ropa/src/main/resources/db/migration` y permisos centralizados por codigo en `PermissionCode.java`.
 
-La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de UX, validaciones, seguridad declarativa, auditoria funcional y regresion automatizada amplia. La Fase 1G ejecuto la primera corrida QA real: API operativa en flujos principales, pero RC rechazado por bloqueos de frontend web, health check y dataset de perfiles de seguridad/soporte. En validaciones posteriores, los usuarios QA de permisos negativos, reportes y soporte ya iniciaron sesion correctamente, y el healthcheck backend fue validado por runtime real en `http://localhost:8090/api/health` con `HTTP/1.1 200 OK`. El RC completo sigue no aprobado por falta de evidencia visual frontend.
+La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de UX, validaciones, seguridad declarativa, auditoria funcional y regresion automatizada amplia. La Fase 1G ejecuto la primera corrida QA real: API operativa en flujos principales, pero RC rechazado por bloqueos de frontend web, health check y dataset de perfiles de seguridad/soporte. En validaciones posteriores, los usuarios QA de permisos negativos, reportes y soporte ya iniciaron sesion correctamente, y el healthcheck backend fue validado por runtime real en `http://localhost:8090/api/health` con `HTTP/1.1 200 OK`. En Fase 1J el frontend ya responde en `http://localhost:8081`, pero el RC completo sigue no aprobado por textos visibles con codificacion rota y arranque QA web no repetible con `npm run web`.
 
 ## Hallazgos clave
 
@@ -23,7 +23,7 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 - Hay riesgo recurrente de codificacion de textos; se requiere barrido de mojibake antes de release.
 - El repositorio Git ya existe y la Fase 1G se trabaja sobre `feature/fase1g-primera-corrida-qa-real`; queda pendiente limpiar o ignorar `.tmp-pdf-images/` y diffs no rastreados de fases anteriores.
 - Primera corrida QA real: venta QA `saleId=1` y pago QA `paymentId=1` creados correctamente en ambiente QA.
-- Decision QA actual: `RC RECHAZADO`; backend/API queda tecnicamente validado y `KI-002`, `KI-004`, `KI-005`, `KI-006` quedaron resueltos validados. Sigue bloqueando `KI-003` por falta de evidencia visual frontend.
+- Decision QA actual: `RC RECHAZADO`; backend/API queda tecnicamente validado y `KI-002`, `KI-004`, `KI-005`, `KI-006` quedaron resueltos validados. `KI-003` avanzo a validacion de disponibilidad web, pero siguen bloqueando `KI-007` y `KI-008`.
 
 ## Madurez ERP estimada
 
@@ -52,7 +52,7 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 
 1. Mantener cambios pequenos, seguros y reversibles.
 2. Limpiar artefactos Git no rastreados antes de release.
-3. Desbloquear `KI-003`; repetir smoke visual/navegacion principal y consolidar evidencia frontend.
+3. Resolver `KI-007` y `KI-008`; repetir smoke visual/navegacion principal y consolidar evidencia frontend.
 4. Validar matriz endpoint-permiso en Fase 4 sin asumir cobertura.
 5. Reforzar auditoria funcional en operaciones sensibles.
 6. Homologar UX en fases 2 y 3.

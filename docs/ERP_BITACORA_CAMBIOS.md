@@ -554,3 +554,37 @@ Siguiente fase recomendada:
 
 - Resolver `KI-003`: levantar frontend QA, capturar evidencia visual y repetir smoke visual/navegacion principal.
 
+## 2026-05-12 - Fase 1J / frontend visual QA
+
+Tipo: validacion frontend runtime y decision RC visual.
+
+Validaciones ejecutadas:
+
+- Rama: `feature/fase1j-frontend-visual-qa`.
+- `npm run web` falla antes de levantar Expo por `Acceso denegado` al escribir `C:\HPSQ-SOFT\control-ropa\logs\frontend\frontend-web.log`.
+- Workaround de QA: `npx.cmd expo start --web --port 8081`.
+- `http://localhost:8081` responde `200`.
+- Rutas verificadas por HTTP runtime: `/login`, `/dashboard`, `/customers`, `/items`, `/batches`, `/reports`, `/users`, `/system-roles`.
+
+Resultado visual/UX:
+
+- Frontend web ya esta disponible en `localhost:8081`, por lo que `KI-003` avanza a `En validacion`.
+- Se detecto texto visible con codificacion rota en `/login`: `Iniciar sesiÃ³n`, `ContraseÃ±a`.
+- Se detecto mojibake tambien en `/reports`.
+- No se pudo aprobar RC visual por calidad de texto visible y arranque QA no repetible con el script oficial.
+
+Issues nuevos:
+
+- `KI-007`: textos visibles con codificacion rota en frontend web.
+- `KI-008`: `npm run web` falla por permisos/ruta de log frontend.
+
+Decision:
+
+- `NO-GO` para RC visual.
+- Backend/API sigue desbloqueado.
+- RC completo sigue rechazado hasta resolver `KI-007` y `KI-008`, y completar evidencia visual interactiva.
+
+Siguiente fase recomendada:
+
+- Fase 1K: correccion acotada de codificacion visible y arranque frontend QA, sin tocar logica de negocio.
+
