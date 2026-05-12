@@ -468,3 +468,56 @@ Siguiente fase recomendada:
 
 - Corregir `KI-006` de forma acotada revisando mapping/runtime de healthcheck.
 - Despues repetir smoke tecnico `GET /api/health`.
+
+## 2026-05-12 - Fase 1H / KI-006
+
+Tipo: correccion acotada de mapping healthcheck backend.
+
+Objetivo:
+
+- Hacer accesible el healthcheck para smoke tecnico pre/post-release.
+- Mantener el cambio limitado a healthcheck, sin tocar modulos operativos, datos, frontend, ventas, pagos, live, lotes ni migraciones.
+
+Causa encontrada:
+
+- En codigo, `HealthController` existe bajo paquete escaneado y no hay `server.servlet.context-path` configurado; la ruta esperada es `GET /api/health`.
+- La prueba automatizada registra correctamente el mapping.
+- El 404 reportado en runtime indica probable artefacto/proceso QA desactualizado, ruta con slash/contexto distinto o despliegue que no contiene el controlador actualizado.
+
+Cambios realizados:
+
+- `HealthController` registra explicitamente `GET /api/health` y `GET /api/health/`.
+- `ApiTokenFilter` permite ambas variantes sin token.
+- Se amplio la prueba automatizada para validar ambas rutas.
+- Se actualizo known issue, release checklist y execution log.
+
+Archivos modificados:
+
+- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/health/HealthController.java`
+- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/config/ApiTokenFilter.java`
+- `backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/health/HealthControllerSecurityTests.java`
+- `docs/ERP_KNOWN_ISSUES.md`
+- `docs/ERP_RELEASE_CHECKLIST.md`
+- `docs/ERP_QA_EXECUTION_LOG.md`
+- `docs/ERP_BITACORA_CAMBIOS.md`
+
+Pruebas ejecutadas:
+
+- `.\mvnw.cmd test` en `backend/control-ropa`: exitoso.
+- `HealthControllerSecurityTests`: `GET /api/health` y `GET /api/health/` responden `200 OK` con `status=OK`.
+
+Riesgos pendientes:
+
+- `KI-006` queda en validacion hasta reiniciar/desplegar backend QA y confirmar por curl contra runtime real.
+- Si runtime sigue respondiendo `404`, revisar contexto de despliegue, puerto usado y artefacto/JAR activo.
+
+Rollback:
+
+- Revertir el mapping explicito en `HealthController`.
+- Revertir la excepcion de `/api/health/` en `ApiTokenFilter`.
+- Revertir la prueba adicional si se decide no soportar trailing slash.
+
+Comando recomendado para validar runtime:
+
+- `curl -i http://localhost:8090/api/health`
+- `curl -i http://localhost:8090/api/health/`

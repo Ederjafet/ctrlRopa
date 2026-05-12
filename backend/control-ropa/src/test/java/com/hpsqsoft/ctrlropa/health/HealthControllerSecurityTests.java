@@ -23,4 +23,11 @@ class HealthControllerSecurityTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("OK"));
     }
+
+    @Test
+    void healthEndpointWithTrailingSlashDoesNotRequireSessionToken() throws Exception {
+        mockMvc.perform(get("/api/health/"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("OK"));
+    }
 }

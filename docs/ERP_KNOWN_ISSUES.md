@@ -16,7 +16,7 @@ Registrar defectos conocidos, riesgos aceptados y workarounds antes de aprobar u
 | KI-003 | Frontend/Web | `SEV-1` | Levantar frontend QA y repetir smoke visual antes de RC. | No hay evidencia de navegacion principal ni UX web desde `localhost:8081`. | Abierto | Frontend Lead / QA Director | Si |
 | KI-004 | Dataset QA/Permisos | `SEV-2` | Validado manualmente en runtime: `qa.sinpermisos@local.test` inicia sesion y queda sin accesos operativos. | El smoke negativo de permisos ya puede ejecutarse. | Resuelto validado | QA/Data Owner | No |
 | KI-005 | Dataset QA/Roles | `SEV-2` | Validado manualmente en runtime: `qa.reportes@local.test` y `qa.soporte@local.test` inician sesion con accesos esperados. | La validacion de reportes y soporte tecnico ya puede continuar. | Resuelto validado | QA/Data Owner | No |
-| KI-006 | Backend/Health mapping runtime | `SEV-2` | Revisar mapping/context-path/runtime de `/api/health`; confirmar ruta real expuesta por `HealthController` y despliegue/JAR en ejecucion. | `/api/health` ya no responde 401, pero devuelve 404; smoke tecnico pre/post-release sigue bloqueado. | Abierto | Backend Lead / Release Manager | Si |
+| KI-006 | Backend/Health mapping runtime | `SEV-2` | Mapping reforzado para `GET /api/health` y `GET /api/health/`; prueba automatizada OK. Pendiente reiniciar/desplegar backend QA y validar con curl runtime. | `/api/health` ya no responde 401, pero devolvio 404 en runtime; smoke tecnico pre/post-release sigue bloqueado hasta validacion runtime. | En validacion | Backend Lead / Release Manager | Si, hasta validar runtime |
 
 ## Plantilla
 
