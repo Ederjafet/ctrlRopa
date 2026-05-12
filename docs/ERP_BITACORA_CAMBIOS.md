@@ -289,3 +289,54 @@ Pruebas ejecutadas:
 Siguiente fase sugerida:
 
 - Fase 1G: ejecutar la primera corrida QA real controlada, registrar evidencias bajo el estandar definido y decidir si existe release candidate.
+
+## 2026-05-12 - Fase 1G
+
+Tipo: primera corrida QA real controlada.
+
+Objetivo:
+
+- Ejecutar validacion operacional real usando proceso QA definido.
+- Registrar resultados por flujo, severidad, impacto y bloqueo RC.
+- Alimentar known issues con defectos reales.
+- Decidir estado de release candidate.
+
+Documento creado:
+
+- `docs/ERP_QA_EXECUTION_1G.md`
+
+Documentos actualizados:
+
+- `docs/ERP_KNOWN_ISSUES.md`
+- `docs/ERP_QA_EXECUTION_LOG.md`
+- `docs/ERP_BITACORA_CAMBIOS.md`
+- `docs/ERP_RESUMEN_EJECUTIVO.md`
+
+Resultados principales:
+
+- OK: login/logout operativo, dashboard API, clientes API, inventario API, lotes API, live lectura API, venta QA controlada, pago QA controlado, reporte diario tienda API, usuarios/roles admin API.
+- BLOCKED: frontend web local, health check publico, usuario sin permisos, usuarios reportes/soporte.
+- Venta QA creada: `saleId=1`, item `QA-CTR-001`, total `125.00`.
+- Pago QA creado: `paymentId=1`, `saleId=1`, total `125.00`.
+
+Known issues agregados:
+
+- `KI-002`: `/api/health` responde 401.
+- `KI-003`: frontend web `localhost:8081` no disponible.
+- `KI-004`: `qa.sinpermisos@local.test` no valida login.
+- `KI-005`: `qa.reportes@local.test` y `qa.soporte@local.test` no validan login.
+
+Decision:
+
+- `RC RECHAZADO`.
+
+Pruebas ejecutadas:
+
+- Pruebas reales API contra `http://localhost:8090`.
+- No se ejecuto SQL.
+- No se corrigieron bugs.
+- No se modifico codigo productivo.
+
+Siguiente fase sugerida:
+
+- Fase 1H: preparar correcciones acotadas o preparacion de ambiente/dataset para desbloquear RC, sin mezclar refactors.
