@@ -36,16 +36,18 @@ Criterios de salida:
 - Smoke tests minimos documentados.
 - Release flow e incident response documentados.
 - Ambientes DEV/QA/STAGING/PROD definidos.
+- Dataset QA, usuarios por rol y plantilla de evidencia definidos.
 
 Subfases completadas:
 
 - Fase 1A: estabilizacion UX minima.
 - Fase 1B: gobernanza ERP.
 - Fase 1C: regresion operacional y release flow.
+- Fase 1D: datos QA, usuarios por rol y evidencia de regresion.
 
 Siguiente subfase recomendada:
 
-- Fase 1D: datos QA, evidencia de regresion y usuarios por rol.
+- Fase 1E: limpieza de artefactos Git no rastreados y preparacion de primer release candidato documental.
 
 ## Fase 2 - Homologacion UX/UI
 
@@ -110,12 +112,15 @@ Dependencias:
 
 - Flujos criticos documentados.
 - Datos QA controlados.
+- Usuarios QA por rol.
+- Plantilla de evidencia y bitacora de ejecucion.
 
 Criterios de salida:
 
 - Smoke tests por modulo.
 - Checklist manual por release.
 - Evidencia de pruebas en flujos criticos.
+- Reporte de ejecucion QA con decision release.
 
 ## Fase 6 - Auditoria y trazabilidad
 

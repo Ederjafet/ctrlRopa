@@ -7,6 +7,14 @@ Alcance: regresion manual/operacional preliminar. No reemplaza pruebas automatiz
 
 Cada flujo debe probarse con usuario permitido y, cuando aplique, con usuario sin permiso. Si falla un flujo CRITICO, el release se bloquea.
 
+## Prerrequisitos de ejecucion
+
+- Preparar datos segun `docs/ERP_QA_DATASET.md`.
+- Usar perfiles definidos en `docs/ERP_QA_USERS_ROLES.md`.
+- Capturar evidencia con `docs/ERP_QA_EVIDENCE_TEMPLATE.md`.
+- Registrar la corrida en `docs/ERP_QA_EXECUTION_LOG.md`.
+- Si faltan datos QA para un flujo, marcarlo como `BLOQUEADO POR DATASET`, no como aprobado.
+
 ## Login
 
 Prioridad: CRITICA  

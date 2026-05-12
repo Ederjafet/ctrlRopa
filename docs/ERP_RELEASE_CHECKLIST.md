@@ -17,6 +17,14 @@
 - Confirmar que no hay cambios accidentales en pagos, live, lotes, seguridad o base de datos.
 - Confirmar si hay migraciones. Si no debe haber, validar que `backend/control-ropa/src/main/resources/db/migration` no cambio.
 
+### Datos y evidencia QA
+
+- Confirmar dataset aplicable: `docs/ERP_QA_DATASET.md`.
+- Confirmar usuarios por rol: `docs/ERP_QA_USERS_ROLES.md`.
+- Confirmar plantilla de evidencia: `docs/ERP_QA_EVIDENCE_TEMPLATE.md`.
+- Confirmar bitacora de ejecucion: `docs/ERP_QA_EXECUTION_LOG.md`.
+- No aprobar release si un flujo critico queda sin datos QA y sin justificacion.
+
 ### Backup
 
 - Si hay migracion o cambio de datos: backup obligatorio de base.
@@ -56,6 +64,7 @@
 - Pagos.
 - Paquetes/envios.
 - Reportes principales.
+- Evidencia registrada para flujos criticos.
 
 ## Release
 
@@ -72,6 +81,7 @@
 - Validar usuario operativo.
 - Validar usuario administrador.
 - Documentar incidentes.
+- Registrar ejecucion en `docs/ERP_QA_EXECUTION_LOG.md`.
 - Actualizar bitacora ERP.
 
 ## Rollback

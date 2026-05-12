@@ -2,6 +2,13 @@
 
 Fecha: 2026-05-12
 
+## Prerrequisitos QA
+
+- Dataset preparado segun `docs/ERP_QA_DATASET.md`.
+- Usuarios por rol disponibles segun `docs/ERP_QA_USERS_ROLES.md`.
+- Evidencia registrada con `docs/ERP_QA_EVIDENCE_TEMPLATE.md`.
+- Resultado resumido en `docs/ERP_QA_EXECUTION_LOG.md`.
+
 ## Antes de release
 
 | ID | Prueba | Prioridad | Bloquea release |
@@ -28,6 +35,7 @@ Fecha: 2026-05-12
 5. Pago solo si hay dato QA.
 6. Reporte diario.
 7. Revisar logs backend.
+8. Registrar resultado y evidencia si el ambiente es QA/STAGING.
 
 ## Checklist operacional
 
@@ -37,6 +45,8 @@ Fecha: 2026-05-12
 - Usuario sin permiso no ejecuta accion.
 - Logs backend no muestran errores nuevos.
 - No hay migraciones inesperadas.
+- Los datos usados pertenecen al dataset QA o estan documentados como prueba controlada.
+- Cada fallo critico tiene evidencia y decision de bloqueo/rollback.
 
 ## Validaciones criticas web/mobile
 
