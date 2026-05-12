@@ -10,7 +10,7 @@ Estado estimado: MEDIO, con modulos FRAGILES en flujos operativos de alto cambio
 
 El proyecto ya tiene una base util para crecer: frontend Expo/React Native con rutas por pantalla en `app/`, backend Spring Boot modular en `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa`, migraciones Flyway en `backend/control-ropa/src/main/resources/db/migration` y permisos centralizados por codigo en `PermissionCode.java`.
 
-La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de UX, validaciones, seguridad declarativa, auditoria funcional y regresion automatizada amplia. La Fase 1G ejecuto la primera corrida QA real: API operativa en flujos principales, pero RC rechazado por bloqueos de frontend web, health check y dataset de perfiles de seguridad/soporte. En validaciones posteriores, los usuarios QA de permisos negativos, reportes y soporte ya iniciaron sesion correctamente, y el healthcheck backend fue validado por runtime real en `http://localhost:8090/api/health` con `HTTP/1.1 200 OK`. En Fase 1K el frontend QA responde en `http://localhost:8081`, las rutas base validadas decodifican UTF-8 sin mojibake y `npm run web` ya no se bloquea por permisos de log/cache; el sistema puede preparar RC candidato completo, pero el release final aun requiere checklist RC y evidencia visual formal.
+La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de UX, validaciones, seguridad declarativa, auditoria funcional y regresion automatizada amplia. La Fase 1G ejecuto la primera corrida QA real: API operativa en flujos principales, pero RC rechazado por bloqueos de frontend web, health check y dataset de perfiles de seguridad/soporte. En validaciones posteriores, los usuarios QA de permisos negativos, reportes y soporte ya iniciaron sesion correctamente, y el healthcheck backend fue validado por runtime real en `http://localhost:8090/api/health` con `HTTP/1.1 200 OK`. En Fase 1K el frontend QA responde en `http://localhost:8081`, las rutas base validadas decodifican UTF-8 sin mojibake y `npm run web` ya no se bloquea por permisos de log/cache. En Fase 1L no quedan bloqueos `SEV-1` ni `SEV-2`; la decision recomendada es `GO PARA RC CANDIDATO APROBABLE`, sin aprobar release final automatico.
 
 ## Hallazgos clave
 
@@ -23,7 +23,7 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 - Hay riesgo recurrente de codificacion de textos; se requiere barrido de mojibake antes de release.
 - El repositorio Git ya existe y la Fase 1G se trabaja sobre `feature/fase1g-primera-corrida-qa-real`; queda pendiente limpiar o ignorar `.tmp-pdf-images/` y diffs no rastreados de fases anteriores.
 - Primera corrida QA real: venta QA `saleId=1` y pago QA `paymentId=1` creados correctamente en ambiente QA.
-- Decision QA actual: `RC CANDIDATO POSIBLE, NO APROBADO FINAL`; backend/API queda tecnicamente validado y `KI-002`, `KI-003`, `KI-004`, `KI-005`, `KI-006`, `KI-007` y `KI-008` quedaron resueltos validados. Falta ejecutar checklist RC completo con evidencia visual formal antes de aprobar release.
+- Decision QA actual: `GO PARA RC CANDIDATO APROBABLE`; backend/API queda tecnicamente validado y `KI-002`, `KI-003`, `KI-004`, `KI-005`, `KI-006`, `KI-007` y `KI-008` quedaron resueltos validados. `KI-001` queda abierto como `SEV-3` no bloqueante para RC candidato. Falta ejecutar checklist RC completo con evidencia visual formal antes de aprobar release final.
 
 ## Madurez ERP estimada
 
@@ -42,11 +42,11 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 | Dashboard | 55% |
 | Auditoria | 38% |
 | Seguridad | 65% |
-| QA | 72% |
+| QA | 74% |
 | UX homogenea | 48% |
 | Trazabilidad | 50% |
-| Gobernanza ERP | 74% |
-| ERP readiness general | 66% |
+| Gobernanza ERP | 76% |
+| ERP readiness general | 68% |
 
 ## Prioridad inmediata
 

@@ -635,3 +635,40 @@ Decision:
 - `KI-008` queda `Resuelto validado`.
 - `KI-003` queda tecnicamente desbloqueado para RC candidato completo, pendiente aprobacion formal de release.
 
+## 2026-05-12 - Fase 1L / revision final RC
+
+Tipo: revision documental final de Release Candidate.
+
+Objetivo:
+
+- Revisar evidencia disponible antes de recomendar GO/NO-GO.
+- Confirmar estado de backend, frontend, usuarios QA, healthcheck y known issues.
+- Decidir si el sistema puede considerarse RC candidato aprobable sin aprobar release final automaticamente.
+
+Documento creado:
+
+- `docs/ERP_RC_FINAL_REVIEW.md`
+
+Documentos actualizados:
+
+- `docs/ERP_QA_EXECUTION_LOG.md`
+- `docs/ERP_BITACORA_CAMBIOS.md`
+- `docs/ERP_RESUMEN_EJECUTIVO.md`
+
+Resultado:
+
+- No hay `SEV-1` ni `SEV-2` abiertos.
+- `KI-001` queda abierto como `SEV-3` no bloqueante para RC candidato.
+- Backend/API, healthcheck, usuarios QA y frontend web quedan documentados como validados para RC.
+
+Decision:
+
+- `GO PARA RC CANDIDATO APROBABLE`.
+- No se aprueba release final automatico.
+
+Riesgos pendientes:
+
+- Adjuntar evidencia visual formal completa antes de release final.
+- Revisar artefactos Git/`KI-001` antes de merge/tag.
+- Repetir smoke tecnico y visual en ventana final de release.
+
