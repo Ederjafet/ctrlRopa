@@ -440,3 +440,31 @@ Siguiente validacion recomendada:
 - Ejecutar en QA: `01-preparacion-datos-qa.sql` si falta base, luego `04-usuarios-roles-qa.sql`, luego `05-fix-usuarios-qa-login.sql`.
 - Repetir login de `qa.sinpermisos@local.test`, `qa.reportes@local.test` y `qa.soporte@local.test`.
 - Repetir `SMK-SEC-01`, `SMK-SEC-02` y reportes con perfil `qa.reportes@local.test`.
+
+## 2026-05-12 - Validacion runtime KI-004/KI-005 y separacion KI-006
+
+Tipo: documentacion de evidencia QA runtime.
+
+Validacion reportada:
+
+- `qa.sinpermisos@local.test` inicia sesion y queda sin accesos operativos.
+- `qa.reportes@local.test` inicia sesion con accesos esperados a reportes.
+- `qa.soporte@local.test` inicia sesion con accesos tecnicos/admin esperados.
+- `/api/health` ya no responde `401`, pero responde `404`.
+
+Cambios documentales:
+
+- `KI-004` marcado como `Resuelto validado`.
+- `KI-005` marcado como `Resuelto validado`.
+- `KI-002` actualizado como bloqueo original de token avanzado/cerrado parcialmente.
+- Se crea `KI-006` para separar el nuevo problema runtime: `/api/health` devuelve `404` por posible mapping, context-path o artefacto en ejecucion.
+
+Decision release:
+
+- RC sigue no aprobado.
+- Bloqueos vigentes: `KI-003` frontend web sin evidencia y `KI-006` healthcheck 404.
+
+Siguiente fase recomendada:
+
+- Corregir `KI-006` de forma acotada revisando mapping/runtime de healthcheck.
+- Despues repetir smoke tecnico `GET /api/health`.
