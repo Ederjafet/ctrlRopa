@@ -3,11 +3,22 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $repoRoot
 
-$logsDir = "C:\HPSQ-SOFT\control-ropa\logs\frontend"
-New-Item -ItemType Directory -Force -Path $logsDir | Out-Null
+$expoRuntimeHome = Join-Path $env:TEMP "control-ropa-expo-home"
+New-Item -ItemType Directory -Force -Path $expoRuntimeHome | Out-Null
+$env:HOME = $expoRuntimeHome
+$env:USERPROFILE = $expoRuntimeHome
 
+$logsDir = "C:\HPSQ-SOFT\control-ropa\logs\frontend"
 $logPath = Join-Path $logsDir "frontend-web.log"
 $maxBytes = 20MB
+$script:logAvailable = $true
+
+try {
+  New-Item -ItemType Directory -Force -Path $logsDir | Out-Null
+} catch {
+  $script:logAvailable = $false
+  Write-Warning "No se pudo preparar la carpeta de logs frontend: $($_.Exception.Message)"
+}
 
 function Rotate-LogIfNeeded {
   param([string] $Path)
@@ -37,8 +48,17 @@ function Rotate-LogIfNeeded {
 function Write-RotatingLog {
   param([string] $Message)
 
-  Rotate-LogIfNeeded -Path $logPath
-  Add-Content -Path $logPath -Value $Message
+  if (-not $script:logAvailable) {
+    return
+  }
+
+  try {
+    Rotate-LogIfNeeded -Path $logPath
+    Add-Content -Path $logPath -Value $Message -Encoding UTF8
+  } catch {
+    $script:logAvailable = $false
+    Write-Warning "No se pudo escribir el log frontend en $logPath. El servidor continuara en consola. Detalle: $($_.Exception.Message)"
+  }
 }
 
 $startedAt = Get-Date -Format "yyyy-MM-dd HH:mm:ss"

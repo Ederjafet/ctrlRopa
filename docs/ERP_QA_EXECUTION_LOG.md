@@ -14,6 +14,7 @@ Fase: 1D - datos QA y evidencia
 | 2026-05-12 | 1H | QA codigo/backend | Codex Backend/QA | Prueba automatizada healthcheck `/api/health` y `/api/health/` | PARCIAL | `KI-006` en validacion; falta curl runtime despues de reiniciar/desplegar backend QA | RC sigue rechazado |
 | 2026-05-12 aprox. | 1I | QA runtime `localhost:8090` | Usuario/QA Director | Smoke tecnico healthcheck con `curl -i http://localhost:8090/api/health` | OK | `KI-006` resuelto validado; evidencia: `HTTP/1.1 200 OK`, JSON `status=OK`; causa del 404 previo: puerto incorrecto `8080` | RC backend desbloqueado; RC completo sigue pendiente por `KI-003` |
 | 2026-05-12 aprox. | 1J | QA frontend `localhost:8081` | Codex QA/Frontend | Validacion runtime web: `/login`, `/dashboard`, `/customers`, `/items`, `/batches`, `/reports`, `/users`, `/system-roles`; intento de arranque `npm run web` | NO-GO visual | `KI-003` en validacion; nuevos `KI-007` textos con codificacion rota y `KI-008` arranque QA por permisos de log | RC rechazado para frontend visual |
+| 2026-05-12 aprox. | 1K | QA frontend `localhost:8081` | Codex QA/Frontend | `npm run web`, smoke runtime `/login`, `/`, `/reports`, `/branches`, `/system-roles`, validacion UTF-8 por respuesta HTTP | OK condicionado | `KI-007` resuelto validado; `KI-008` resuelto validado con fallback de log; `KI-003` visual tecnicamente desbloqueado | RC candidato completo posible; no aprobar release final sin checklist RC y evidencia visual formal |
 
 ## Reglas de registro
 

@@ -522,7 +522,6 @@ Comando recomendado para validar runtime:
 
 - `curl -i http://localhost:8090/api/health`
 - `curl -i http://localhost:8090/api/health/`
-=======
 ## 2026-05-12 - Fase 1I / cierre runtime KI-006
 
 Tipo: cierre documental con evidencia runtime real.
@@ -587,4 +586,52 @@ Decision:
 Siguiente fase recomendada:
 
 - Fase 1K: correccion acotada de codificacion visible y arranque frontend QA, sin tocar logica de negocio.
+
+## 2026-05-12 - Fase 1K / frontend encoding y logs
+
+Tipo: correccion acotada frontend QA.
+
+Objetivo:
+
+- Resolver `KI-007` mojibake/codificacion visible.
+- Resolver `KI-008` arranque web bloqueado por permisos de logs/cache.
+- Mantener el cambio limitado a frontend runtime y documentacion, sin tocar backend, APIs, seguridad ni logica ERP.
+
+Causa encontrada:
+
+- Los fuentes visibles revisados (`app/login.tsx`, `app/reports.tsx`) ya estan guardados en UTF-8 correcto; el mojibake reportado venia de evidencia runtime/lectura sin decodificacion UTF-8 y cache/arranque web inestable.
+- `npm run web` fallaba porque `scripts/start-web-logs.ps1` detenia el proceso al no poder escribir `C:\HPSQ-SOFT\control-ropa\logs\frontend\frontend-web.log`.
+- Expo tambien intentaba escribir cache bajo el perfil de Windows y podia fallar con `EPERM`; se aislo el home de Expo a `%TEMP%\control-ropa-expo-home` durante el arranque web.
+
+Cambios realizados:
+
+- `scripts/start-web-logs.ps1` ahora usa un home temporal escribible para Expo.
+- El log frontend rota/escribe en C: cuando tiene permiso, pero si Windows lo bloquea muestra advertencia y continua en consola.
+- No se modificaron pantallas, backend, endpoints, base de datos ni seguridad.
+
+Archivos modificados:
+
+- `scripts/start-web-logs.ps1`
+- `docs/ERP_KNOWN_ISSUES.md`
+- `docs/ERP_QA_EXECUTION_LOG.md`
+- `docs/ERP_BITACORA_CAMBIOS.md`
+- `docs/ERP_RESUMEN_EJECUTIVO.md`
+
+Pruebas ejecutadas:
+
+- `npm.cmd run web`: levanta Metro hasta `Waiting on http://localhost:8081`; el intento queda vivo y la herramienta lo corta por timeout, sin error fatal por logs/cache.
+- Runtime HTTP con servidor Expo: `/login`, `/`, `/reports`, `/branches`, `/system-roles` responden `200` y decodifican UTF-8 sin patrones `Ã`, `Â`, `â€` ni `�`.
+- OK: `npx.cmd tsc --noEmit`.
+- `npx.cmd eslint scripts/start-web-logs.ps1`: no aplica porque ESLint ignora `.ps1`; resultado sin errores de codigo frontend.
+
+Riesgos pendientes:
+
+- El archivo `C:\HPSQ-SOFT\control-ropa\logs\frontend\frontend-web.log` sigue requiriendo correccion de permisos Windows si se desea persistencia en esa ruta exacta.
+- RC completo no queda aprobado automaticamente; requiere checklist RC y evidencia visual formal.
+
+Decision:
+
+- `KI-007` queda `Resuelto validado`.
+- `KI-008` queda `Resuelto validado`.
+- `KI-003` queda tecnicamente desbloqueado para RC candidato completo, pendiente aprobacion formal de release.
 
