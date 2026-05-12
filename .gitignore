@@ -65,3 +65,4 @@ temp/
 *.tmp.tmp-pdf-images/
 pdf-images/
 git-diffs/
+.tmp-pdf-images/
