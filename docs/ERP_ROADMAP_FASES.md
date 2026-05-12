@@ -45,10 +45,11 @@ Subfases completadas:
 - Fase 1C: regresion operacional y release flow.
 - Fase 1D: datos QA, usuarios por rol y evidencia de regresion.
 - Fase 1E: plan y runbook para primera ejecucion QA controlada.
+- Fase 1F: hardening de gobernanza QA, severidades, flujos criticos, evidencia, known issues y politica RC.
 
 Siguiente subfase recomendada:
 
-- Fase 1F: ejecutar QA real controlado, registrar evidencia y decidir release candidato.
+- Fase 1G: ejecutar QA real controlado, registrar evidencia y decidir release candidate.
 
 ## Fase 2 - Homologacion UX/UI
 
@@ -116,6 +117,7 @@ Dependencias:
 - Usuarios QA por rol.
 - Plantilla de evidencia y bitacora de ejecucion.
 - Runbook de primera ejecucion QA controlada.
+- Severidades QA, flujos criticos, estandar de evidencia, known issues y politica RC.
 
 Criterios de salida:
 
@@ -123,6 +125,7 @@ Criterios de salida:
 - Checklist manual por release.
 - Evidencia de pruebas en flujos criticos.
 - Reporte de ejecucion QA con decision release.
+- Politica RC aplicada sin `SEV-1` abierto.
 
 ## Fase 6 - Auditoria y trazabilidad
 

@@ -241,3 +241,51 @@ Pruebas ejecutadas:
 Siguiente fase sugerida:
 
 - Fase 1F: ejecutar el runbook en ambiente QA, capturar evidencias y decidir si el release candidato queda aprobado, rechazado o bloqueado.
+
+## 2026-05-12 - Fase 1F
+
+Tipo: hardening de gobernanza QA y release candidate.
+
+Objetivo:
+
+- Fortalecer gobernanza QA antes de ejecutar la primera corrida real.
+- Definir severidades de defectos y su relacion con bloqueo/rollback.
+- Definir flujos criticos ERP y su obligatoriedad QA.
+- Definir estandar de evidencias.
+- Definir politica de release candidate.
+- Crear registro de known issues.
+- Mejorar smoke tests y release checklist con control RC.
+
+Documentos creados:
+
+- `docs/ERP_DEFECT_SEVERITY.md`
+- `docs/ERP_CRITICAL_FLOWS.md`
+- `docs/ERP_EVIDENCE_STANDARD.md`
+- `docs/ERP_RELEASE_CANDIDATE_POLICY.md`
+- `docs/ERP_KNOWN_ISSUES.md`
+
+Documentos actualizados:
+
+- `docs/ERP_SMOKE_TESTS.md`
+- `docs/ERP_RELEASE_CHECKLIST.md`
+- `docs/ERP_QA_REGRESION_OPERACIONAL.md`
+- `docs/ERP_BITACORA_CAMBIOS.md`
+- `docs/ERP_ROADMAP_FASES.md`
+- `docs/ERP_RESUMEN_EJECUTIVO.md`
+
+Riesgos detectados:
+
+- `.tmp-pdf-images/`, `cambios_fase1a.diff`, `cambios_fase1b.diff`, `cambios_fase1c.diff`, `cambios_fase1d.diff` y `cambios_fase1e.diff` aparecen como no rastreados; no se tocaron.
+- La primera ejecucion QA real sigue pendiente por instruccion de fase.
+- Las severidades y tiempos SLA deben calibrarse con responsables reales.
+- Known issues queda inicializado y debe alimentarse durante la corrida real.
+
+Pruebas ejecutadas:
+
+- Revision documental de runbook, checklist, smoke, regresion, roadmap y bitacora.
+- No se ejecutaron pruebas reales, SQL ni comandos de build.
+- No se modifico codigo productivo.
+
+Siguiente fase sugerida:
+
+- Fase 1G: ejecutar la primera corrida QA real controlada, registrar evidencias bajo el estandar definido y decidir si existe release candidate.

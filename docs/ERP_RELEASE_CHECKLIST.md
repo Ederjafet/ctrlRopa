@@ -22,9 +22,25 @@
 - Confirmar dataset aplicable: `docs/ERP_QA_DATASET.md`.
 - Confirmar usuarios por rol: `docs/ERP_QA_USERS_ROLES.md`.
 - Confirmar plantilla de evidencia: `docs/ERP_QA_EVIDENCE_TEMPLATE.md`.
+- Confirmar estandar de evidencia: `docs/ERP_EVIDENCE_STANDARD.md`.
 - Confirmar bitacora de ejecucion: `docs/ERP_QA_EXECUTION_LOG.md`.
 - Para primera corrida controlada, seguir `docs/ERP_QA_RUNBOOK_1E.md`.
 - No aprobar release si un flujo critico queda sin datos QA y sin justificacion.
+
+### Severidades y known issues
+
+- Revisar severidades abiertas contra `docs/ERP_DEFECT_SEVERITY.md`.
+- Confirmar que no exista `SEV-1` abierto.
+- Confirmar que todo `SEV-2` tenga workaround aprobado o este cerrado.
+- Revisar `docs/ERP_KNOWN_ISSUES.md`.
+- Confirmar que known issues aceptados no afecten dinero, seguridad ni datos.
+
+### Release candidate
+
+- Confirmar politica RC: `docs/ERP_RELEASE_CANDIDATE_POLICY.md`.
+- Confirmar flujos criticos: `docs/ERP_CRITICAL_FLOWS.md`.
+- Confirmar que el build candidato esta congelado.
+- Confirmar aprobacion QA Director/Release Manager si aplica.
 
 ### Backup
 
@@ -56,6 +72,10 @@
 
 ### Smoke tests criticos
 
+- Smoke tecnico.
+- Smoke operacional.
+- Smoke visual.
+- Smoke seguridad.
 - Login/logout.
 - Dashboard.
 - Clientes.
