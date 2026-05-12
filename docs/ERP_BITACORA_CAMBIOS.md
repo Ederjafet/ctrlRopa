@@ -340,3 +340,50 @@ Pruebas ejecutadas:
 Siguiente fase sugerida:
 
 - Fase 1H: preparar correcciones acotadas o preparacion de ambiente/dataset para desbloquear RC, sin mezclar refactors.
+
+## 2026-05-12 - Fase 1H / KI-002
+
+Tipo: correccion acotada de healthcheck backend.
+
+Objetivo:
+
+- Desbloquear el smoke tecnico de release para `/api/health`.
+- Mantener el cambio limitado al filtro de token sin alterar seguridad general ni flujos operativos.
+
+Causa encontrada:
+
+- `SecurityConfig` permitia las rutas, pero `ApiTokenFilter` validaba todo `/api/*` antes del controlador.
+- `/api/health` no estaba dentro de las excepciones publicas del filtro y por eso respondia `401`.
+
+Cambios realizados:
+
+- Se excluyo unicamente `/api/health` de la validacion de token en `ApiTokenFilter`.
+- Se agrego prueba automatizada para confirmar que `GET /api/health` no requiere token y responde `status=OK`.
+- Se actualizo known issue y checklist de release para exigir validacion de healthcheck sin token.
+
+Archivos modificados:
+
+- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/config/ApiTokenFilter.java`
+- `backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/health/HealthControllerSecurityTests.java`
+- `docs/ERP_KNOWN_ISSUES.md`
+- `docs/ERP_RELEASE_CHECKLIST.md`
+- `docs/ERP_BITACORA_CAMBIOS.md`
+
+Pruebas ejecutadas:
+
+- `.\mvnw.cmd test` en `backend/control-ropa`: exitoso.
+- Prueba agregada: `HealthControllerSecurityTests.healthEndpointDoesNotRequireSessionToken`.
+
+Riesgos pendientes:
+
+- El backend QA en ejecucion debe reiniciarse/desplegarse con esta rama y repetirse el smoke tecnico runtime.
+- `KI-002` queda en validacion hasta confirmar `/api/health` en el ambiente QA real.
+
+Rollback:
+
+- Revertir la excepcion de `/api/health` en `ApiTokenFilter`.
+- Remover la prueba automatizada asociada si se decide que el healthcheck debe volver a requerir token.
+
+Siguiente bloqueo recomendado:
+
+- `KI-003`: frontend web `localhost:8081` no disponible durante la corrida QA.

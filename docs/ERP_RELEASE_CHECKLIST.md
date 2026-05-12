@@ -61,6 +61,7 @@
 
 - Ejecutar `.\mvnw.cmd test`.
 - Validar arranque si cambio backend.
+- Validar `GET /api/health` sin token; debe responder `200 OK` y `status=OK`. Si responde `401`, bloquear smoke tecnico.
 - Revisar logs backend.
 - Validar que no existan errores de Flyway.
 

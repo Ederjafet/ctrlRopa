@@ -72,6 +72,10 @@ public class ApiTokenFilter extends OncePerRequestFilter {
             return false;
         }
 
+        if (path.equals("/api/health")) {
+            return false;
+        }
+
         return !(path.equals("/api/appearance") && "GET".equalsIgnoreCase(request.getMethod()));
     }
 
