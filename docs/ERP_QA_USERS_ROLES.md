@@ -11,6 +11,7 @@ Definir perfiles QA minimos para validar menus, permisos, acciones permitidas, a
 
 Password sugerido para usuarios creados por scripts QA: `Qa12345!`.  
 Los usuarios son ficticios y solo deben existir en DEV/QA/STAGING controlado.
+Si fallan los usuarios `qa.sinpermisos@local.test`, `qa.reportes@local.test` o `qa.soporte@local.test`, ejecutar en QA `docs/qa/05-fix-usuarios-qa-login.sql` despues de respaldo para resetear password, estado, bloqueo temporal, rol y sucursal.
 
 ## Perfiles minimos
 

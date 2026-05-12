@@ -387,3 +387,56 @@ Rollback:
 Siguiente bloqueo recomendado:
 
 - `KI-003`: frontend web `localhost:8081` no disponible durante la corrida QA.
+
+## 2026-05-12 - Fase 1H / KI-004 y KI-005
+
+Tipo: correccion acotada de dataset QA para usuarios de regresion.
+
+Objetivo:
+
+- Desbloquear smoke de permisos negativos, reportes y soporte tecnico.
+- Corregir solo usuarios QA sin tocar seguridad global, frontend, backend productivo, ventas, pagos, live, lotes ni migraciones Flyway.
+
+Causa probable:
+
+- Los usuarios `qa.sinpermisos@local.test`, `qa.reportes@local.test` y `qa.soporte@local.test` dependian de `docs/qa/04-usuarios-roles-qa.sql`.
+- Ese script activaba usuarios existentes, pero no actualizaba `password_hash` cuando ya existian.
+- Tambien era posible que quedaran bloqueados en `user_login_security` por intentos fallidos previos.
+
+Cambios realizados:
+
+- Se creo `docs/qa/05-fix-usuarios-qa-login.sql` como script SOLO QA.
+- El script resetea password `{noop}Qa12345!`, estado `ACTIVE`, sucursal `QA_CTR`, roles, permisos esperados y bloqueo temporal de login para los tres usuarios QA.
+- `NO_ACCESS` queda sin permisos efectivos para validar acceso denegado.
+- `REPORTS` queda con permisos de consulta.
+- `SUPPORT_TECH` queda con permisos minimos de soporte existentes.
+
+Documentos actualizados:
+
+- `docs/ERP_KNOWN_ISSUES.md`
+- `docs/ERP_QA_DATASET.md`
+- `docs/ERP_QA_USERS_ROLES.md`
+- `docs/ERP_QA_RUNBOOK_1E.md`
+- `docs/ERP_BITACORA_CAMBIOS.md`
+
+Pruebas ejecutadas:
+
+- No se ejecuto SQL.
+- No aplica `.\mvnw.cmd test` porque no se modifico codigo Java productivo ni tests.
+- Validacion pendiente: ejecutar `docs/qa/05-fix-usuarios-qa-login.sql` en QA y repetir login real.
+
+Riesgos pendientes:
+
+- Si `QA_CTR` no existe, el script no podra crear/actualizar usuarios; debe ejecutarse primero `docs/qa/01-preparacion-datos-qa.sql`.
+- `KI-004` y `KI-005` quedan en validacion hasta probar login real con `Qa12345!`.
+
+Rollback:
+
+- No ejecutar el script si no se requiere.
+- Si ya se ejecuto, revertir restaurando backup QA previo o desactivando los tres usuarios QA especificos.
+
+Siguiente validacion recomendada:
+
+- Ejecutar en QA: `01-preparacion-datos-qa.sql` si falta base, luego `04-usuarios-roles-qa.sql`, luego `05-fix-usuarios-qa-login.sql`.
+- Repetir login de `qa.sinpermisos@local.test`, `qa.reportes@local.test` y `qa.soporte@local.test`.
+- Repetir `SMK-SEC-01`, `SMK-SEC-02` y reportes con perfil `qa.reportes@local.test`.

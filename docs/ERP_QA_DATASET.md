@@ -50,9 +50,11 @@ Definir un dataset QA repetible para ejecutar smoke tests, regresion operacional
 - `docs/qa/02-limpieza-datos-qa.sql`: limpieza opcional, requiere respaldo y ambiente QA.
 - `docs/qa/03-datos-base-qa.sql`: extension Fase 1D para proveedores y calidad de lotes.
 - `docs/qa/04-usuarios-roles-qa.sql`: extension Fase 1D para perfiles QA minimos.
+- `docs/qa/05-fix-usuarios-qa-login.sql`: fix QA acotado para resetear login/roles de `qa.sinpermisos`, `qa.reportes` y `qa.soporte` si fallan `KI-004/KI-005`.
 
 ## Pendiente de validar
 
 - Confirmar en base QA que `01-preparacion-datos-qa.sql` sigue alineado con todas las migraciones actuales.
 - Confirmar que los usuarios QA con `{noop}Qa12345!` siguen permitidos en la configuracion de autenticacion vigente.
+- Confirmar login real de `qa.sinpermisos@local.test`, `qa.reportes@local.test` y `qa.soporte@local.test` despues de ejecutar `docs/qa/05-fix-usuarios-qa-login.sql`.
 - Confirmar limpieza segura de operaciones financieras antes de usar en STAGING.

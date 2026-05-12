@@ -39,6 +39,7 @@ Orden sugerido en ambiente QA:
 1. Ejecutar `docs/qa/01-preparacion-datos-qa.sql` si el dataset base no existe.
 2. Ejecutar `docs/qa/03-datos-base-qa.sql` para proveedores/calidad.
 3. Ejecutar `docs/qa/04-usuarios-roles-qa.sql` para perfiles adicionales.
+4. Ejecutar `docs/qa/05-fix-usuarios-qa-login.sql` si `qa.sinpermisos`, `qa.reportes` o `qa.soporte` no inician sesion.
 
 Reglas:
 
@@ -51,6 +52,7 @@ Validaciones posteriores:
 - Existe `QA_CTR`.
 - Existe `qa.admin@local.test`.
 - Existen `qa.reportes@local.test`, `qa.sinpermisos@local.test`, `qa.soporte@local.test`.
+- Los usuarios `qa.reportes@local.test`, `qa.sinpermisos@local.test` y `qa.soporte@local.test` usan password `Qa12345!`, estan `ACTIVE`, no estan bloqueados y tienen sucursal `QA_CTR`.
 - Existen proveedores `QA_SUP_FAST` y `QA_SUP_REVIEW`.
 - Existe lote `QA-LOTE-PENDIENTE-001`.
 
@@ -125,5 +127,6 @@ Por cada flujo critico:
 
 - `docs/qa/03-datos-base-qa.sql` actualiza lotes QA existentes y crea un lote pendiente; depende de `qa.admin@local.test` y `QA_CTR`.
 - `docs/qa/04-usuarios-roles-qa.sql` elimina y reasigna roles/permisos solo para `qa.reportes@local.test`, `qa.sinpermisos@local.test` y `qa.soporte@local.test`.
-- Ambos scripts requieren que `01-preparacion-datos-qa.sql` haya creado sucursales y usuario admin.
-- Ambos scripts deben ejecutarse solo despues de backup QA.
+- `docs/qa/05-fix-usuarios-qa-login.sql` resetea password `{noop}Qa12345!`, estado activo, bloqueo de login, roles y sucursales de `qa.reportes@local.test`, `qa.sinpermisos@local.test` y `qa.soporte@local.test`; debe usarse solo para desbloquear `KI-004/KI-005`.
+- Los scripts `03`, `04` y `05` requieren que `01-preparacion-datos-qa.sql` haya creado sucursales y usuario admin.
+- Los scripts `03`, `04` y `05` deben ejecutarse solo despues de backup QA.
