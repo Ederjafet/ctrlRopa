@@ -201,3 +201,43 @@ Pruebas ejecutadas:
 Siguiente fase sugerida:
 
 - Fase 1E: ejecutar dataset QA en ambiente controlado, capturar primera evidencia real y limpiar/decidir artefactos Git no rastreados antes de release candidato.
+
+## 2026-05-12 - Fase 1E
+
+Tipo: preparacion de ejecucion QA controlada.
+
+Objetivo:
+
+- Preparar la primera ejecucion QA real sin tocar comportamiento productivo.
+- Crear plan de fase y runbook operativo.
+- Documentar riesgos de scripts QA existentes.
+- Actualizar checklist release, execution log y roadmap.
+
+Documentos creados:
+
+- `docs/ERP_FASE_1E_PLAN.md`
+- `docs/ERP_QA_RUNBOOK_1E.md`
+
+Documentos actualizados:
+
+- `docs/ERP_QA_EXECUTION_LOG.md`
+- `docs/ERP_RELEASE_CHECKLIST.md`
+- `docs/ERP_BITACORA_CAMBIOS.md`
+- `docs/ERP_ROADMAP_FASES.md`
+
+Riesgos detectados:
+
+- `.tmp-pdf-images/`, `cambios_fase1a.diff`, `cambios_fase1b.diff`, `cambios_fase1c.diff` y `cambios_fase1d.diff` aparecen como no rastreados; no se tocaron.
+- `docs/qa/03-datos-base-qa.sql` depende de `QA_CTR`, `qa.admin@local.test` y migracion `V37__suppliers_and_batch_quality.sql`.
+- `docs/qa/04-usuarios-roles-qa.sql` reasigna roles/permisos solo de usuarios QA especificos; debe ejecutarse exclusivamente en ambiente QA.
+- La ejecucion real queda pendiente; esta fase solo prepara el control.
+
+Pruebas ejecutadas:
+
+- Revision documental de dataset, usuarios, evidencia, smoke, checklist y scripts QA.
+- No se ejecutaron SQL ni pruebas funcionales.
+- No se modifico codigo productivo.
+
+Siguiente fase sugerida:
+
+- Fase 1F: ejecutar el runbook en ambiente QA, capturar evidencias y decidir si el release candidato queda aprobado, rechazado o bloqueado.

@@ -23,11 +23,13 @@
 - Confirmar usuarios por rol: `docs/ERP_QA_USERS_ROLES.md`.
 - Confirmar plantilla de evidencia: `docs/ERP_QA_EVIDENCE_TEMPLATE.md`.
 - Confirmar bitacora de ejecucion: `docs/ERP_QA_EXECUTION_LOG.md`.
+- Para primera corrida controlada, seguir `docs/ERP_QA_RUNBOOK_1E.md`.
 - No aprobar release si un flujo critico queda sin datos QA y sin justificacion.
 
 ### Backup
 
 - Si hay migracion o cambio de datos: backup obligatorio de base.
+- Si se ejecutan scripts QA, backup obligatorio aunque no haya cambio productivo.
 - Si no hay cambio de datos: registrar "no aplica".
 - Guardar version/JAR/APK/web build anterior si aplica.
 
@@ -100,4 +102,5 @@
 - Archivos no rastreados que alteren build.
 - Cambio de seguridad sin matriz de permisos.
 - Cambio de pagos/caja sin regresion.
+- Primera corrida QA sin evidencia o sin execution log.
 

@@ -44,10 +44,11 @@ Subfases completadas:
 - Fase 1B: gobernanza ERP.
 - Fase 1C: regresion operacional y release flow.
 - Fase 1D: datos QA, usuarios por rol y evidencia de regresion.
+- Fase 1E: plan y runbook para primera ejecucion QA controlada.
 
 Siguiente subfase recomendada:
 
-- Fase 1E: limpieza de artefactos Git no rastreados y preparacion de primer release candidato documental.
+- Fase 1F: ejecutar QA real controlado, registrar evidencia y decidir release candidato.
 
 ## Fase 2 - Homologacion UX/UI
 
@@ -114,6 +115,7 @@ Dependencias:
 - Datos QA controlados.
 - Usuarios QA por rol.
 - Plantilla de evidencia y bitacora de ejecucion.
+- Runbook de primera ejecucion QA controlada.
 
 Criterios de salida:
 
