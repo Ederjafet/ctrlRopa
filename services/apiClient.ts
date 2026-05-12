@@ -15,10 +15,20 @@ export class ApiError extends Error {
   rawMessage: string;
 
   constructor(status: number, rawMessage: string) {
-    super(extractApiErrorMessage(rawMessage) || `Error HTTP ${status}`);
+    super(extractApiErrorMessage(rawMessage) || friendlyStatusMessage(status));
     this.status = status;
     this.rawMessage = rawMessage;
   }
+}
+
+function friendlyStatusMessage(status: number): string {
+  if (status === 400) return 'Revisa la información capturada e intenta de nuevo.';
+  if (status === 401) return 'Tu sesión expiró. Inicia sesión nuevamente.';
+  if (status === 403) return 'No tienes permisos para realizar esta acción.';
+  if (status === 404) return 'No se encontró la información solicitada.';
+  if (status === 409) return 'La acción no se puede completar por el estado actual.';
+  if (status >= 500) return 'Ocurrió un error del servidor. Intenta de nuevo más tarde.';
+  return `No se pudo completar la solicitud (${status}).`;
 }
 
 function extractApiErrorMessage(rawMessage: string): string {
@@ -49,7 +59,7 @@ export async function apiRequest<T>(
 
   if (includeSession && session && isSessionExpired(session)) {
     await clearSession();
-    throw new ApiError(401, JSON.stringify({ message: 'La sesión expiro por inactividad.' }));
+    throw new ApiError(401, JSON.stringify({ message: 'La sesión expiró por inactividad.' }));
   }
 
   let response: Response;
@@ -83,7 +93,7 @@ export async function apiRequest<T>(
     if (includeSession && response.status === 401) {
       await clearSession();
     }
-    throw new ApiError(response.status, text || `Error HTTP ${response.status}`);
+    throw new ApiError(response.status, text || friendlyStatusMessage(response.status));
   }
 
   if (includeSession && session) {

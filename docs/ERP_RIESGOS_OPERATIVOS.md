@@ -9,7 +9,7 @@
 | Permisos incompletos | Alto | `SecurityConfig.java` usa `permitAll`; validacion dispersa. |
 | Historiales inmanejables | Medio | Live historico en `app/live.tsx` puede crecer. |
 | Logs tecnicos a usuarios operativos | Medio | `app/system-logs.tsx` visible en sistema segun permisos actuales. |
-| Codificacion rota | Medio | Mensajes con `Ã` en frontend/backend. |
+| Codificación rota | Medio | Mensajes visibles con mojibake en frontend/backend. |
 | Cancelaciones sin autorizacion | Alto | Existen cancelaciones, pero flujo solicitud/aprobacion esta PENDIENTE DE VALIDAR. |
 
 ## Acciones que deberian auditarse
@@ -24,4 +24,3 @@
 - Preparacion/cancelacion de paquete.
 - Envio/despacho/resolucion/reapertura.
 - Cambios de permisos, roles, usuarios y configuracion de seguridad.
-

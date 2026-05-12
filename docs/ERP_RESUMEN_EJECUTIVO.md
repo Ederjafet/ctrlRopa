@@ -19,8 +19,8 @@ La principal alerta enterprise es que aun no hay una capa homogenea de UX, valid
 - Proveedores ya existen en backend con `SupplierController.java`, `SupplierService.java` y migracion `V37__suppliers_and_batch_quality.sql`.
 - Lotes ya guardan proveedor, fecha de recepcion y calidad por `BatchService.java`, pero faltan filtros backend especificos por proveedor, estatus, fecha y calidad.
 - UX esta mejorando con componentes reutilizables como `AppButton`, `AppBottomModal`, `AppNoticeDropdown`, `AppScreen`, pero muchas pantallas siguen usando `Alert.alert` directo.
-- Hay problemas reales de codificacion en textos: ejemplos visibles en `services/apiClient.ts`, `components/ui/AppNoticeDropdown.tsx`, `SupplierService.java` y `BatchService.java` con cadenas como `sesiÃ³n`, `acciÃ³n`, `cÃ³digo`, `recepciÃ³n`.
-- El directorio actual no parece estar dentro de un repo Git inicializado: `git status` respondio `fatal: not a git repository`. Esto es riesgo fuerte para control de cambios y releases.
+- Hay problemas reales de codificación en textos: se detectaron cadenas visibles con mojibake en servicios frontend/backend.
+- El repositorio Git ya existe y la Fase 1A se trabaja sobre `feature/fase1a-estabilizacion-ux`; queda pendiente limpiar o ignorar `.tmp-pdf-images/`.
 
 ## Madurez ERP estimada
 
@@ -52,4 +52,3 @@ La principal alerta enterprise es que aun no hay una capa homogenea de UX, valid
 4. Definir regresion minima por flujo critico.
 5. Reforzar auditoria funcional en operaciones sensibles.
 6. Corregir codificacion de textos de forma controlada en una fase posterior.
-
