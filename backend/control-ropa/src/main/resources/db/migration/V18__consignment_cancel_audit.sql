@@ -1,0 +1,9 @@
+SET NAMES utf8mb4;
+START TRANSACTION;
+
+ALTER TABLE consignments
+ADD COLUMN cancelled_at DATETIME NULL,
+ADD COLUMN cancelled_by_user_id BIGINT NULL,
+ADD COLUMN cancel_reason TEXT NULL;
+
+COMMIT;

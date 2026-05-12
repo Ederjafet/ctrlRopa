@@ -1,0 +1,32 @@
+CREATE TABLE refunds (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    return_id BIGINT UNSIGNED NOT NULL,
+    customer_id BIGINT UNSIGNED NOT NULL,
+    customer_order_id BIGINT UNSIGNED NULL,
+    branch_id BIGINT UNSIGNED NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    method ENUM('CASH','ORIGINAL_METHOD','STORE_CREDIT') NOT NULL,
+    status ENUM('PENDING','APPROVED','PROCESSED','CANCELLED') NOT NULL DEFAULT 'PENDING',
+    reason VARCHAR(255) NOT NULL,
+    notes VARCHAR(500) NULL,
+    created_by_user_id BIGINT UNSIGNED NOT NULL,
+    approved_by_user_id BIGINT UNSIGNED NULL,
+    processed_by_user_id BIGINT UNSIGNED NULL,
+    cancelled_by_user_id BIGINT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    approved_at DATETIME NULL,
+    processed_at DATETIME NULL,
+    cancelled_at DATETIME NULL,
+    cancel_reason VARCHAR(255) NULL,
+
+    PRIMARY KEY (id),
+    KEY idx_refunds_return (return_id),
+    KEY idx_refunds_customer (customer_id),
+    KEY idx_refunds_order (customer_order_id),
+    KEY idx_refunds_status (status),
+
+    CONSTRAINT fk_refunds_return FOREIGN KEY (return_id) REFERENCES returns(id),
+    CONSTRAINT fk_refunds_customer FOREIGN KEY (customer_id) REFERENCES customers(id),
+    CONSTRAINT fk_refunds_order FOREIGN KEY (customer_order_id) REFERENCES customer_orders(id),
+    CONSTRAINT fk_refunds_branch FOREIGN KEY (branch_id) REFERENCES branches(id)
+);

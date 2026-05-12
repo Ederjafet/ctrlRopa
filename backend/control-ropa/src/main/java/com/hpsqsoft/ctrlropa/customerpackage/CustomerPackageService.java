@@ -1,0 +1,604 @@
+package com.hpsqsoft.ctrlropa.customerpackage;
+
+import com.hpsqsoft.ctrlropa.branch.Branch;
+import com.hpsqsoft.ctrlropa.branch.BranchRepository;
+import com.hpsqsoft.ctrlropa.customer.Customer;
+import com.hpsqsoft.ctrlropa.customer.CustomerRepository;
+import com.hpsqsoft.ctrlropa.item.Item;
+import com.hpsqsoft.ctrlropa.item.ItemRepository;
+import com.hpsqsoft.ctrlropa.order.CustomerOrder;
+import com.hpsqsoft.ctrlropa.order.CustomerOrderItem;
+import com.hpsqsoft.ctrlropa.order.CustomerOrderItemRepository;
+import com.hpsqsoft.ctrlropa.order.CustomerOrderService;
+import com.hpsqsoft.ctrlropa.order.CustomerOrderSettlementResponse;
+import com.hpsqsoft.ctrlropa.reservation.Reservation;
+import com.hpsqsoft.ctrlropa.reservation.ReservationRepository;
+import com.hpsqsoft.ctrlropa.reservation.ReservationStatus;
+import com.hpsqsoft.ctrlropa.sale.Sale;
+import com.hpsqsoft.ctrlropa.sale.SaleRepository;
+import com.hpsqsoft.ctrlropa.sale.SaleStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+
+@Service
+@Transactional
+public class CustomerPackageService {
+
+    private final CustomerPackageRepository repository;
+    private final CustomerPackageItemRepository itemRepository;
+    private final CustomerRepository customerRepository;
+    private final BranchRepository branchRepository;
+    private final SaleRepository saleRepository;
+    private final ReservationRepository reservationRepository;
+    private final ItemRepository itemEntityRepository;
+    private final CustomerOrderService customerOrderService;
+    private final CustomerOrderItemRepository customerOrderItemRepository;
+    private final JdbcTemplate jdbcTemplate;
+
+    public CustomerPackageService(CustomerPackageRepository repository,
+                                  CustomerPackageItemRepository itemRepository,
+                                  CustomerRepository customerRepository,
+                                  BranchRepository branchRepository,
+                                  SaleRepository saleRepository,
+                                  ReservationRepository reservationRepository,
+                                  ItemRepository itemEntityRepository,
+                                  CustomerOrderService customerOrderService,
+                                  CustomerOrderItemRepository customerOrderItemRepository,
+                                  JdbcTemplate jdbcTemplate) {
+        this.repository = repository;
+        this.itemRepository = itemRepository;
+        this.customerRepository = customerRepository;
+        this.branchRepository = branchRepository;
+        this.saleRepository = saleRepository;
+        this.reservationRepository = reservationRepository;
+        this.itemEntityRepository = itemEntityRepository;
+        this.customerOrderService = customerOrderService;
+        this.customerOrderItemRepository = customerOrderItemRepository;
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    public CustomerPackageResponse create(CreateCustomerPackageRequest request) {
+        Customer customer = customerRepository.findById(request.getCustomerId())
+                .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado"));
+
+        Branch branch = branchRepository.findById(request.getBranchId())
+                .orElseThrow(() -> new IllegalArgumentException("Sucursal no encontrada"));
+
+        CustomerPackage customerPackage = new CustomerPackage();
+        customerPackage.setFolio(generateUniqueFolio());
+        customerPackage.setCustomer(customer);
+        customerPackage.setBranch(branch);
+        customerPackage.setStatus(CustomerPackageStatus.OPEN);
+        customerPackage.setNotes(request.getNotes());
+        customerPackage.setCreatedByUserId(request.getCreatedByUserId());
+
+        return toResponse(repository.save(customerPackage));
+    }
+
+    public CustomerPackageDetailResponse prepareFromOrder(Long orderId, PrepareCustomerPackageFromOrderRequest request) {
+        CustomerOrder order = customerOrderService.findEntityById(orderId);
+        List<CustomerOrderItem> orderItems = customerOrderItemRepository.findByCustomerOrderIdOrderByCreatedAtAsc(orderId);
+
+        if (orderItems.isEmpty()) {
+            throw new IllegalArgumentException("El pedido no tiene prendas para preparar paquete");
+        }
+
+        CustomerOrderSettlementResponse settlement = customerOrderService.getSettlement(orderId);
+        if (settlement.getPending().compareTo(BigDecimal.ZERO) > 0) {
+            throw new IllegalArgumentException("El pedido aun tiene saldo pendiente");
+        }
+
+        Long existingPackageId = findExistingPackageId(orderItems);
+        CustomerPackage customerPackage = existingPackageId == null
+                ? createPackageForOrder(order, request.getCreatedByUserId())
+                : findEntity(existingPackageId);
+
+        for (CustomerOrderItem orderItem : orderItems) {
+            if (isAlreadyPackaged(orderItem)) {
+                continue;
+            }
+
+            AddCustomerPackageItemRequest addItemRequest = new AddCustomerPackageItemRequest();
+            addItemRequest.setItemId(orderItem.getItem().getId());
+
+            if (orderItem.getSale() != null) {
+                addItemRequest.setSaleId(orderItem.getSale().getId());
+            } else if (orderItem.getReservation() != null) {
+                addItemRequest.setReservationId(orderItem.getReservation().getId());
+            } else {
+                continue;
+            }
+
+            addItem(customerPackage.getId(), addItemRequest);
+        }
+
+        return findDetail(customerPackage.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public List<CustomerPackageResponse> findByCustomer(Long customerId) {
+        return repository.findByCustomerIdOrderByCreatedAtDesc(customerId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public CustomerPackageDetailResponse findDetail(Long packageId) {
+        CustomerPackage customerPackage = findEntity(packageId);
+        return toDetail(customerPackage);
+    }
+
+    @Transactional(readOnly = true)
+    public CustomerPackageDetailResponse findDetailByFolio(String folio) {
+        CustomerPackage customerPackage = findEntityByFolio(folio);
+        return toDetail(customerPackage);
+    }
+
+    public CustomerPackageDetailResponse addItem(Long packageId, AddCustomerPackageItemRequest request) {
+        CustomerPackage customerPackage = findEntity(packageId);
+
+        if (customerPackage.getStatus() != CustomerPackageStatus.OPEN) {
+            throw new IllegalArgumentException("Solo se pueden agregar items a paquetes en OPEN");
+        }
+
+        validateSourceSelection(request);
+
+        Item item = itemEntityRepository.findById(request.getItemId())
+                .orElseThrow(() -> new IllegalArgumentException("Item no encontrado"));
+
+        if (itemRepository.existsByCustomerPackageIdAndItemId(packageId, item.getId())) {
+            throw new IllegalArgumentException("El item ya está en el paquete");
+        }
+
+        CustomerPackageItem packageItem = new CustomerPackageItem();
+        packageItem.setCustomerPackageId(packageId);
+        packageItem.setItem(item);
+
+        if (request.getSaleId() != null) {
+            Sale sale = saleRepository.findById(request.getSaleId())
+                    .orElseThrow(() -> new IllegalArgumentException("Venta no encontrada"));
+
+            validateSaleAgainstPackage(customerPackage, sale, item);
+
+            if (itemRepository.existsBySaleId(sale.getId())) {
+                throw new IllegalArgumentException("La venta ya está en otro paquete");
+            }
+
+            packageItem.setSaleId(sale.getId());
+        } else {
+            Reservation reservation = reservationRepository.findById(request.getReservationId())
+                    .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada"));
+
+            validateReservationAgainstPackage(customerPackage, reservation, item);
+
+            if (itemRepository.existsByReservationId(reservation.getId())) {
+                throw new IllegalArgumentException("La reserva ya está en otro paquete");
+            }
+
+            packageItem.setReservationId(reservation.getId());
+        }
+
+        itemRepository.save(packageItem);
+
+        return findDetail(packageId);
+    }
+
+    public CustomerPackageDetailResponse addItemByItemCode(String packageFolio, String itemCode) {
+        CustomerPackage customerPackage = findEntityByFolio(packageFolio);
+
+        Item item = itemEntityRepository.findByCode(itemCode)
+                .orElseThrow(() -> new IllegalArgumentException("Item no encontrado con código: " + itemCode));
+
+        AddCustomerPackageItemRequest request = buildAddItemRequestFromItem(item);
+        return addItem(customerPackage.getId(), request);
+    }
+
+    public CustomerPackageDetailResponse addItemByQrCode(String packageFolio, String qrCode) {
+        CustomerPackage customerPackage = findEntityByFolio(packageFolio);
+
+        Item item = itemEntityRepository.findByQrCode(qrCode)
+                .orElseThrow(() -> new IllegalArgumentException("Item no encontrado con QR: " + qrCode));
+
+        AddCustomerPackageItemRequest request = buildAddItemRequestFromItem(item);
+        return addItem(customerPackage.getId(), request);
+    }
+
+    public CustomerPackageDetailResponse markReady(Long packageId, CloseCustomerPackageRequest request) {
+        CustomerPackage customerPackage = findEntity(packageId);
+
+        if (customerPackage.getStatus() != CustomerPackageStatus.OPEN) {
+            throw new IllegalArgumentException("Solo paquetes en OPEN pueden pasar a READY");
+        }
+
+        if (itemRepository.findByCustomerPackageIdOrderByCreatedAtAsc(packageId).isEmpty()) {
+            throw new IllegalArgumentException("No se puede cerrar un paquete vacío");
+        }
+
+        customerPackage.setStatus(CustomerPackageStatus.READY);
+        customerPackage.setClosedAt(LocalDateTime.now());
+        customerPackage.setClosedByUserId(request.getClosedByUserId());
+
+        repository.save(customerPackage);
+
+        return findDetail(packageId);
+    }
+
+    public CustomerPackageDetailResponse markReadyByFolio(String folio, CloseCustomerPackageRequest request) {
+        CustomerPackage customerPackage = findEntityByFolio(folio);
+        return markReady(customerPackage.getId(), request);
+    }
+
+    public CustomerPackageDetailResponse cancel(Long packageId, CancelCustomerPackageRequest request) {
+        CustomerPackage customerPackage = findEntity(packageId);
+
+        if (customerPackage.getStatus() == CustomerPackageStatus.CANCELLED) {
+            throw new IllegalArgumentException("El paquete ya está cancelado");
+        }
+
+        if (customerPackage.getStatus() == CustomerPackageStatus.SHIPPED ||
+                customerPackage.getStatus() == CustomerPackageStatus.DELIVERED) {
+            throw new IllegalArgumentException("No se puede cancelar un paquete ya enviado o entregado");
+        }
+
+        customerPackage.setStatus(CustomerPackageStatus.CANCELLED);
+        customerPackage.setNotes(request.getNotes());
+        customerPackage.setClosedAt(LocalDateTime.now());
+        customerPackage.setClosedByUserId(request.getClosedByUserId());
+
+        repository.save(customerPackage);
+
+        return findDetail(packageId);
+    }
+
+    public CustomerPackageDetailResponse cancelByFolio(String folio, CancelCustomerPackageRequest request) {
+        CustomerPackage customerPackage = findEntityByFolio(folio);
+        return cancel(customerPackage.getId(), request);
+    }
+
+    private CustomerPackage createPackageForOrder(CustomerOrder order, Long createdByUserId) {
+        CustomerPackage customerPackage = new CustomerPackage();
+        customerPackage.setFolio(generateUniqueFolio());
+        customerPackage.setCustomer(order.getCustomer());
+        customerPackage.setBranch(order.getBranch());
+        customerPackage.setStatus(CustomerPackageStatus.OPEN);
+        customerPackage.setNotes("Preparado desde pedido #" + order.getId());
+        customerPackage.setCreatedByUserId(createdByUserId);
+
+        return repository.save(customerPackage);
+    }
+
+    private Long findExistingPackageId(List<CustomerOrderItem> orderItems) {
+        for (CustomerOrderItem orderItem : orderItems) {
+            if (orderItem.getSale() != null) {
+                Long packageId = itemRepository.findFirstBySaleId(orderItem.getSale().getId())
+                        .map(CustomerPackageItem::getCustomerPackageId)
+                        .orElse(null);
+                if (packageId != null) {
+                    return packageId;
+                }
+            }
+
+            if (orderItem.getReservation() != null) {
+                Long packageId = itemRepository.findFirstByReservationId(orderItem.getReservation().getId())
+                        .map(CustomerPackageItem::getCustomerPackageId)
+                        .orElse(null);
+                if (packageId != null) {
+                    return packageId;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private boolean isAlreadyPackaged(CustomerOrderItem orderItem) {
+        if (orderItem.getSale() != null && itemRepository.existsBySaleId(orderItem.getSale().getId())) {
+            return true;
+        }
+
+        return orderItem.getReservation() != null
+                && itemRepository.existsByReservationId(orderItem.getReservation().getId());
+    }
+
+    private CustomerPackage findEntity(Long id) {
+        return repository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Paquete no encontrado con id: " + id));
+    }
+
+    private CustomerPackage findEntityByFolio(String folio) {
+        return repository.findByFolio(folio)
+                .orElseThrow(() -> new IllegalArgumentException("Paquete no encontrado con folio: " + folio));
+    }
+
+    private AddCustomerPackageItemRequest buildAddItemRequestFromItem(Item item) {
+        Sale sale = saleRepository.findByItemIdAndStatus(item.getId(), SaleStatus.ACTIVE)
+                .orElse(null);
+
+        AddCustomerPackageItemRequest request = new AddCustomerPackageItemRequest();
+        request.setItemId(item.getId());
+
+        if (sale != null) {
+            request.setSaleId(sale.getId());
+            return request;
+        }
+
+        Reservation reservation = reservationRepository.findByItemIdAndStatus(item.getId(), ReservationStatus.ACTIVE)
+                .orElseThrow(() -> new IllegalArgumentException("No existe venta ni reserva activa para este item"));
+
+        request.setReservationId(reservation.getId());
+        return request;
+    }
+
+    private CustomerPackageDetailResponse toDetail(CustomerPackage customerPackage) {
+        List<CustomerPackageDetailResponse.ItemLine> items = itemRepository
+                .findByCustomerPackageIdOrderByCreatedAtAsc(customerPackage.getId())
+                .stream()
+                .map(this::toItemLine)
+                .toList();
+
+        BigDecimal totalAmount = items.stream()
+                .map(CustomerPackageDetailResponse.ItemLine::getPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal paidAmount = items.stream()
+                .map(CustomerPackageDetailResponse.ItemLine::getPaidAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal pendingAmount = totalAmount.subtract(paidAmount);
+        if (pendingAmount.signum() < 0) {
+            pendingAmount = BigDecimal.ZERO;
+        }
+
+        String paymentStatus = resolvePaymentStatus(totalAmount, paidAmount);
+
+        List<CustomerPackageDetailResponse.ShipmentLine> shipments = findShipmentLines(customerPackage.getId());
+
+        return new CustomerPackageDetailResponse(
+                customerPackage.getId(),
+                customerPackage.getFolio(),
+                customerPackage.getCustomer().getId(),
+                customerPackage.getCustomer().getName(),
+                customerPackage.getCustomer().getPhone(),
+                customerPackage.getBranch().getId(),
+                customerPackage.getBranch().getCode(),
+                customerPackage.getBranch().getName(),
+                customerPackage.getStatus().name(),
+                paymentStatus,
+                customerPackage.getNotes(),
+                customerPackage.getCreatedAt(),
+                customerPackage.getCreatedByUserId(),
+                customerPackage.getClosedAt(),
+                customerPackage.getClosedByUserId(),
+                items.size(),
+                totalAmount,
+                paidAmount,
+                pendingAmount,
+                items,
+                shipments
+        );
+    }
+
+    private List<CustomerPackageDetailResponse.ShipmentLine> findShipmentLines(Long packageId) {
+        return jdbcTemplate.query(
+                """
+                SELECT
+                    sp.id AS shipment_package_id,
+                    sh.id AS shipment_id,
+                    sh.folio AS shipment_folio,
+                    sh.status AS shipment_status,
+                    sp.result_status AS package_shipment_status,
+                    sp.payment_mode AS payment_mode,
+                    sp.expected_cod_amount AS expected_collection_amount,
+                    sp.collected_amount AS collected_amount,
+                    sp.collection_difference AS collection_difference,
+                    sp.collection_status AS collection_status,
+                    sp.result_notes AS collection_notes,
+                    sp.delivered_at AS delivered_at,
+                    sp.returned_at AS returned_at
+                FROM shipment_packages sp
+                JOIN shipments sh ON sh.id = sp.shipment_id
+                WHERE sp.customer_package_id = ?
+                ORDER BY sp.id DESC
+                """,
+                (rs, rowNum) -> new CustomerPackageDetailResponse.ShipmentLine(
+                        rs.getLong("shipment_package_id"),
+                        rs.getLong("shipment_id"),
+                        rs.getString("shipment_folio"),
+                        rs.getString("shipment_status"),
+                        rs.getString("package_shipment_status"),
+                        rs.getString("payment_mode"),
+                        safe(rs.getBigDecimal("expected_collection_amount")),
+                        safe(rs.getBigDecimal("collected_amount")),
+                        safe(rs.getBigDecimal("collection_difference")),
+                        rs.getString("collection_status"),
+                        rs.getString("collection_notes"),
+                        toLocalDateTime(rs.getTimestamp("delivered_at")),
+                        toLocalDateTime(rs.getTimestamp("returned_at"))
+                ),
+                packageId
+        );
+    }
+
+    private void validateSourceSelection(AddCustomerPackageItemRequest request) {
+        boolean hasSale = request.getSaleId() != null;
+        boolean hasReservation = request.getReservationId() != null;
+
+        if (hasSale == hasReservation) {
+            throw new IllegalArgumentException("Debes enviar exactamente uno de saleId o reservationId");
+        }
+    }
+
+    private void validateSaleAgainstPackage(CustomerPackage customerPackage, Sale sale, Item item) {
+        if (!sale.getCustomer().getId().equals(customerPackage.getCustomer().getId())) {
+            throw new IllegalArgumentException("La venta no pertenece al cliente del paquete");
+        }
+
+        if (!sale.getBranch().getId().equals(customerPackage.getBranch().getId())) {
+            throw new IllegalArgumentException("La venta no pertenece a la sucursal del paquete");
+        }
+
+        if (!sale.getItem().getId().equals(item.getId())) {
+            throw new IllegalArgumentException("El item no coincide con la venta enviada");
+        }
+    }
+
+    private void validateReservationAgainstPackage(CustomerPackage customerPackage, Reservation reservation, Item item) {
+        if (!reservation.getCustomer().getId().equals(customerPackage.getCustomer().getId())) {
+            throw new IllegalArgumentException("La reserva no pertenece al cliente del paquete");
+        }
+
+        if (!reservation.getBranch().getId().equals(customerPackage.getBranch().getId())) {
+            throw new IllegalArgumentException("La reserva no pertenece a la sucursal del paquete");
+        }
+
+        if (!reservation.getItem().getId().equals(item.getId())) {
+            throw new IllegalArgumentException("El item no coincide con la reserva enviada");
+        }
+    }
+
+    private CustomerPackageResponse toResponse(CustomerPackage customerPackage) {
+        return new CustomerPackageResponse(
+                customerPackage.getId(),
+                customerPackage.getFolio(),
+                customerPackage.getCustomer().getId(),
+                customerPackage.getCustomer().getName(),
+                customerPackage.getBranch().getId(),
+                customerPackage.getBranch().getCode(),
+                customerPackage.getStatus().name(),
+                customerPackage.getNotes(),
+                customerPackage.getCreatedAt(),
+                customerPackage.getCreatedByUserId(),
+                customerPackage.getClosedAt(),
+                customerPackage.getClosedByUserId()
+        );
+    }
+
+    private CustomerPackageDetailResponse.ItemLine toItemLine(CustomerPackageItem packageItem) {
+        String sourceType = packageItem.getSaleId() != null ? "SALE" : "RESERVATION";
+
+        SourceFinancialData financialData = getSourceFinancialData(packageItem);
+
+        BigDecimal pendingAmount = financialData.price().subtract(financialData.paidAmount());
+        if (pendingAmount.signum() < 0) {
+            pendingAmount = BigDecimal.ZERO;
+        }
+
+        Item item = packageItem.getItem();
+
+        return new CustomerPackageDetailResponse.ItemLine(
+                packageItem.getId(),
+                item.getId(),
+                item.getCode(),
+                item.getQrCode(),
+                item.getStatus().name(),
+                item.getProductType().getName(),
+                item.getBrand() != null ? item.getBrand().getName() : null,
+                item.getSize() != null ? item.getSize().getName() : null,
+                financialData.price(),
+                financialData.paidAmount(),
+                pendingAmount,
+                packageItem.getSaleId(),
+                packageItem.getReservationId(),
+                sourceType,
+                financialData.sourceStatus(),
+                packageItem.getCreatedAt()
+        );
+    }
+
+    private SourceFinancialData getSourceFinancialData(CustomerPackageItem packageItem) {
+        if (packageItem.getSaleId() != null) {
+            return jdbcTemplate.queryForObject(
+                    """
+                    SELECT
+                        s.price AS price,
+                        s.status AS source_status,
+                        COALESCE(SUM(CASE
+                            WHEN p.status = 'ACTIVE' THEN pa.amount
+                            ELSE 0
+                        END), 0) AS paid_amount
+                    FROM sales s
+                    LEFT JOIN payment_allocations pa ON pa.sale_id = s.id
+                    LEFT JOIN payments p ON p.id = pa.payment_id
+                    WHERE s.id = ?
+                    GROUP BY s.id, s.price, s.status
+                    """,
+                    (rs, rowNum) -> new SourceFinancialData(
+                            safe(rs.getBigDecimal("price")),
+                            safe(rs.getBigDecimal("paid_amount")),
+                            rs.getString("source_status")
+                    ),
+                    packageItem.getSaleId()
+            );
+        }
+
+        return jdbcTemplate.queryForObject(
+                """
+                SELECT
+                    r.price AS price,
+                    r.status AS source_status,
+                    COALESCE(SUM(CASE
+                        WHEN p.status = 'ACTIVE' THEN pa.amount
+                        ELSE 0
+                    END), 0) AS paid_amount
+                FROM reservations r
+                LEFT JOIN payment_allocations pa ON pa.reservation_id = r.id
+                LEFT JOIN payments p ON p.id = pa.payment_id
+                WHERE r.id = ?
+                GROUP BY r.id, r.price, r.status
+                """,
+                (rs, rowNum) -> new SourceFinancialData(
+                        safe(rs.getBigDecimal("price")),
+                        safe(rs.getBigDecimal("paid_amount")),
+                        rs.getString("source_status")
+                ),
+                packageItem.getReservationId()
+        );
+    }
+
+    private String resolvePaymentStatus(BigDecimal total, BigDecimal paid) {
+        if (paid.compareTo(BigDecimal.ZERO) <= 0) {
+            return "UNPAID";
+        }
+
+        if (paid.compareTo(total) < 0) {
+            return "PARTIALLY_PAID";
+        }
+
+        return "PAID";
+    }
+
+    private BigDecimal safe(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private LocalDateTime toLocalDateTime(Timestamp timestamp) {
+        if (timestamp == null) {
+            return null;
+        }
+
+        return timestamp.toLocalDateTime();
+    }
+
+    private String generateUniqueFolio() {
+        String candidate;
+        do {
+            candidate = "PKG-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
+        } while (repository.existsByFolio(candidate));
+        return candidate;
+    }
+
+    private record SourceFinancialData(
+            BigDecimal price,
+            BigDecimal paidAmount,
+            String sourceStatus
+    ) {
+    }
+}

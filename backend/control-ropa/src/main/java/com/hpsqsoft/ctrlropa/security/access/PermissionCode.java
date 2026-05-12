@@ -1,0 +1,57 @@
+package com.hpsqsoft.ctrlropa.security.access;
+
+public final class PermissionCode {
+
+    private PermissionCode() {
+    }
+
+    public static final String MANAGE_USERS = "MANAGE_USERS";
+    public static final String MANAGE_ROLES = "MANAGE_ROLES";
+    public static final String MANAGE_BRANCH_CHANNELS = "MANAGE_BRANCH_CHANNELS";
+    public static final String MANAGE_BRANCHES = "MANAGE_BRANCHES";
+    public static final String MANAGE_CATALOGS = "MANAGE_CATALOGS";
+    public static final String MANAGE_SECURITY_SETTINGS = "MANAGE_SECURITY_SETTINGS";
+
+    public static final String VIEW_CUSTOMERS = "VIEW_CUSTOMERS";
+    public static final String VIEW_CUSTOMER_ORDERS = "VIEW_CUSTOMER_ORDERS";
+    public static final String VIEW_INVENTORY = "VIEW_INVENTORY";
+    public static final String MANAGE_INVENTORY = "MANAGE_INVENTORY";
+
+    public static final String DO_LIVE_RESERVATION = "DO_LIVE_RESERVATION";
+    public static final String DO_DOOR_SALE = "DO_DOOR_SALE";
+    public static final String DO_DOOR_RESERVATION = "DO_DOOR_RESERVATION";
+
+    public static final String REGISTER_PAYMENTS = "REGISTER_PAYMENTS";
+    public static final String APPLY_CUSTOMER_BALANCE = "APPLY_CUSTOMER_BALANCE";
+    public static final String VOID_PAYMENT = "VOID_PAYMENT";
+
+    public static final String CREATE_CLOSE_CUSTOMER_PACKAGE = "CREATE_CLOSE_CUSTOMER_PACKAGE";
+    public static final String MANAGE_SHIPMENTS = "MANAGE_SHIPMENTS";
+
+    public static final String CANCEL_RESERVATION = "CANCEL_RESERVATION";
+    public static final String CANCEL_SALE = "CANCEL_SALE";
+
+    public static final String REQUEST_REFUND = "REQUEST_REFUND";
+    public static final String APPROVE_REFUND = "APPROVE_REFUND";
+    public static final String PROCESS_REFUND = "PROCESS_REFUND";
+    public static final String CANCEL_REFUND = "CANCEL_REFUND";
+    public static final String MANAGE_REFUNDS = "MANAGE_REFUNDS";
+    public static final String MANAGE_RETURNS = "MANAGE_RETURNS";
+
+    public static final String REASSIGN_CUSTOMERS = "REASSIGN_CUSTOMERS";
+    public static final String MANAGE_BRANDING = "MANAGE_BRANDING";
+
+    public static final String MANAGE_TRANSFERS = "MANAGE_TRANSFERS";
+    public static final String SEND_TRANSFERS = "SEND_TRANSFERS";
+    public static final String RECEIVE_TRANSFERS = "RECEIVE_TRANSFERS";
+    public static final String CANCEL_TRANSFERS = "CANCEL_TRANSFERS";
+
+    public static final String MANAGE_CONSIGNMENTS = "MANAGE_CONSIGNMENTS";
+    public static final String SETTLE_CONSIGNMENTS = "SETTLE_CONSIGNMENTS";
+    public static final String CANCEL_CONSIGNMENTS = "CANCEL_CONSIGNMENTS";
+    
+    public static final String VIEW_REPORTS = "VIEW_REPORTS";
+    
+    public static final String MANAGE_CASH_CLOSURES = "MANAGE_CASH_CLOSURES";
+    public static final String MANAGE_INCIDENTS = "MANAGE_INCIDENTS";
+}
