@@ -12,6 +12,7 @@ Fase: 1D - datos QA y evidencia
 | 2026-05-12 | 1G | QA local/API | Codex QA | Login/logout, dashboard, clientes, inventario, lotes, live lectura, venta QA, pago QA, reportes, usuarios/permisos | RC RECHAZADO | `KI-002`, `KI-003`, `KI-004`, `KI-005` | Rechazado |
 | 2026-05-12 | 1H | QA runtime | Usuario/QA Director | Validacion manual de `qa.sinpermisos`, `qa.reportes`, `qa.soporte`; revalidacion de `/api/health` | PARCIAL | `KI-004` resuelto validado, `KI-005` resuelto validado, `KI-006` nuevo: `/api/health` devuelve 404 | RC sigue rechazado |
 | 2026-05-12 | 1H | QA codigo/backend | Codex Backend/QA | Prueba automatizada healthcheck `/api/health` y `/api/health/` | PARCIAL | `KI-006` en validacion; falta curl runtime despues de reiniciar/desplegar backend QA | RC sigue rechazado |
+| 2026-05-12 aprox. | 1I | QA runtime `localhost:8090` | Usuario/QA Director | Smoke tecnico healthcheck con `curl -i http://localhost:8090/api/health` | OK | `KI-006` resuelto validado; evidencia: `HTTP/1.1 200 OK`, JSON `status=OK`; causa del 404 previo: puerto incorrecto `8080` | RC backend desbloqueado; RC completo sigue pendiente por `KI-003` |
 
 ## Reglas de registro
 

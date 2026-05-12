@@ -469,6 +469,7 @@ Siguiente fase recomendada:
 - Corregir `KI-006` de forma acotada revisando mapping/runtime de healthcheck.
 - Despues repetir smoke tecnico `GET /api/health`.
 
+
 ## 2026-05-12 - Fase 1H / KI-006
 
 Tipo: correccion acotada de mapping healthcheck backend.
@@ -521,3 +522,35 @@ Comando recomendado para validar runtime:
 
 - `curl -i http://localhost:8090/api/health`
 - `curl -i http://localhost:8090/api/health/`
+=======
+## 2026-05-12 - Fase 1I / cierre runtime KI-006
+
+Tipo: cierre documental con evidencia runtime real.
+
+Validacion reportada:
+
+- Comando ejecutado: `curl -i http://localhost:8090/api/health`.
+- Resultado: `HTTP/1.1 200 OK`.
+- Respuesta JSON: `status=OK` y `timestamp`.
+
+Causa raiz real:
+
+- El `404` anterior fue provocado por validacion contra puerto incorrecto `8080`.
+- El backend QA correcto corre en `8090`.
+
+Cambios documentales:
+
+- `KI-002` queda como `Resuelto validado`.
+- `KI-006` queda como `Resuelto validado`.
+- Se actualiza execution log con smoke tecnico exitoso.
+- Se actualiza resumen ejecutivo para reflejar backend/API tecnicamente validado.
+
+Decision release:
+
+- Backend/API queda desbloqueado tecnicamente para RC.
+- RC completo no queda aprobado todavia porque `KI-003` frontend web/visual sigue abierto.
+
+Siguiente fase recomendada:
+
+- Resolver `KI-003`: levantar frontend QA, capturar evidencia visual y repetir smoke visual/navegacion principal.
+

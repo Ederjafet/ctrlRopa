@@ -12,17 +12,16 @@ Registrar defectos conocidos, riesgos aceptados y workarounds antes de aprobar u
 | ID | Modulo | Severidad | Workaround | Impacto | Estado | Responsable | Bloquea release |
 |---|---|---|---|---|---|---|---|
 | KI-001 | Release/Git | `SEV-3` | No incluir artefactos no rastreados en release; decidir limpiar/ignorar antes de RC. | Puede confundir el diff y el paquete de release. | Abierto | Release Manager | No, salvo que afecte build |
-| KI-002 | Backend/Health | `SEV-2` | Correccion de seguridad validada parcialmente: `/api/health` ya no responde 401. Ver `KI-006` para el nuevo bloqueo runtime 404. | El bloqueo original por token avanzo; ahora el smoke tecnico queda bloqueado por mapping/context-path/runtime. | Cerrado validado parcialmente | Backend Lead / Release Manager | No; sustituido por `KI-006` |
+| KI-002 | Backend/Health | `SEV-2` | Validado por runtime: `curl -i http://localhost:8090/api/health` devuelve `HTTP/1.1 200 OK`. | El bloqueo original por token fue corregido y validado; `/api/health` ya no responde 401. | Resuelto validado | Backend Lead / Release Manager | No |
 | KI-003 | Frontend/Web | `SEV-1` | Levantar frontend QA y repetir smoke visual antes de RC. | No hay evidencia de navegacion principal ni UX web desde `localhost:8081`. | Abierto | Frontend Lead / QA Director | Si |
 | KI-004 | Dataset QA/Permisos | `SEV-2` | Validado manualmente en runtime: `qa.sinpermisos@local.test` inicia sesion y queda sin accesos operativos. | El smoke negativo de permisos ya puede ejecutarse. | Resuelto validado | QA/Data Owner | No |
 | KI-005 | Dataset QA/Roles | `SEV-2` | Validado manualmente en runtime: `qa.reportes@local.test` y `qa.soporte@local.test` inician sesion con accesos esperados. | La validacion de reportes y soporte tecnico ya puede continuar. | Resuelto validado | QA/Data Owner | No |
-| KI-006 | Backend/Health mapping runtime | `SEV-2` | Mapping reforzado para `GET /api/health` y `GET /api/health/`; prueba automatizada OK. Pendiente reiniciar/desplegar backend QA y validar con curl runtime. | `/api/health` ya no responde 401, pero devolvio 404 en runtime; smoke tecnico pre/post-release sigue bloqueado hasta validacion runtime. | En validacion | Backend Lead / Release Manager | Si, hasta validar runtime |
+| KI-006 | Backend/Health mapping runtime | `SEV-2` | Validado por runtime: `curl -i http://localhost:8090/api/health` devuelve `HTTP/1.1 200 OK` con JSON `status=OK`. Causa raíz del 404 anterior: validación contra puerto incorrecto `8080`; el puerto correcto del backend QA es `8090`. | Smoke técnico backend desbloqueado. | Resuelto validado | Backend Lead / Release Manager | No |//
 
 ## Plantilla
 
 | ID | Modulo | Severidad | Workaround | Impacto | Estado | Responsable | Bloquea release |
 |---|---|---|---|---|---|---|---|
-| KI-___ |  | `SEV-1/2/3/4` |  |  | Abierto/En revision/Cerrado/Aceptado temporalmente |  | Si/No |
 
 ## Reglas
 
