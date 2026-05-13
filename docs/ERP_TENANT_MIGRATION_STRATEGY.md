@@ -30,7 +30,14 @@ Definir una estrategia incremental para llevar el ERP actual mono-compania/multi
 
 ### MC-1 - Companies y company default
 
-Futuro:
+Estado Fase 2D:
+
+- Implementado bootstrap minimo en `V38__tenant_bootstrap_companies.sql`.
+- Creada tabla `companies`.
+- Creada company default `DEFAULT / HPSQ-SOFT Default Company`.
+- No se migraron ventas, pagos, live, reportes ni tablas P0 operativas.
+
+Diseno:
 
 - Crear `companies`.
 - Crear company inicial para datos existentes.
@@ -45,7 +52,15 @@ Validacion:
 
 ### MC-2 - Branches tenant
 
-Futuro:
+Estado Fase 2D:
+
+- Implementado `branches.company_id`.
+- Backfill de sucursales actuales hacia company default.
+- Agregado indice `idx_branches_company_status`.
+- Cambiada unicidad de `branches.code` global a `(company_id, code)`.
+- Agregada FK `fk_branches_company`.
+
+Diseno:
 
 - Agregar `branches.company_id`.
 - Backfill con company default.
@@ -253,4 +268,4 @@ Recomendacion:
 
 ## Recomendacion
 
-Fase 2C debe cerrar diseno y checklist de migracion. La primera fase de codigo real debe ser pequena: `companies`, company default y validacion de branches, sin tocar ventas/pagos/reportes todavia.
+Fase 2D implementa el bootstrap minimo: `companies`, company default, `branches.company_id`, `CurrentTenantContext`, `TenantResolver` y `/api/tenant/current`. La siguiente fase no debe tocar flujos financieros todavia; conviene validar runtime QA, login, sucursales y dashboard con company default antes de migrar tablas P0 operativas.

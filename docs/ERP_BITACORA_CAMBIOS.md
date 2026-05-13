@@ -868,3 +868,53 @@ Siguiente fase recomendada:
 
 - Fase 2D: disenar/implementar en rama separada el modelo minimo `companies`, company default y validacion branch-company, con migraciones controladas y QA de login/dashboard antes de tocar flujos financieros.
 
+## 2026-05-13 - Fase 2D / tenant bootstrap minimo
+
+Tipo: implementacion backend y migracion minima, sin tocar ventas, pagos, live ni reportes.
+
+Objetivo:
+
+- Crear base minima multi-compania compatible con el sistema actual.
+- Agregar company default para datos existentes.
+- Vincular sucursales existentes con company default.
+- Introducir contexto tenant backend sin activar multi-compania funcional completa.
+
+Cambios realizados:
+
+- Migracion `V38__tenant_bootstrap_companies.sql`.
+- Tabla `companies`.
+- Company default `DEFAULT / HPSQ-SOFT Default Company`.
+- Columna `branches.company_id` con backfill.
+- FK `branches.company_id -> companies.id`.
+- Indice `idx_branches_company_status`.
+- Unicidad `uq_branches_company_code`.
+- Entidad `Company`.
+- `CompanyRepository` y `CompanyService`.
+- `CurrentTenantContext`.
+- `TenantContextHolder`.
+- `TenantResolver`.
+- Endpoint autenticado `GET /api/tenant/current`.
+- Validacion minima `assertBranchBelongsToCompany`.
+- `BranchService` asigna company default si el alta actual no envia company.
+
+Fuera de alcance respetado:
+
+- No se migraron ventas.
+- No se migraron pagos.
+- No se migro live.
+- No se migraron reportes.
+- No se implemento consola SaaS HPSQ-SOFT.
+- No se cambio frontend operativo.
+
+Riesgos pendientes:
+
+- `user_api_sessions` aun no guarda company/branch activa.
+- Roles y permisos siguen globales.
+- Tablas P0 operativas aun no tienen `company_id`.
+- Reportes y dashboard siguen mono-compania por `branch_id`.
+- Se requiere validacion runtime QA de Flyway sobre base real.
+
+Siguiente fase recomendada:
+
+- Fase 2E: validar runtime del bootstrap tenant, smoke login/sucursales/dashboard y preparar diseno/implementacion de `user_companies` y sesiones tenant-aware antes de migrar tablas P0.
+

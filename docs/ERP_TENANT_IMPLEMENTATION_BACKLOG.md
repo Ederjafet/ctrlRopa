@@ -119,4 +119,26 @@ Convertir el analisis de Fase 2A/2B en un backlog tecnico ordenado para implemen
 
 ## Siguiente fase recomendada
 
-Fase 2C debe ser preparacion de modelo base y tenant context minimo: `companies`, compania default, matriz de migracion final por tabla y diseno tecnico de `CurrentTenantContext`. No conviene tocar ventas/pagos/reportes antes de cerrar esa base.
+## Avance Fase 2D
+
+Completado en bootstrap minimo:
+
+- `companies` y company default.
+- `branches.company_id` con backfill a company default.
+- Indice `idx_branches_company_status`.
+- Unicidad `uq_branches_company_code`.
+- Entidad/repositorio/servicio `Company`.
+- `CurrentTenantContext`, `TenantContextHolder`, `TenantResolver`.
+- Endpoint autenticado `GET /api/tenant/current`.
+- Validacion minima branch-company en `TenantResolver`.
+
+Pendiente antes de tocar flujos financieros:
+
+- Validacion runtime QA de migracion Flyway en base real.
+- Smoke login/dashboard/sucursales con company default.
+- Decidir si `user_api_sessions` se extiende con active company/branch en Fase 2E.
+- Crear QA Empresa A/B antes de migrar tablas P0 operativas.
+
+## Siguiente fase recomendada
+
+Fase 2E debe validar bootstrap tenant en QA y preparar `user_companies`/sesiones tenant-aware. No conviene tocar ventas/pagos/reportes antes de validar login, sucursales y dashboard sobre company default.
