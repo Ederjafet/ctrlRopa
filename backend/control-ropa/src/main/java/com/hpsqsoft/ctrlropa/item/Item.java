@@ -1,10 +1,12 @@
 package com.hpsqsoft.ctrlropa.item;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.hpsqsoft.ctrlropa.batch.Batch;
 import com.hpsqsoft.ctrlropa.branch.Branch;
 import com.hpsqsoft.ctrlropa.catalog.Brand;
 import com.hpsqsoft.ctrlropa.catalog.ProductType;
 import com.hpsqsoft.ctrlropa.catalog.Size;
+import com.hpsqsoft.ctrlropa.company.Company;
 import com.hpsqsoft.ctrlropa.inventory.StorageLocation;
 import jakarta.persistence.*;
 
@@ -15,8 +17,8 @@ import java.time.LocalDateTime;
 @Table(
         name = "items",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uq_items_code", columnNames = {"code"}),
-                @UniqueConstraint(name = "uq_items_qr_code", columnNames = {"qr_code"})
+                @UniqueConstraint(name = "uq_items_company_code", columnNames = {"company_id", "code"}),
+                @UniqueConstraint(name = "uq_items_company_qr_code", columnNames = {"company_id", "qr_code"})
         }
 )
 public class Item {
@@ -25,10 +27,15 @@ public class Item {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 50)
+    @JsonIgnore
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id", nullable = false)
+    private Company company;
+
+    @Column(nullable = false, length = 50)
     private String code;
 
-    @Column(name = "qr_code", nullable = false, unique = true, length = 100)
+    @Column(name = "qr_code", nullable = false, length = 100)
     private String qrCode;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
@@ -89,6 +96,9 @@ public class Item {
     }
 
     public Long getId() { return id; }
+
+    public Company getCompany() { return company; }
+    public void setCompany(Company company) { this.company = company; }
 
     public String getCode() { return code; }
     public void setCode(String code) { this.code = code; }

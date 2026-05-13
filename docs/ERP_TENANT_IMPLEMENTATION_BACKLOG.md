@@ -197,3 +197,28 @@ Pendiente backlog:
 | Migrar `customer_owner_history` | P1 | ALTO | customers.company_id | Historial solo de customer/company activa |
 | Revisar consumidores legacy de `CustomerRepository.findById` | P0 | CRITICO | entidades P0 siguientes | Cada modulo valida company antes de usar customer |
 | Definir unicidad telefono por company o branch | P1 | MEDIO | decision negocio | Constraint documentado y probado |
+
+## Avance Fase 2K
+
+Epic: segunda P0 operativa tenant-aware, inventario/items.
+
+Completado:
+
+- Migrar `items` con `company_id`.
+- Backfill desde `branches.company_id`.
+- FK `fk_items_company`.
+- Indices por company/branch/status/code/qr/batch/storage location.
+- Unicidad de `code` y `qr_code` scoped por company.
+- Filtrar endpoints directos de items por tenant activo.
+- Probar update/list/lookup codigo/lookup QR en runtime local.
+- Documentar rollback y riesgos.
+
+Pendiente backlog:
+
+| Tarea | Prioridad | Riesgo | Dependencia | Criterio de aceptacion |
+|---|---|---|---|---|
+| Crear dataset Empresa A/B | P0 | CRITICO | customers/items tenant-aware | Usuario A no puede ver cliente/item B |
+| Revisar consumidores legacy de `ItemRepository.findById` | P0 | CRITICO | ventas/pagos/live/reportes futuros | Cada modulo valida company antes de usar item |
+| Migrar `batches` | P0/P1 | ALTO | items.company_id | Items y lotes no cruzan companies |
+| Migrar `storage_locations` | P1 | ALTO | branch/company | Ubicacion solo acepta items de su company |
+| Definir catalogos globales vs tenant | P1 | MEDIO | decision negocio | Product types/brands/sizes no mezclan configuracion privada |

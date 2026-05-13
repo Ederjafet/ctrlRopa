@@ -364,3 +364,32 @@ Decision:
 
 - Avance permitido solo a otra P0 de bajo riesgo.
 - No migrar flujos financieros hasta completar entidad base y QA cross-company.
+
+## Avance Fase 2K - items P0
+
+Completado:
+
+- `items.company_id` agregado por `V41__items_tenant_company.sql`.
+- Backfill de items existentes desde `branches.company_id`.
+- FK `fk_items_company`.
+- Indices por company/branch/status/code/qr/batch/storage location.
+- `V42__items_company_unique_scope.sql` cambia unicidad de codigo/QR de global a scoped por company.
+- Endpoints directos de items filtran por company activa.
+- Create/update/list/find/lookup code/lookup QR/location usan tenant activo o validan branch-company.
+
+Compatibilidad:
+
+- `branch_id` se mantiene para contrato frontend y operacion actual.
+- Company `DEFAULT` conserva datos existentes.
+- Metodos legacy en `ItemRepository` se mantienen para no tocar ventas, pagos, live, paquetes, envios ni reportes.
+
+Pendiente:
+
+- Dataset Empresa A/B para validar fuga cross-company real.
+- Migrar consumidores de `ItemRepository.findById` en ventas/pagos/reservas/live/paquetes/envios/reportes en fases separadas.
+- Decidir si `batches`, `storage_locations` y catalogos quedan company-scoped o globales administrados.
+
+Decision:
+
+- Avance permitido solo a otra P0 no financiera de bajo riesgo.
+- No migrar flujos financieros ni reportes hasta completar QA cross-company.

@@ -1223,3 +1223,41 @@ Decision:
 - `GO condicionado` para siguiente P0 de bajo riesgo.
 - `NO-GO` para ventas, pagos, live y reportes.
 
+## 2026-05-13 - Fase 2K / items tenant-aware
+
+Tipo: implementacion incremental P0 de inventario.
+
+Objetivo:
+
+- Convertir `items` en segunda tabla operativa tenant-aware.
+- Agregar `company_id` obligatorio con backfill desde `branches.company_id`.
+- Filtrar endpoints directos de inventario por company activa.
+- Mantener ventas, pagos, live y reportes fuera de alcance.
+
+Cambios realizados:
+
+- Migracion `V41__items_tenant_company.sql`.
+- Migracion `V42__items_company_unique_scope.sql`.
+- `Item` ahora referencia `Company`.
+- `ItemRepository` agrega consultas tenant-aware y conserva metodos legacy.
+- `ItemService` resuelve tenant activo, valida branch-company y usa consultas por `company_id`.
+- Pruebas unitarias `ItemServiceTests`.
+- Documento `docs/ERP_ITEMS_TENANT_MIGRATION.md`.
+
+Pruebas:
+
+- `.\mvnw.cmd test`: `BUILD SUCCESS`, `22 tests`.
+- Runtime local `localhost:8090`: login `qa.admin` OK, `/api/tenant/current` OK.
+- Runtime items: crear item QA previo, actualizar item `27`, lookup por codigo, lookup por QR y listar inventario de branch `QA_CTR`.
+
+Riesgos pendientes:
+
+- Falta dataset Empresa A/B para fuga cross-company real.
+- Consumidores legacy de items en ventas/pagos/live/reportes/paquetes/envios siguen fuera de alcance.
+- Tablas relacionadas como `batches`, `storage_locations` y catalogos aun requieren decision tenant por modulo.
+
+Decision:
+
+- `GO condicionado` para siguiente P0 no financiera de bajo riesgo.
+- `NO-GO` para ventas, pagos, live y reportes.
+

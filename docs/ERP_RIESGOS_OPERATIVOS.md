@@ -60,6 +60,9 @@ Probabilidad:
 | Clientes tenant-aware con consumidores legacy | ALTO | ALTA durante Fase 2J+ | Endpoints directos de clientes quedan protegidos, pero ventas/pagos/reportes podrian seguir consultando clientes por id sin company hasta sus fases. | No declarar SaaS real; migrar consumidores por modulo y agregar pruebas negativas. | Revertir consumers migrados o mantener operacion mono-company DEFAULT. |
 | Backfill customers incompleto | CRITICO | BAJA/MEDIA durante V40 | Clientes sin `company_id` bloquearian arranque o quedarian huerfanos. | Backfill desde `branches.company_id`, FK y `NOT NULL`; validar Flyway/test. | Restaurar backup o rollback V40 en QA. |
 | Telefono cliente con unicidad insuficiente | MEDIO | MEDIA futura | La unicidad actual es por sucursal; si el negocio espera unicidad por company, puede haber duplicados entre sucursales. | Definir politica antes de multi-branch SaaS completo. | Mantener unicidad por sucursal o limpiar duplicados antes de constraint nuevo. |
+| Items tenant-aware con consumidores legacy | ALTO | ALTA durante Fase 2K+ | Endpoints directos de inventario quedan protegidos, pero ventas/pagos/live/reportes/paquetes/envios podrian seguir consultando items por id sin company hasta sus fases. | No declarar SaaS real; migrar consumidores por modulo y agregar pruebas negativas. | Revertir consumers migrados o mantener operacion mono-company DEFAULT. |
+| Backfill items incompleto | CRITICO | BAJA/MEDIA durante V41 | Items sin `company_id` bloquearian arranque o quedarian huerfanos. | Backfill desde `branches.company_id`, FK y `NOT NULL`; validar Flyway/test. | Restaurar backup o rollback V41/V42 en QA. |
+| QR/codigo item scoped por company sin QA A/B | ALTO | MEDIA futura | Se permite repetir QR/codigo entre companies; sin QA cross-company se podria aprobar aislamiento incompleto. | Probar lookup codigo/QR con Empresa A/B antes de SaaS real. | Mantener operacion DEFAULT o restaurar unicidad global si negocio lo exige. |
 
 ## Acciones que deberian auditarse
 
@@ -93,6 +96,7 @@ Probabilidad:
 - Fase 2G valida runtime tenant-aware, pero dataset QA incompleto mantiene `NO-GO` para P0.
 - Fase 2H prepara script QA tenant-aware; P0 sigue bloqueado hasta ejecutar y validar runtime.
 - Fase 2I valida usuarios QA tenant-aware; avanzar solo a primera P0 de bajo riesgo, no financiera.
+- Fase 2K convierte items/inventario en segunda P0 tenant-aware; no declarar aislamiento SaaS real hasta probar Empresa A/B y migrar consumidores legacy.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.
