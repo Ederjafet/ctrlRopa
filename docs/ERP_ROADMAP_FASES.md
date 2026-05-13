@@ -99,6 +99,21 @@ Riesgo de seguridad:
 - No se debe exponer consola SaaS a clientes ni mezclar permisos `SAAS_*` con permisos ERP.
 - No se debe implementar billing automatico antes de validar suspension/reactivacion y auditoria.
 
+Entregables Fase 2B:
+
+- `ERP_TENANT_ENDPOINT_MATRIX.md`
+- `ERP_TENANT_TABLE_MATRIX.md`
+- `ERP_SAAS_AUDIT_ACTIONS_MATRIX.md`
+- `ERP_TENANT_IMPLEMENTATION_BACKLOG.md`
+
+Criterios de salida Fase 2B:
+
+- Endpoints P0 identificados.
+- Tablas P0 identificadas.
+- Acciones HPSQ-SOFT auditables clasificadas.
+- Backlog tecnico ordenado por dependencia.
+- Decision explicita de no implementar aun.
+
 ## Fase 3 - Validaciones y alertas
 
 Prioridad operacional: ALTA  

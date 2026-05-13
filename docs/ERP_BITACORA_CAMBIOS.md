@@ -774,3 +774,47 @@ Siguiente fase recomendada:
 
 - Fase 2B: matriz endpoint-tabla-tenant, matriz roles SaaS/ERP y matriz de acciones auditables HPSQ-SOFT antes de implementar.
 
+## 2026-05-13 - Fase 2B / matrices tenant y backlog tecnico
+
+Tipo: analisis tecnico documental, sin codigo ni migraciones.
+
+Objetivo:
+
+- Preparar implementacion multi-compania segura.
+- Identificar endpoints P0 que requieren validacion `company_id`.
+- Identificar tablas P0 que requieren `company_id`, indices y unicidad por compania.
+- Clasificar acciones HPSQ-SOFT que deben auditarse.
+- Convertir hallazgos en backlog tecnico ordenado.
+
+Documentos creados:
+
+- `docs/ERP_TENANT_ENDPOINT_MATRIX.md`
+- `docs/ERP_TENANT_TABLE_MATRIX.md`
+- `docs/ERP_SAAS_AUDIT_ACTIONS_MATRIX.md`
+- `docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md`
+
+Documentos actualizados:
+
+- `docs/ERP_ROADMAP_FASES.md`
+- `docs/ERP_RIESGOS_OPERATIVOS.md`
+- `docs/ERP_RESUMEN_EJECUTIVO.md`
+- `docs/ERP_BITACORA_CAMBIOS.md`
+
+Analisis realizado:
+
+- Revision de controladores backend con rutas `/api/*`.
+- Revision de servicios frontend en `services/` y uso de `session.branchId`.
+- Revision de migraciones Flyway actuales para tablas, FKs, unicidades e indices.
+- Revision de documentos Fase 2A multi-compania y SaaS HPSQ-SOFT.
+
+Hallazgos principales:
+
+- Muchos endpoints P0 reciben `branchId`, ids directos, folios, codigos o QR sin un `company_id` explicito en el modelo actual.
+- Las tablas raiz mas criticas son `branches`, `users`, `customers`, `items`, `batches`, `sales`, `payments`, `reservations`, `lives`, `customer_orders`, `customer_packages`, `shipments`, `cash_closures` y `system_movement_audit_log`.
+- Reportes y dashboard son criticos porque agregan multiples fuentes y podrian mezclar datos silenciosamente.
+- Acciones HPSQ-SOFT como suspender empresa, cambiar plan, soporte delegado, consultar/exportar logs y reset de usuarios requieren auditoria estricta.
+
+Siguiente fase recomendada:
+
+- Fase 2C: preparar modelo base `companies`, compania default, diseno tecnico de `CurrentTenantContext` y plan de migracion por tabla antes de tocar flujos operativos.
+

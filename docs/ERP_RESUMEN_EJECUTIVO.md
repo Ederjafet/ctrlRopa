@@ -30,6 +30,8 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 - HPSQ-SOFT debe tener una consola SaaS privada para administrar empresas, planes, soporte, auditoria, salud y branding; esta consola no debe ser visible para usuarios cliente.
 - Roles SaaS HPSQ-SOFT deben separarse de roles ERP cliente para evitar administracion global accidental.
 - Billing/facturacion automatica no debe implementarse todavia; primero se recomienda control administrativo de planes, limites, suspension y reactivacion.
+- Fase 2B convierte el diseno en matrices tecnicas: endpoints P0, tablas P0, acciones HPSQ-SOFT auditables y backlog de implementacion.
+- Los modulos de mayor riesgo tenant son pagos/ventas/caja, reportes/dashboard, inventario/items, usuarios/permisos y soporte/logs.
 
 ## Madurez ERP estimada
 
@@ -48,7 +50,7 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 | Dashboard | 55% |
 | Auditoria | 38% |
 | Seguridad | 65% |
-| Multi-compania / SaaS readiness | 22% |
+| Multi-compania / SaaS readiness | 28% |
 | QA | 74% |
 | UX homogenea | 48% |
 | Trazabilidad | 50% |
@@ -61,8 +63,9 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 2. Limpiar artefactos Git no rastreados antes de release.
 3. Ejecutar checklist RC completo y consolidar evidencia visual formal para frontend web.
 4. Cerrar matriz tabla-endpoint-tenant antes de cualquier migracion multi-compania.
-5. Cerrar matriz de roles SaaS vs roles ERP antes de exponer consola HPSQ-SOFT.
-6. Validar matriz endpoint-permiso en Fase 4 sin asumir cobertura.
-7. Reforzar auditoria funcional en operaciones sensibles.
-8. Homologar UX despues de definir tenant context.
+5. Usar el backlog tenant como entrada para Fase 2C, sin implementar ventas/pagos/reportes todavia.
+6. Cerrar matriz de roles SaaS vs roles ERP antes de exponer consola HPSQ-SOFT.
+7. Validar matriz endpoint-permiso en Fase 4 sin asumir cobertura.
+8. Reforzar auditoria funcional en operaciones sensibles.
+9. Homologar UX despues de definir tenant context.
 

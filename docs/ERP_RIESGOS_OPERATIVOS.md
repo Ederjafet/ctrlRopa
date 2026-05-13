@@ -41,6 +41,9 @@ Probabilidad:
 | Suspension comercial mal aplicada | ALTO | MEDIA | Empresa suspendida podria seguir operando o empresa activa quedar bloqueada. | Validar estado de compania en login/endpoints y QA reactivacion. | Revertir estado desde historial y revalidar acceso. |
 | Limites de plan solo en frontend | ALTO | MEDIA | Cliente podria exceder usuarios, sucursales o modulos por API. | Validacion backend contra `company_subscriptions`. | Desactivar recurso excedente con proceso administrativo. |
 | Soporte HPSQ-SOFT modifica datos financieros | CRITICO | BAJA/MEDIA | Riesgo de saldos/caja incorrectos y responsabilidad operativa. | Prohibir por defecto; herramienta auditada y aprobacion formal si se requiere. | Auditoria, reversa operacional y bloqueo de sesion soporte. |
+| Endpoint P0 sin tenant validation | CRITICO | ALTA durante migracion | Un id directo, folio o branchId podria exponer datos de otra empresa. | Usar `ERP_TENANT_ENDPOINT_MATRIX.md`, bloquear release si endpoint P0 queda sin `company_id`. | Deshabilitar multi-compania o bloquear endpoint afectado. |
+| Tabla P0 sin company_id/backfill | CRITICO | ALTA durante migracion | Datos existentes podrian quedar huerfanos o mezclados. | Usar `ERP_TENANT_TABLE_MATRIX.md`, conteos antes/despues, migracion gradual. | Restaurar backup o mantener columna nullable hasta corregir. |
+| Accion HPSQ-SOFT sin auditoria SaaS | CRITICO | MEDIA | No se podria explicar quien suspendio, cambio plan o accedio a soporte. | Usar `ERP_SAAS_AUDIT_ACTIONS_MATRIX.md`, motivo y doble confirmacion cuando aplique. | Revocar permisos SaaS y suspender consola. |
 
 ## Acciones que deberian auditarse
 
@@ -66,6 +69,7 @@ Probabilidad:
 - Permisos incompletos por validacion dispersa.
 - Multi-compania sin tenant context seria riesgo CRITICO de fuga de datos.
 - Consola SaaS sin separacion de roles HPSQ-SOFT/cliente seria riesgo CRITICO.
+- Fase 2B identifica endpoints/tablas P0; implementacion sin esas matrices cerradas seria riesgo CRITICO.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.
