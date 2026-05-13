@@ -48,6 +48,7 @@ Probabilidad:
 | Cache o logs sin company context | ALTO | MEDIA | Datos/logs de una empresa podrian verse en otra o soporte podria analizar informacion equivocada. | Reglas de enforcement tenant-aware, cache key con companyId, logs sanitizados. | Desactivar cache o filtros afectados. |
 | Company suspendida opera con token previo | CRITICO | MEDIA | Cliente suspendido podria seguir vendiendo/cobrando. | Validar estado company en cada request P0 y revocar sesiones al suspender. | Revocar sesiones y bloquear company. |
 | Bootstrap tenant parcialmente aplicado | ALTO | MEDIA durante Fase 2D | Si la migracion queda aplicada sin validar runtime, sucursales o login podrian fallar por `company_id`. | Smoke QA inmediato de Flyway, login, `/api/tenant/current`, sucursales y dashboard. | Revertir rama o restaurar backup antes de activar multi-compania real. |
+| Runtime backend no sincronizado con rama tenant | ALTO | MEDIA durante Fase 2E | QA podria validar un proceso viejo y tomar decisiones incorrectas sobre `/api/tenant/current`. | Reiniciar/desplegar backend, confirmar build/commit/rama y repetir smoke HTTP autenticado. | Detener validacion runtime, volver al ultimo artefacto conocido y documentar evidencia. |
 
 ## Acciones que deberian auditarse
 
@@ -76,6 +77,7 @@ Probabilidad:
 - Fase 2B identifica endpoints/tablas P0; implementacion sin esas matrices cerradas seria riesgo CRITICO.
 - Fase 2C define foundation tenant; implementacion sin `CurrentTenantContext` central seria riesgo CRITICO.
 - Fase 2D introduce bootstrap tenant minimo; ventas/pagos/reportes siguen sin tenant real y no deben considerarse multi-compania.
+- Fase 2E detecta riesgo de runtime no sincronizado; no migrar P0 sin evidencia HTTP autenticada.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

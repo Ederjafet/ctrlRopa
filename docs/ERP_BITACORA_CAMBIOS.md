@@ -918,3 +918,48 @@ Siguiente fase recomendada:
 
 - Fase 2E: validar runtime del bootstrap tenant, smoke login/sucursales/dashboard y preparar diseno/implementacion de `user_companies` y sesiones tenant-aware antes de migrar tablas P0.
 
+## 2026-05-13 - Fase 2E / validacion runtime tenant
+
+Tipo: validacion y documentacion, sin cambios funcionales.
+
+Objetivo:
+
+- Confirmar bootstrap tenant antes de migrar tablas P0.
+- Documentar evidencia manual y tecnica.
+- Identificar riesgos runtime.
+
+Documento creado:
+
+- `docs/ERP_TENANT_RUNTIME_VALIDATION.md`
+
+Documentos actualizados:
+
+- `docs/ERP_QA_EXECUTION_LOG.md`
+- `docs/ERP_BITACORA_CAMBIOS.md`
+- `docs/ERP_RESUMEN_EJECUTIVO.md`
+- `docs/ERP_TENANT_MIGRATION_STRATEGY.md`
+- `docs/ERP_RIESGOS_OPERATIVOS.md`
+
+Validacion manual reportada:
+
+- Flyway `V38`.
+- Company default `DEFAULT / HPSQ-SOFT Default Company`.
+- Sucursales actuales con `company_id = 1`.
+- Backend, dashboard, navegacion frontend y sucursales operativas.
+- RC previo sin ruptura visible.
+
+Validacion tecnica Codex:
+
+- Revision de `TenantResolver`, `CurrentTenantContext`, `TenantController` y `BranchService`.
+- `.\mvnw.cmd test` exitoso: `8 tests`, `0 failures`, `0 errors`.
+- Intento HTTP contra `localhost:8090` detecto runtime no sincronizado con rama actual: `/api/tenant/current` no registrado y login QA devolvio `500`.
+
+Decision:
+
+- Bootstrap tenant queda `GO condicionado`.
+- Migracion de tablas P0 queda `NO-GO` hasta reiniciar/desplegar backend y capturar evidencia JSON de `/api/tenant/current`.
+
+Siguiente fase recomendada:
+
+- Fase 2F: redeploy/reinicio controlado, smoke tenant runtime autenticado y preparacion de `user_companies`/sesiones tenant-aware.
+

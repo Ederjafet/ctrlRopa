@@ -50,6 +50,12 @@ Validacion:
 - No cambia login.
 - No cambia dashboard.
 
+Estado de validacion Fase 2E:
+
+- Validacion manual reportada como OK para company default, backend, dashboard y navegacion.
+- Pruebas Maven OK.
+- Validacion HTTP autenticada de `/api/tenant/current` queda pendiente por runtime no sincronizado con rama actual.
+
 ### MC-2 - Branches tenant
 
 Estado Fase 2D:
@@ -71,6 +77,12 @@ Validacion:
 - Todas las branches tienen company.
 - No hay branch sin company.
 - Usuario actual sigue viendo sus branches.
+
+Estado de validacion Fase 2E:
+
+- Validacion manual reporta todas las sucursales actuales con `company_id = 1`.
+- Sucursales siguen visibles y operativas.
+- Pendiente capturar evidencia SQL/HTTP formal en QA despues de reinicio/despliegue.
 
 ### MC-3 - Usuarios y sesiones
 
