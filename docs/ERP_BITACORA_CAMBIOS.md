@@ -1130,3 +1130,59 @@ Decision:
 
 - P0 sigue `NO-GO` hasta ejecutar `06-usuarios-tenant-qa.sql` y repetir smoke 2G.
 
+## 2026-05-13 - Fase 2I / runtime smoke tenant users
+
+Tipo: validacion runtime real con SQL QA aplicado.
+
+Objetivo:
+
+- Ejecutar `docs/qa/06-usuarios-tenant-qa.sql`.
+- Validar usuarios QA tenant-aware.
+- Confirmar sesiones con `active_company_id` y `active_branch_id`.
+- Validar permisos negativos, reportes y soporte antes de P0.
+
+Documento creado:
+
+- `docs/ERP_TENANT_RUNTIME_VALIDATION_2I.md`
+
+Documentos actualizados:
+
+- `docs/ERP_QA_EXECUTION_LOG.md`
+- `docs/ERP_BITACORA_CAMBIOS.md`
+- `docs/ERP_RESUMEN_EJECUTIVO.md`
+- `docs/ERP_RIESGOS_OPERATIVOS.md`
+- `docs/ERP_TENANT_MIGRATION_STRATEGY.md`
+
+Validacion ejecutada:
+
+- SQL QA `06-usuarios-tenant-qa.sql` aplicado correctamente.
+- Usuarios `qa.sinpermisos`, `qa.reportes`, `qa.soporte` activos.
+- Los tres usuarios quedan en `QA_CTR`, company `DEFAULT`, con `user_companies=YES`.
+- Sesiones legacy de esos tres usuarios revocadas.
+- Login OK para `qa.admin`, `qa.sinpermisos`, `qa.reportes`, `qa.soporte`.
+- `/api/tenant/current` OK para los cuatro usuarios.
+- Dashboard y sucursales OK.
+- `/api/users` devuelve 403 esperado para `qa.sinpermisos` y `qa.reportes`.
+- `/api/users` OK para `qa.admin` y `qa.soporte`.
+- Reportes OK para `qa.reportes` y `qa.soporte`.
+- Reportes 403 esperado para `qa.sinpermisos`.
+- Sesiones nuevas de usuarios QA con `active_company_id=1`, `active_branch_id=4`.
+- Logs backend sin `500`, `ERROR`, CORS, auth inesperado ni errores tenant en tramo revisado.
+- Logs frontend sin errores relevantes en tramo revisado.
+- `.\mvnw.cmd test`: `BUILD SUCCESS`, `14 tests`.
+
+Riesgos pendientes:
+
+- Existen sesiones legacy de `qa.admin` con tenant null.
+- Todavia no existe dataset Empresa A/B para afirmar aislamiento cross-company real.
+- Branches/reportes aun no deben considerarse tenant P0 final.
+
+Decision:
+
+- `GO condicionado` para iniciar primera P0 de bajo riesgo.
+- Mantener fuera de alcance ventas, pagos, live y reportes.
+
+Siguiente fase recomendada:
+
+- Fase 2J: seleccionar primera tabla P0 de bajo riesgo, proponer migracion/backfill/rollback y preparar QA Empresa A/B antes de declarar aislamiento SaaS real.
+

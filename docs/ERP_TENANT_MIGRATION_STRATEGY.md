@@ -140,6 +140,20 @@ Preparacion Fase 2H:
 - No es migracion Flyway y no debe ejecutarse en PROD.
 - P0 sigue bloqueado hasta ejecutar el script en QA y repetir smoke tenant-aware.
 
+Estado de validacion Fase 2I:
+
+- `docs/qa/06-usuarios-tenant-qa.sql` ejecutado en QA local.
+- `qa.admin`, `qa.sinpermisos`, `qa.reportes` y `qa.soporte` validan login.
+- Los cuatro usuarios resuelven `/api/tenant/current` con `DEFAULT / QA_CTR`.
+- Sesiones nuevas guardan `active_company_id=1` y `active_branch_id=4`.
+- `qa.sinpermisos` recibe 403 esperado en `/api/users` y reportes.
+- `qa.reportes` accede a reportes y recibe 403 esperado en `/api/users`.
+- `qa.soporte` conserva acceso tecnico esperado.
+- Maven test OK.
+- Decision: `GO condicionado` para primera tabla P0 de bajo riesgo.
+- Restriccion: no migrar ventas, pagos, live ni reportes en la primera P0.
+- Pendiente: dataset Empresa A/B para validar fuga cross-company real.
+
 ### MC-4 - Tablas P0 operativas
 
 Tablas:

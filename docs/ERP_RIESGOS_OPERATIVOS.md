@@ -55,6 +55,8 @@ Probabilidad:
 | Dataset QA tenant incompleto | ALTO | ALTA durante Fase 2G | No se pueden validar permisos negativos, reportes y soporte antes de migrar P0. | Restaurar/ejecutar scripts QA controlados y asegurar `user_companies` para usuarios creados despues de V39. | No migrar P0; volver a dataset QA conocido. |
 | Sesiones legacy con tenant null | MEDIO | MEDIA durante transicion | Validaciones estrictas SaaS podrian mezclar evidencia de sesiones antiguas con fallback. | Revocar o expirar sesiones previas antes de QA cross-company. | Mantener fallback temporal solo en mono-company. |
 | Script QA tenant ejecutado en ambiente incorrecto | ALTO | BAJA/MEDIA | Usuarios de prueba, roles o passwords QA podrian contaminar un ambiente no QA. | Mantener `06-usuarios-tenant-qa.sql` en `docs/qa`, con advertencia NO PROD y respaldo previo. | Restaurar backup o eliminar usuarios `qa.*@local.test`. |
+| Primera P0 elegida con alto riesgo | CRITICO | MEDIA durante Fase 2J | Migrar ventas, pagos, live o reportes demasiado pronto puede romper operacion y trazabilidad financiera. | Elegir P0 de bajo riesgo, con backfill simple, pruebas API y rollback. | Revertir rama y restaurar backup antes de liberar. |
+| Validacion cross-company sin Empresa B | ALTO | ALTA antes de dataset SaaS | Se podria aprobar tenant sin probar fuga real entre companias. | Crear dataset Empresa A/B antes de declarar aislamiento SaaS. | Mantener sistema en company DEFAULT solamente. |
 
 ## Acciones que deberian auditarse
 
@@ -87,6 +89,7 @@ Probabilidad:
 - Fase 2F agrega sesiones tenant-aware minimas; no habilitar multi-company real hasta validar runtime y permisos por company.
 - Fase 2G valida runtime tenant-aware, pero dataset QA incompleto mantiene `NO-GO` para P0.
 - Fase 2H prepara script QA tenant-aware; P0 sigue bloqueado hasta ejecutar y validar runtime.
+- Fase 2I valida usuarios QA tenant-aware; avanzar solo a primera P0 de bajo riesgo, no financiera.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.
