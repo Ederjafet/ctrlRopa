@@ -86,8 +86,8 @@ Subfases:
 
 - Fase 2A: diseno multi-compania / SaaS seguro.
 - Fase 2B: matriz endpoint-tabla-tenant antes de implementar.
-- Fase 2C: modelo companies, tenant settings y compania default, si se aprueba.
-- Fase 2D: tenant context backend y filtros por company.
+- Fase 2C: tenant core foundation, CurrentTenantContext, auth tenant-aware, enforcement y estrategia de migracion.
+- Fase 2D: modelo companies, tenant settings y compania default, si se aprueba.
 - Fase 2E: permisos por compania y roles SaaS separados.
 - Fase 2F: consola HPSQ-SOFT minima sin tocar operacion financiera.
 - Fase 2G: QA cross-company, suspension/reactivacion y limites de plan.
@@ -112,6 +112,25 @@ Criterios de salida Fase 2B:
 - Tablas P0 identificadas.
 - Acciones HPSQ-SOFT auditables clasificadas.
 - Backlog tecnico ordenado por dependencia.
+- Decision explicita de no implementar aun.
+
+Entregables Fase 2C:
+
+- `ERP_TENANT_CORE_FOUNDATION.md`
+- `ERP_CURRENT_TENANT_CONTEXT_DESIGN.md`
+- `ERP_TENANT_AUTH_SECURITY.md`
+- `ERP_TENANT_MIGRATION_STRATEGY.md`
+- `ERP_TENANT_ENFORCEMENT_RULES.md`
+- `ERP_TENANT_RISK_SCENARIOS.md`
+
+Criterios de salida Fase 2C:
+
+- Estrategia tenant-aware oficial definida.
+- Diseno `CurrentTenantContext` documentado.
+- Auth/security tenant-aware documentado.
+- Reglas de enforcement obligatorias definidas.
+- Estrategia de migracion incremental definida.
+- Escenarios de riesgo SaaS documentados.
 - Decision explicita de no implementar aun.
 
 ## Fase 3 - Validaciones y alertas

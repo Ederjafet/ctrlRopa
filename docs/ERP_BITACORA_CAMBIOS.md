@@ -818,3 +818,53 @@ Siguiente fase recomendada:
 
 - Fase 2C: preparar modelo base `companies`, compania default, diseno tecnico de `CurrentTenantContext` y plan de migracion por tabla antes de tocar flujos operativos.
 
+## 2026-05-13 - Fase 2C / tenant core foundation
+
+Tipo: diseno tecnico avanzado, sin codigo ni migraciones.
+
+Objetivo:
+
+- Definir el nucleo tenant-aware antes de implementar.
+- Documentar `CurrentTenantContext`.
+- Documentar auth/security tenant-aware.
+- Documentar estrategia de migracion incremental.
+- Definir reglas obligatorias de enforcement.
+- Documentar escenarios de riesgo SaaS.
+
+Documentos creados:
+
+- `docs/ERP_TENANT_CORE_FOUNDATION.md`
+- `docs/ERP_CURRENT_TENANT_CONTEXT_DESIGN.md`
+- `docs/ERP_TENANT_AUTH_SECURITY.md`
+- `docs/ERP_TENANT_MIGRATION_STRATEGY.md`
+- `docs/ERP_TENANT_ENFORCEMENT_RULES.md`
+- `docs/ERP_TENANT_RISK_SCENARIOS.md`
+
+Documentos actualizados:
+
+- `docs/ERP_ROADMAP_FASES.md`
+- `docs/ERP_RIESGOS_OPERATIVOS.md`
+- `docs/ERP_RESUMEN_EJECUTIVO.md`
+- `docs/ERP_BITACORA_CAMBIOS.md`
+
+Decisiones documentadas:
+
+- El backend sera la unica autoridad tenant.
+- `CurrentTenantContext` debe propagarse controller -> service -> query -> auditoria/logs.
+- Company y branch se validan en cada request P0.
+- Auth debe preferir resolver permisos server-side para evitar tokens stale.
+- No iniciar implementacion por ventas/pagos/reportes; primero foundation tenant.
+
+Riesgos destacados:
+
+- Query sin `company_id`.
+- Lookup global por QR/codigo.
+- Reporte sin filtro tenant.
+- Cache contaminado.
+- Company suspendida operando con token previo.
+- Soporte HPSQ-SOFT sin auditoria o sin expiracion.
+
+Siguiente fase recomendada:
+
+- Fase 2D: disenar/implementar en rama separada el modelo minimo `companies`, company default y validacion branch-company, con migraciones controladas y QA de login/dashboard antes de tocar flujos financieros.
+

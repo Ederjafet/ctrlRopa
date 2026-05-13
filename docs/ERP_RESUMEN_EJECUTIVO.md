@@ -32,6 +32,8 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 - Billing/facturacion automatica no debe implementarse todavia; primero se recomienda control administrativo de planes, limites, suspension y reactivacion.
 - Fase 2B convierte el diseno en matrices tecnicas: endpoints P0, tablas P0, acciones HPSQ-SOFT auditables y backlog de implementacion.
 - Los modulos de mayor riesgo tenant son pagos/ventas/caja, reportes/dashboard, inventario/items, usuarios/permisos y soporte/logs.
+- Fase 2C define el tenant core foundation: `CurrentTenantContext`, auth tenant-aware, enforcement obligatorio, migracion incremental y escenarios de riesgo SaaS.
+- La implementacion real no debe iniciar por ventas/pagos/reportes; debe iniciar por contexto tenant, company default, branch validation y auditoria.
 
 ## Madurez ERP estimada
 
@@ -50,7 +52,7 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 | Dashboard | 55% |
 | Auditoria | 38% |
 | Seguridad | 65% |
-| Multi-compania / SaaS readiness | 28% |
+| Multi-compania / SaaS readiness | 34% |
 | QA | 74% |
 | UX homogenea | 48% |
 | Trazabilidad | 50% |
@@ -63,9 +65,10 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 2. Limpiar artefactos Git no rastreados antes de release.
 3. Ejecutar checklist RC completo y consolidar evidencia visual formal para frontend web.
 4. Cerrar matriz tabla-endpoint-tenant antes de cualquier migracion multi-compania.
-5. Usar el backlog tenant como entrada para Fase 2C, sin implementar ventas/pagos/reportes todavia.
-6. Cerrar matriz de roles SaaS vs roles ERP antes de exponer consola HPSQ-SOFT.
-7. Validar matriz endpoint-permiso en Fase 4 sin asumir cobertura.
-8. Reforzar auditoria funcional en operaciones sensibles.
-9. Homologar UX despues de definir tenant context.
+5. Usar foundation tenant como entrada para Fase 2D, sin implementar ventas/pagos/reportes todavia.
+6. Disenar plan tecnico de `companies` + company default + branch validation antes de cualquier endpoint operativo.
+7. Cerrar matriz de roles SaaS vs roles ERP antes de exponer consola HPSQ-SOFT.
+8. Validar matriz endpoint-permiso en Fase 4 sin asumir cobertura.
+9. Reforzar auditoria funcional en operaciones sensibles.
+10. Homologar UX despues de definir tenant context.
 
