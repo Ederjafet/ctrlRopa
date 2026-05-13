@@ -86,18 +86,37 @@ Estado de validacion Fase 2E:
 
 ### MC-3 - Usuarios y sesiones
 
-Futuro:
+Estado Fase 2F:
 
-- Crear `user_companies`.
-- Backfill usuarios actuales.
-- Validar `user_branches` contra company.
-- Preparar `user_api_sessions` tenant-aware.
+- Implementado `user_companies`.
+- Backfill inicial de usuarios actuales hacia company default derivada de `users.branch_id`.
+- `user_api_sessions` ahora puede guardar `active_company_id` y `active_branch_id`.
+- Login nuevo crea sesion con tenant activo.
+- `TenantResolver` resuelve tenant desde sesion activa cuando existe token.
+- Se conserva fallback temporal desde `users.branch_id` para compatibilidad con sesiones antiguas.
+- No se implemento selector/cambio de tenant.
+- No se implementaron permisos por company.
+
+Diseno pendiente:
+
+- Crear selector/cambio de tenant auditado.
+- Definir active company/branch en refresh token si se implementa.
+- Revocar o recalcular sesiones cuando company se suspenda.
+- Migrar roles/permisos a company scope.
 
 Validacion:
 
 - Todos los usuarios activos tienen company.
 - Usuarios QA login OK.
 - Usuario sin company no opera.
+- Usuario no puede operar branch fuera de su company.
+- `/api/tenant/current` devuelve company/branch activa con token valido.
+
+Estado de pruebas Fase 2F:
+
+- `.\mvnw.cmd test` exitoso.
+- Flyway valido `39 migrations`.
+- Validacion runtime real queda pendiente despues de reiniciar/desplegar backend.
 
 ### MC-4 - Tablas P0 operativas
 

@@ -30,4 +30,10 @@ class HealthControllerSecurityTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("OK"));
     }
+
+    @Test
+    void tenantCurrentRequiresSessionToken() throws Exception {
+        mockMvc.perform(get("/api/tenant/current"))
+                .andExpect(status().isUnauthorized());
+    }
 }

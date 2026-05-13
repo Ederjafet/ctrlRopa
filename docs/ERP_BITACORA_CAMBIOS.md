@@ -963,3 +963,65 @@ Siguiente fase recomendada:
 
 - Fase 2F: redeploy/reinicio controlado, smoke tenant runtime autenticado y preparacion de `user_companies`/sesiones tenant-aware.
 
+## 2026-05-13 - Fase 2F / tenant runtime hardening
+
+Tipo: implementacion minima backend/base de datos.
+
+Objetivo:
+
+- Preparar sesiones tenant-aware sin migrar ventas, pagos, live, reportes ni tablas P0.
+- Crear relacion usuario-company.
+- Guardar company/branch activa en sesiones nuevas.
+- Mantener fallback compatible con el RC actual.
+
+Cambios realizados:
+
+- Creada migracion `V39__tenant_user_company_sessions.sql`.
+- Creada tabla `user_companies`.
+- Agregadas columnas `user_api_sessions.active_company_id` y `active_branch_id`.
+- Agregado backfill de usuarios actuales hacia company default.
+- Agregado backfill de sesiones actuales cuando aplica.
+- Agregado `UserCompany`, `UserCompanyId`, `UserCompanyRepository` y `UserCompanyService`.
+- `AuthService` crea sesiones nuevas con tenant activo.
+- `ApiTokenFilter` valida company/branch activa cuando la sesion las trae.
+- `TenantResolver` resuelve tenant desde sesion activa y conserva fallback temporal.
+- Agregadas pruebas unitarias de user-company/branch y tenant current protegido.
+
+Documentos creados:
+
+- `docs/ERP_TENANT_RUNTIME_HARDENING.md`
+
+Documentos actualizados:
+
+- `docs/ERP_BITACORA_CAMBIOS.md`
+- `docs/ERP_TENANT_MIGRATION_STRATEGY.md`
+- `docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md`
+- `docs/ERP_RIESGOS_OPERATIVOS.md`
+
+Pruebas ejecutadas:
+
+- `.\mvnw.cmd test`
+- Resultado: `BUILD SUCCESS`, `14 tests`, `0 failures`, `0 errors`.
+- Flyway valido `39 migrations`.
+
+Fuera de alcance respetado:
+
+- No se tocaron ventas.
+- No se tocaron pagos.
+- No se tocaron reportes.
+- No se toco live.
+- No se modifico frontend.
+- No se implemento consola SaaS.
+- No se implemento selector de tenant.
+
+Riesgos pendientes:
+
+- Roles y permisos siguen globales.
+- Tablas P0 operativas siguen sin `company_id`.
+- Selector/cambio de tenant para usuarios multi-company queda pendiente.
+- Fallback por usuario/sucursal debe retirarse cuando las sesiones tenant-aware esten estabilizadas.
+
+Siguiente fase recomendada:
+
+- Fase 2G: validacion runtime real de login, `/api/tenant/current`, `user_companies`, sesiones con `active_company_id`, dashboard y sucursales antes de migrar tablas P0.
+

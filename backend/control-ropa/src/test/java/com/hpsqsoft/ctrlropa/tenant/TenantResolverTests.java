@@ -18,7 +18,8 @@ class TenantResolverTests {
 
     private final JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
     private final CurrentUser currentUser = mock(CurrentUser.class);
-    private final TenantResolver resolver = new TenantResolver(jdbcTemplate, currentUser);
+    private final UserCompanyService userCompanyService = mock(UserCompanyService.class);
+    private final TenantResolver resolver = new TenantResolver(jdbcTemplate, currentUser, userCompanyService);
 
     @Test
     void currentTenantResolvesFromAuthenticatedUser() {
@@ -40,6 +41,29 @@ class TenantResolverTests {
 
         org.junit.jupiter.api.Assertions.assertEquals(1L, result.getCompanyId());
         org.junit.jupiter.api.Assertions.assertEquals(10L, result.getBranchId());
+    }
+
+    @Test
+    void currentTenantCanResolveFromActiveSession() {
+        CurrentTenantContext expected = new CurrentTenantContext(
+                1L,
+                "DEFAULT",
+                "HPSQ-SOFT Default Company",
+                10L,
+                "CTR",
+                "Centro",
+                99L
+        );
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(currentUser.getCurrentTokenHash()).thenReturn("token-hash");
+        when(jdbcTemplate.query(anyString(), anyResultSetExtractor(), eq("token-hash"), eq(99L)))
+                .thenReturn(expected);
+
+        CurrentTenantContext result = resolver.resolveCurrent();
+
+        org.junit.jupiter.api.Assertions.assertEquals(1L, result.getCompanyId());
+        org.junit.jupiter.api.Assertions.assertEquals(99L, result.getUserId());
     }
 
     @Test

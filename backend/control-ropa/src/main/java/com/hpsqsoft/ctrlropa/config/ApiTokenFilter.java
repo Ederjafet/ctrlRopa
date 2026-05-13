@@ -94,11 +94,15 @@ public class ApiTokenFilter extends OncePerRequestFilter {
                 SELECT COUNT(*)
                 FROM user_api_sessions s
                 JOIN users u ON u.id = s.user_id
+                LEFT JOIN companies c ON c.id = s.active_company_id
+                LEFT JOIN branches b ON b.id = s.active_branch_id
                 WHERE s.token_hash = ?
                   AND s.revoked_at IS NULL
                   AND s.expires_at > CURRENT_TIMESTAMP
                   AND (s.absolute_expires_at IS NULL OR s.absolute_expires_at > CURRENT_TIMESTAMP)
                   AND u.status = 'ACTIVE'
+                  AND (s.active_company_id IS NULL OR c.status = 'ACTIVE')
+                  AND (s.active_branch_id IS NULL OR (b.status = 'ACTIVE' AND b.company_id = s.active_company_id))
                 """,
                 Integer.class,
                 sha256(token)

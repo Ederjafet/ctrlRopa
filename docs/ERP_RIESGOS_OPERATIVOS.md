@@ -49,6 +49,9 @@ Probabilidad:
 | Company suspendida opera con token previo | CRITICO | MEDIA | Cliente suspendido podria seguir vendiendo/cobrando. | Validar estado company en cada request P0 y revocar sesiones al suspender. | Revocar sesiones y bloquear company. |
 | Bootstrap tenant parcialmente aplicado | ALTO | MEDIA durante Fase 2D | Si la migracion queda aplicada sin validar runtime, sucursales o login podrian fallar por `company_id`. | Smoke QA inmediato de Flyway, login, `/api/tenant/current`, sucursales y dashboard. | Revertir rama o restaurar backup antes de activar multi-compania real. |
 | Runtime backend no sincronizado con rama tenant | ALTO | MEDIA durante Fase 2E | QA podria validar un proceso viejo y tomar decisiones incorrectas sobre `/api/tenant/current`. | Reiniciar/desplegar backend, confirmar build/commit/rama y repetir smoke HTTP autenticado. | Detener validacion runtime, volver al ultimo artefacto conocido y documentar evidencia. |
+| Sesion tenant activa inconsistente | CRITICO | MEDIA durante Fase 2F/F2G | Un token podria apuntar a company/branch incorrecta y abrir riesgo cross-company futuro. | Guardar `active_company_id`/`active_branch_id`, validar company activa, branch activa y branch-company por request. | Revocar sesiones afectadas y volver a fallback mono-company hasta corregir. |
+| Usuario sin relacion company opera por fallback | ALTO | MEDIA durante transicion | Un usuario legacy podria depender de `users.branch_id` y ocultar un problema de asignacion tenant. | Backfill `user_companies`, pruebas negativas, retirar fallback cuando QA lo permita. | Bloquear usuario o restaurar asignacion default controlada. |
+| Usuario multi-company sin selector auditado | ALTO | MEDIA futura | Usuario con varias companies podria operar en la company equivocada si no hay seleccion explicita. | Implementar selector/cambio de tenant auditado antes de habilitar multi-company real. | Limitar usuario a una company hasta completar selector. |
 
 ## Acciones que deberian auditarse
 
@@ -78,6 +81,7 @@ Probabilidad:
 - Fase 2C define foundation tenant; implementacion sin `CurrentTenantContext` central seria riesgo CRITICO.
 - Fase 2D introduce bootstrap tenant minimo; ventas/pagos/reportes siguen sin tenant real y no deben considerarse multi-compania.
 - Fase 2E detecta riesgo de runtime no sincronizado; no migrar P0 sin evidencia HTTP autenticada.
+- Fase 2F agrega sesiones tenant-aware minimas; no habilitar multi-company real hasta validar runtime y permisos por company.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

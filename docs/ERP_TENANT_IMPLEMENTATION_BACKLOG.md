@@ -142,3 +142,36 @@ Pendiente antes de tocar flujos financieros:
 ## Siguiente fase recomendada
 
 Fase 2E debe validar bootstrap tenant en QA y preparar `user_companies`/sesiones tenant-aware. No conviene tocar ventas/pagos/reportes antes de validar login, sucursales y dashboard sobre company default.
+
+## Avance Fase 2F
+
+Completado en tenant runtime hardening minimo:
+
+- Migracion `V39__tenant_user_company_sessions.sql`.
+- Tabla `user_companies`.
+- Backfill usuarios actuales hacia company default.
+- Columnas `user_api_sessions.active_company_id` y `active_branch_id`.
+- Backfill de sesiones existentes cuando existe usuario/sucursal/company.
+- Modelo/repositorio/servicio `UserCompany`.
+- Validacion usuario-company.
+- Validacion usuario-branch-company.
+- Login crea sesion con tenant activo.
+- `TenantResolver` usa tenant activo de sesion y fallback temporal.
+- `ApiTokenFilter` valida estado de company/branch activa.
+- `/api/tenant/current` protegido por token.
+
+Pruebas:
+
+- `.\mvnw.cmd test` exitoso con `14 tests`.
+
+Pendiente antes de tablas P0:
+
+- Validar runtime real despues de reiniciar/desplegar backend.
+- Capturar evidencia de `/api/tenant/current` autenticado.
+- Confirmar SQL de `user_companies` y sesiones activas.
+- Definir selector de tenant para usuarios multi-company.
+- Definir permisos por company antes de endpoints operativos.
+
+Nueva recomendacion:
+
+Fase 2G debe ser validacion runtime y no migracion P0. Las tablas `customers`, `items`, `sales`, `payments`, `lives`, `reports` y paquetes siguen fuera de alcance hasta tener evidencia de tenant session estable.

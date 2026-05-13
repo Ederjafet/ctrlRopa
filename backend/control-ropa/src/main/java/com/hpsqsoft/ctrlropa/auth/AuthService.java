@@ -162,11 +162,14 @@ public class AuthService {
         secureRandom.nextBytes(randomBytes);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
         Integer absoluteHours = settings.getAbsoluteSessionTimeoutHours();
+        DefaultTenantRow tenant = findDefaultTenantForUser(userId);
 
         jdbcTemplate.update(
                 """
                 INSERT INTO user_api_sessions (
                   user_id,
+                  active_company_id,
+                  active_branch_id,
                   token_hash,
                   expires_at,
                   absolute_expires_at,
@@ -174,6 +177,8 @@ public class AuthService {
                   ip_address,
                   user_agent
                 ) VALUES (
+                  ?,
+                  ?,
                   ?,
                   ?,
                   DATE_ADD(CURRENT_TIMESTAMP, INTERVAL ? MINUTE),
@@ -184,6 +189,8 @@ public class AuthService {
                 )
                 """,
                 userId,
+                tenant.companyId(),
+                tenant.branchId(),
                 sha256(token),
                 settings.getSessionTimeoutMinutes(),
                 absoluteHours,
@@ -193,6 +200,36 @@ public class AuthService {
         );
 
         return token;
+    }
+
+    private DefaultTenantRow findDefaultTenantForUser(Long userId) {
+        return jdbcTemplate.query(
+                """
+                SELECT
+                  c.id AS company_id,
+                  b.id AS branch_id
+                FROM users u
+                JOIN branches b ON b.id = u.branch_id
+                JOIN companies c ON c.id = b.company_id
+                JOIN user_companies uc ON uc.user_id = u.id
+                                      AND uc.company_id = c.id
+                                      AND uc.status = 'ACTIVE'
+                WHERE u.id = ?
+                  AND u.status = 'ACTIVE'
+                  AND b.status = 'ACTIVE'
+                  AND c.status = 'ACTIVE'
+                """,
+                rs -> {
+                    if (!rs.next()) {
+                        throw new AccessDeniedException("No se pudo resolver company activa para la sesion");
+                    }
+                    return new DefaultTenantRow(
+                            rs.getLong("company_id"),
+                            rs.getLong("branch_id")
+                    );
+                },
+                userId
+        );
     }
 
     private String sha256(String value) {
@@ -632,6 +669,12 @@ public class AuthService {
             Long id,
             Long branchId,
             String name
+    ) {
+    }
+
+    private record DefaultTenantRow(
+            Long companyId,
+            Long branchId
     ) {
     }
 }
