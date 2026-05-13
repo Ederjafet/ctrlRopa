@@ -30,6 +30,7 @@ Arquitectura objetivo para convertir el sistema en ERP estable, auditable, modul
 - Login/logout auditables.
 - Password policy configurable.
 - Bloqueos y desbloqueos con trazabilidad.
+- Contexto futuro multi-compania: `activeCompanyId`, `activeBranchId`, companias permitidas y modo soporte.
 
 ## Permisos
 
@@ -38,6 +39,9 @@ Arquitectura objetivo para convertir el sistema en ERP estable, auditable, modul
 - Validacion backend obligatoria.
 - Frontend solo oculta/guia; backend siempre decide.
 - Perfil operativo, administrador y tecnico separados.
+- Roles/permisos por compania para ERP cliente.
+- Roles SaaS HPSQ-SOFT separados de roles ERP cliente.
+- Permisos `SAAS_*` exclusivos para consola privada HPSQ-SOFT.
 
 ## Auditoria
 
@@ -45,6 +49,8 @@ Arquitectura objetivo para convertir el sistema en ERP estable, auditable, modul
 - Eventos de negocio futuros: venta registrada, pago anulado, lote recibido, paquete cerrado, usuario modificado.
 - Auditoria de intentos fallidos en acciones sensibles.
 - Retencion y consulta por perfil tecnico/admin.
+- Auditoria SaaS para alta/suspension/reactivacion de empresas, cambios de plan, acceso soporte y consulta de logs.
+- Auditoria tenant-aware con `company_id`, `branch_id`, actor, motivo y resultado.
 
 ## QA
 
@@ -68,6 +74,8 @@ Arquitectura objetivo para convertir el sistema en ERP estable, auditable, modul
 - Errores JSON normalizados.
 - No exponer detalle tecnico a usuario operativo.
 - Observabilidad de latencia por endpoint.
+- Tenant isolation obligatorio por backend.
+- Ningun endpoint debe confiar en `companyId` o `branchId` recibido sin validarlo contra sesion.
 
 ## Modulos ERP
 
@@ -76,6 +84,19 @@ Arquitectura objetivo para convertir el sistema en ERP estable, auditable, modul
 - Logistica: paquetes, envios, transferencias.
 - Finanzas: caja, reembolsos, saldos.
 - Control: reportes, auditoria, seguridad.
+
+## Plataforma SaaS HPSQ-SOFT
+
+- Consola privada HPSQ-SOFT separada del ERP cliente.
+- Administracion de empresas.
+- Planes, suscripciones, limites y estado.
+- Modulos habilitados por empresa.
+- Branding por empresa.
+- Soporte delegado con motivo, ticket, caducidad y auditoria.
+- Salud por empresa y metricas de uso.
+- Bitacora global.
+
+No debe operar ventas/pagos directamente salvo herramienta futura formal y auditada.
 
 ## Integracion futura
 
@@ -89,6 +110,7 @@ Arquitectura objetivo para convertir el sistema en ERP estable, auditable, modul
 ## Trazabilidad
 
 - Toda accion critica debe responder: quien, cuando, desde que sucursal, que cambio, a que entidad afecto y resultado.
+- En SaaS tambien debe responder: que usuario HPSQ-SOFT, sobre que compania, con que motivo, bajo que rol y con que resultado.
 
 ## Observabilidad
 
@@ -104,4 +126,6 @@ Arquitectura objetivo para convertir el sistema en ERP estable, auditable, modul
 - Versionado por fase.
 - Rollback definido por artefacto y datos.
 - No liberar con deuda desconocida en flujos criticos.
+- No liberar multi-compania sin QA cross-company.
+- No liberar consola SaaS sin pruebas negativas de cliente y auditoria.
 

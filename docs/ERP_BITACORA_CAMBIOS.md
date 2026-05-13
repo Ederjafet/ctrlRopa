@@ -672,3 +672,105 @@ Riesgos pendientes:
 - Revisar artefactos Git/`KI-001` antes de merge/tag.
 - Repetir smoke tecnico y visual en ventana final de release.
 
+## 2026-05-12 - Fase 2A / diseno multi-compania
+
+Tipo: arquitectura SaaS y seguridad multi-tenant.
+
+Objetivo:
+
+- Disenar multi-compania antes de implementar.
+- Evitar fuga de datos entre clientes/empresas.
+- Mantener una sola aplicacion y una sola base en un solo servidor.
+- No modificar codigo, base de datos, migraciones, frontend, backend ni SQL.
+
+Analisis realizado:
+
+- Backend actual modular en `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa`.
+- Esquema actual basado en `branches`, `users.branch_id` y `user_branches`.
+- Seguridad actual con `ApiTokenFilter`, `CurrentUser` y `AccessService`.
+- Frontend actual basado en `session.branchId` y servicios por `/branch/{branchId}`.
+- Reportes actuales reciben `branchId` y requieren tenant scope futuro.
+
+Documentos creados:
+
+- `docs/ERP_MULTICOMPANY_ARCHITECTURE.md`
+- `docs/ERP_MULTICOMPANY_DATA_MODEL.md`
+- `docs/ERP_MULTICOMPANY_SECURITY.md`
+- `docs/ERP_MULTICOMPANY_MIGRATION_PLAN.md`
+- `docs/ERP_MULTICOMPANY_QA_PLAN.md`
+
+Documentos actualizados:
+
+- `docs/ERP_ROADMAP_FASES.md`
+- `docs/ERP_RIESGOS_OPERATIVOS.md`
+- `docs/ERP_RESUMEN_EJECUTIVO.md`
+- `docs/ERP_BITACORA_CAMBIOS.md`
+
+Decision arquitectonica sugerida:
+
+- Usar una sola base de datos y una sola aplicacion.
+- Agregar `company_id` obligatorio en tablas tenant-scoped.
+- Mantener `branch_id` como scope operativo subordinado a `company_id`.
+- Resolver tenant en backend desde token/sesion; no confiar en frontend.
+
+Riesgos criticos:
+
+- Fuga de datos entre companias si se usa solo `branch_id`.
+- Permisos globales aplicados indebidamente a varias empresas.
+- Reportes financieros sin filtro `company_id`.
+- Soporte tecnico HPSQ-SOFT sin auditoria por compania.
+
+Siguiente fase recomendada:
+
+- Fase 2B: crear matriz endpoint-tabla-tenant y matriz de migracion por tabla antes de escribir codigo o SQL.
+
+## 2026-05-12 - Fase 2A / ampliacion consola SaaS HPSQ-SOFT
+
+Tipo: arquitectura SaaS, product ownership y seguridad de plataforma.
+
+Objetivo:
+
+- Ampliar el diseno multi-compania para incluir consola privada HPSQ-SOFT.
+- Separar administracion SaaS de operacion ERP cliente.
+- Definir roles HPSQ-SOFT, roles cliente, planes, limites, suspension, soporte y auditoria.
+- Mantener la regla de no implementar codigo, migraciones ni cambios funcionales.
+
+Documentos creados:
+
+- `docs/ERP_SAAS_ADMIN_CONSOLE.md`
+- `docs/ERP_SAAS_ROLES_PERMISSIONS.md`
+- `docs/ERP_SAAS_BILLING_AND_PLANS.md`
+
+Documentos actualizados:
+
+- `docs/ERP_MULTICOMPANY_ARCHITECTURE.md`
+- `docs/ERP_MULTICOMPANY_DATA_MODEL.md`
+- `docs/ERP_MULTICOMPANY_SECURITY.md`
+- `docs/ERP_MULTICOMPANY_MIGRATION_PLAN.md`
+- `docs/ERP_MULTICOMPANY_QA_PLAN.md`
+- `docs/ERP_ROADMAP_FASES.md`
+- `docs/ERP_RIESGOS_OPERATIVOS.md`
+- `docs/ERP_RESUMEN_EJECUTIVO.md`
+- `docs/ERP_TARGET_ARCHITECTURE.md`
+- `docs/ERP_OWNERSHIP_MATRIX.md`
+- `docs/ERP_BITACORA_CAMBIOS.md`
+
+Decision:
+
+- Mantener una sola aplicacion y una sola base con `company_id`.
+- Crear consola SaaS privada HPSQ-SOFT en fases futuras, no visible para clientes.
+- Separar roles `SAAS_*` y roles HPSQ-SOFT de roles ERP cliente.
+- No implementar billing automatico todavia; primero controles administrativos, limites, suspension/reactivacion y auditoria.
+
+Riesgos agregados:
+
+- Consola SaaS visible a clientes.
+- Soporte HPSQ-SOFT con acceso excesivo.
+- Suspension comercial mal aplicada.
+- Limites de plan validados solo en frontend.
+- Modificacion de ventas/pagos desde soporte sin proceso formal.
+
+Siguiente fase recomendada:
+
+- Fase 2B: matriz endpoint-tabla-tenant, matriz roles SaaS/ERP y matriz de acciones auditables HPSQ-SOFT antes de implementar.
+

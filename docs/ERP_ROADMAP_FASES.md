@@ -51,23 +51,53 @@ Siguiente subfase recomendada:
 
 - Fase 1G: ejecutar QA real controlado, registrar evidencia y decidir release candidate.
 
-## Fase 2 - Homologacion UX/UI
+## Fase 2 - Arquitectura multi-compania, consola SaaS y homologacion UX/UI
 
-Prioridad operacional: ALTA  
+Prioridad operacional: CRITICA  
 Esfuerzo estimado: ALTO  
-Riesgo de regresion: MEDIO.
+Riesgo de regresion: ALTO si se implementa sin tenant context; BAJO en Fase 2A documental.
 
 Dependencias:
 
 - Fase 1 cerrada.
+- RC candidato aprobable documentado.
+- Modelo multi-compania aprobado antes de cualquier migracion.
+- Consola SaaS HPSQ-SOFT aprobada antes de exponer administracion global.
+- Roles SaaS separados aprobados antes de crear rutas privadas.
 - Guia UX aprobada.
 - Componentes base identificados.
 
 Criterios de salida:
 
+- Fase 2A: arquitectura multi-compania documentada.
+- Modelo recomendado definido: una sola base, una sola app, `company_id` obligatorio.
+- Seguridad tenant documentada.
+- Consola SaaS HPSQ-SOFT documentada.
+- Roles/permisos SaaS separados de roles ERP cliente.
+- Planes, suscripciones, limites y suspension documentados sin implementacion automatica.
+- Plan de migracion gradual definido.
+- QA de aislamiento multi-compania definido.
+- No iniciar migraciones hasta cerrar matriz tabla/endpoints tenant.
 - Uso consistente de `AppBottomModal`, `AppNoticeDropdown`, `AppButton` y estados vacios.
 - Mensajes tecnicos no visibles al usuario operativo.
 - Pantallas criticas validadas en web/mobile.
+
+Subfases:
+
+- Fase 2A: diseno multi-compania / SaaS seguro.
+- Fase 2B: matriz endpoint-tabla-tenant antes de implementar.
+- Fase 2C: modelo companies, tenant settings y compania default, si se aprueba.
+- Fase 2D: tenant context backend y filtros por company.
+- Fase 2E: permisos por compania y roles SaaS separados.
+- Fase 2F: consola HPSQ-SOFT minima sin tocar operacion financiera.
+- Fase 2G: QA cross-company, suspension/reactivacion y limites de plan.
+- Fase 2H: homologacion UX/UI sobre base tenant-aware.
+
+Riesgo de seguridad:
+
+- No se debe avanzar a multi-compania funcional sin validar que cada endpoint filtre por `company_id`.
+- No se debe exponer consola SaaS a clientes ni mezclar permisos `SAAS_*` con permisos ERP.
+- No se debe implementar billing automatico antes de validar suspension/reactivacion y auditoria.
 
 ## Fase 3 - Validaciones y alertas
 
