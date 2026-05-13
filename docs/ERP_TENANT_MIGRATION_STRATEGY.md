@@ -118,6 +118,20 @@ Estado de pruebas Fase 2F:
 - Flyway valido `39 migrations`.
 - Validacion runtime real queda pendiente despues de reiniciar/desplegar backend.
 
+Estado de validacion Fase 2G:
+
+- Backend reiniciado en `localhost:8090`.
+- Flyway `V39` confirmado por SQL.
+- Company `DEFAULT` activa confirmada.
+- `branches`: `5/5` con `company_id`.
+- `user_companies`: `14` registros.
+- Login `qa.admin@local.test` OK y sesion nueva con `active_company_id=1`, `active_branch_id=4`.
+- `/api/tenant/current` sin token devuelve `401`.
+- `/api/tenant/current` con token devuelve company/branch activa.
+- Dashboard y sucursales activas responden OK.
+- `qa.sinpermisos`, `qa.reportes` y `qa.soporte` no existen en la base runtime actual; completar dataset antes de P0.
+- Decision: `NO-GO` para migrar primera tabla P0 hasta repetir smoke con dataset QA completo.
+
 ### MC-4 - Tablas P0 operativas
 
 Tablas:

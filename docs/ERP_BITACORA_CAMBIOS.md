@@ -1025,3 +1025,59 @@ Siguiente fase recomendada:
 
 - Fase 2G: validacion runtime real de login, `/api/tenant/current`, `user_companies`, sesiones con `active_company_id`, dashboard y sucursales antes de migrar tablas P0.
 
+## 2026-05-13 - Fase 2G / validacion runtime tenant-aware
+
+Tipo: validacion runtime y documentacion.
+
+Objetivo:
+
+- Confirmar que el backend reiniciado desde la rama actual crea sesiones tenant-aware.
+- Validar `/api/tenant/current` sin token y con token valido.
+- Validar compatibilidad con dashboard y sucursales.
+- Decidir GO/NO-GO antes de migrar tablas P0.
+
+Documento creado:
+
+- `docs/ERP_TENANT_RUNTIME_VALIDATION_2G.md`
+
+Documentos actualizados:
+
+- `docs/ERP_QA_EXECUTION_LOG.md`
+- `docs/ERP_BITACORA_CAMBIOS.md`
+- `docs/ERP_RESUMEN_EJECUTIVO.md`
+- `docs/ERP_TENANT_MIGRATION_STRATEGY.md`
+- `docs/ERP_RIESGOS_OPERATIVOS.md`
+
+Validacion ejecutada:
+
+- Flyway V39 confirmado por SQL.
+- Company `DEFAULT` activa confirmada.
+- `branches`: `5/5` con `company_id`.
+- `user_companies`: `14` registros.
+- Reinicio backend de proceso viejo a proceso nuevo en `8090`.
+- `/api/health`: `200`.
+- `/api/tenant/current` sin token: `401`.
+- Login `qa.admin@local.test`: OK.
+- Login `qa.vendedor.centro@local.test`: OK.
+- `/api/tenant/current` con token admin: `companyId=1`, `branchId=4`, `branchCode=QA_CTR`.
+- Dashboard: OK.
+- Branches activas: OK.
+- Sesion nueva `qa.admin` confirmada con `active_company_id=1` y `active_branch_id=4`.
+- `.\mvnw.cmd test`: `BUILD SUCCESS`, `14 tests`.
+
+Hallazgos:
+
+- El runtime previo en `8090` no estaba sincronizado con Fase 2F; generaba sesiones con tenant null.
+- Despues del reinicio limpio, sesiones nuevas ya guardan tenant activo.
+- `qa.sinpermisos@local.test`, `qa.reportes@local.test` y `qa.soporte@local.test` no existen en la base runtime actual; por eso fallan con 403.
+- Existen sesiones antiguas con `active_company_id=NULL`; fallback compatible aceptado temporalmente.
+
+Decision:
+
+- `GO tecnico condicionado` para runtime tenant-aware.
+- `NO-GO` para migrar primera tabla P0 hasta completar dataset QA y repetir smoke de permisos/reportes/soporte.
+
+Siguiente fase recomendada:
+
+- Fase 2H: completar dataset QA de usuarios faltantes, asegurar `user_companies` para usuarios creados despues de V39, revocar/expirar sesiones legacy si se requiere, y repetir validacion runtime antes de tocar P0.
+
