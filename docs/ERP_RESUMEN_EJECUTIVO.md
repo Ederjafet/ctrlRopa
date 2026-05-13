@@ -2,7 +2,7 @@
 
 Fecha de analisis inicial: 2026-05-11  
 Ultima actualizacion: 2026-05-13  
-Alcance: Fase 0 a Fase 2I, incluyendo RC candidato Fase 1 y smoke runtime tenant-aware con usuarios QA.
+Alcance: Fase 0 a Fase 2J, incluyendo RC candidato Fase 1, smoke runtime tenant-aware con usuarios QA y primera tabla P0 tenant-aware.
 
 ## Estado general
 
@@ -10,7 +10,7 @@ Estado estimado: MEDIO, con modulos FRAGILES en flujos operativos de alto cambio
 
 El proyecto ya tiene una base util para crecer: frontend Expo/React Native con rutas por pantalla en `app/`, backend Spring Boot modular en `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa`, migraciones Flyway en `backend/control-ropa/src/main/resources/db/migration` y permisos centralizados por codigo en `PermissionCode.java`.
 
-La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de UX, validaciones, seguridad declarativa, auditoria funcional y regresion automatizada amplia. La Fase 1G ejecuto la primera corrida QA real: API operativa en flujos principales, pero RC rechazado por bloqueos de frontend web, health check y dataset de perfiles de seguridad/soporte. En validaciones posteriores, los usuarios QA de permisos negativos, reportes y soporte ya iniciaron sesion correctamente, y el healthcheck backend fue validado por runtime real en `http://localhost:8090/api/health` con `HTTP/1.1 200 OK`. En Fase 1K el frontend QA responde en `http://localhost:8081`, las rutas base validadas decodifican UTF-8 sin mojibake y `npm run web` ya no se bloquea por permisos de log/cache. En Fase 1L no quedan bloqueos `SEV-1` ni `SEV-2`; la decision recomendada es `GO PARA RC CANDIDATO APROBABLE`, sin aprobar release final automatico. En Fase 2A se inicia el diseno SaaS multi-compania: la recomendacion arquitectonica es una sola aplicacion y una sola base con `company_id` obligatorio, tenant context backend, QA estricto de aislamiento y consola SaaS privada HPSQ-SOFT separada del ERP operativo de clientes. En Fase 2D se implemento bootstrap minimo `companies` + company default + `branches.company_id`; en Fase 2F se agregaron `user_companies` y sesiones con `active_company_id`/`active_branch_id`; en Fase 2I se ejecuto smoke runtime con usuarios QA completos: admin, sin permisos, reportes y soporte inician sesion, resuelven tenant actual, cargan dashboard/sucursales y respetan permisos esperados. La decision cambia a `GO condicionado` para iniciar primera P0 de bajo riesgo, manteniendo fuera ventas, pagos, live y reportes.
+La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de UX, validaciones, seguridad declarativa, auditoria funcional y regresion automatizada amplia. La Fase 1G ejecuto la primera corrida QA real: API operativa en flujos principales, pero RC rechazado por bloqueos de frontend web, health check y dataset de perfiles de seguridad/soporte. En validaciones posteriores, los usuarios QA de permisos negativos, reportes y soporte ya iniciaron sesion correctamente, y el healthcheck backend fue validado por runtime real en `http://localhost:8090/api/health` con `HTTP/1.1 200 OK`. En Fase 1K el frontend QA responde en `http://localhost:8081`, las rutas base validadas decodifican UTF-8 sin mojibake y `npm run web` ya no se bloquea por permisos de log/cache. En Fase 1L no quedan bloqueos `SEV-1` ni `SEV-2`; la decision recomendada es `GO PARA RC CANDIDATO APROBABLE`, sin aprobar release final automatico. En Fase 2A se inicia el diseno SaaS multi-compania: la recomendacion arquitectonica es una sola aplicacion y una sola base con `company_id` obligatorio, tenant context backend, QA estricto de aislamiento y consola SaaS privada HPSQ-SOFT separada del ERP operativo de clientes. En Fase 2D se implemento bootstrap minimo `companies` + company default + `branches.company_id`; en Fase 2F se agregaron `user_companies` y sesiones con `active_company_id`/`active_branch_id`; en Fase 2I se ejecuto smoke runtime con usuarios QA completos: admin, sin permisos, reportes y soporte inician sesion, resuelven tenant actual, cargan dashboard/sucursales y respetan permisos esperados. En Fase 2J `customers` se convierte en la primera tabla P0 tenant-aware con `company_id`, backfill desde sucursales, endpoints directos filtrados por company activa y QA runtime create/list/search/update/deactivate. La decision queda `GO condicionado` para otra P0 de bajo riesgo, manteniendo fuera ventas, pagos, live y reportes.
 
 ## Hallazgos clave
 
@@ -24,7 +24,7 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 - El repositorio Git ya existe y la Fase 1G se trabaja sobre `feature/fase1g-primera-corrida-qa-real`; queda pendiente limpiar o ignorar `.tmp-pdf-images/` y diffs no rastreados de fases anteriores.
 - Primera corrida QA real: venta QA `saleId=1` y pago QA `paymentId=1` creados correctamente en ambiente QA.
 - Decision QA actual: `GO PARA RC CANDIDATO APROBABLE`; backend/API queda tecnicamente validado y `KI-002`, `KI-003`, `KI-004`, `KI-005`, `KI-006`, `KI-007` y `KI-008` quedaron resueltos validados. `KI-001` queda abierto como `SEV-3` no bloqueante para RC candidato. Falta ejecutar checklist RC completo con evidencia visual formal antes de aprobar release final.
-- Multi-compania actual: no existe `company_id`; la arquitectura actual es mono-compania/multi-sucursal con `branch_id` como eje operativo.
+- Multi-compania actual: ya existe `company_id` en `branches` y `customers`; la arquitectura operativa sigue siendo mono-company `DEFAULT` hasta completar dataset Empresa A/B y migrar el resto de tablas P0.
 - Decision arquitectonica Fase 2A: adoptar una sola base compartida con `company_id`, no base por compania ni esquema por compania para la primera evolucion.
 - Riesgo critico Fase 2A: no implementar multi-compania funcional hasta que backend valide tenant por cada endpoint y reporte.
 - HPSQ-SOFT debe tener una consola SaaS privada para administrar empresas, planes, soporte, auditoria, salud y branding; esta consola no debe ser visible para usuarios cliente.
@@ -35,13 +35,14 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 - Fase 2C define el tenant core foundation: `CurrentTenantContext`, auth tenant-aware, enforcement obligatorio, migracion incremental y escenarios de riesgo SaaS.
 - La implementacion real no debe iniciar por ventas/pagos/reportes; debe iniciar por contexto tenant, company default, branch validation y auditoria.
 - Fase 2D/2F/2I: bootstrap tenant minimo y sesiones tenant-aware implementadas; usuarios QA tenant validados. Se permite avanzar solo a primera P0 de bajo riesgo con rollback y sin tocar ventas/pagos/live/reportes.
+- Fase 2J: `customers` queda tenant-aware en endpoints directos. Todavia falta dataset Empresa A/B y migrar consumidores legacy antes de declarar aislamiento SaaS real.
 
 ## Madurez ERP estimada
 
 | Area | Madurez |
 |---|---:|
 | Usuarios y permisos | 72% |
-| Clientes | 60% |
+| Clientes | 68% |
 | Proveedores | 45% |
 | Inventario | 65% |
 | Lotes | 55% |
@@ -53,12 +54,12 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 | Dashboard | 55% |
 | Auditoria | 38% |
 | Seguridad | 65% |
-| Multi-compania / SaaS readiness | 48% |
+| Multi-compania / SaaS readiness | 52% |
 | QA | 74% |
 | UX homogenea | 48% |
 | Trazabilidad | 50% |
 | Gobernanza ERP | 76% |
-| ERP readiness general | 70% |
+| ERP readiness general | 71% |
 
 ## Prioridad inmediata
 

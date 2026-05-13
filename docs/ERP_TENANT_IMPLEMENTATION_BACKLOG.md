@@ -175,3 +175,25 @@ Pendiente antes de tablas P0:
 Nueva recomendacion:
 
 Fase 2G debe ser validacion runtime y no migracion P0. Las tablas `customers`, `items`, `sales`, `payments`, `lives`, `reports` y paquetes siguen fuera de alcance hasta tener evidencia de tenant session estable.
+
+## Avance Fase 2J
+
+Epic: primera P0 operativa tenant-aware.
+
+Completado:
+
+- Migrar `customers` con `company_id`.
+- Backfill desde `branches.company_id`.
+- Filtrar endpoints directos de clientes por tenant activo.
+- Probar create/list/search/update/deactivate en runtime local.
+- Documentar rollback y riesgos.
+
+Pendiente backlog:
+
+| Tarea | Prioridad | Riesgo | Dependencia | Criterio de aceptacion |
+|---|---|---|---|---|
+| Crear dataset Empresa A/B | P0 | CRITICO | customers tenant-aware | Usuario A no puede ver cliente B |
+| Migrar `customer_addresses` | P1 | ALTO | customers.company_id | Direcciones solo accesibles desde customer de company activa |
+| Migrar `customer_owner_history` | P1 | ALTO | customers.company_id | Historial solo de customer/company activa |
+| Revisar consumidores legacy de `CustomerRepository.findById` | P0 | CRITICO | entidades P0 siguientes | Cada modulo valida company antes de usar customer |
+| Definir unicidad telefono por company o branch | P1 | MEDIO | decision negocio | Constraint documentado y probado |

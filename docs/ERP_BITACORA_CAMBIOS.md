@@ -1186,3 +1186,40 @@ Siguiente fase recomendada:
 
 - Fase 2J: seleccionar primera tabla P0 de bajo riesgo, proponer migracion/backfill/rollback y preparar QA Empresa A/B antes de declarar aislamiento SaaS real.
 
+## 2026-05-13 - Fase 2J / customers tenant-aware
+
+Tipo: implementacion incremental P0 de bajo riesgo.
+
+Objetivo:
+
+- Convertir `customers` en primera tabla operativa tenant-aware.
+- Agregar `company_id` obligatorio con backfill desde `branches.company_id`.
+- Filtrar endpoints directos de clientes por company activa.
+- Mantener ventas, pagos, live y reportes fuera de alcance.
+
+Cambios realizados:
+
+- Migracion `V40__customers_tenant_company.sql`.
+- `Customer` ahora referencia `Company`.
+- `CustomerRepository` agrega consultas tenant-aware y conserva metodos legacy.
+- `CustomerService` resuelve tenant activo, valida branch-company y usa consultas por `company_id`.
+- Pruebas unitarias `CustomerServiceTests`.
+- Documento `docs/ERP_CUSTOMERS_TENANT_MIGRATION.md`.
+
+Pruebas:
+
+- `.\mvnw.cmd test`: `BUILD SUCCESS`, `18 tests`.
+- Runtime local `localhost:8090`: health OK, login `qa.admin` OK, `/api/tenant/current` OK.
+- Runtime customers: crear/listar/buscar/actualizar/desactivar cliente QA en branch `QA_CTR`.
+
+Riesgos pendientes:
+
+- Falta dataset Empresa A/B para fuga cross-company real.
+- Direcciones/historial de cliente siguen P1.
+- Modulos que referencian `customers` desde ventas/pagos/reportes siguen fuera de alcance.
+
+Decision:
+
+- `GO condicionado` para siguiente P0 de bajo riesgo.
+- `NO-GO` para ventas, pagos, live y reportes.
+

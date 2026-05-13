@@ -57,6 +57,9 @@ Probabilidad:
 | Script QA tenant ejecutado en ambiente incorrecto | ALTO | BAJA/MEDIA | Usuarios de prueba, roles o passwords QA podrian contaminar un ambiente no QA. | Mantener `06-usuarios-tenant-qa.sql` en `docs/qa`, con advertencia NO PROD y respaldo previo. | Restaurar backup o eliminar usuarios `qa.*@local.test`. |
 | Primera P0 elegida con alto riesgo | CRITICO | MEDIA durante Fase 2J | Migrar ventas, pagos, live o reportes demasiado pronto puede romper operacion y trazabilidad financiera. | Elegir P0 de bajo riesgo, con backfill simple, pruebas API y rollback. | Revertir rama y restaurar backup antes de liberar. |
 | Validacion cross-company sin Empresa B | ALTO | ALTA antes de dataset SaaS | Se podria aprobar tenant sin probar fuga real entre companias. | Crear dataset Empresa A/B antes de declarar aislamiento SaaS. | Mantener sistema en company DEFAULT solamente. |
+| Clientes tenant-aware con consumidores legacy | ALTO | ALTA durante Fase 2J+ | Endpoints directos de clientes quedan protegidos, pero ventas/pagos/reportes podrian seguir consultando clientes por id sin company hasta sus fases. | No declarar SaaS real; migrar consumidores por modulo y agregar pruebas negativas. | Revertir consumers migrados o mantener operacion mono-company DEFAULT. |
+| Backfill customers incompleto | CRITICO | BAJA/MEDIA durante V40 | Clientes sin `company_id` bloquearian arranque o quedarian huerfanos. | Backfill desde `branches.company_id`, FK y `NOT NULL`; validar Flyway/test. | Restaurar backup o rollback V40 en QA. |
+| Telefono cliente con unicidad insuficiente | MEDIO | MEDIA futura | La unicidad actual es por sucursal; si el negocio espera unicidad por company, puede haber duplicados entre sucursales. | Definir politica antes de multi-branch SaaS completo. | Mantener unicidad por sucursal o limpiar duplicados antes de constraint nuevo. |
 
 ## Acciones que deberian auditarse
 

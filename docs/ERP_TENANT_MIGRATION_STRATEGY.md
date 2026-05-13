@@ -336,3 +336,31 @@ Recomendacion:
 ## Recomendacion
 
 Fase 2D implementa el bootstrap minimo: `companies`, company default, `branches.company_id`, `CurrentTenantContext`, `TenantResolver` y `/api/tenant/current`. La siguiente fase no debe tocar flujos financieros todavia; conviene validar runtime QA, login, sucursales y dashboard con company default antes de migrar tablas P0 operativas.
+
+## Avance Fase 2J - customers P0
+
+Completado:
+
+- `customers.company_id` agregado por `V40__customers_tenant_company.sql`.
+- Backfill de clientes existentes desde `branches.company_id`.
+- FK `fk_customers_company`.
+- Indices por company/branch/status/phone.
+- Endpoints directos de clientes filtran por company activa.
+- Create/update/list/search/find/deactivate de clientes usan tenant activo.
+
+Compatibilidad:
+
+- `branch_id` se mantiene para contrato frontend y operacion actual.
+- Company `DEFAULT` conserva datos existentes.
+- Metodos legacy en `CustomerRepository` se mantienen para no tocar ventas, pagos, live ni reportes.
+
+Pendiente:
+
+- Dataset Empresa A/B para validar fuga cross-company real.
+- Migrar `customer_addresses` y `customer_owner_history` como P1 derivado.
+- Migrar consumidores de `CustomerRepository.findById` en ventas/pagos/reservas/paquetes/reportes en fases separadas.
+
+Decision:
+
+- Avance permitido solo a otra P0 de bajo riesgo.
+- No migrar flujos financieros hasta completar entidad base y QA cross-company.
