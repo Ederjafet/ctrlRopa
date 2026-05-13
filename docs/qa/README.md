@@ -12,6 +12,19 @@ Este paquete prepara una prueba completa de un dia operativo usando datos aislad
 6. Comparar el cierre contra `resultados-esperados.md`.
 7. Opcional: ejecutar `02-limpieza-datos-qa.sql` al finalizar.
 
+## Orden adicional para tenant-aware
+
+Despues de aplicar migraciones hasta `V39`, ejecutar tambien:
+
+```text
+06-usuarios-tenant-qa.sql
+```
+
+Este script es solo QA y asegura que `qa.reportes@local.test`,
+`qa.sinpermisos@local.test` y `qa.soporte@local.test` existan, tengan
+company `DEFAULT`, sucursal `QA_CTR`, registros en `user_companies` y sesiones
+legacy revocadas para forzar login tenant-aware.
+
 ## Usuarios QA
 
 Todos usan la misma clave:

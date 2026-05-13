@@ -1081,3 +1081,52 @@ Siguiente fase recomendada:
 
 - Fase 2H: completar dataset QA de usuarios faltantes, asegurar `user_companies` para usuarios creados despues de V39, revocar/expirar sesiones legacy si se requiere, y repetir validacion runtime antes de tocar P0.
 
+## 2026-05-13 - Fase 2H / usuarios QA tenant-aware
+
+Tipo: SQL QA y documentacion, sin cambios productivos.
+
+Objetivo:
+
+- Completar dataset QA tenant-aware para perfiles faltantes.
+- Preparar usuarios `qa.sinpermisos`, `qa.reportes` y `qa.soporte` antes de migrar tablas P0.
+- Asegurar company DEFAULT, branch QA_CTR, `user_companies` y sesiones legacy revocadas.
+
+Archivos creados:
+
+- `docs/qa/06-usuarios-tenant-qa.sql`
+
+Archivos actualizados:
+
+- `docs/qa/README.md`
+- `docs/ERP_QA_EXECUTION_LOG.md`
+- `docs/ERP_BITACORA_CAMBIOS.md`
+- `docs/ERP_TENANT_MIGRATION_STRATEGY.md`
+- `docs/ERP_RIESGOS_OPERATIVOS.md`
+- `docs/ERP_TENANT_RUNTIME_VALIDATION_2G.md`
+
+Alcance del script:
+
+- Crea/reactiva `qa.reportes@local.test`, `qa.sinpermisos@local.test`, `qa.soporte@local.test`.
+- Resetea password QA `{noop}Qa12345!`.
+- Asigna sucursal `QA_CTR`.
+- Asegura branches QA bajo company `DEFAULT`.
+- Inserta/actualiza `user_companies`.
+- Inserta/actualiza `user_branches`.
+- Reasigna roles `REPORTS`, `NO_ACCESS`, `SUPPORT_TECH`.
+- Revoca sesiones legacy de esos correos para forzar nuevo login tenant-aware.
+
+Pruebas:
+
+- No aplica `.\mvnw.cmd test`: solo se modificaron docs y SQL QA.
+- SQL no ejecutado en esta fase para evitar modificar runtime sin aprobacion explicita.
+
+Riesgos pendientes:
+
+- Ejecutar el script en QA y capturar evidencia SQL.
+- Repetir login de usuarios faltantes.
+- Confirmar que nuevas sesiones tengan `active_company_id` y `active_branch_id`.
+
+Decision:
+
+- P0 sigue `NO-GO` hasta ejecutar `06-usuarios-tenant-qa.sql` y repetir smoke 2G.
+

@@ -359,3 +359,29 @@ Fase 2H:
 - Repetir smoke tenant runtime.
 - Revocar sesiones legacy sin active tenant si se requiere validacion estricta.
 - Solo despues evaluar migracion de primera tabla P0 de bajo riesgo.
+
+## Seguimiento Fase 2H
+
+Se creo `docs/qa/06-usuarios-tenant-qa.sql` para preparar los usuarios faltantes:
+
+- `qa.sinpermisos@local.test`
+- `qa.reportes@local.test`
+- `qa.soporte@local.test`
+
+El script:
+
+- Es solo QA.
+- No es migracion Flyway.
+- Asegura `QA_CTR` bajo company `DEFAULT`.
+- Crea/reactiva usuarios.
+- Resetea password QA.
+- Inserta/actualiza `user_companies`.
+- Inserta/actualiza `user_branches`.
+- Reasigna roles/permisos esperados.
+- Revoca sesiones legacy de esos usuarios.
+
+Estado:
+
+- Pendiente ejecutar en QA.
+- Pendiente repetir smoke 2G.
+- Decision P0 se mantiene `NO-GO` hasta validar esos usuarios en runtime.

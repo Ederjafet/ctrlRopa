@@ -54,6 +54,7 @@ Probabilidad:
 | Usuario multi-company sin selector auditado | ALTO | MEDIA futura | Usuario con varias companies podria operar en la company equivocada si no hay seleccion explicita. | Implementar selector/cambio de tenant auditado antes de habilitar multi-company real. | Limitar usuario a una company hasta completar selector. |
 | Dataset QA tenant incompleto | ALTO | ALTA durante Fase 2G | No se pueden validar permisos negativos, reportes y soporte antes de migrar P0. | Restaurar/ejecutar scripts QA controlados y asegurar `user_companies` para usuarios creados despues de V39. | No migrar P0; volver a dataset QA conocido. |
 | Sesiones legacy con tenant null | MEDIO | MEDIA durante transicion | Validaciones estrictas SaaS podrian mezclar evidencia de sesiones antiguas con fallback. | Revocar o expirar sesiones previas antes de QA cross-company. | Mantener fallback temporal solo en mono-company. |
+| Script QA tenant ejecutado en ambiente incorrecto | ALTO | BAJA/MEDIA | Usuarios de prueba, roles o passwords QA podrian contaminar un ambiente no QA. | Mantener `06-usuarios-tenant-qa.sql` en `docs/qa`, con advertencia NO PROD y respaldo previo. | Restaurar backup o eliminar usuarios `qa.*@local.test`. |
 
 ## Acciones que deberian auditarse
 
@@ -85,6 +86,7 @@ Probabilidad:
 - Fase 2E detecta riesgo de runtime no sincronizado; no migrar P0 sin evidencia HTTP autenticada.
 - Fase 2F agrega sesiones tenant-aware minimas; no habilitar multi-company real hasta validar runtime y permisos por company.
 - Fase 2G valida runtime tenant-aware, pero dataset QA incompleto mantiene `NO-GO` para P0.
+- Fase 2H prepara script QA tenant-aware; P0 sigue bloqueado hasta ejecutar y validar runtime.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

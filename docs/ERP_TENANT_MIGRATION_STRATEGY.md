@@ -132,6 +132,14 @@ Estado de validacion Fase 2G:
 - `qa.sinpermisos`, `qa.reportes` y `qa.soporte` no existen en la base runtime actual; completar dataset antes de P0.
 - Decision: `NO-GO` para migrar primera tabla P0 hasta repetir smoke con dataset QA completo.
 
+Preparacion Fase 2H:
+
+- Creado script QA `docs/qa/06-usuarios-tenant-qa.sql`.
+- El script prepara `qa.sinpermisos`, `qa.reportes` y `qa.soporte` con branch `QA_CTR`, company `DEFAULT` y `user_companies`.
+- El script revoca sesiones legacy de esos usuarios para forzar login tenant-aware.
+- No es migracion Flyway y no debe ejecutarse en PROD.
+- P0 sigue bloqueado hasta ejecutar el script en QA y repetir smoke tenant-aware.
+
 ### MC-4 - Tablas P0 operativas
 
 Tablas:
