@@ -2,7 +2,7 @@
 
 Fecha de analisis inicial: 2026-05-11  
 Ultima actualizacion: 2026-05-17
-Alcance: Fase 0 a Fase 2N, incluyendo RC candidato Fase 1, smoke runtime tenant-aware, primeras tablas P0 tenant-aware, lotes tenant-aware runtime y dataset QA Empresa A/B.
+Alcance: Fase 0 a Fase 2O, incluyendo RC candidato Fase 1, smoke runtime tenant-aware, primeras tablas P0 tenant-aware, lotes tenant-aware runtime, dataset QA Empresa A/B y validacion runtime A/B.
 
 ## Estado general
 
@@ -10,7 +10,7 @@ Estado estimado: MEDIO, con modulos FRAGILES en flujos operativos de alto cambio
 
 El proyecto ya tiene una base util para crecer: frontend Expo/React Native con rutas por pantalla en `app/`, backend Spring Boot modular en `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa`, migraciones Flyway en `backend/control-ropa/src/main/resources/db/migration` y permisos centralizados por codigo en `PermissionCode.java`.
 
-La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de UX, validaciones, seguridad declarativa, auditoria funcional y regresion automatizada amplia. La Fase 1G ejecuto la primera corrida QA real: API operativa en flujos principales, pero RC rechazado por bloqueos de frontend web, health check y dataset de perfiles de seguridad/soporte. En validaciones posteriores, los usuarios QA de permisos negativos, reportes y soporte ya iniciaron sesion correctamente, y el healthcheck backend fue validado por runtime real en `http://localhost:8090/api/health` con `HTTP/1.1 200 OK`. En Fase 1K el frontend QA responde en `http://localhost:8081`, las rutas base validadas decodifican UTF-8 sin mojibake y `npm run web` ya no se bloquea por permisos de log/cache. En Fase 1L no quedan bloqueos `SEV-1` ni `SEV-2`; la decision recomendada es `GO PARA RC CANDIDATO APROBABLE`, sin aprobar release final automatico. En Fase 2A se inicia el diseno SaaS multi-compania: la recomendacion arquitectonica es una sola aplicacion y una sola base con `company_id` obligatorio, tenant context backend, QA estricto de aislamiento y consola SaaS privada HPSQ-SOFT separada del ERP operativo de clientes. En Fase 2D se implemento bootstrap minimo `companies` + company default + `branches.company_id`; en Fase 2F se agregaron `user_companies` y sesiones con `active_company_id`/`active_branch_id`; en Fase 2I se ejecuto smoke runtime con usuarios QA completos. En Fase 2J `customers` se convierte en la primera tabla P0 tenant-aware. En Fase 2K `items`/inventario se convierte en la segunda tabla P0 tenant-aware. En Fase 2M `batches` queda tenant-aware para endpoints directos. En Fase 2N se prepara dataset QA Empresa A/B con companies, branches, usuarios y datos duplicados para probar aislamiento real. Aun no se debe declarar SaaS real porque falta ejecutar runtime smoke A/B, proveedores tenant-aware y revision de consumidores legacy en ventas, pagos, live, reservaciones y reportes.
+La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de UX, validaciones, seguridad declarativa, auditoria funcional y regresion automatizada amplia. La Fase 1G ejecuto la primera corrida QA real: API operativa en flujos principales, pero RC rechazado por bloqueos de frontend web, health check y dataset de perfiles de seguridad/soporte. En validaciones posteriores, los usuarios QA de permisos negativos, reportes y soporte ya iniciaron sesion correctamente, y el healthcheck backend fue validado por runtime real en `http://localhost:8090/api/health` con `HTTP/1.1 200 OK`. En Fase 1K el frontend QA responde en `http://localhost:8081`, las rutas base validadas decodifican UTF-8 sin mojibake y `npm run web` ya no se bloquea por permisos de log/cache. En Fase 1L no quedan bloqueos `SEV-1` ni `SEV-2`; la decision recomendada es `GO PARA RC CANDIDATO APROBABLE`, sin aprobar release final automatico. En Fase 2A se inicia el diseno SaaS multi-compania: la recomendacion arquitectonica es una sola aplicacion y una sola base con `company_id` obligatorio, tenant context backend, QA estricto de aislamiento y consola SaaS privada HPSQ-SOFT separada del ERP operativo de clientes. En Fase 2D se implemento bootstrap minimo `companies` + company default + `branches.company_id`; en Fase 2F se agregaron `user_companies` y sesiones con `active_company_id`/`active_branch_id`; en Fase 2I se ejecuto smoke runtime con usuarios QA completos. En Fase 2J `customers` se convierte en la primera tabla P0 tenant-aware. En Fase 2K `items`/inventario se convierte en la segunda tabla P0 tenant-aware. En Fase 2M `batches` queda tenant-aware para endpoints directos. En Fase 2N se prepara dataset QA Empresa A/B. En Fase 2O se valida runtime A/B: login, tenant current, customers, items, lookup code/QR y batches por folio quedan aislados entre `QA_A` y `QA_B`, y `DEFAULT` sigue operativo. Aun no se debe declarar SaaS real porque faltan proveedores tenant-aware, permisos por company y revision de consumidores legacy en ventas, pagos, live, reservaciones y reportes.
 
 ## Hallazgos clave
 
@@ -38,6 +38,7 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 - Fase 2J: `customers` queda tenant-aware en endpoints directos. Fase 2K: `items` queda tenant-aware en endpoints directos. Todavia falta dataset Empresa A/B y migrar consumidores legacy antes de declarar aislamiento SaaS real.
 - Fase 2L/2M: `batches` queda planificado e implementado como tenant-aware en endpoints directos. La implementacion se mantuvo aislada de ventas/pagos/live/reportes.
 - Fase 2N: se crea dataset QA Empresa A/B para ejecutar pruebas negativas reales de customers/items/batches. No se ejecuto SQL ni se modifico codigo productivo.
+- Fase 2O: se valida runtime A/B y no se detecta fuga cross-company en endpoints directos de customers/items/batches.
 
 ## Madurez ERP estimada
 
@@ -56,8 +57,8 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 | Dashboard | 55% |
 | Auditoria | 38% |
 | Seguridad | 65% |
-| Multi-compania / SaaS readiness | 62% |
-| QA | 76% |
+| Multi-compania / SaaS readiness | 66% |
+| QA | 78% |
 | UX homogenea | 48% |
 | Trazabilidad | 50% |
 | Gobernanza ERP | 76% |

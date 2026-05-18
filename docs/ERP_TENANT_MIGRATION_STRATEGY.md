@@ -502,3 +502,38 @@ Decision:
 
 - `GO documental` para ejecutar dataset A/B en QA.
 - `NO-GO` para declarar aislamiento SaaS real hasta completar evidencia runtime A/B.
+
+## Avance Fase 2O - runtime Empresa A/B
+
+Completado:
+
+- Validacion SQL de companies `DEFAULT`, `QA_A`, `QA_B`.
+- Validacion SQL de branches `QA_A_CTR`, `QA_B_CTR`.
+- Validacion SQL de usuarios A/B activos y ligados a su company/branch.
+- Validacion API de login para admin/vendedor A/B.
+- Validacion API de `/api/tenant/current`.
+- Validacion API de customers duplicados por company.
+- Validacion API de items duplicados por company.
+- Validacion API de lookup por code y QR.
+- Validacion API de batches duplicados por folio.
+- Validacion negativa cross-company con `404` esperado.
+- Validacion de company `DEFAULT` con `qa.admin@local.test`.
+- Validacion CORS preflight basico.
+- Revision de logs sin 500 en ventana revisada.
+
+Resultado:
+
+- Aislamiento confirmado en endpoints directos de customers/items/batches.
+- `DEFAULT` sigue operativo.
+
+Pendiente:
+
+- Revocar sesiones legacy `NULL/NULL` antes de release SaaS real.
+- Tenantizar proveedores.
+- Definir permisos por company.
+- Mantener ventas, pagos, live, reservaciones y reportes fuera de alcance.
+
+Decision:
+
+- `GO condicionado` para continuar con P0 no financiera o hardening tenant.
+- `NO-GO` para SaaS real completo.

@@ -1392,3 +1392,48 @@ Decision:
 - `GO documental` para ejecutar dataset A/B en QA.
 - `NO-GO` para declarar aislamiento SaaS hasta validar runtime real.
 
+## 2026-05-18 - Fase 2O / validacion runtime Empresa A-B
+
+Tipo: validacion QA runtime y documentacion, sin cambios de codigo.
+
+Objetivo:
+
+- Validar aislamiento real entre `QA_A` y `QA_B`.
+- Confirmar que `DEFAULT` sigue funcionando.
+- Probar customers, items, lookup code/QR y batches por folio.
+- Mantener ventas, pagos, live, reportes y reservaciones fuera de alcance.
+
+Cambios realizados:
+
+- Se creo `docs/ERP_TENANT_COMPANY_AB_RUNTIME_VALIDATION.md`.
+- Se actualizaron bitacoras y matrices ERP con evidencia de Fase 2O.
+- No se modifico Java.
+- No se modifico frontend.
+- No se crearon migraciones Flyway.
+
+Validaciones:
+
+- SQL: `DEFAULT`, `QA_A`, `QA_B` activos.
+- SQL: branches `QA_A_CTR` y `QA_B_CTR` activas.
+- SQL: customers duplicados `24/25`.
+- SQL: items duplicados `28/29`.
+- SQL: batches duplicados `7/8`.
+- API: login OK para usuarios A/B admin/vendedor.
+- API: `/api/tenant/current` OK para A/B y `DEFAULT`.
+- API: A no ve datos B; B no ve datos A.
+- API: lookup por code/QR resuelve dentro de la company activa.
+- CORS preflight basico OK.
+- Logs sin 500 en ventana revisada.
+
+Riesgos pendientes:
+
+- Persisten sesiones legacy `NULL/NULL` para `qa.admin`.
+- Proveedores aun no son tenant-aware.
+- Roles/permisos no estan completamente scoped por company.
+- Ventas/pagos/live/reportes siguen fuera de alcance.
+
+Decision:
+
+- `GO condicionado` para siguiente fase tenant no financiera o hardening de sesiones/permisos.
+- `NO-GO` para declarar SaaS real completo.
+

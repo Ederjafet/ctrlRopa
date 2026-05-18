@@ -21,6 +21,7 @@ Fase: 1D - datos QA y evidencia
 | 2026-05-13 | 2H | QA dataset tenant | Codex QA/Backend | Preparacion documental SQL QA para usuarios tenant-aware faltantes | PENDIENTE DE EJECUCION | Se creo `docs/qa/06-usuarios-tenant-qa.sql`; no se ejecuto SQL en runtime durante esta fase | Repetir smoke 2G despues de ejecutar script QA |
 | 2026-05-13 | 2I | QA local/runtime tenant users `localhost:8090` | Codex QA/Backend | Ejecucion `06-usuarios-tenant-qa.sql`, login admin/sinpermisos/reportes/soporte, tenant current, dashboard, branches, reportes, permisos negativos, logs y Maven test | GO condicionado | Sesiones legacy admin con tenant null; falta dataset Empresa A/B para fuga cross-company real | GO condicionado para primera P0 de bajo riesgo; no ventas/pagos/live/reportes |
 | 2026-05-17 | 2N | QA dataset documental | Codex QA/SaaS | Preparacion SQL Empresa A/B para customers/items/batches duplicados por company | PENDIENTE DE EJECUCION | Se creo `docs/qa/07-empresa-ab-tenant-qa.sql`; no se ejecuto SQL en esta fase | Ejecutar en QA y abrir Fase 2O runtime smoke A/B |
+| 2026-05-18 | 2O | QA local/runtime `localhost:8090` | Codex QA/SaaS | Validacion SQL y API Empresa A/B: login, tenant current, customers, items code/QR, batches folio, cross-company 404, DEFAULT, CORS y logs | GO condicionado | Persisten sesiones legacy null/null en `qa.admin`; ventas/pagos/live/reportes fuera de alcance | GO para siguiente fase no financiera; NO-GO para SaaS real completo |
 
 ## Reglas de registro
 

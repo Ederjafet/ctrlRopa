@@ -302,3 +302,30 @@ Pendiente backlog:
 | Validar items A/B code/QR | P0 | CRITICO | items tenant-aware | Mismo code/QR resuelve solo dentro de company activa |
 | Validar batches A/B folio | P0 | CRITICO | batches tenant-aware | Mismo folio resuelve solo dentro de company activa |
 | Validar `DEFAULT` post-script | P0 | ALTO | script aplicado | qa.admin y dashboard DEFAULT siguen operativos |
+
+## Avance Fase 2O
+
+Epic: validacion runtime Empresa A/B.
+
+Completado:
+
+- Ejecutar validacion SQL de dataset A/B.
+- Login A/B admin/vendedor.
+- `/api/tenant/current` A/B.
+- Customers A/B por telefono y bloqueo cross-company por id.
+- Items A/B por code y bloqueo cross-company por id.
+- Lookup A/B por code y QR.
+- Batches A/B por folio y bloqueo cross-company por id.
+- Validacion `DEFAULT`.
+- CORS preflight basico.
+- Revision de logs sin 500 en ventana revisada.
+
+Pendiente backlog:
+
+| Tarea | Prioridad | Riesgo | Dependencia | Criterio de aceptacion |
+|---|---|---|---|---|
+| Revocar sesiones legacy `NULL/NULL` | P0 | ALTO | estrategia sesiones | No quedan sesiones activas sin tenant para usuarios operativos |
+| Tenantizar proveedores | P0/P1 | ALTO | batches tenant-aware | Proveedor A no visible desde B |
+| Permisos por company | P0 | CRITICO | user_companies | Permiso admin A no aplica en B |
+| QA visual A/B | P1 | MEDIO | endpoints A/B OK | Frontend no muestra datos cruzados |
+| Evaluar siguiente P0 no financiera | P1 | ALTO | A/B OK | No toca ventas/pagos/live/reportes |
