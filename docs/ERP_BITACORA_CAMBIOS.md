@@ -1347,3 +1347,48 @@ Decision:
 - `GO condicionado` para batches tenant-aware dentro de `DEFAULT`.
 - `NO-GO` para declarar SaaS real o tocar ventas/pagos/live/reportes.
 
+## 2026-05-17 - Fase 2N / dataset Empresa A-B tenant QA
+
+Tipo: dataset QA documental/SQL, sin Java ni migraciones Flyway.
+
+Objetivo:
+
+- Crear dataset controlado Empresa A/B para validar aislamiento real multi-company.
+- Mantener `DEFAULT` intacto.
+- Preparar datos duplicados por company en customers, items y batches.
+- No tocar ventas, pagos, live, reportes ni reservaciones.
+
+Cambios realizados:
+
+- Se creo `docs/qa/07-empresa-ab-tenant-qa.sql`.
+- Se creo `docs/ERP_TENANT_COMPANY_AB_QA_PLAN.md`.
+- Se actualizo `docs/qa/README.md` y se corrigio mojibake visible en ese archivo.
+- Se documentaron usuarios QA A/B, branches A/B, customers/items/batches duplicados y validaciones esperadas.
+
+Usuarios QA agregados:
+
+- `qa.a.admin@local.test`
+- `qa.b.admin@local.test`
+- `qa.a.vendedor@local.test`
+- `qa.b.vendedor@local.test`
+
+Password:
+
+- `Qa12345!`
+
+Pruebas:
+
+- No se ejecuto SQL en esta fase.
+- No aplica `.\mvnw.cmd test`: no se modifico Java ni migraciones Flyway.
+
+Riesgos pendientes:
+
+- Ejecutar script solo en QA, nunca PROD.
+- Validar runtime real A/B en fase posterior.
+- `DEFAULT` debe verificarse despues de aplicar el script.
+
+Decision:
+
+- `GO documental` para ejecutar dataset A/B en QA.
+- `NO-GO` para declarar aislamiento SaaS hasta validar runtime real.
+

@@ -468,3 +468,37 @@ Decision:
 
 - `GO condicionado` para considerar batches tenant-aware en company `DEFAULT`.
 - No migrar flujos financieros ni live/reportes hasta completar QA cross-company.
+
+## Avance Fase 2N - dataset Empresa A/B
+
+Completado:
+
+- Preparado script QA `docs/qa/07-empresa-ab-tenant-qa.sql`.
+- El script crea companies `QA_A` y `QA_B`.
+- El script crea branches `QA_A_CTR` y `QA_B_CTR`.
+- El script crea usuarios admin/vendedor por company.
+- El script asigna `user_companies` y `user_branches`.
+- El script crea customers/items/batches duplicados por company para pruebas negativas.
+- El script revoca sesiones legacy y limpia lock solo de usuarios A/B.
+- Se creo plan de validacion `docs/ERP_TENANT_COMPANY_AB_QA_PLAN.md`.
+
+Compatibilidad:
+
+- `DEFAULT` no se modifica.
+- No se borran datos historicos.
+- No se truncaron tablas.
+- No hay migracion Flyway nueva.
+- No se modifico Java ni frontend.
+
+Pendiente:
+
+- Ejecutar script en QA con respaldo previo.
+- Validar login A/B.
+- Validar `/api/tenant/current` A/B.
+- Validar aislamiento de customers/items/batches.
+- Confirmar que `DEFAULT` sigue operativo.
+
+Decision:
+
+- `GO documental` para ejecutar dataset A/B en QA.
+- `NO-GO` para declarar aislamiento SaaS real hasta completar evidencia runtime A/B.

@@ -70,6 +70,9 @@ Probabilidad:
 | Suppliers globales con batches tenant-aware | ALTO | ALTA despues de Fase 2M | Un lote ya es tenant-aware, pero proveedores pueden seguir siendo catalogo global y generar confusion o exposicion futura. | Tenantizar `suppliers` o definirlos como catalogo global administrado antes de SaaS real. | Mantener proveedores QA controlados y no habilitar multi-company real. |
 | Batches tenant-aware sin dataset Empresa A/B | ALTO | ALTA despues de Fase 2M | La operacion `DEFAULT` funciona, pero no hay evidencia de fuga cross-company real bloqueada. | Crear dataset Empresa A/B y pruebas negativas por id/folio/branch. | Mantener sistema mono-company DEFAULT. |
 | Consumidores legacy de batches | CRITICO | MEDIA despues de Fase 2M | Live, reservaciones, ventas, pagos o reportes podrian usar batch por id sin company cuando se migren sus flujos. | Revisar cada consumidor antes de tocar modulos financieros/live/reportes. | No habilitar esos modulos en SaaS multi-company hasta migrarlos. |
+| Dataset Empresa A/B ejecutado sin respaldo | ALTO | MEDIA durante Fase 2N | Datos QA A/B podrian contaminar evidencia o requerir limpieza manual. | Respaldar QA antes de ejecutar `07-empresa-ab-tenant-qa.sql`; script no borra historicos. | Desactivar companies/branches/users A/B o restaurar backup QA. |
+| Evidencia A/B sin cerrar sesiones antiguas | MEDIO | MEDIA durante Fase 2N/2O | Un token anterior podria apuntar a tenant viejo y falsear validacion. | Script revoca sesiones A/B; login nuevo obligatorio antes de probar. | Revocar sesiones de usuarios A/B y repetir login. |
+| Roles ADMIN/SELLER todavia globales | ALTO | MEDIA durante validacion A/B | Permisos siguen sin scope por company; aislamiento depende del tenant resolver y servicios migrados. | Validar datos por endpoint tenant-aware y no declarar seguridad SaaS completa todavia. | Limitar usuarios A/B a QA y no habilitar SaaS real. |
 
 ## Acciones que deberian auditarse
 
@@ -106,6 +109,7 @@ Probabilidad:
 - Fase 2K convierte items/inventario en segunda P0 tenant-aware; no declarar aislamiento SaaS real hasta probar Empresa A/B y migrar consumidores legacy.
 - Fase 2L solo documenta plan de batches; no hay cambio runtime. Implementacion futura debe bloquearse si `findById`/`findByFolio` siguen globales.
 - Fase 2M convierte batches en tenant-aware para endpoints directos; aun falta dataset Empresa A/B, proveedores tenant-aware y revision de consumidores legacy.
+- Fase 2N crea dataset QA Empresa A/B; el aislamiento real sigue pendiente hasta ejecutar runtime smoke y capturar evidencia.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

@@ -274,3 +274,31 @@ Pendiente backlog:
 | Revisar `batch_classification_details` | P1 | ALTO | batch tenant-validado | No hay endpoint/servicio que consulte detalles sin batch validado |
 | Probar folio duplicado entre companies | P1 | MEDIO | dataset Empresa A/B | Folio duplicado permitido entre companies, bloqueado dentro de la misma |
 | Preparar siguiente P0 no financiera | P1 | ALTO | QA cross-company | No se toca dinero ni live antes de evidencia A/B |
+
+## Avance Fase 2N
+
+Epic: dataset QA Empresa A/B para aislamiento real.
+
+Completado:
+
+- Crear script `docs/qa/07-empresa-ab-tenant-qa.sql`.
+- Crear companies `QA_A` y `QA_B`.
+- Crear branches `QA_A_CTR` y `QA_B_CTR`.
+- Crear usuarios admin/vendedor por company.
+- Asignar `user_companies` y `user_branches`.
+- Crear customers duplicados por company.
+- Crear items duplicados por company con mismo `code` y `qr_code`.
+- Crear batches duplicados por company con mismo `folio`.
+- Revocar sesiones legacy y limpiar lock solo de usuarios A/B.
+- Crear plan `docs/ERP_TENANT_COMPANY_AB_QA_PLAN.md`.
+
+Pendiente backlog:
+
+| Tarea | Prioridad | Riesgo | Dependencia | Criterio de aceptacion |
+|---|---|---|---|---|
+| Ejecutar `07-empresa-ab-tenant-qa.sql` en QA | P0 | ALTO | backup QA | Script finaliza sin errores y `DEFAULT` sigue intacto |
+| Validar login A/B | P0 | CRITICO | script aplicado | Usuarios A/B obtienen tenant correcto |
+| Validar customers A/B | P0 | CRITICO | customers tenant-aware | QA_A no ve cliente QA_B y viceversa |
+| Validar items A/B code/QR | P0 | CRITICO | items tenant-aware | Mismo code/QR resuelve solo dentro de company activa |
+| Validar batches A/B folio | P0 | CRITICO | batches tenant-aware | Mismo folio resuelve solo dentro de company activa |
+| Validar `DEFAULT` post-script | P0 | ALTO | script aplicado | qa.admin y dashboard DEFAULT siguen operativos |
