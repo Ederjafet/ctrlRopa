@@ -63,6 +63,10 @@ Probabilidad:
 | Items tenant-aware con consumidores legacy | ALTO | ALTA durante Fase 2K+ | Endpoints directos de inventario quedan protegidos, pero ventas/pagos/live/reportes/paquetes/envios podrian seguir consultando items por id sin company hasta sus fases. | No declarar SaaS real; migrar consumidores por modulo y agregar pruebas negativas. | Revertir consumers migrados o mantener operacion mono-company DEFAULT. |
 | Backfill items incompleto | CRITICO | BAJA/MEDIA durante V41 | Items sin `company_id` bloquearian arranque o quedarian huerfanos. | Backfill desde `branches.company_id`, FK y `NOT NULL`; validar Flyway/test. | Restaurar backup o rollback V41/V42 en QA. |
 | QR/codigo item scoped por company sin QA A/B | ALTO | MEDIA futura | Se permite repetir QR/codigo entre companies; sin QA cross-company se podria aprobar aislamiento incompleto. | Probar lookup codigo/QR con Empresa A/B antes de SaaS real. | Mantener operacion DEFAULT o restaurar unicidad global si negocio lo exige. |
+| Batches sin company_id | CRITICO | ALTA antes de Fase 2M | Lotes pueden consultarse por id/folio/listado sin tenant, exponiendo recepcion, calidad y clasificacion de otra company. | Implementar `batches.company_id`, queries tenant-aware y validacion branch-company. | Mantener batches solo en DEFAULT o bloquear endpoints de lotes multi-company. |
+| Folio de lote global | ALTO | MEDIA durante migracion tenant | `findByFolio` global puede resolver lote de otra company y la unicidad no expresa aislamiento SaaS. | Cambiar a `uq_batches_company_folio` y `findByCompanyIdAndFolio`. | Restaurar `uq_batches_folio` solo si no hay duplicados globales. |
+| Item/batch company mismatch | CRITICO | MEDIA durante Fase 2M+ | Item de una company podria quedar ligado a lote de otra, contaminando inventario y cancelacion. | Validar `item.company_id = batch.company_id` y branch-company. | Corregir relaciones manualmente desde backup antes de operar. |
+| Classification details sin validacion previa | ALTO | MEDIA durante Fase 2M | Detalles de clasificacion pueden exponerse si se consultan por `batch_id` sin validar batch. | Consultar detalles solo desde batch tenant-validado o agregar queries con join company. | Revertir service y bloquear endpoint hasta corregir. |
 
 ## Acciones que deberian auditarse
 
@@ -97,6 +101,7 @@ Probabilidad:
 - Fase 2H prepara script QA tenant-aware; P0 sigue bloqueado hasta ejecutar y validar runtime.
 - Fase 2I valida usuarios QA tenant-aware; avanzar solo a primera P0 de bajo riesgo, no financiera.
 - Fase 2K convierte items/inventario en segunda P0 tenant-aware; no declarar aislamiento SaaS real hasta probar Empresa A/B y migrar consumidores legacy.
+- Fase 2L solo documenta plan de batches; no hay cambio runtime. Implementacion futura debe bloquearse si `findById`/`findByFolio` siguen globales.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

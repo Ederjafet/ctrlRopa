@@ -1261,3 +1261,44 @@ Decision:
 - `GO condicionado` para siguiente P0 no financiera de bajo riesgo.
 - `NO-GO` para ventas, pagos, live y reportes.
 
+## 2026-05-17 - Fase 2L / batches tenant-aware plan
+
+Tipo: diseno tecnico/documentacion, sin implementacion.
+
+Objetivo:
+
+- Preparar implementacion futura de lotes tenant-aware.
+- Analizar riesgos de `batches`, `batch_classification_details` e integracion con `items`.
+- Definir migracion propuesta `V43__batches_tenant_company.sql`.
+- Mantener fuera de alcance ventas, pagos, live, reportes, frontend y migraciones reales.
+
+Documento creado:
+
+- `docs/ERP_BATCHES_TENANT_IMPLEMENTATION_PLAN.md`
+
+Documentos actualizados:
+
+- `docs/ERP_BITACORA_CAMBIOS.md`
+- `docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md`
+- `docs/ERP_TENANT_MIGRATION_STRATEGY.md`
+- `docs/ERP_RIESGOS_OPERATIVOS.md`
+- `docs/ERP_RESUMEN_EJECUTIVO.md`
+
+Hallazgos:
+
+- `batches` no tiene `company_id`.
+- `batches.folio` mantiene unicidad global.
+- `BatchRepository.findByFolio`, `existsByFolio` y `findByBranchIdOrderByCreatedAtDesc` no filtran company.
+- `BatchService.findEntity` usa `findById` global.
+- `itemCount` y cancelacion usan items por `batch_id` sin filtro company.
+- `batch_classification_details` puede mantenerse sin `company_id` si solo se accede desde batch tenant-validado.
+
+Pruebas:
+
+- No aplica `.\mvnw.cmd test`: no se modifico codigo ni migraciones.
+
+Decision:
+
+- `GO documental` para preparar Fase 2M.
+- `NO-GO` para implementacion hasta crear rama/runtime especifico y ejecutar QA.
+

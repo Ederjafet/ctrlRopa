@@ -393,3 +393,36 @@ Decision:
 
 - Avance permitido solo a otra P0 no financiera de bajo riesgo.
 - No migrar flujos financieros ni reportes hasta completar QA cross-company.
+
+## Avance Fase 2L - batches plan
+
+Completado:
+
+- Plan tecnico para migrar `batches` como siguiente P0 no financiera.
+- Propuesta `V43__batches_tenant_company.sql`.
+- Backfill desde `branches.company_id`.
+- FK futura `fk_batches_company`.
+- Unicidad futura `uq_batches_company_folio`.
+- Indices por company/branch/status, company/folio y company/supplier.
+- Validaciones SQL previas y posteriores.
+- Riesgos de `batch_classification_details` y `items.batch_id` documentados.
+
+Compatibilidad propuesta:
+
+- Mantener contrato HTTP actual.
+- Mantener `branch_id`.
+- Mantener metodos legacy temporalmente para consumidores fuera de alcance.
+- Acceder a `batch_classification_details` solo despues de validar tenant del batch.
+- Usar items tenant-aware para conteos/cancelacion.
+
+Pendiente:
+
+- Implementar Fase 2M en rama separada.
+- Agregar tests unitarios de `BatchService`.
+- Ejecutar runtime smoke con `qa.admin@local.test`.
+- Crear dataset Empresa A/B antes de declarar aislamiento SaaS real.
+
+Decision:
+
+- `GO documental` para implementar batches en fase posterior.
+- No tocar ventas, pagos, live ni reportes.

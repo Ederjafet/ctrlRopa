@@ -222,3 +222,26 @@ Pendiente backlog:
 | Migrar `batches` | P0/P1 | ALTO | items.company_id | Items y lotes no cruzan companies |
 | Migrar `storage_locations` | P1 | ALTO | branch/company | Ubicacion solo acepta items de su company |
 | Definir catalogos globales vs tenant | P1 | MEDIO | decision negocio | Product types/brands/sizes no mezclan configuracion privada |
+
+## Avance Fase 2L
+
+Epic: planificacion de lotes tenant-aware, sin implementacion.
+
+Completado:
+
+- Analizar `Batch`, `BatchRepository`, `BatchService`, `BatchController` y `BatchClassificationDetail`.
+- Documentar riesgos de `findById`, `findByFolio`, `itemCount` y clasificacion por `batch_id`.
+- Proponer migracion futura `V43__batches_tenant_company.sql`.
+- Definir cambios backend futuros y pruebas necesarias.
+- Crear `docs/ERP_BATCHES_TENANT_IMPLEMENTATION_PLAN.md`.
+
+Pendiente backlog:
+
+| Tarea | Prioridad | Riesgo | Dependencia | Criterio de aceptacion |
+|---|---|---|---|---|
+| Implementar `batches.company_id` | P0 | CRITICO | customers/items tenant-aware | Lote pertenece a company activa |
+| Reemplazar unicidad `folio` por company | P0 | ALTO | migracion V43 | Folio duplicado permitido entre companies, bloqueado dentro de la misma |
+| Tenantizar `BatchRepository` | P0 | CRITICO | `company_id` | Id/folio/listado no exponen otra company |
+| Tenantizar `itemCount` | P0 | ALTO | items tenant-aware | Conteo no infiere items cross-company |
+| Proteger classification details | P0 | ALTO | batch validado | Detalles solo visibles desde batch tenant-validado |
+| QA runtime batches | P0 | ALTO | implementacion Fase 2M | Crear/recibir/clasificar/reconciliar/cancelar sin romper frontend |
