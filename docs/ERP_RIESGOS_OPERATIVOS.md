@@ -79,6 +79,10 @@ Probabilidad:
 | Idioma no persistido | BAJO | MEDIA en fase inicial | Usuario podria cambiar idioma en LIVE y perder preferencia al reiniciar la app. | Definir persistencia de idioma en fase futura. | Mantener espanol como default. |
 | Estatus/errores backend no traducidos | MEDIO | MEDIA | Algunos errores o etiquetas pueden mostrarse en idioma distinto al seleccionado. | Centralizar estrategia de errores y status labels en i18n. | Mostrar fallback espanol operativo. |
 | Puerto frontend 8081 ocupado por proceso stale | MEDIO | MEDIA en QA local | `npm run web` puede fallar aunque el build/export sea correcto, bloqueando validacion visual. | Liberar proceso `node` antes de smoke web o usar puerto QA alterno documentado. | Cerrar proceso stale y repetir `npm run web`. |
+| LIVE metricas sin company_id | CRITICO | MEDIA futura | Viewers, comentarios o engagement de una empresa podrian mezclarse con otra. | Toda tabla/evento/metrica LIVE debe tener `company_id` y validar `CurrentTenantContext`. | Deshabilitar dashboard LIVE analytics y restaurar datos desde backup si hubo mezcla. |
+| Tokens Facebook globales o en logs | CRITICO | MEDIA futura | Un token de una empresa podria exponerse o usarse para otra company. | Token por company, cifrado/referencia segura, logs sanitizados y auditoria. | Revocar token, rotar credenciales y bloquear integracion. |
+| Eventos LIVE duplicados | ALTO | MEDIA futura | Engagement y conversion pueden inflarse y afectar decisiones comerciales. | Deduplicacion por `company_id`, fuente, tipo y external_event_id. | Recalcular agregados desde eventos crudos depurados. |
+| Dependencia Facebook API | ALTO | ALTA futura | Rate limit o cambios API pueden degradar metricas externas. | Operacion LIVE local independiente, adapter desacoplado, backoff y alertas amigables. | Desactivar sincronizacion Facebook y mantener metricas internas. |
 
 ## Acciones que deberian auditarse
 
@@ -117,6 +121,7 @@ Probabilidad:
 - Fase 2M convierte batches en tenant-aware para endpoints directos; aun falta dataset Empresa A/B, proveedores tenant-aware y revision de consumidores legacy.
 - Fase 2N crea dataset QA Empresa A/B; el aislamiento real sigue pendiente hasta ejecutar runtime smoke y capturar evidencia.
 - Fase 2O valida aislamiento A/B para customers/items/batches directos; SaaS real sigue bloqueado para ventas/pagos/live/reportes.
+- LIVE-B documenta metricas/engagement/Facebook; no implementar runtime sin normalizar estados, company_id y eventos internos.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

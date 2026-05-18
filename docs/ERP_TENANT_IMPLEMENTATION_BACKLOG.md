@@ -329,3 +329,27 @@ Pendiente backlog:
 | Permisos por company | P0 | CRITICO | user_companies | Permiso admin A no aplica en B |
 | QA visual A/B | P1 | MEDIO | endpoints A/B OK | Frontend no muestra datos cruzados |
 | Evaluar siguiente P0 no financiera | P1 | ALTO | A/B OK | No toca ventas/pagos/live/reportes |
+
+## Avance LIVE-B
+
+Epic: arquitectura LIVE para metricas, engagement, tracking y futura integracion Facebook.
+
+Completado:
+
+- Crear `docs/ERP_LIVE_ARCHITECTURE_METRICS_ENGAGEMENT.md`.
+- Crear `docs/ERP_LIVE_FACEBOOK_INTEGRATION_DESIGN.md`.
+- Crear `docs/ERP_LIVE_EVENTS_TRACKING_MODEL.md`.
+- Documentar lifecycle futuro `DRAFT`, `SCHEDULED`, `OPEN`, `ACTIVE`, `PAUSED`, `CLOSED`, `CANCELLED`.
+- Documentar eventos futuros `LIVE_CREATED`, `COMMENT_RECEIVED`, `REACTION_RECEIVED`, `PRODUCT_PINNED`, `FACEBOOK_SYNC_FAILED`, entre otros.
+- Documentar reglas multi-tenant para metricas y tokens Facebook por company.
+
+Pendiente backlog:
+
+| Tarea | Prioridad | Riesgo | Dependencia | Criterio de aceptacion |
+|---|---|---|---|---|
+| LIVE-C normalizar estados y UX | P1 | ALTO | diseno LIVE-B | Estados claros sin romper `OPEN/ACTIVE/CLOSED` actuales |
+| LIVE-D tabla/eventos internos | P1 | CRITICO | lives tenant-aware | Evento LIVE incluye `company_id` y deduplicacion |
+| LIVE-E metricas internas sin Facebook | P1 | ALTO | eventos internos | Dashboard interno no depende de Meta |
+| LIVE-F diseno tecnico final Facebook | P1 | ALTO | permisos Meta validados | Adapter especificado con seguridad y rate limit |
+| LIVE-G integracion Facebook runtime | P2 | CRITICO | LIVE-E/F + QA tenant | Tokens por company, sin datos cross-company |
+| LIVE-H dashboard analytics | P2 | ALTO | metricas internas/externas | Viewers, engagement y resumen post-live por company |

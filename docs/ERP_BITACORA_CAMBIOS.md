@@ -1475,3 +1475,38 @@ Decision:
 
 - `GO tecnico condicionado`: compilacion/export web correctos; runtime interactivo en `8081` pendiente por puerto ocupado.
 
+## 2026-05-18 - Fase LIVE-B / arquitectura metricas y engagement
+
+Tipo: diseno producto/arquitectura, sin cambios de runtime.
+
+Objetivo:
+
+- Disenar arquitectura futura LIVE para metricas, engagement y tracking.
+- Preparar integracion futura Facebook/Meta sin implementarla.
+- Mantener ventas, pagos, reportes y reservaciones fuera de alcance.
+
+Cambios realizados:
+
+- Se creo `docs/ERP_LIVE_ARCHITECTURE_METRICS_ENGAGEMENT.md`.
+- Se creo `docs/ERP_LIVE_FACEBOOK_INTEGRATION_DESIGN.md`.
+- Se creo `docs/ERP_LIVE_EVENTS_TRACKING_MODEL.md`.
+- Se documentaron estados futuros `DRAFT`, `SCHEDULED`, `OPEN`, `ACTIVE`, `PAUSED`, `CLOSED`, `CANCELLED`.
+- Se definio modelo conceptual de eventos LIVE tenant-aware.
+- Se definio diseno futuro de adapter Facebook por company.
+
+Validaciones:
+
+- No aplica build/test: fase solo documental.
+- Se revisaron `app/live.tsx`, `services/liveService.ts`, `LiveController`, `LiveService`, `Live`, `LiveRepository` y backlog tenant.
+
+Riesgos pendientes:
+
+- LIVE todavia no es tenant-aware completo.
+- Integracion Facebook requiere validacion futura de permisos Meta vigentes.
+- Eventos/metricas no deben implementarse antes de normalizar estados y QA tenant.
+
+Decision:
+
+- `GO documental` para avanzar a LIVE-C normalizacion de estados/UX.
+- `NO-GO` para Facebook runtime, ventas, pagos o reservaciones.
+
