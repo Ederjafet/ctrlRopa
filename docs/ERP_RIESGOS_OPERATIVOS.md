@@ -84,6 +84,8 @@ Probabilidad:
 | Eventos LIVE duplicados | ALTO | MEDIA futura | Engagement y conversion pueden inflarse y afectar decisiones comerciales. | Deduplicacion por `company_id`, fuente, tipo y external_event_id. | Recalcular agregados desde eventos crudos depurados. |
 | Dependencia Facebook API | ALTO | ALTA futura | Rate limit o cambios API pueden degradar metricas externas. | Operacion LIVE local independiente, adapter desacoplado, backoff y alertas amigables. | Desactivar sincronizacion Facebook y mantener metricas internas. |
 | Estado LIVE ambiguo para operador | MEDIO | MEDIA en operacion | Operador podria capturar o cerrar en contexto equivocado si no distingue abierto/activo/cerrado. | Tarjeta de estado operativo, instrucciones de siguiente paso y confirmaciones explicitas. | Revertir UX LIVE-C y operar con checklist manual. |
+| Smoke visual LIVE no ejecutado en navegador real | MEDIO | MEDIA en QA local | Build/export puede pasar, pero errores visuales o de click ES/EN podrian no detectarse. | Levantar `8081`, capturar evidencia visual y repetir checklist LIVE-D. | Bloquear metricas runtime/Facebook hasta completar smoke visual. |
+| Permisos de log frontend bloqueados | MEDIO | MEDIA en QA local | `npm run web` puede operar sin log persistente o dificultar diagnostico de errores visuales. | Revisar permisos de `C:\HPSQ-SOFT\control-ropa\logs\frontend`. | Ejecutar con usuario autorizado o corregir ACL antes de smoke. |
 
 ## Acciones que deberian auditarse
 
@@ -124,6 +126,7 @@ Probabilidad:
 - Fase 2O valida aislamiento A/B para customers/items/batches directos; SaaS real sigue bloqueado para ventas/pagos/live/reportes.
 - LIVE-B documenta metricas/engagement/Facebook; no implementar runtime sin normalizar estados, company_id y eventos internos.
 - LIVE-C normaliza UX visual de estados, pero backend sigue con estados actuales `OPEN/ACTIVE/CLOSED`.
+- LIVE-D no cierra smoke visual real hasta validar navegador en `8081` con evidencia.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

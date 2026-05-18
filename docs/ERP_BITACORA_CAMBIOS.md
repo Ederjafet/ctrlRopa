@@ -1546,3 +1546,42 @@ Riesgos pendientes:
 Decision:
 
 - `GO tecnico acotado` para LIVE-C. No aprueba cambios de backend, Facebook, ventas, pagos, reportes ni reservaciones.
+
+## 2026-05-18 - Fase LIVE-D / smoke visual i18n UX
+
+Tipo: QA frontend/documentacion, sin backend ni migraciones.
+
+Objetivo:
+
+- Validar LIVE visualmente en navegador real con i18n ES/EN.
+- Confirmar que UX normalizada de LIVE-C no rompe build/export frontend.
+- Mantener fuera de alcance ventas, pagos, reportes, reservaciones y Facebook.
+
+Cambios realizados:
+
+- Se creo `docs/ERP_LIVE_SMOKE_VISUAL_I18N_UX.md`.
+- Se actualizo `docs/ERP_QA_EXECUTION_LOG.md`.
+- Se actualizo `docs/ERP_BITACORA_CAMBIOS.md`.
+- Se actualizo `docs/ERP_RIESGOS_OPERATIVOS.md`.
+- Se actualizo `docs/ERP_RESUMEN_EJECUTIVO.md`.
+
+Validaciones:
+
+- Rama: `feature/live-d-smoke-visual-i18n-ux`.
+- `git status --short` inicial: limpio.
+- `netstat -ano | findstr :8081`: sin proceso escuchando antes de iniciar.
+- `npm run lint`: ejecutado, sin errores; quedan 55 warnings preexistentes.
+- `npx tsc --noEmit`: ejecutado correctamente.
+- `npx expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: ejecutado correctamente.
+- `rg -n "Ã|Â|�" app\live.tsx locales\es\common.json locales\en\common.json`: sin coincidencias.
+
+Hallazgos:
+
+- `npx expo start --web --port 8081` no dejo servidor accesible en `http://localhost:8081`.
+- `npm run web` inicio Metro, pero mostro warning de permisos al escribir en `C:\HPSQ-SOFT\control-ropa\logs\frontend\frontend-web.log`.
+- No se detectaron errores JS por build/export, pero no se completo smoke visual real de navegador.
+
+Decision:
+
+- `GO tecnico` para build/export frontend.
+- `NO-GO visual pendiente` para cerrar LIVE-D hasta repetir smoke en navegador real con `8081` accesible.
