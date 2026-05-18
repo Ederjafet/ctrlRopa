@@ -245,3 +245,32 @@ Pendiente backlog:
 | Tenantizar `itemCount` | P0 | ALTO | items tenant-aware | Conteo no infiere items cross-company |
 | Proteger classification details | P0 | ALTO | batch validado | Detalles solo visibles desde batch tenant-validado |
 | QA runtime batches | P0 | ALTO | implementacion Fase 2M | Crear/recibir/clasificar/reconciliar/cancelar sin romper frontend |
+
+## Avance Fase 2M
+
+Epic: tercera P0 operativa tenant-aware, lotes/batches.
+
+Completado:
+
+- Migrar `batches` con `company_id`.
+- Backfill desde `branches.company_id`.
+- FK `fk_batches_company`.
+- Reemplazar unicidad global de `folio` por `uq_batches_company_folio`.
+- Indices por company/branch/status, company/folio y company/supplier.
+- Filtrar endpoints directos de batches por company activa.
+- Tenantizar create/list/find by id/find by folio/receive/classification/reconcile/cancel.
+- Ajustar `itemCount` para usar `items.company_id`.
+- Bloquear cancelacion si existe mismatch item-company-batch.
+- Validar runtime con `qa.admin@local.test`.
+- Documentar `docs/ERP_BATCHES_TENANT_MIGRATION.md`.
+
+Pendiente backlog:
+
+| Tarea | Prioridad | Riesgo | Dependencia | Criterio de aceptacion |
+|---|---|---|---|---|
+| Crear dataset Empresa A/B | P0 | CRITICO | customers/items/batches tenant-aware | Usuario A no puede ver cliente/item/lote B |
+| Tenantizar `suppliers` | P0/P1 | ALTO | batches.company_id | Proveedor B no visible desde A |
+| Revisar consumidores legacy de `BatchRepository.findById` | P0 | CRITICO | live/reservations/sales/reports futuros | Cada modulo valida company antes de usar batch |
+| Revisar `batch_classification_details` | P1 | ALTO | batch tenant-validado | No hay endpoint/servicio que consulte detalles sin batch validado |
+| Probar folio duplicado entre companies | P1 | MEDIO | dataset Empresa A/B | Folio duplicado permitido entre companies, bloqueado dentro de la misma |
+| Preparar siguiente P0 no financiera | P1 | ALTO | QA cross-company | No se toca dinero ni live antes de evidencia A/B |

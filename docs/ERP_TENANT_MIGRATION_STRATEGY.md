@@ -426,3 +426,45 @@ Decision:
 
 - `GO documental` para implementar batches en fase posterior.
 - No tocar ventas, pagos, live ni reportes.
+
+## Avance Fase 2M - batches P0
+
+Completado:
+
+- `batches.company_id` agregado por `V43__batches_tenant_company.sql`.
+- Backfill de lotes existentes desde `branches.company_id`.
+- FK `fk_batches_company`.
+- Unicidad `uq_batches_company_folio`.
+- Indices:
+  - `(company_id, branch_id, status)`
+  - `(company_id, folio)`
+  - `(company_id, supplier_id)`
+- Endpoints directos de lotes filtran por company activa.
+- Create/list/find/folio/receive/classification/reconcile/cancel usan tenant activo.
+- `itemCount` usa items tenant-aware.
+
+Compatibilidad:
+
+- `branch_id` se mantiene para contrato frontend y operacion actual.
+- Company `DEFAULT` conserva datos existentes.
+- Metodos legacy se mantienen temporalmente para no tocar ventas, pagos, live ni reportes.
+- `batch_classification_details` no recibe `company_id` todavia; queda protegido por acceso desde batch tenant-validado.
+
+Validacion:
+
+- `.\mvnw.cmd test` exitoso.
+- Flyway valido `43 migrations`.
+- Runtime local validado con `qa.admin@local.test`.
+- Se valido crear, recibir, clasificar, reconciliar, buscar por id, buscar por folio, listar por branch y cancelar lote sin items.
+
+Pendiente:
+
+- Dataset Empresa A/B para validar fuga cross-company real.
+- Tenantizar proveedores antes de operar SaaS real.
+- Revisar consumidores legacy en live, reservaciones, ventas, pagos y reportes en fases separadas.
+- Evaluar si `batch_classification_details` requiere `company_id` propio despues de estabilizar consumidores.
+
+Decision:
+
+- `GO condicionado` para considerar batches tenant-aware en company `DEFAULT`.
+- No migrar flujos financieros ni live/reportes hasta completar QA cross-company.

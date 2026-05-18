@@ -67,6 +67,9 @@ Probabilidad:
 | Folio de lote global | ALTO | MEDIA durante migracion tenant | `findByFolio` global puede resolver lote de otra company y la unicidad no expresa aislamiento SaaS. | Cambiar a `uq_batches_company_folio` y `findByCompanyIdAndFolio`. | Restaurar `uq_batches_folio` solo si no hay duplicados globales. |
 | Item/batch company mismatch | CRITICO | MEDIA durante Fase 2M+ | Item de una company podria quedar ligado a lote de otra, contaminando inventario y cancelacion. | Validar `item.company_id = batch.company_id` y branch-company. | Corregir relaciones manualmente desde backup antes de operar. |
 | Classification details sin validacion previa | ALTO | MEDIA durante Fase 2M | Detalles de clasificacion pueden exponerse si se consultan por `batch_id` sin validar batch. | Consultar detalles solo desde batch tenant-validado o agregar queries con join company. | Revertir service y bloquear endpoint hasta corregir. |
+| Suppliers globales con batches tenant-aware | ALTO | ALTA despues de Fase 2M | Un lote ya es tenant-aware, pero proveedores pueden seguir siendo catalogo global y generar confusion o exposicion futura. | Tenantizar `suppliers` o definirlos como catalogo global administrado antes de SaaS real. | Mantener proveedores QA controlados y no habilitar multi-company real. |
+| Batches tenant-aware sin dataset Empresa A/B | ALTO | ALTA despues de Fase 2M | La operacion `DEFAULT` funciona, pero no hay evidencia de fuga cross-company real bloqueada. | Crear dataset Empresa A/B y pruebas negativas por id/folio/branch. | Mantener sistema mono-company DEFAULT. |
+| Consumidores legacy de batches | CRITICO | MEDIA despues de Fase 2M | Live, reservaciones, ventas, pagos o reportes podrian usar batch por id sin company cuando se migren sus flujos. | Revisar cada consumidor antes de tocar modulos financieros/live/reportes. | No habilitar esos modulos en SaaS multi-company hasta migrarlos. |
 
 ## Acciones que deberian auditarse
 
@@ -102,6 +105,7 @@ Probabilidad:
 - Fase 2I valida usuarios QA tenant-aware; avanzar solo a primera P0 de bajo riesgo, no financiera.
 - Fase 2K convierte items/inventario en segunda P0 tenant-aware; no declarar aislamiento SaaS real hasta probar Empresa A/B y migrar consumidores legacy.
 - Fase 2L solo documenta plan de batches; no hay cambio runtime. Implementacion futura debe bloquearse si `findById`/`findByFolio` siguen globales.
+- Fase 2M convierte batches en tenant-aware para endpoints directos; aun falta dataset Empresa A/B, proveedores tenant-aware y revision de consumidores legacy.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

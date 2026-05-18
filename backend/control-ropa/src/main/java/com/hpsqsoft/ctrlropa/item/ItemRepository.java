@@ -21,6 +21,8 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
 
     List<Item> findByCompanyIdAndBatchIdOrderByCreatedAtAsc(Long companyId, Long batchId);
 
+    long countByCompanyIdAndBatchId(Long companyId, Long batchId);
+
     List<Item> findByCompanyIdAndStorageLocationIdOrderByCreatedAtDesc(Long companyId, Long storageLocationId);
 
     Optional<Item> findByCode(String code);
@@ -34,6 +36,8 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
     List<Item> findByBranchIdOrderByCreatedAtDesc(Long branchId);
 
     List<Item> findByBatchIdOrderByCreatedAtAsc(Long batchId);
+
+    long countByBatchId(Long batchId);
 
     List<Item> findByStorageLocationIdOrderByCreatedAtDesc(Long storageLocationId);
 }

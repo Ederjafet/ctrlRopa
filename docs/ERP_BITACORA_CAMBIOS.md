@@ -1302,3 +1302,48 @@ Decision:
 - `GO documental` para preparar Fase 2M.
 - `NO-GO` para implementacion hasta crear rama/runtime especifico y ejecutar QA.
 
+## 2026-05-17 - Fase 2M / batches tenant-aware runtime
+
+Tipo: implementacion incremental P0 no financiera.
+
+Objetivo:
+
+- Convertir `batches` en tabla tenant-aware con `company_id`.
+- Reemplazar folio global por folio unico por company.
+- Tenantizar endpoints directos de lotes sin tocar ventas, pagos, live, reservaciones ni reportes.
+- Mantener compatibilidad con company `DEFAULT`.
+
+Cambios realizados:
+
+- Migracion `V43__batches_tenant_company.sql`.
+- `Batch` ahora referencia `Company`.
+- `BatchRepository` agrega consultas por `company_id`.
+- `BatchService` resuelve tenant activo, valida branch-company y usa batch-company para id/folio/listados.
+- `generateUniqueFolio` ahora es scoped por company.
+- `itemCount` usa `items.company_id`.
+- Cancelacion bloquea mismatch `item.company_id != batch.company_id`.
+- `batch_classification_details` se mantiene sin `company_id`, accediendo solo desde batch tenant-validado.
+- Se agregaron pruebas `BatchServiceTests`.
+- Se creo `docs/ERP_BATCHES_TENANT_MIGRATION.md`.
+
+Pruebas:
+
+- `.\mvnw.cmd test`: `BUILD SUCCESS`.
+- Resultado Maven: `Tests run: 28, Failures: 0, Errors: 0, Skipped: 0`.
+- Flyway valido `43 migrations`.
+- Runtime local `localhost:8090`: login `qa.admin` OK, `/api/tenant/current` OK.
+- Runtime batches: crear lote, recibir, clasificar, reconciliar, buscar por id, buscar por folio, listar por branch y cancelar lote sin items.
+- Runtime compatibilidad: customers/items siguen respondiendo.
+
+Riesgos pendientes:
+
+- Falta dataset Empresa A/B para fuga cross-company real.
+- `suppliers` sigue sin `company_id`.
+- `batch_classification_details` depende de acceso indirecto desde batch tenant-validado.
+- Consumidores legacy de batches en ventas/pagos/live/reportes siguen fuera de alcance.
+
+Decision:
+
+- `GO condicionado` para batches tenant-aware dentro de `DEFAULT`.
+- `NO-GO` para declarar SaaS real o tocar ventas/pagos/live/reportes.
+
