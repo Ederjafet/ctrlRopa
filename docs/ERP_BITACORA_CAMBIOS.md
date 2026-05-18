@@ -1625,3 +1625,37 @@ Decision:
 
 - `GO tecnico` para build/export del modo demo.
 - `NO-GO visual pendiente` hasta repetir smoke en navegador real con `8081` accesible.
+
+## 2026-05-18 - Fase DEMO-A / presentacion LIVE SaaS
+
+Tipo: documentacion comercial/tecnica/demo, sin cambios de codigo.
+
+Objetivo:
+
+- Preparar guion de presentacion para mostrar avance SaaS multi-compania.
+- Mostrar LIVE commerce como diferenciador.
+- Explicar i18n, metricas demo y roadmap sin prometer funcionalidades no terminadas.
+
+Cambios realizados:
+
+- Se creo `docs/DEMO_LIVE_SAAS_PRESENTATION_SCRIPT.md`.
+- Se creo `docs/DEMO_LIVE_SAAS_CHECKLIST.md`.
+- Se creo `docs/DEMO_LIVE_SAAS_TALK_TRACK.md`.
+- Se actualizo `docs/ERP_BITACORA_CAMBIOS.md`.
+- Se actualizo `docs/ERP_RESUMEN_EJECUTIVO.md`.
+
+Validaciones:
+
+- Rama: `feature/demo-a-live-saas-presentation`.
+- `git status --short` inicial: limpio.
+- No aplica build/test: fase solo documental.
+
+Riesgos pendientes:
+
+- La demo debe aclarar que metricas LIVE son simuladas.
+- No prometer Facebook real, ventas LIVE finales, pagos LIVE, billing automatico ni SaaS productivo completo.
+- Smoke visual de LIVE sigue pendiente hasta tener `8081` accesible.
+
+Decision:
+
+- `GO documental` para usar el material como base de presentacion/demo.
