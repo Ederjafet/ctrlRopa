@@ -134,6 +134,7 @@ export default function LiveScreen() {
   const [isSavingReservation, setIsSavingReservation] = useState(false);
   const [liveNotice, setLiveNotice] = useState<LiveNotice | null>(null);
   const [closeLiveToConfirm, setCloseLiveToConfirm] = useState<Live | null>(null);
+  const [activateLiveToConfirm, setActivateLiveToConfirm] = useState<Live | null>(null);
   const [reservationIssue, setReservationIssue] = useState<string | null>(null);
 
   const [lives, setLives] = useState<Live[]>([]);
@@ -341,6 +342,44 @@ export default function LiveScreen() {
             ? t('live.channelReason')
             : '';
   const selectedLiveIsOperable = isLiveOperable(selectedLive);
+  const selectedLiveStatus = normalizeStatus(selectedLive?.status);
+  const statusColor =
+    selectedLiveStatus === 'ACTIVE'
+      ? theme.colors.success
+      : selectedLiveStatus === 'OPEN'
+        ? theme.colors.warning
+        : selectedLiveStatus === 'CLOSED'
+          ? theme.colors.danger
+          : theme.colors.accent;
+  const statusBackground =
+    selectedLiveStatus === 'ACTIVE'
+      ? theme.colors.successBackground
+      : selectedLiveStatus === 'OPEN'
+        ? theme.colors.warningBackground
+        : selectedLiveStatus === 'CLOSED'
+          ? theme.colors.dangerBackground
+          : theme.colors.infoCardBackground;
+  const statusLabel = selectedLive
+    ? getLiveStatusLabel(selectedLive.status)
+    : t('live.noLiveStatusLabel');
+  const statusHelp = !selectedLive
+    ? t('live.noLiveStatusBody')
+    : selectedLiveStatus === 'ACTIVE'
+      ? t('live.activeStatusBody')
+      : selectedLiveStatus === 'OPEN'
+        ? t('live.openStatusBody')
+        : selectedLiveStatus === 'CLOSED'
+          ? t('live.closedStatusBody')
+          : t('live.unknownStatusBody');
+  const actionHint = !selectedLive
+    ? t('live.noLiveActionHint')
+    : selectedLiveStatus === 'ACTIVE'
+      ? t('live.activeLiveActionHint')
+      : selectedLiveStatus === 'OPEN'
+        ? t('live.openLiveActionHint')
+        : selectedLiveStatus === 'CLOSED'
+          ? t('live.closedLiveActionHint')
+          : t('live.unknownLiveActionHint');
   const createLiveBlockedReason = !newLiveNotes.trim()
     ? t('live.createLiveMissingNotes')
     : isSavingLive
@@ -448,8 +487,13 @@ export default function LiveScreen() {
     try {
       const updated = await activateLive(live.id);
       setSelectedLive(updated);
+      setActivateLiveToConfirm(null);
       await saveSelectedLiveId(session.branchId, session.userId, updated.id);
       await loadData();
+      setLiveNotice({
+        message: t('live.liveActivated', { id: updated.id }),
+        tone: 'success',
+      });
     } catch (err: any) {
       Alert.alert(t('live.title'), err?.message || t('live.liveActivationError'));
     } finally {
@@ -734,6 +778,35 @@ export default function LiveScreen() {
           />
         ) : null}
 
+        <AppCard>
+          <View style={styles.statusHeader}>
+            <View style={styles.statusTextBlock}>
+              <AppText variant="subtitle" bold>
+                {t('live.operationalStatusTitle')}
+              </AppText>
+              <AppText color={theme.colors.mutedText}>{statusHelp}</AppText>
+            </View>
+            <View
+              style={[
+                styles.statusPill,
+                {
+                  backgroundColor: statusBackground,
+                  borderColor: statusColor,
+                },
+              ]}
+            >
+              <AppText color={statusColor} bold>
+                {statusLabel}
+              </AppText>
+            </View>
+          </View>
+          <View style={styles.statusHint}>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {actionHint}
+            </AppText>
+          </View>
+        </AppCard>
+
         {filteredLives.length > 0 ? (
           <AppCard>
             <AppText variant="subtitle" bold>
@@ -807,7 +880,7 @@ export default function LiveScreen() {
                   <View style={styles.buttonFill}>
                     <AppButton
                       title={t('live.activateLive')}
-                      onPress={() => handleActivateLive(selectedLive)}
+                      onPress={() => setActivateLiveToConfirm(selectedLive)}
                       loading={isSavingLive}
                     />
                   </View>
@@ -1202,6 +1275,43 @@ export default function LiveScreen() {
 
 
       <AppBottomModal
+        visible={activateLiveToConfirm !== null}
+        title={t('live.activateLiveModalTitle')}
+        onClose={() => setActivateLiveToConfirm(null)}
+        showCancelButton={false}
+      >
+        <AppText>{t('live.activateLiveModalBody')}</AppText>
+        {activateLiveToConfirm ? (
+          <AppText color={theme.colors.mutedText}>
+            Live #{activateLiveToConfirm.id}
+            {activateLiveToConfirm.notes ? ` - ${activateLiveToConfirm.notes}` : ''}
+          </AppText>
+        ) : null}
+        <View style={styles.buttonRow}>
+          <View style={styles.buttonFill}>
+            <AppButton
+              title={t('common.cancel')}
+              variant="secondary"
+              onPress={() => setActivateLiveToConfirm(null)}
+              disabled={isSavingLive}
+            />
+          </View>
+          <View style={styles.buttonFill}>
+            <AppButton
+              title={t('live.confirmActivate')}
+              onPress={() =>
+                activateLiveToConfirm
+                  ? handleActivateLive(activateLiveToConfirm)
+                  : undefined
+              }
+              loading={isSavingLive}
+              disabled={isSavingLive}
+            />
+          </View>
+        </View>
+      </AppBottomModal>
+
+      <AppBottomModal
         visible={closeLiveToConfirm !== null}
         title={t('live.closeLiveModalTitle')}
         onClose={() => setCloseLiveToConfirm(null)}
@@ -1209,6 +1319,9 @@ export default function LiveScreen() {
       >
         <AppText>
           {t('live.closeLiveModalBody')}
+        </AppText>
+        <AppText color={theme.colors.warning} bold>
+          {t('live.closeLiveModalWarning')}
         </AppText>
         {closeLiveToConfirm ? (
           <AppText color={theme.colors.mutedText}>
@@ -1334,5 +1447,24 @@ const styles = StyleSheet.create({
   sectionSpacing: {
     marginTop: 12,
     gap: 8,
+  },
+  statusHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  statusHint: {
+    marginTop: 10,
+  },
+  statusPill: {
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  statusTextBlock: {
+    flex: 1,
+    minWidth: 220,
   },
 });

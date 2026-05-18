@@ -1510,3 +1510,39 @@ Decision:
 - `GO documental` para avanzar a LIVE-C normalizacion de estados/UX.
 - `NO-GO` para Facebook runtime, ventas, pagos o reservaciones.
 
+## 2026-05-18 - Fase LIVE-C / normalizacion UX de estados LIVE
+
+Tipo: frontend incremental y documentacion, sin backend ni migraciones.
+
+Objetivo:
+
+- Hacer mas claro el estado operativo de LIVE.
+- Diferenciar sin live, live abierto, activo y cerrado.
+- Mantener i18n ES/EN.
+- Mejorar confirmaciones de activar/cerrar sin cambiar reglas de negocio.
+
+Cambios realizados:
+
+- Se agrego tarjeta de estado operativo en `app/live.tsx`.
+- Se agregaron instrucciones de siguiente paso para operador/QA.
+- Se agrego modal de confirmacion para activar live.
+- Se reforzo modal de cierre con advertencia previa.
+- Se agregaron llaves i18n nuevas en `locales/es/common.json` y `locales/en/common.json`.
+- Se creo `docs/ERP_LIVE_UX_FLOW_NORMALIZATION.md`.
+
+Validaciones:
+
+- `npm run lint`: ejecutado, sin errores; quedan 55 warnings preexistentes en otras pantallas.
+- `npx tsc --noEmit`: ejecutado correctamente.
+- `npx expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: ejecutado correctamente.
+- `rg -n "Ã|Â|�" app\live.tsx locales\es\common.json locales\en\common.json`: sin coincidencias.
+- Runtime local `http://localhost:8081/live`: se intento levantar web para smoke manual, pero no quedo servidor escuchando en `8081`; queda validacion interactiva pendiente en ambiente QA levantado.
+
+Riesgos pendientes:
+
+- Runtime web en `8081` puede seguir bloqueado si existe proceso stale.
+- LIVE sigue fuera de alcance para tenant completo, Facebook, ventas, pagos y reportes.
+
+Decision:
+
+- `GO tecnico acotado` para LIVE-C. No aprueba cambios de backend, Facebook, ventas, pagos, reportes ni reservaciones.
