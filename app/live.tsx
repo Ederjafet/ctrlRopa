@@ -136,6 +136,7 @@ export default function LiveScreen() {
   const [closeLiveToConfirm, setCloseLiveToConfirm] = useState<Live | null>(null);
   const [activateLiveToConfirm, setActivateLiveToConfirm] = useState<Live | null>(null);
   const [reservationIssue, setReservationIssue] = useState<string | null>(null);
+  const [showDemoMetrics, setShowDemoMetrics] = useState(true);
 
   const [lives, setLives] = useState<Live[]>([]);
   const [selectedLive, setSelectedLive] = useState<Live | null>(null);
@@ -380,6 +381,60 @@ export default function LiveScreen() {
         : selectedLiveStatus === 'CLOSED'
           ? t('live.closedLiveActionHint')
           : t('live.unknownLiveActionHint');
+  const demoMetricCards = [
+    {
+      label: t('live.demoCurrentViewers'),
+      value: selectedLiveStatus === 'ACTIVE' ? '128' : selectedLiveStatus === 'OPEN' ? '42' : '0',
+      helper: t('live.demoCurrentViewersHelp'),
+    },
+    {
+      label: t('live.demoPeakViewers'),
+      value: selectedLiveStatus === 'ACTIVE' ? '214' : '86',
+      helper: t('live.demoPeakViewersHelp'),
+    },
+    {
+      label: t('live.demoEngagement'),
+      value: selectedLiveStatus === 'CLOSED' ? '0%' : '18%',
+      helper: t('live.demoEngagementHelp'),
+    },
+    {
+      label: t('live.demoComments'),
+      value: selectedLiveStatus === 'CLOSED' ? '0' : '63',
+      helper: t('live.demoCommentsHelp'),
+    },
+    {
+      label: t('live.demoReactions'),
+      value: selectedLiveStatus === 'CLOSED' ? '0' : '312',
+      helper: t('live.demoReactionsHelp'),
+    },
+    {
+      label: t('live.demoPinnedProducts'),
+      value: selectedLiveStatus === 'CLOSED' ? '0' : '4',
+      helper: t('live.demoPinnedProductsHelp'),
+    },
+  ];
+  const demoTimeline = [
+    { time: '00:00', label: t('live.demoEventLiveStarted') },
+    { time: '03:20', label: t('live.demoEventViewerJoined') },
+    { time: '08:45', label: t('live.demoEventProductPinned') },
+    { time: '12:10', label: t('live.demoEventCommentReceived') },
+    { time: '15:30', label: t('live.demoEventReactionReceived') },
+    { time: '28:00', label: t('live.demoEventLiveClosed') },
+  ];
+  const demoProducts = [
+    {
+      name: t('live.demoProductBlouse'),
+      stat: t('live.demoProductClicks', { count: 28 }),
+    },
+    {
+      name: t('live.demoProductDress'),
+      stat: t('live.demoProductClicks', { count: 19 }),
+    },
+    {
+      name: t('live.demoProductJacket'),
+      stat: t('live.demoProductClicks', { count: 14 }),
+    },
+  ];
   const createLiveBlockedReason = !newLiveNotes.trim()
     ? t('live.createLiveMissingNotes')
     : isSavingLive
@@ -805,6 +860,161 @@ export default function LiveScreen() {
               {actionHint}
             </AppText>
           </View>
+        </AppCard>
+
+        <AppCard>
+          <View style={styles.demoHeader}>
+            <View style={styles.statusTextBlock}>
+              <View style={styles.demoTitleRow}>
+                <AppText variant="subtitle" bold>
+                  {t('live.demoMetricsTitle')}
+                </AppText>
+                <View
+                  style={[
+                    styles.demoBadge,
+                    {
+                      backgroundColor: theme.colors.infoCardBackground,
+                      borderColor: theme.colors.accent,
+                    },
+                  ]}
+                >
+                  <AppText variant="caption" color={theme.colors.accent} bold>
+                    {t('live.demoModeBadge')}
+                  </AppText>
+                </View>
+              </View>
+              <AppText color={theme.colors.mutedText}>
+                {t('live.demoMetricsHelp')}
+              </AppText>
+            </View>
+
+            <Pressable
+              onPress={() => setShowDemoMetrics((current) => !current)}
+              style={({ pressed }) => [
+                styles.demoToggle,
+                {
+                  borderColor: theme.colors.border,
+                  opacity: pressed ? 0.75 : 1,
+                },
+              ]}
+            >
+              <AppText variant="caption" bold>
+                {showDemoMetrics
+                  ? t('live.demoHideMetrics')
+                  : t('live.demoShowMetrics')}
+              </AppText>
+            </Pressable>
+          </View>
+
+          {showDemoMetrics ? (
+            <>
+              <AppResponsiveGrid tabletColumns={3} desktopColumns={3} style={styles.demoMetricGrid}>
+                {demoMetricCards.map((metric) => (
+                  <View
+                    key={metric.label}
+                    style={[
+                      styles.demoMetricCard,
+                      {
+                        borderColor: theme.colors.border,
+                        backgroundColor: theme.colors.surface,
+                      },
+                    ]}
+                  >
+                    <AppText variant="caption" color={theme.colors.mutedText}>
+                      {metric.label}
+                    </AppText>
+                    <AppText variant="title" color={theme.colors.accent} bold>
+                      {metric.value}
+                    </AppText>
+                    <AppText variant="caption" color={theme.colors.mutedText}>
+                      {metric.helper}
+                    </AppText>
+                  </View>
+                ))}
+              </AppResponsiveGrid>
+
+              <View style={styles.demoSplitRow}>
+                <View
+                  style={[
+                    styles.demoPanel,
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor: theme.colors.surface,
+                    },
+                  ]}
+                >
+                  <AppText bold>{t('live.demoActivityTitle')}</AppText>
+                  <View style={styles.demoBars}>
+                    {[28, 56, 44, 72, 62, 88, 50, 66].map((height, index) => (
+                      <View
+                        key={`${height}-${index}`}
+                        style={[
+                          styles.demoBar,
+                          {
+                            height,
+                            backgroundColor: theme.colors.accent,
+                          },
+                        ]}
+                      />
+                    ))}
+                  </View>
+                  <AppText variant="caption" color={theme.colors.mutedText}>
+                    {t('live.demoActivityHelp')}
+                  </AppText>
+                </View>
+
+                <View
+                  style={[
+                    styles.demoPanel,
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor: theme.colors.surface,
+                    },
+                  ]}
+                >
+                  <AppText bold>{t('live.demoFeaturedProductsTitle')}</AppText>
+                  {demoProducts.map((product) => (
+                    <View key={product.name} style={styles.demoProductRow}>
+                      <AppText>{product.name}</AppText>
+                      <AppText variant="caption" color={theme.colors.accent} bold>
+                        {product.stat}
+                      </AppText>
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              <View
+                style={[
+                  styles.demoPanel,
+                  {
+                    borderColor: theme.colors.border,
+                    backgroundColor: theme.colors.surface,
+                  },
+                ]}
+              >
+                <AppText bold>{t('live.demoTimelineTitle')}</AppText>
+                {demoTimeline.map((event) => (
+                  <View key={`${event.time}-${event.label}`} style={styles.demoTimelineRow}>
+                    <View
+                      style={[
+                        styles.demoTimelineDot,
+                        { backgroundColor: theme.colors.accent },
+                      ]}
+                    />
+                    <AppText variant="caption" color={theme.colors.mutedText}>
+                      {event.time}
+                    </AppText>
+                    <AppText>{event.label}</AppText>
+                  </View>
+                ))}
+              </View>
+            </>
+          ) : (
+            <AppText color={theme.colors.mutedText}>
+              {t('live.demoMetricsCollapsed')}
+            </AppText>
+          )}
         </AppCard>
 
         {filteredLives.length > 0 ? (
@@ -1395,6 +1605,81 @@ const styles = StyleSheet.create({
   },
   buttonSpacing: {
     marginTop: 10,
+  },
+  demoBadge: {
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  demoBar: {
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+    flex: 1,
+    minWidth: 12,
+  },
+  demoBars: {
+    alignItems: 'flex-end',
+    flexDirection: 'row',
+    gap: 6,
+    height: 96,
+    marginTop: 12,
+  },
+  demoHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  demoMetricCard: {
+    borderWidth: 1,
+    gap: 6,
+    minHeight: 118,
+    padding: 12,
+  },
+  demoMetricGrid: {
+    marginTop: 14,
+  },
+  demoPanel: {
+    borderWidth: 1,
+    flex: 1,
+    gap: 10,
+    minWidth: 240,
+    padding: 12,
+  },
+  demoProductRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'space-between',
+  },
+  demoSplitRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 12,
+  },
+  demoTimelineDot: {
+    height: 10,
+    width: 10,
+  },
+  demoTimelineRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  demoTitleRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  demoToggle: {
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   liveButton: {
     borderWidth: 1,

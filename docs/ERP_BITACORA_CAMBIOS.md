@@ -1585,3 +1585,43 @@ Decision:
 
 - `GO tecnico` para build/export frontend.
 - `NO-GO visual pendiente` para cerrar LIVE-D hasta repetir smoke en navegador real con `8081` accesible.
+
+## 2026-05-18 - Fase LIVE-E / demo metricas engagement
+
+Tipo: frontend/demo controlado, sin backend ni migraciones.
+
+Objetivo:
+
+- Crear una experiencia visual fuerte para presentacion comercial de LIVE.
+- Mostrar engagement y actividad simulada sin Facebook, WebSockets ni backend realtime.
+- Mantener i18n ES/EN.
+
+Cambios realizados:
+
+- Se agrego panel `Metricas demo` en `app/live.tsx`.
+- Se agregaron tarjetas visuales de viewers, viewers pico, engagement, comentarios, reacciones y productos destacados.
+- Se agrego grafica simple de actividad por minuto.
+- Se agrego lista de productos destacados demo.
+- Se agrego timeline visual con eventos LIVE simulados.
+- Se agrego toggle para ocultar/mostrar demo.
+- Se agregaron llaves i18n en `locales/es/common.json` y `locales/en/common.json`.
+- Se creo `docs/ERP_LIVE_DEMO_METRICS_MODE.md`.
+
+Validaciones:
+
+- `npm run lint`: ejecutado, sin errores; quedan 55 warnings preexistentes en otras pantallas.
+- `npx tsc --noEmit`: ejecutado correctamente.
+- `npx expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: ejecutado correctamente.
+- `rg -n "Ã|Â|�" app\live.tsx locales\es\common.json locales\en\common.json`: sin coincidencias.
+- Runtime local `http://localhost:8081/live`: pendiente; `npx expo start --web --port 8081` no dejo servidor accesible desde esta sesion.
+
+Riesgos pendientes:
+
+- El panel es demo visual, no metrica real.
+- Smoke visual en navegador sigue pendiente hasta tener `8081` accesible.
+- Facebook, ventas, pagos, reportes y reservaciones siguen fuera de alcance.
+
+Decision:
+
+- `GO tecnico` para build/export del modo demo.
+- `NO-GO visual pendiente` hasta repetir smoke en navegador real con `8081` accesible.
