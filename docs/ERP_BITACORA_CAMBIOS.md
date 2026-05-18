@@ -1437,3 +1437,41 @@ Decision:
 - `GO condicionado` para siguiente fase tenant no financiera o hardening de sesiones/permisos.
 - `NO-GO` para declarar SaaS real completo.
 
+## 2026-05-18 - Fase LIVE-A / base i18n frontend y UX LIVE
+
+Tipo: implementacion frontend incremental, sin cambios backend ni base de datos.
+
+Objetivo:
+
+- Crear base minima multi idioma en frontend.
+- Preparar LIVE para traducciones ES/EN.
+- Mantener reglas operativas LIVE sin cambios.
+
+Cambios realizados:
+
+- Se instalaron `i18next`, `react-i18next` y `expo-localization`.
+- Se creo `services/i18n.ts`.
+- Se crearon `locales/es/common.json` y `locales/en/common.json`.
+- Se integro `I18nextProvider` en `app/_layout.tsx`.
+- Se migraron textos principales de `app/live.tsx` a traducciones.
+- Se agrego selector minimo ES/EN en LIVE para validar la base tecnica.
+- Se crearon `docs/ERP_FRONTEND_I18N_BASE.md` y `docs/ERP_LIVE_UX_I18N_PREPARATION.md`.
+
+Validaciones:
+
+- `npm.cmd run lint`: ejecutado sin errores; conserva 55 warnings historicos fuera de alcance.
+- `npx.cmd tsc --noEmit`: ejecutado correctamente.
+- `npx.cmd expo export --platform web --output-dir C:\tmp\control-ropa-web-export`: ejecutado correctamente; genero ruta estatica `/live`.
+- `npm.cmd run web`: no pudo tomar `8081` porque el puerto ya estaba ocupado por un proceso `node` y Expo aborto en modo no interactivo.
+
+Riesgos pendientes:
+
+- Traduccion global del ERP queda fuera de alcance.
+- Persistencia de idioma queda pendiente.
+- Mensajes backend y etiquetas de estatus requieren estrategia posterior.
+- Validacion runtime en `localhost:8081` queda pendiente hasta liberar el proceso `node` que ocupa el puerto.
+
+Decision:
+
+- `GO tecnico condicionado`: compilacion/export web correctos; runtime interactivo en `8081` pendiente por puerto ocupado.
+

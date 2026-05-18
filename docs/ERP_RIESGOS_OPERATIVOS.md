@@ -75,6 +75,10 @@ Probabilidad:
 | Roles ADMIN/SELLER todavia globales | ALTO | MEDIA durante validacion A/B | Permisos siguen sin scope por company; aislamiento depende del tenant resolver y servicios migrados. | Validar datos por endpoint tenant-aware y no declarar seguridad SaaS completa todavia. | Limitar usuarios A/B a QA y no habilitar SaaS real. |
 | Sesiones legacy tenant null persistentes | MEDIO | MEDIA despues de Fase 2O | Sesiones antiguas pueden confundir evidencia o mantener fallback mono-company. | Revocar sesiones `active_company_id IS NULL` antes de release SaaS real. | Cerrar sesiones y repetir login tenant-aware. |
 | Aislamiento A/B solo en endpoints directos | ALTO | ALTA antes de SaaS real | Customers/items/batches estan aislados, pero consumers de ventas/pagos/live/reportes no fueron validados. | Mantener esos modulos fuera de alcance y migrarlos por fase. | No habilitar multi-company real para flujos no migrados. |
+| I18N parcial en frontend | MEDIO | MEDIA durante migracion UX | LIVE puede mostrar textos traducidos mientras otras pantallas siguen con literales directos, generando experiencia inconsistente. | Migrar pantallas por fases y mantener diccionarios por modulo. | Revertir cambios de i18n en la pantalla afectada. |
+| Idioma no persistido | BAJO | MEDIA en fase inicial | Usuario podria cambiar idioma en LIVE y perder preferencia al reiniciar la app. | Definir persistencia de idioma en fase futura. | Mantener espanol como default. |
+| Estatus/errores backend no traducidos | MEDIO | MEDIA | Algunos errores o etiquetas pueden mostrarse en idioma distinto al seleccionado. | Centralizar estrategia de errores y status labels en i18n. | Mostrar fallback espanol operativo. |
+| Puerto frontend 8081 ocupado por proceso stale | MEDIO | MEDIA en QA local | `npm run web` puede fallar aunque el build/export sea correcto, bloqueando validacion visual. | Liberar proceso `node` antes de smoke web o usar puerto QA alterno documentado. | Cerrar proceso stale y repetir `npm run web`. |
 
 ## Acciones que deberian auditarse
 

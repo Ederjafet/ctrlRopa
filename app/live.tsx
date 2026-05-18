@@ -40,6 +40,7 @@ import { validateRouteAccess } from '@/services/routeGuard';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -124,6 +125,7 @@ function isReservationSettled(reservation: Reservation, paid: number) {
 export default function LiveScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
+  const { i18n, t } = useTranslation('common');
 
   const [session, setSession] = useState<UserSession | null>(null);
   const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
@@ -177,7 +179,7 @@ export default function LiveScreen() {
       setIsAllowed(true);
       await loadData();
     } catch (err: any) {
-      Alert.alert('Live', err?.message || 'No se pudo cargar Live.');
+      Alert.alert(t('live.title'), err?.message || t('live.loadingError'));
       setIsLoading(false);
     }
   };
@@ -263,7 +265,7 @@ export default function LiveScreen() {
             : ''
         );
         Alert.alert(
-          'Live',
+          t('live.title'),
           `Prenda ${createdItem.code} lista para agregar a la reserva.`
         );
       }
@@ -272,16 +274,16 @@ export default function LiveScreen() {
         .filter((result) => result.status === 'rejected')
         .map((result) =>
           result.status === 'rejected'
-            ? result.reason?.message || 'No se pudo cargar un recurso.'
+            ? result.reason?.message || t('live.resourceLoadError')
             : ''
         )
         .filter(Boolean);
 
       if (errors.length > 0) {
-        Alert.alert('Live', errors.join('\n'));
+        Alert.alert(t('live.title'), errors.join('\n'));
       }
     } catch (err: any) {
-      Alert.alert('Live', err?.message || 'No se pudo cargar Live.');
+      Alert.alert(t('live.title'), err?.message || t('live.loadingError'));
     } finally {
       setIsLoading(false);
     }
@@ -328,21 +330,21 @@ export default function LiveScreen() {
   }, [items, itemSearch]);
 
   const reservationPendingReason = !selectedLive || !isLiveOperable(selectedLive)
-    ? 'Selecciona o crea un live abierto.'
+    ? t('live.selectOpenLiveReason')
     : !selectedCustomer
-      ? 'Selecciona un cliente.'
+      ? t('live.selectCustomerReason')
       : !selectedItem
-        ? 'Selecciona o crea una prenda.'
+        ? t('live.selectItemReason')
         : !priceText.trim() || Number.isNaN(Number(priceText)) || Number(priceText) <= 0
-          ? 'Captura un precio mayor a cero.'
+          ? t('live.priceReason')
           : !liveChannelId
-            ? 'El canal Live no esta habilitado para la sucursal.'
+            ? t('live.channelReason')
             : '';
   const selectedLiveIsOperable = isLiveOperable(selectedLive);
   const createLiveBlockedReason = !newLiveNotes.trim()
-    ? 'Captura la ubicacion o notas del live antes de crearlo.'
+    ? t('live.createLiveMissingNotes')
     : isSavingLive
-      ? 'Espera a que termine la accion en proceso.'
+      ? t('live.actionInProgress')
       : '';
   const goToReservationDetail = (reservationId: number) => {
     router.push({
@@ -393,19 +395,19 @@ export default function LiveScreen() {
 
   const handleCreateLive = async () => {
     if (!session) {
-      Alert.alert('Sesión', 'No hay sesión activa.');
+      Alert.alert(t('live.sessionTitle'), t('live.noActiveSession'));
       return;
     }
 
     if (!newLiveNotes.trim()) {
-      Alert.alert('Live', 'Captura la ubicacion o notas del live antes de crearlo.');
+      Alert.alert(t('live.title'), t('live.createLiveMissingNotes'));
       return;
     }
 
     const branchId = Number(session.branchId);
 
     if (!Number.isFinite(branchId) || branchId <= 0) {
-      Alert.alert('Live', 'No se encontro una sucursal valida para crear el live. Cierra sesión e inicia nuevamente.');
+      Alert.alert(t('live.title'), t('live.invalidBranch'));
       return;
     }
 
@@ -422,14 +424,17 @@ export default function LiveScreen() {
       setSelectedLive(live);
       await saveSelectedLiveId(session.branchId, session.userId, live.id);
       setLiveNotice({
-        message: `Live #${live.id} creado correctamente: ${live.notes || liveNotes}`,
+        message: t('live.liveCreatedDetail', {
+          id: live.id,
+          notes: live.notes || liveNotes,
+        }),
         tone: 'success',
       });
       await loadData();
 
-      Alert.alert('Live', 'Live creado correctamente.');
+      Alert.alert(t('live.title'), t('live.liveCreated'));
     } catch (err: any) {
-      Alert.alert('Live', err?.message || 'No se pudo crear el live.');
+      Alert.alert(t('live.title'), err?.message || t('live.liveCreateError'));
     } finally {
       setIsSavingLive(false);
     }
@@ -446,7 +451,7 @@ export default function LiveScreen() {
       await saveSelectedLiveId(session.branchId, session.userId, updated.id);
       await loadData();
     } catch (err: any) {
-      Alert.alert('Live', err?.message || 'No se pudo activar el live.');
+      Alert.alert(t('live.title'), err?.message || t('live.liveActivationError'));
     } finally {
       setIsSavingLive(false);
     }
@@ -455,7 +460,7 @@ export default function LiveScreen() {
   const handleCloseLive = (live: Live) => {
     setCloseLiveToConfirm(live);
     setLiveNotice({
-      message: `Confirma si deseas cerrar el Live #${live.id}.`,
+      message: t('live.closeConfirmNotice', { id: live.id }),
       tone: 'warning',
     });
 
@@ -480,12 +485,12 @@ export default function LiveScreen() {
       }
       await loadData();
       setLiveNotice({
-        message: `Live #${closedLive.id} cerrado correctamente.`,
+        message: t('live.liveClosed', { id: closedLive.id }),
         tone: 'success',
       });
     } catch (err: any) {
       setLiveNotice({
-        message: err?.message || 'No se pudo cerrar el live.',
+        message: err?.message || t('live.liveCloseError'),
         tone: 'danger',
       });
     } finally {
@@ -519,7 +524,7 @@ export default function LiveScreen() {
     );
 
     if (!item) {
-      Alert.alert('Live', 'No se encontró una prenda disponible con ese código.');
+      Alert.alert(t('live.title'), t('live.itemNotFound'));
       setScanInput('');
       return;
     }
@@ -535,34 +540,34 @@ export default function LiveScreen() {
 
   const validateReservation = () => {
     if (!session) {
-      Alert.alert('Sesión', 'No hay sesión activa.');
+      Alert.alert(t('live.sessionTitle'), t('live.noActiveSession'));
       return false;
     }
 
     if (!selectedLive || !isLiveOperable(selectedLive)) {
-      Alert.alert('Live', 'Selecciona o crea un live abierto.');
+      Alert.alert(t('live.title'), t('live.selectOpenLiveReason'));
       return false;
     }
 
     if (!liveChannelId) {
-      Alert.alert('Live', 'El canal LIVE no está habilitado para la sucursal.');
+      Alert.alert(t('live.title'), t('live.channelDisabled'));
       return false;
     }
 
     if (!selectedCustomer) {
-      Alert.alert('Live', 'Selecciona un cliente.');
+      Alert.alert(t('live.title'), t('live.selectCustomerReason'));
       return false;
     }
 
     if (!selectedItem) {
-      Alert.alert('Live', 'Selecciona o escanea una prenda.');
+      Alert.alert(t('live.title'), t('live.selectOrScanItem'));
       return false;
     }
 
     const price = Number(priceText);
 
     if (!priceText.trim() || Number.isNaN(price) || price <= 0) {
-      Alert.alert('Live', 'Captura un precio válido.');
+      Alert.alert(t('live.title'), t('live.validPrice'));
       return false;
     }
 
@@ -573,7 +578,9 @@ export default function LiveScreen() {
     if (reservationPendingReason) {
       setReservationIssue(reservationPendingReason);
       setLiveNotice({
-        message: `No se puede agregar la reserva: ${reservationPendingReason}`,
+        message: t('live.reservationBlockedMessage', {
+          reason: reservationPendingReason,
+        }),
         tone: 'warning',
       });
       return;
@@ -622,12 +629,12 @@ export default function LiveScreen() {
       await loadData();
 
       setLiveNotice({
-        message: `Reserva #${reservation.id} creada correctamente.`,
+        message: t('live.reservationCreated', { id: reservation.id }),
         tone: 'success',
       });
     } catch (err: any) {
       setLiveNotice({
-        message: err?.message || 'No se pudo crear la reserva.',
+        message: err?.message || t('live.reservationCreateError'),
         tone: 'danger',
       });
     } finally {
@@ -637,24 +644,32 @@ export default function LiveScreen() {
 
   const handleReservationIssueAction = () => {
     const issue = reservationIssue || '';
+    const normalizedIssue = normalize(issue);
     setReservationIssue(null);
 
-    if (issue.includes('cliente')) {
+    if (normalizedIssue.includes('cliente') || normalizedIssue.includes('customer')) {
       setIsCustomerModalVisible(true);
       return;
     }
 
-    if (issue.includes('prenda')) {
+    if (
+      normalizedIssue.includes('prenda') ||
+      normalizedIssue.includes('item')
+    ) {
       setIsItemModalVisible(true);
     }
   };
 
   const reservationIssueActionLabel =
-    reservationIssue?.includes('cliente')
-      ? 'Seleccionar cliente'
-      : reservationIssue?.includes('prenda')
-        ? 'Buscar prenda'
-        : 'Entendido';
+    reservationIssue &&
+    (normalize(reservationIssue).includes('cliente') ||
+      normalize(reservationIssue).includes('customer'))
+      ? t('live.selectCustomer')
+      : reservationIssue &&
+          (normalize(reservationIssue).includes('prenda') ||
+            normalize(reservationIssue).includes('item'))
+        ? t('live.searchItem')
+        : t('common.understood');
 
   if (isAllowed === null || isLoading) {
     return (
@@ -670,12 +685,49 @@ export default function LiveScreen() {
         <AppBackButton fallbackRoute="/" />
 
         <AppText variant="title" bold>
-          Live
+          {t('live.title')}
         </AppText>
+        <View style={styles.languageRow}>
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            {t('language.label')}
+          </AppText>
+          <Pressable
+            onPress={() => void i18n.changeLanguage('es')}
+            style={({ pressed }) => [
+              styles.languageOption,
+              {
+                borderColor: i18n.language.startsWith('es')
+                  ? theme.colors.accent
+                  : theme.colors.border,
+                opacity: pressed ? 0.75 : 1,
+              },
+            ]}
+          >
+            <AppText variant="caption">{t('language.spanish')}</AppText>
+          </Pressable>
+          <Pressable
+            onPress={() => void i18n.changeLanguage('en')}
+            style={({ pressed }) => [
+              styles.languageOption,
+              {
+                borderColor: i18n.language.startsWith('en')
+                  ? theme.colors.accent
+                  : theme.colors.border,
+                opacity: pressed ? 0.75 : 1,
+              },
+            ]}
+          >
+            <AppText variant="caption">{t('language.english')}</AppText>
+          </Pressable>
+        </View>
 
         {liveNotice ? (
           <AppNoticeDropdown
-            title={liveNotice.tone === 'success' ? 'Reserva creada' : 'No se pudo completar'}
+            title={
+              liveNotice.tone === 'success'
+                ? t('live.reservationCreatedTitle')
+                : t('live.reservationBlockedTitle')
+            }
             message={liveNotice.message}
             tone={liveNotice.tone}
             onClose={() => setLiveNotice(null)}
@@ -685,10 +737,10 @@ export default function LiveScreen() {
         {filteredLives.length > 0 ? (
           <AppCard>
             <AppText variant="subtitle" bold>
-              Lives abiertos
+              {t('live.openLivesTitle')}
             </AppText>
             <AppText color={theme.colors.mutedText}>
-              Selecciona el live donde vas a capturar reservas.
+              {t('live.openLivesHelp')}
             </AppText>
 
             <AppResponsiveGrid tabletColumns={2} desktopColumns={3} style={styles.liveButtonGrid}>
@@ -720,7 +772,7 @@ export default function LiveScreen() {
                     ) : null}
                     {selected ? (
                       <AppText variant="caption" color={theme.colors.accent} bold>
-                        Live seleccionado
+                        {t('live.selectedLive')}
                       </AppText>
                     ) : null}
                   </Pressable>
@@ -733,17 +785,19 @@ export default function LiveScreen() {
         {selectedLive ? (
           <AppCard>
           <AppText variant="subtitle" bold>
-            Sesión de live
+            {t('live.liveSessionTitle')}
           </AppText>
 
             <>
               <AppText bold>Live #{selectedLive.id}</AppText>
               <AppText color={theme.colors.mutedText}>
-                Estado: {getLiveStatusLabel(selectedLive.status)}
+                {t('live.status', {
+                  status: getLiveStatusLabel(selectedLive.status),
+                })}
               </AppText>
               {selectedLive.status !== 'CLOSED' ? (
                 <AppText variant="caption" color={theme.colors.accent} bold>
-                  Capturando en este live. Registra la reserva en el bloque de abajo.
+                  {t('live.capturingHelp')}
                 </AppText>
               ) : null}
               {selectedLive.notes ? <AppText>{selectedLive.notes}</AppText> : null}
@@ -752,7 +806,7 @@ export default function LiveScreen() {
                 {selectedLive.status === 'OPEN' ? (
                   <View style={styles.buttonFill}>
                     <AppButton
-                      title="Activar live"
+                      title={t('live.activateLive')}
                       onPress={() => handleActivateLive(selectedLive)}
                       loading={isSavingLive}
                     />
@@ -762,33 +816,31 @@ export default function LiveScreen() {
             </>
           </AppCard>
         ) : (
-          <AppInfoCard title="Sesión de live">
+          <AppInfoCard title={t('live.liveSessionTitle')}>
             <AppText color={theme.colors.infoCardText}>
-              No hay live abierto seleccionado. Crea uno o selecciona uno de la
-              lista.
+              {t('live.liveSessionEmpty')}
             </AppText>
           </AppInfoCard>
         )}
 
         <AppCard>
           <AppText variant="subtitle" bold>
-            Crear otro live
+            {t('live.createLiveTitle')}
           </AppText>
           <AppText color={theme.colors.mutedText}>
-            Usa esta opcion si la sucursal opera otro live al mismo tiempo en
-            otra ubicacion, mesa o transmision.
+            {t('live.createLiveHelp')}
           </AppText>
 
           <AppInput
-            label="Ubicacion / notas *"
+            label={t('live.locationNotesLabel')}
             value={newLiveNotes}
             onChangeText={setNewLiveNotes}
-            placeholder="Ej. Mesa 2, bodega, transmision tarde"
+            placeholder={t('live.locationNotesPlaceholder')}
             multiline
           />
 
           <AppButton
-            title="Crear otro live"
+            title={t('live.createLive')}
             onPress={handleCreateLive}
             loading={isSavingLive}
             disabled={isSavingLive || !newLiveNotes.trim()}
@@ -840,40 +892,44 @@ export default function LiveScreen() {
 
         <AppCard>
           <AppText variant="subtitle" bold>
-            Capturar reserva
+            {t('live.captureReservationTitle')}
           </AppText>
 
           {!selectedLive || !isLiveOperable(selectedLive) ? (
             <AppText color={theme.colors.mutedText}>
-              Selecciona o crea un live abierto para capturar reservas.
+              {t('live.selectLiveToCapture')}
             </AppText>
           ) : null}
 
           <View style={styles.sectionSpacing}>
-            <AppText bold>Cliente</AppText>
+            <AppText bold>{t('live.customer')}</AppText>
             <AppText>
               {selectedCustomer
                 ? selectedCustomer.name
-                : 'Selecciona cliente real o genérico.'}
+                : t('live.selectCustomerHelp')}
             </AppText>
 
             <AppButton
-              title={selectedCustomer ? 'Cambiar cliente' : 'Seleccionar cliente'}
+              title={
+                selectedCustomer
+                  ? t('live.changeCustomer')
+                  : t('live.selectCustomer')
+              }
               variant="operation"
               onPress={() => setIsCustomerModalVisible(true)}
             />
           </View>
 
           <View style={styles.sectionSpacing}>
-            <AppText bold>Prenda</AppText>
+            <AppText bold>{t('live.item')}</AppText>
             <AppText>
               {selectedItem
-                ? `${selectedItem.code} · ${selectedItem.productTypeName || 'Sin tipo'}`
-                : 'Escanea o selecciona una prenda disponible.'}
+                ? `${selectedItem.code} · ${selectedItem.productTypeName || t('live.noType')}`
+                : t('live.itemHelp')}
             </AppText>
 
             <AppInput
-              placeholder="Escanea o escribe código/QR"
+              placeholder={t('live.scanPlaceholder')}
               value={scanInput}
               onChangeText={setScanInput}
               onSubmitEditing={() => addItemByCode(scanInput)}
@@ -882,7 +938,7 @@ export default function LiveScreen() {
             <View style={styles.buttonRow}>
               <View style={styles.buttonFill}>
                 <AppButton
-                  title="Agregar por código"
+                  title={t('live.addByCode')}
                   variant="operation"
                   onPress={() => addItemByCode(scanInput)}
                 />
@@ -890,7 +946,7 @@ export default function LiveScreen() {
 
               <View style={styles.buttonFill}>
                 <AppButton
-                  title="Escanear QR"
+                  title={t('live.scanQr')}
                   variant="secondary"
                   onPress={() => setIsScannerVisible(true)}
                 />
@@ -900,14 +956,14 @@ export default function LiveScreen() {
             <View style={styles.buttonRow}>
               <View style={styles.buttonFill}>
                 <AppButton
-                  title="Buscar prenda"
+                  title={t('live.searchItem')}
                   variant="secondary"
                   onPress={() => setIsItemModalVisible(true)}
                 />
               </View>
               <View style={styles.buttonFill}>
                 <AppButton
-                  title="Alta rapida de prenda"
+                  title={t('live.quickItem')}
                   variant="secondary"
                   onPress={() =>
                     router.push('/items-create?returnTo=/live' as any)
@@ -918,7 +974,7 @@ export default function LiveScreen() {
             </View>
 
           <AppInput
-            label="Precio"
+            label={t('live.price')}
             value={priceText}
             onChangeText={setPriceText}
             placeholder="0.00"
@@ -926,7 +982,7 @@ export default function LiveScreen() {
           />
 
           <AppButton
-            title="Agregar reserva"
+            title={t('live.addReservation')}
             onPress={handleCreateReservation}
             loading={isSavingReservation}
             disabled={isSavingReservation}
@@ -935,12 +991,12 @@ export default function LiveScreen() {
 
         <AppCard>
           <AppText variant="subtitle" bold>
-            Reservas recientes
+            {t('live.recentReservations')}
           </AppText>
 
           {recentReservations.length === 0 ? (
             <AppText color={theme.colors.mutedText}>
-              Aún no hay reservas capturadas en esta sesión.
+              {t('live.noRecentReservations')}
             </AppText>
           ) : (
             recentReservations.map(({ reservation, customerName, itemCode }) => {
@@ -963,21 +1019,25 @@ export default function LiveScreen() {
                   <AppText>{customerName}</AppText>
                   <AppText color={theme.colors.mutedText}>
                     {formatMoney(Number(reservation.price || 0))}
-                    {settled ? ' - Liquidado' : ''}
+                    {settled ? ` - ${t('live.settled')}` : ''}
                   </AppText>
                   <AppText variant="caption" color={theme.colors.mutedText}>
                     Live: #{reservation.liveId || selectedLive?.id || '-'}
                   </AppText>
                   <AppText variant="caption" color={theme.colors.mutedText}>
-                    Reservo: {getReservationSellerLabel(reservation)}
+                    {t('live.reservedBy', {
+                      seller: getReservationSellerLabel(reservation),
+                    })}
                   </AppText>
                   <AppText variant="caption" color={theme.colors.mutedText}>
-                    Fecha: {formatDateTime(reservation.createdAt)}
+                    {t('live.date', {
+                      date: formatDateTime(reservation.createdAt),
+                    })}
                   </AppText>
                   <View style={styles.buttonRow}>
                     <View style={styles.buttonFill}>
                       <AppButton
-                        title="Ver detalle"
+                        title={t('live.viewDetail')}
                         variant="secondary"
                         onPress={() => goToReservationDetail(reservation.id)}
                       />
@@ -985,7 +1045,7 @@ export default function LiveScreen() {
                     {!settled ? (
                       <View style={styles.buttonFill}>
                         <AppButton
-                          title="Cobrar"
+                          title={t('live.charge')}
                           onPress={() => goToReservationPayment(reservation.id)}
                         />
                       </View>
@@ -1000,21 +1060,21 @@ export default function LiveScreen() {
         {selectedLive ? (
           <AppCard>
             <AppText variant="subtitle" bold>
-              Cierre del live
+              {t('live.closeLiveTitle')}
             </AppText>
             <AppText color={theme.colors.mutedText}>
-              Cierra la sesión cuando termines de capturar reservas.
+              {t('live.closeLiveHelp')}
             </AppText>
             {selectedLive.status === 'CLOSED' ? (
               <AppButton
-                title="Live cerrado"
+                title={t('live.liveClosedButton')}
                 variant="cancel"
                 disabled
                 style={styles.buttonSpacing}
               />
             ) : (
               <AppButton
-                title="Cerrar live"
+                title={t('live.closeLive')}
                 variant="danger"
                 onPress={() => handleCloseLive(selectedLive)}
                 loading={isSavingLive}
@@ -1075,12 +1135,12 @@ export default function LiveScreen() {
 
       <AppBottomModal
         visible={isCustomerModalVisible}
-        title="Seleccionar cliente"
+        title={t('live.selectCustomerModal')}
         onClose={() => setIsCustomerModalVisible(false)}
         scroll={false}
       >
         <AppInput
-          placeholder="Buscar cliente"
+          placeholder={t('live.searchCustomer')}
           value={customerSearch}
           onChangeText={setCustomerSearch}
         />
@@ -1093,24 +1153,24 @@ export default function LiveScreen() {
           renderItem={({ item }) => (
             <AppOptionRow
               title={item.name}
-              subtitle={`${item.phone || 'Sin teléfono'}${
-                item.isGeneric ? ' · Genérico' : ''
+              subtitle={`${item.phone || t('live.noPhone')}${
+                item.isGeneric ? ` · ${t('live.generic')}` : ''
               }`}
               onPress={() => selectCustomer(item)}
             />
           )}
-          ListEmptyComponent={<AppText>No hay clientes activos.</AppText>}
+          ListEmptyComponent={<AppText>{t('live.noActiveCustomers')}</AppText>}
         />
       </AppBottomModal>
 
       <AppBottomModal
         visible={isItemModalVisible}
-        title="Seleccionar prenda"
+        title={t('live.selectItemModal')}
         onClose={() => setIsItemModalVisible(false)}
         scroll={false}
       >
         <AppInput
-          placeholder="Buscar por código, tipo, marca o talla"
+          placeholder={t('live.searchItemPlaceholder')}
           value={itemSearch}
           onChangeText={setItemSearch}
         />
@@ -1123,32 +1183,32 @@ export default function LiveScreen() {
           renderItem={({ item }) => (
             <AppOptionRow
               title={item.code}
-              subtitle={`${item.productTypeName || 'Sin tipo'} · ${
-                item.brandName || 'Sin marca'
-              } · ${item.sizeName || 'Sin talla'}`}
+              subtitle={`${item.productTypeName || t('live.noType')} · ${
+                item.brandName || t('live.noBrand')
+              } · ${item.sizeName || t('live.noSize')}`}
               onPress={() => selectItem(item)}
             >
               <AppText variant="caption" color={theme.colors.mutedText}>
-                Precio sugerido:{' '}
+                {t('live.suggestedPrice')}{' '}
                 {item.price !== null && item.price !== undefined
                   ? formatMoney(item.price)
-                  : 'Sin precio'}
+                  : t('live.noPrice')}
               </AppText>
             </AppOptionRow>
           )}
-          ListEmptyComponent={<AppText>No hay prendas disponibles.</AppText>}
+          ListEmptyComponent={<AppText>{t('live.noAvailableItems')}</AppText>}
         />
       </AppBottomModal>
 
 
       <AppBottomModal
         visible={closeLiveToConfirm !== null}
-        title="Cerrar live"
+        title={t('live.closeLiveModalTitle')}
         onClose={() => setCloseLiveToConfirm(null)}
         showCancelButton={false}
       >
         <AppText>
-          Al cerrar el live ya no se podran capturar reservas en esta sesión.
+          {t('live.closeLiveModalBody')}
         </AppText>
         {closeLiveToConfirm ? (
           <AppText color={theme.colors.mutedText}>
@@ -1159,7 +1219,7 @@ export default function LiveScreen() {
         <View style={styles.buttonRow}>
           <View style={styles.buttonFill}>
             <AppButton
-              title="Cancelar"
+              title={t('common.cancel')}
               variant="secondary"
               onPress={() => setCloseLiveToConfirm(null)}
               disabled={isSavingLive}
@@ -1167,7 +1227,7 @@ export default function LiveScreen() {
           </View>
           <View style={styles.buttonFill}>
             <AppButton
-              title="Confirmar cierre"
+              title={t('live.confirmClose')}
               variant="danger"
               onPress={confirmCloseLive}
               loading={isSavingLive}
@@ -1179,12 +1239,12 @@ export default function LiveScreen() {
 
       <AppBottomModal
         visible={reservationIssue !== null}
-        title="No se puede agregar reserva"
+        title={t('live.reservationIssueTitle')}
         onClose={() => setReservationIssue(null)}
         showCancelButton={false}
       >
         <AppText>
-          Falta completar información para poder agregar la reserva.
+          {t('live.reservationIssueBody')}
         </AppText>
         <AppText color={theme.colors.warning} bold>
           {reservationIssue}
@@ -1192,7 +1252,7 @@ export default function LiveScreen() {
         <View style={styles.buttonRow}>
           <View style={styles.buttonFill}>
             <AppButton
-              title="Cerrar"
+              title={t('common.close')}
               variant="secondary"
               onPress={() => setReservationIssue(null)}
             />
@@ -1232,6 +1292,19 @@ const styles = StyleSheet.create({
   },
   liveButtonGrid: {
     marginTop: 10,
+  },
+  languageOption: {
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  languageRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+    marginTop: 4,
   },
   liveHistoryRow: {
     alignItems: 'center',
