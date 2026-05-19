@@ -1843,3 +1843,38 @@ Decision:
 
 - `GO tecnico` para lint, TypeScript y export web.
 - `GO runtime pendiente` hasta smoke visual tablet/desktop/movil.
+
+## 2026-05-19 - LIVE-L / layouts y flujo operativo Live Commerce
+
+Tipo: frontend UX acotado + documentacion producto/arquitectura, sin backend ni integraciones externas.
+
+Objetivo:
+
+- Separar visualmente `En vivo` por desktop, tablet y movil.
+- Documentar flujo operativo real de Live Commerce.
+- Disenar estrategia futura de adaptadores por plataforma.
+- Definir reporte final deseado sin tocar reportes runtime.
+
+Cambios realizados:
+
+- `components/live/LiveDesktopLayout.tsx`: layout tres columnas para desktop.
+- `components/live/LiveTabletLayout.tsx`: layout dos columnas para tablet.
+- `components/live/LiveMobileLayout.tsx`: layout apilado para movil.
+- `app/live.tsx`: usa layout por dispositivo manteniendo la logica principal.
+- `docs/ERP_LIVE_RESPONSIVE_LAYOUTS.md`: documenta PC/tablet/movil.
+- `docs/ERP_LIVE_OPERATIONAL_FLOW_DESIGN.md`: documenta presentadora, operador, clientes, prendas y metricas.
+- `docs/ERP_LIVE_PLATFORM_ADAPTERS_STRATEGY.md`: documenta adaptadores Facebook/YouTube/Instagram/TikTok sin runtime.
+- `docs/ERP_LIVE_FINAL_REPORT_DESIGN.md`: define reporte final deseado.
+
+Validaciones:
+
+- `npm run lint`: ejecutado, sin errores; quedan 55 warnings preexistentes fuera del alcance.
+- `npx tsc --noEmit`: ejecutado correctamente.
+- `npx expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: ejecutado correctamente.
+- `rg -n "Live|Dashboard|Timeline" app/live.tsx components/live locales/es/common.json`: devuelve coincidencias en claves/identificadores tecnicos y valores aceptables como `En vivo`; no se detectaron textos visibles nuevos en espanol usando `Dashboard` o `Timeline`.
+- Busqueda de mojibake en `app`, `components`, `locales` y documentos LIVE-L: sin coincidencias nuevas; las coincidencias amplias corresponden a referencias historicas documentales previas.
+
+Decision:
+
+- `GO tecnico` para lint, TypeScript y export web.
+- `GO runtime pendiente` hasta smoke visual por dispositivo fisico o navegador con viewports tablet/movil.

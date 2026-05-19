@@ -1,4 +1,7 @@
 import QRScannerModal from '@/components/qr/QRScannerModal';
+import LiveDesktopLayout from '@/components/live/LiveDesktopLayout';
+import LiveMobileLayout from '@/components/live/LiveMobileLayout';
+import LiveTabletLayout from '@/components/live/LiveTabletLayout';
 import AppBackButton from '@/components/ui/AppBackButton';
 import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
@@ -189,7 +192,11 @@ export default function LiveScreen() {
   const { theme } = useAppTheme();
   const { isDesktop, isTablet } = useResponsiveLayout();
   const { t } = useTranslation('common');
-  const isCommerceWide = isDesktop || isTablet;
+  const LiveLayout = isDesktop
+    ? LiveDesktopLayout
+    : isTablet
+      ? LiveTabletLayout
+      : LiveMobileLayout;
 
   const [session, setSession] = useState<UserSession | null>(null);
   const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
@@ -915,18 +922,8 @@ export default function LiveScreen() {
           </AppInfoCard>
         ) : null}
 
-        <View
-          style={[
-            styles.commerceColumns,
-            isCommerceWide ? styles.commerceColumnsWide : styles.commerceColumnsStack,
-          ]}
-        >
-          <View
-            style={[
-              styles.commerceColumn,
-              isCommerceWide ? styles.commerceSideColumn : styles.commerceFullColumn,
-            ]}
-          >
+        <LiveLayout>
+          <View style={styles.commerceColumn}>
             <AppCard>
               <View style={styles.productVisualHeader}>
                 <View
@@ -1179,12 +1176,7 @@ export default function LiveScreen() {
 
           </View>
 
-          <View
-            style={[
-              styles.commerceColumn,
-              isCommerceWide ? styles.commerceMainColumn : styles.commerceFullColumn,
-            ]}
-          >
+          <View style={styles.commerceColumn}>
 
         {filteredLives.length > 0 ? (
           <AppCard>
@@ -1443,12 +1435,7 @@ export default function LiveScreen() {
 
           </View>
 
-          <View
-            style={[
-              styles.commerceColumn,
-              isCommerceWide ? styles.commerceSideColumn : styles.commerceFullColumn,
-            ]}
-          >
+          <View style={styles.commerceColumn}>
 
         <AppCard>
           <AppText variant="subtitle" bold>
@@ -1548,7 +1535,7 @@ export default function LiveScreen() {
         ) : null}
 
           </View>
-        </View>
+        </LiveLayout>
 
         {false && selectedLiveIsOperable && filteredLives.length > 0 ? (
           <AppCard>
@@ -1805,25 +1792,6 @@ const styles = StyleSheet.create({
   commerceColumn: {
     gap: 12,
     minWidth: 0,
-  },
-  commerceColumns: {
-    gap: 14,
-  },
-  commerceColumnsStack: {
-    flexDirection: 'column',
-  },
-  commerceColumnsWide: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-  },
-  commerceFullColumn: {
-    width: '100%',
-  },
-  commerceMainColumn: {
-    flex: 1.32,
-  },
-  commerceSideColumn: {
-    flex: 0.92,
   },
   commentBubble: {
     borderWidth: 1,
