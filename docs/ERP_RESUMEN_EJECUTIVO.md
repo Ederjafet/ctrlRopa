@@ -51,6 +51,7 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 - LIVE-J: se pule el flujo visual En vivo -> Reserva -> Pagos con notificaciones compactas y detalle de cobro agrupado/responsive, sin tocar backend ni logica financiera.
 - LIVE-K: se transforma `En vivo` a un layout tablet-first tipo live commerce con producto visual, captura central, reservas recientes y metricas demo compactas, manteniendo backend y finanzas intactos.
 - LIVE-L: se separa visualmente `En vivo` por desktop/tablet/movil mediante componentes de layout y se documenta el flujo operativo real, adaptadores futuros por plataforma y reporte final deseado.
+- LIVE-M: se rediseña especificamente tablet para operacion real, priorizando captura, reservas recientes y producto visual compacto sin tocar backend ni logica financiera.
 
 ## Madurez ERP estimada
 

@@ -548,6 +548,13 @@ export default function LiveScreen() {
       stat: t('live.demoProductClicks', { count: 14 }),
     },
   ];
+  const visibleDemoMetricCards = isTablet
+    ? demoMetricCards.slice(0, 4)
+    : demoMetricCards;
+  const visibleDemoTimeline = isTablet ? demoTimeline.slice(0, 3) : demoTimeline;
+  const visibleRecentReservations = isTablet
+    ? recentReservations.slice(0, 3)
+    : recentReservations;
   const featuredProductName =
     selectedItem?.productTypeName ||
     selectedItem?.code ||
@@ -946,6 +953,7 @@ export default function LiveScreen() {
               <View
                 style={[
                   styles.productVisual,
+                  isTablet ? styles.productVisualTablet : null,
                   {
                     backgroundColor: theme.colors.optionPressedBackground,
                     borderColor: theme.colors.border,
@@ -1040,9 +1048,11 @@ export default function LiveScreen() {
                   </AppText>
                 </View>
               </View>
-              <AppText color={theme.colors.mutedText}>
-                {t('live.demoMetricsHelp')}
-              </AppText>
+              {!isTablet ? (
+                <AppText color={theme.colors.mutedText}>
+                  {t('live.demoMetricsHelp')}
+                </AppText>
+              ) : null}
             </View>
 
             <Pressable
@@ -1065,31 +1075,48 @@ export default function LiveScreen() {
 
           {showDemoMetrics ? (
             <>
-              <AppResponsiveGrid tabletColumns={3} desktopColumns={3} style={styles.demoMetricGrid}>
-                {demoMetricCards.map((metric) => (
+              <AppResponsiveGrid
+                gap={isTablet ? 8 : 12}
+                tabletColumns={2}
+                desktopColumns={3}
+                style={styles.demoMetricGrid}
+              >
+                {visibleDemoMetricCards.map((metric) => (
                   <View
                     key={metric.label}
                     style={[
                       styles.demoMetricCard,
+                      isTablet ? styles.demoMetricCardTablet : null,
                       {
                         borderColor: theme.colors.border,
                         backgroundColor: theme.colors.surface,
                       },
                     ]}
                   >
-                    <AppText variant="caption" color={theme.colors.mutedText}>
+                    <AppText
+                      variant="caption"
+                      color={theme.colors.mutedText}
+                      numberOfLines={1}
+                    >
                       {metric.label}
                     </AppText>
-                    <AppText variant="title" color={theme.colors.accent} bold>
+                    <AppText
+                      variant={isTablet ? 'subtitle' : 'title'}
+                      color={theme.colors.accent}
+                      bold
+                    >
                       {metric.value}
                     </AppText>
-                    <AppText variant="caption" color={theme.colors.mutedText}>
-                      {metric.helper}
-                    </AppText>
+                    {!isTablet ? (
+                      <AppText variant="caption" color={theme.colors.mutedText}>
+                        {metric.helper}
+                      </AppText>
+                    ) : null}
                   </View>
                 ))}
               </AppResponsiveGrid>
 
+              {!isTablet ? (
               <View style={styles.demoSplitRow}>
                 <View
                   style={[
@@ -1140,10 +1167,12 @@ export default function LiveScreen() {
                   ))}
                 </View>
               </View>
+              ) : null}
 
               <View
                 style={[
                   styles.demoPanel,
+                  isTablet ? styles.demoPanelTablet : null,
                   {
                     borderColor: theme.colors.border,
                     backgroundColor: theme.colors.surface,
@@ -1151,7 +1180,7 @@ export default function LiveScreen() {
                 ]}
               >
                 <AppText bold>{t('live.demoTimelineTitle')}</AppText>
-                {demoTimeline.map((event) => (
+                {visibleDemoTimeline.map((event) => (
                   <View key={`${event.time}-${event.label}`} style={styles.demoTimelineRow}>
                     <View
                       style={[
@@ -1321,7 +1350,7 @@ export default function LiveScreen() {
                   <AppText bold>{t('live.liveNumber', { id: live.id })}</AppText>
                   <AppText color={theme.colors.mutedText}>
                     {getLiveStatusLabel(live.status)}
-                    {live.notes ? ` · ${live.notes}` : ''}
+                    {live.notes ? ` - ${live.notes}` : ''}
                   </AppText>
                   {selected ? (
                     <AppText variant="caption" color={theme.colors.accent} bold>
@@ -1368,7 +1397,7 @@ export default function LiveScreen() {
             <AppText bold>{t('live.item')}</AppText>
             <AppText>
               {selectedItem
-                ? `${selectedItem.code} · ${selectedItem.productTypeName || t('live.noType')}`
+                ? `${selectedItem.code} - ${selectedItem.productTypeName || t('live.noType')}`
                 : t('live.itemHelp')}
             </AppText>
 
@@ -1447,7 +1476,8 @@ export default function LiveScreen() {
               {t('live.noRecentReservations')}
             </AppText>
           ) : (
-            recentReservations.map(({ reservation, customerName, itemCode }) => {
+            <>
+            {visibleRecentReservations.map(({ reservation, customerName, itemCode }) => {
               const paid = paidByReservationId[reservation.id] ?? 0;
               const settled = isReservationSettled(reservation, paid);
 
@@ -1503,7 +1533,15 @@ export default function LiveScreen() {
                   </View>
                 </Pressable>
               );
-            })
+            })}
+            {isTablet && recentReservations.length > visibleRecentReservations.length ? (
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                {t('live.moreRecentReservations', {
+                  count: recentReservations.length - visibleRecentReservations.length,
+                })}
+              </AppText>
+            ) : null}
+            </>
           )}
         </AppCard>
 
@@ -1566,7 +1604,7 @@ export default function LiveScreen() {
                   <AppText bold>{t('live.liveNumber', { id: live.id })}</AppText>
                   <AppText color={theme.colors.mutedText}>
                     {getLiveStatusLabel(live.status)}
-                    {live.notes ? ` · ${live.notes}` : ''}
+                    {live.notes ? ` - ${live.notes}` : ''}
                   </AppText>
                   {selected ? (
                     <AppText variant="caption" color={theme.colors.accent} bold>
@@ -1607,7 +1645,7 @@ export default function LiveScreen() {
             <AppOptionRow
               title={item.name}
               subtitle={`${item.phone || t('live.noPhone')}${
-                item.isGeneric ? ` · ${t('live.generic')}` : ''
+                item.isGeneric ? ` - ${t('live.generic')}` : ''
               }`}
               onPress={() => selectCustomer(item)}
             />
@@ -1640,9 +1678,9 @@ export default function LiveScreen() {
           renderItem={({ item }) => (
             <AppOptionRow
               title={item.code}
-              subtitle={`${item.productTypeName || t('live.noType')} · ${
+              subtitle={`${item.productTypeName || t('live.noType')} - ${
                 item.brandName || t('live.noBrand')
-              } · ${item.sizeName || t('live.noSize')}`}
+              } - ${item.sizeName || t('live.noSize')}`}
               onPress={() => selectItem(item)}
             >
               <AppText variant="caption" color={theme.colors.mutedText}>
@@ -1835,6 +1873,11 @@ const styles = StyleSheet.create({
     minHeight: 118,
     padding: 12,
   },
+  demoMetricCardTablet: {
+    gap: 2,
+    minHeight: 70,
+    padding: 10,
+  },
   demoMetricGrid: {
     marginTop: 14,
   },
@@ -1844,6 +1887,11 @@ const styles = StyleSheet.create({
     gap: 10,
     minWidth: 240,
     padding: 12,
+  },
+  demoPanelTablet: {
+    gap: 6,
+    minWidth: 0,
+    padding: 10,
   },
   demoProductRow: {
     alignItems: 'center',
@@ -1920,6 +1968,10 @@ const styles = StyleSheet.create({
     minHeight: 240,
     padding: 18,
     justifyContent: 'flex-end',
+  },
+  productVisualTablet: {
+    minHeight: 160,
+    padding: 14,
   },
   productVisualHeader: {
     alignItems: 'center',

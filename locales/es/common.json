@@ -148,6 +148,7 @@
     "itemNotFound": "No se encontró una prenda disponible con ese código.",
     "recentReservations": "Reservas recientes",
     "noRecentReservations": "Aún no hay reservas capturadas en esta sesión.",
+    "moreRecentReservations": "+{{count}} reservas más en esta sesión.",
     "settled": "Liquidado",
     "reservedBy": "Reservó: {{seller}}",
     "date": "Fecha: {{date}}",

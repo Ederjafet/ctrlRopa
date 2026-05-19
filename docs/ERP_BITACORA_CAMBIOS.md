@@ -1878,3 +1878,35 @@ Decision:
 
 - `GO tecnico` para lint, TypeScript y export web.
 - `GO runtime pendiente` hasta smoke visual por dispositivo fisico o navegador con viewports tablet/movil.
+
+## 2026-05-19 - LIVE-M / rediseño UX tablet En vivo
+
+Tipo: UX frontend tablet-first, sin backend, migraciones, pagos reales ni reportes.
+
+Objetivo:
+
+- Corregir el layout tablet detectado como incomodo en prueba real.
+- Priorizar reservas rapidas, captura operacional, producto visual y reservas recientes.
+- Evitar que tablet se sienta como desktop comprimido.
+
+Cambios realizados:
+
+- `components/live/LiveTabletLayout.tsx`: reordena tablet para poner operacion/reservas como columna principal y producto/metricas como soporte.
+- `app/live.tsx`: compacta metricas demo en tablet, limita ayudas largas y resume la linea de tiempo.
+- `app/live.tsx`: limita visualmente reservas recientes en tablet y muestra contador de reservas adicionales.
+- `app/live.tsx`: reduce altura del producto visual en tablet.
+- `locales/es/common.json` y `locales/en/common.json`: agrega texto para reservas recientes adicionales.
+- `docs/ERP_LIVE_TABLET_UX_REDESIGN.md`: documenta antes/despues, validacion y riesgos.
+
+Validaciones:
+
+- `npm run lint`: ejecutado, sin errores; quedan 55 warnings preexistentes fuera del alcance.
+- `npx tsc --noEmit`: ejecutado correctamente.
+- `npx expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: ejecutado correctamente.
+- `rg -n "Ã|Â|�" app components locales docs`: solo devuelve coincidencias historicas documentales previas; `app`, `components`, `locales` y `docs/ERP_LIVE_TABLET_UX_REDESIGN.md` no tienen coincidencias nuevas.
+- `rg -n "Live|Dashboard|Timeline" app/live.tsx components/live locales/es/common.json`: devuelve claves/identificadores tecnicos y valores aceptables como `En vivo`; no se detectaron textos visibles nuevos en espanol usando `Dashboard` o `Timeline`.
+
+Decision:
+
+- `GO tecnico` para lint, TypeScript y export web.
+- `GO runtime pendiente` hasta smoke visual en Galaxy Tab/iPad y viewports 1024x768, 1280x800.

@@ -148,6 +148,7 @@
     "itemNotFound": "No available item was found with that code.",
     "recentReservations": "Recent reservations",
     "noRecentReservations": "There are no reservations captured in this session yet.",
+    "moreRecentReservations": "+{{count}} more reservations in this session.",
     "settled": "Settled",
     "reservedBy": "Reserved by: {{seller}}",
     "date": "Date: {{date}}",
