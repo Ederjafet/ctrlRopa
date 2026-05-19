@@ -11,6 +11,7 @@ import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
 import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
+import { ApiError } from '@/services/apiClient';
 import { Customer, getCustomersByBranch } from '@/services/customerService';
 import { getItemsByBranch, Item } from '@/services/itemService';
 import {
@@ -60,6 +61,24 @@ type LiveNotice = {
   message: string;
   tone: 'success' | 'warning' | 'danger';
 };
+
+function isForbiddenError(error: unknown) {
+  return error instanceof ApiError && error.status === 403;
+}
+
+function resolveLoadIssue(
+  error: unknown,
+  fallbackMessage: string,
+  forbiddenMessage: string
+) {
+  if (isForbiddenError(error)) return forbiddenMessage;
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return fallbackMessage;
+}
 
 function formatMoney(value: number) {
   return `$${value.toFixed(2)}`;
@@ -137,8 +156,10 @@ export default function LiveScreen() {
   const [activateLiveToConfirm, setActivateLiveToConfirm] = useState<Live | null>(null);
   const [reservationIssue, setReservationIssue] = useState<string | null>(null);
   const [showDemoMetrics, setShowDemoMetrics] = useState(true);
+  const [liveLoadIssue, setLiveLoadIssue] = useState<string | null>(null);
   const [customerLoadIssue, setCustomerLoadIssue] = useState<string | null>(null);
   const [itemLoadIssue, setItemLoadIssue] = useState<string | null>(null);
+  const [reservationLoadIssue, setReservationLoadIssue] = useState<string | null>(null);
 
   const [lives, setLives] = useState<Live[]>([]);
   const [selectedLive, setSelectedLive] = useState<Live | null>(null);
@@ -183,7 +204,10 @@ export default function LiveScreen() {
       setIsAllowed(true);
       await loadData();
     } catch (err: any) {
-      Alert.alert(t('live.title'), err?.message || t('live.loadingError'));
+      Alert.alert(
+        t('live.title'),
+        resolveLoadIssue(err, t('live.loadingError'), t('live.accessDenied'))
+      );
       setIsLoading(false);
     }
   };
@@ -214,14 +238,41 @@ export default function LiveScreen() {
         customerResult.status === 'fulfilled' ? customerResult.value : [];
       const reservationData =
         reservationResult.status === 'fulfilled' ? reservationResult.value : [];
+      const nextLiveLoadIssue =
+        liveResult.status === 'rejected'
+          ? resolveLoadIssue(
+              liveResult.reason,
+              t('live.liveLoadError'),
+              t('live.accessDenied')
+            )
+          : null;
+
+      setLiveLoadIssue(nextLiveLoadIssue);
       setCustomerLoadIssue(
         customerResult.status === 'rejected'
-          ? customerResult.reason?.message || t('live.customerLoadError')
+          ? resolveLoadIssue(
+              customerResult.reason,
+              t('live.customerLoadError'),
+              t('live.customerPermissionError')
+            )
           : null
       );
       setItemLoadIssue(
         itemResult.status === 'rejected'
-          ? itemResult.reason?.message || t('live.itemLoadError')
+          ? resolveLoadIssue(
+              itemResult.reason,
+              t('live.itemLoadError'),
+              t('live.itemPermissionError')
+            )
+          : null
+      );
+      setReservationLoadIssue(
+        reservationResult.status === 'rejected'
+          ? resolveLoadIssue(
+              reservationResult.reason,
+              t('live.reservationLoadError'),
+              t('live.reservationPermissionError')
+            )
           : null
       );
 
@@ -285,20 +336,17 @@ export default function LiveScreen() {
         );
       }
 
-      const errors = [liveResult, itemResult, customerResult, reservationResult]
-        .filter((result) => result.status === 'rejected')
-        .map((result) =>
-          result.status === 'rejected'
-            ? result.reason?.message || t('live.resourceLoadError')
-            : ''
-        )
-        .filter(Boolean);
-
-      if (errors.length > 0) {
-        Alert.alert(t('live.title'), errors.join('\n'));
+      if (
+        liveResult.status === 'rejected' &&
+        isForbiddenError(liveResult.reason)
+      ) {
+        Alert.alert(t('live.title'), t('live.accessDenied'));
       }
     } catch (err: any) {
-      Alert.alert(t('live.title'), err?.message || t('live.loadingError'));
+      Alert.alert(
+        t('live.title'),
+        resolveLoadIssue(err, t('live.loadingError'), t('live.accessDenied'))
+      );
     } finally {
       setIsLoading(false);
     }
@@ -809,6 +857,22 @@ export default function LiveScreen() {
             message={liveNotice.message}
             tone={liveNotice.tone}
             onClose={() => setLiveNotice(null)}
+          />
+        ) : null}
+        {liveLoadIssue ? (
+          <AppNoticeDropdown
+            title={t('live.liveLoadIssueTitle')}
+            message={liveLoadIssue}
+            tone="danger"
+            onClose={() => setLiveLoadIssue(null)}
+          />
+        ) : null}
+        {reservationLoadIssue ? (
+          <AppNoticeDropdown
+            title={t('live.reservationLoadIssueTitle')}
+            message={reservationLoadIssue}
+            tone="warning"
+            onClose={() => setReservationLoadIssue(null)}
           />
         ) : null}
 

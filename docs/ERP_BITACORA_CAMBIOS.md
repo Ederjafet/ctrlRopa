@@ -1705,3 +1705,38 @@ Decision:
 
 - `GO tecnico` para build/export e i18n LIVE.
 - `GO runtime pendiente` hasta capturar evidencia visual de clientes/prendas reales en navegador.
+
+## 2026-05-18 - Correccion LIVE / permisos y errores secundarios
+
+Tipo: frontend acotado, manejo UX de errores en LIVE, sin backend ni migraciones.
+
+Objetivo:
+
+- Evitar modal duplicado de permisos en movil.
+- Diferenciar acceso denegado real a En vivo de errores secundarios de clientes, prendas o reservaciones.
+- Mantener la pantalla usable cuando falla un recurso no bloqueante.
+
+Cambios realizados:
+
+- Se actualizo `app/live.tsx` para detectar `ApiError.status === 403`.
+- Se elimino el `Alert.alert` global que concatenaba errores de `Promise.allSettled`.
+- Se agregaron mensajes por recurso para clientes, prendas y reservaciones.
+- Se agrego aviso no bloqueante para error de reservaciones.
+- Se actualizaron claves i18n en `locales/es/common.json` y `locales/en/common.json`.
+- Se creo `docs/ERP_LIVE_PERMISSION_ERROR_HANDLING.md`.
+
+Causa raiz:
+
+- Varias llamadas paralelas podian devolver el mismo 403; LIVE juntaba los mensajes y los mostraba en un unico modal, generando duplicados.
+
+Validaciones:
+
+- `npm run lint`: ejecutado, sin errores; quedan 55 warnings preexistentes fuera del alcance.
+- `npx tsc --noEmit`: ejecutado correctamente.
+- `npx expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: ejecutado correctamente.
+- `rg -n "Ã|Â|�" app services locales docs/ERP_LIVE_PERMISSION_ERROR_HANDLING.md`: sin coincidencias.
+
+Decision:
+
+- `GO tecnico` para build/export.
+- `GO runtime pendiente` hasta validar en movil que no se duplica el modal y registrar endpoint 403 real.

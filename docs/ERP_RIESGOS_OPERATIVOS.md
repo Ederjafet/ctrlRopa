@@ -89,6 +89,7 @@ Probabilidad:
 | Metricas demo confundidas con metricas reales | MEDIO | MEDIA en demos | Usuario comercial u operativo podria interpretar datos simulados como analytics productivos. | Badge `Demo visual`, textos explicitos y documentacion de alcance. | Ocultar panel demo y no avanzar a analytics reales sin backend/eventos tenant-aware. |
 | Idioma global parcialmente aplicado | MEDIO | MEDIA durante rollout i18n | El usuario puede cambiar ES/EN en Sistema, pero pantallas no migradas aun conservan literales directos. | Migrar i18n por modulo y documentar pantallas cubiertas. | Mantener espanol como fallback y revertir pantalla afectada si rompe navegacion. |
 | LIVE oculta fallas de carga como listas vacias | ALTO | MEDIA en QA/demo | Clientes o prendas pueden parecer inexistentes aunque la causa sea API, token, tenant o branch. | Mostrar `customerLoadIssue`/`itemLoadIssue` y validar logs/API antes de asumir ausencia de datos. | Revertir cambio frontend o volver a cargar despues de logout/login. |
+| LIVE concatena 403 secundarios | MEDIO | MEDIA en movil/web | Dos endpoints secundarios pueden mostrar el mismo permiso denegado en un modal duplicado, alarmando al usuario. | Separar errores por recurso y reservar alerta global solo para acceso denegado real a En vivo. | Revertir manejo local y revisar permisos/dataset del usuario afectado. |
 | Estatus de item no normalizado | MEDIO | MEDIA | Comparaciones exactas pueden ocultar prendas disponibles en LIVE. | Normalizar estatus en frontend y formalizar contrato API. | Usar busqueda directa por codigo/QR mientras se corrige contrato. |
 
 ## Acciones que deberian auditarse
@@ -133,6 +134,7 @@ Probabilidad:
 - LIVE-D no cierra smoke visual real hasta validar navegador en `8081` con evidencia.
 - LIVE-E agrega metricas demo visuales; no representan datos reales y no habilitan Facebook/analytics productivo.
 - Refinamiento LIVE i18n global centraliza idioma en Sistema, pero i18n completo del ERP sigue pendiente por modulos.
+- Correccion LIVE de permisos evita duplicar 403 secundarios, pero se debe validar en movil cual endpoint falla.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.
