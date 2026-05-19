@@ -37,6 +37,14 @@ Este script es solo QA y prepara Empresas A/B para validar aislamiento real:
 
 No borra datos historicos, no toca `DEFAULT` y solo revoca sesiones/locks de esos usuarios QA A/B.
 
+Para corregir o normalizar permisos/sesion tenant-aware de usuarios QA usados en LIVE, ejecutar:
+
+```text
+08-live-qa-permissions-fix.sql
+```
+
+Este script es solo QA y asegura `user_companies`, `user_branches`, permisos minimos de LIVE, canal `LIVE` activo en sucursal y revocacion de sesiones activas para forzar un login limpio. No trunca tablas, no borra historicos y no crea migraciones Flyway.
+
 ## Usuarios QA
 
 Todos usan la misma clave:

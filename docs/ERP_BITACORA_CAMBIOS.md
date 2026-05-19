@@ -1740,3 +1740,41 @@ Decision:
 
 - `GO tecnico` para build/export.
 - `GO runtime pendiente` hasta validar en movil que no se duplica el modal y registrar endpoint 403 real.
+
+## 2026-05-18 - LIVE-I / revision permisos QA y control 403 clientes
+
+Tipo: revision frontend/backend/security + SQL QA, sin backend Java ni migraciones.
+
+Objetivo:
+
+- Diagnosticar `No tienes permisos para cargar clientes` en LIVE.
+- Confirmar permisos/endpoints involucrados.
+- Preparar script QA seguro para corregir relaciones tenant/permisos/sesiones sin debilitar seguridad.
+
+Hallazgos:
+
+- `GET /api/customers/branch/{branchId}` usa `CustomerService.findByBranch` y no ejecuta `assertCan(VIEW_CUSTOMERS)`.
+- `GET /api/items/branch/{branchId}` usa `ItemService.findByBranch` y no ejecuta `assertCan(VIEW_INVENTORY)`.
+- El 403 en clientes/prendas probablemente viene de `TenantResolver.assertBranchBelongsToCompany` o de sesion tenant-aware inconsistente.
+- LIVE requiere para operar: canal `LIVE`, permiso `DO_LIVE_RESERVATION`, `user_companies`, `user_branches`, branch/company activa y sesion nueva.
+
+Cambios realizados:
+
+- Se creo `docs/ERP_LIVE_QA_PERMISSION_REVIEW.md`.
+- Se creo `docs/qa/08-live-qa-permissions-fix.sql`.
+- Se actualizo `docs/ERP_LIVE_PERMISSION_ERROR_HANDLING.md`.
+- Se actualizo `docs/ERP_QA_EXECUTION_LOG.md`.
+- Se actualizo `docs/ERP_RIESGOS_OPERATIVOS.md`.
+- Se actualizo `docs/ERP_RESUMEN_EJECUTIVO.md`.
+
+Validaciones:
+
+- `npm run lint`: ejecutado, sin errores; quedan 55 warnings preexistentes fuera del alcance.
+- `npx tsc --noEmit`: ejecutado correctamente.
+- `npx expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: ejecutado correctamente.
+- No aplica `mvnw test`: no se modifico Java backend.
+
+Decision:
+
+- `GO documental/SQL QA`.
+- `GO runtime pendiente` hasta ejecutar SQL en QA/local, relogin y validar usuario afectado.

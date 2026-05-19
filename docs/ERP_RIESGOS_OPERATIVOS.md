@@ -90,6 +90,8 @@ Probabilidad:
 | Idioma global parcialmente aplicado | MEDIO | MEDIA durante rollout i18n | El usuario puede cambiar ES/EN en Sistema, pero pantallas no migradas aun conservan literales directos. | Migrar i18n por modulo y documentar pantallas cubiertas. | Mantener espanol como fallback y revertir pantalla afectada si rompe navegacion. |
 | LIVE oculta fallas de carga como listas vacias | ALTO | MEDIA en QA/demo | Clientes o prendas pueden parecer inexistentes aunque la causa sea API, token, tenant o branch. | Mostrar `customerLoadIssue`/`itemLoadIssue` y validar logs/API antes de asumir ausencia de datos. | Revertir cambio frontend o volver a cargar despues de logout/login. |
 | LIVE concatena 403 secundarios | MEDIO | MEDIA en movil/web | Dos endpoints secundarios pueden mostrar el mismo permiso denegado en un modal duplicado, alarmando al usuario. | Separar errores por recurso y reservar alerta global solo para acceso denegado real a En vivo. | Revertir manejo local y revisar permisos/dataset del usuario afectado. |
+| Sesion tenant-aware vieja en LIVE | ALTO | MEDIA en movil/web | Una sesion con `active_company_id`/`active_branch_id` desalineado puede provocar 403 en clientes/prendas aunque el usuario tenga permisos. | Revocar sesiones QA con `08-live-qa-permissions-fix.sql`, forzar relogin y validar `/api/tenant/current`. | Cerrar sesion manualmente, revocar token y repetir login. |
+| Permisos QA LIVE incompletos | MEDIO | MEDIA en QA | Usuario QA puede entrar por ruta/cache pero no cargar clientes/prendas o no operar reservas. | Asegurar `DO_LIVE_RESERVATION`, `VIEW_CUSTOMERS`, `VIEW_INVENTORY`, canal LIVE y user_companies/user_branches. | Ejecutar script QA idempotente y reintentar con usuario correcto. |
 | Estatus de item no normalizado | MEDIO | MEDIA | Comparaciones exactas pueden ocultar prendas disponibles en LIVE. | Normalizar estatus en frontend y formalizar contrato API. | Usar busqueda directa por codigo/QR mientras se corrige contrato. |
 
 ## Acciones que deberian auditarse
@@ -135,6 +137,7 @@ Probabilidad:
 - LIVE-E agrega metricas demo visuales; no representan datos reales y no habilitan Facebook/analytics productivo.
 - Refinamiento LIVE i18n global centraliza idioma en Sistema, pero i18n completo del ERP sigue pendiente por modulos.
 - Correccion LIVE de permisos evita duplicar 403 secundarios, pero se debe validar en movil cual endpoint falla.
+- LIVE-I identifica que 403 de clientes/prendas probablemente es tenant/session, no permiso funcional directo; ejecutar script QA y relogin antes de abrir incidencias backend.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

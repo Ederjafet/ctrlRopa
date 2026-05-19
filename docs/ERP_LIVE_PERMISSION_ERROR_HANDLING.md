@@ -92,3 +92,24 @@ No se modifico backend, permisos, ventas, pagos, reportes ni migraciones.
 - Si un usuario tiene permiso para LIVE pero no para inventario/clientes, podra entrar a pantalla pero no operar completamente. Esto debe revisarse en matriz de permisos.
 - Reservaciones todavia tiene consumidores legacy y debe tenantizarse formalmente en una fase posterior.
 - La validacion movil real debe confirmar cual endpoint devuelve 403 en el dispositivo.
+
+## Revision QA posterior
+
+Se agrego `docs/ERP_LIVE_QA_PERMISSION_REVIEW.md` y `docs/qa/08-live-qa-permissions-fix.sql`.
+
+Hallazgo relevante:
+
+- `GET /api/customers/branch/{branchId}` y `GET /api/items/branch/{branchId}` no hacen `assertCan` funcional en sus servicios actuales.
+- Si esos endpoints devuelven `403`, la causa mas probable es tenant/branch/session:
+  - `user_companies` faltante o inactivo,
+  - `user_branches` faltante,
+  - `active_company_id` / `active_branch_id` viejo en sesion,
+  - branch fuera de company activa,
+  - company o branch inactiva.
+
+Control recomendado:
+
+- Ejecutar `docs/qa/08-live-qa-permissions-fix.sql` solo en QA/local.
+- Cerrar sesion en web/movil.
+- Iniciar sesion nuevamente para crear sesion tenant-aware limpia.
+- Validar `/api/tenant/current` antes de abrir En vivo.
