@@ -2,6 +2,7 @@ import QRScannerModal from '@/components/qr/QRScannerModal';
 import LiveDesktopLayout from '@/components/live/LiveDesktopLayout';
 import LiveMobileLayout from '@/components/live/LiveMobileLayout';
 import LiveTabletLayout from '@/components/live/LiveTabletLayout';
+import { LiveMetricCard } from '@/components/live/LiveCommerceCards';
 import AppBackButton from '@/components/ui/AppBackButton';
 import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
@@ -1082,37 +1083,13 @@ export default function LiveScreen() {
                 style={styles.demoMetricGrid}
               >
                 {visibleDemoMetricCards.map((metric) => (
-                  <View
+                  <LiveMetricCard
                     key={metric.label}
-                    style={[
-                      styles.demoMetricCard,
-                      isTablet ? styles.demoMetricCardTablet : null,
-                      {
-                        borderColor: theme.colors.border,
-                        backgroundColor: theme.colors.surface,
-                      },
-                    ]}
-                  >
-                    <AppText
-                      variant="caption"
-                      color={theme.colors.mutedText}
-                      numberOfLines={1}
-                    >
-                      {metric.label}
-                    </AppText>
-                    <AppText
-                      variant={isTablet ? 'subtitle' : 'title'}
-                      color={theme.colors.accent}
-                      bold
-                    >
-                      {metric.value}
-                    </AppText>
-                    {!isTablet ? (
-                      <AppText variant="caption" color={theme.colors.mutedText}>
-                        {metric.helper}
-                      </AppText>
-                    ) : null}
-                  </View>
+                    label={metric.label}
+                    value={metric.value}
+                    helper={metric.helper}
+                    compact={isTablet}
+                  />
                 ))}
               </AppResponsiveGrid>
 
@@ -1866,17 +1843,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 12,
     justifyContent: 'space-between',
-  },
-  demoMetricCard: {
-    borderWidth: 1,
-    gap: 6,
-    minHeight: 118,
-    padding: 12,
-  },
-  demoMetricCardTablet: {
-    gap: 2,
-    minHeight: 70,
-    padding: 10,
   },
   demoMetricGrid: {
     marginTop: 14,

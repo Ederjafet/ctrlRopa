@@ -96,6 +96,7 @@ Probabilidad:
 | Detalle de cobro dificil de leer en movil | MEDIO | MEDIA en flujo En vivo -> Pagos | Lista vertical larga aumenta errores del cajero al validar reserva, cliente, prenda y montos. | Agrupar datos en tarjetas responsive sin cambiar calculos ni endpoint. | Revertir solo layout frontend de `app/payments.tsx`. |
 | Layout En vivo tablet-first no validado en dispositivos reales | MEDIO | MEDIA durante demo | El layout puede verse bien en export web pero necesitar ajuste fino en Galaxy Tab/iPad reales. | Ejecutar smoke visual 1024x768, 1280x800, Galaxy Tab y iPad antes de demo comercial. | Revertir layout de `app/live.tsx` o forzar stack si hay desbordes. |
 | Consola En vivo tablet con informacion excesiva | MEDIO | MEDIA durante operacion | Metricas, linea de tiempo y reservas pueden competir con la captura rapida en tablet. | LIVE-M compacta metricas, resume linea de tiempo y prioriza columna operativa; validar en tablet fisica. | Revertir cambios de `LiveTabletLayout` y compactacion tablet en `app/live.tsx`. |
+| Design system LIVE aplicado parcialmente | MEDIO | MEDIA durante evolucion UX | Si solo algunas tarjetas usan componentes LIVE, la pantalla puede seguir mezclando estilos viejos y nuevos. | LIVE-N crea componentes base y migra metricas; planear migracion gradual de estado, reservas y avisos. | Revertir `components/live/LiveCommerceCards.tsx` y uso de `LiveMetricCard` en `app/live.tsx`. |
 | Integraciones Live Commerce sobredimensionadas | ALTO | MEDIA en roadmap | Prometer Facebook/YouTube/Instagram/TikTok sin validar APIs, permisos y limites puede generar deuda y expectativas incorrectas. | Mantener estrategia de adaptadores documentada y no implementar runtime hasta tener QA, permisos y seguridad tenant-aware. | Mantener operacion manual/QA sin adaptadores externos. |
 | Estatus de item no normalizado | MEDIO | MEDIA | Comparaciones exactas pueden ocultar prendas disponibles en LIVE. | Normalizar estatus en frontend y formalizar contrato API. | Usar busqueda directa por codigo/QR mientras se corrige contrato. |
 
@@ -147,6 +148,7 @@ Probabilidad:
 - LIVE-K reorganiza En vivo como comercio visual tablet-first; validar en tablets reales antes de usarlo como demo comercial formal.
 - LIVE-L separa layouts por dispositivo y documenta flujo/adaptadores, pero no habilita integraciones reales ni metricas reales.
 - LIVE-M ajusta tablet para operacion comercial real; el riesgo pendiente es validacion tactil en Galaxy Tab/iPad.
+- LIVE-N inicia design system y microcopy especializado; el riesgo pendiente es migracion gradual sin refactor masivo.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

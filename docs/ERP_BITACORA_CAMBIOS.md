@@ -1910,3 +1910,35 @@ Decision:
 
 - `GO tecnico` para lint, TypeScript y export web.
 - `GO runtime pendiente` hasta smoke visual en Galaxy Tab/iPad y viewports 1024x768, 1280x800.
+
+## 2026-05-19 - LIVE-N / microcopy y design system live-commerce
+
+Tipo: UX/product design frontend, sin backend, migraciones, pagos reales, reportes ni integraciones.
+
+Objetivo:
+
+- Convertir `En vivo` hacia una experiencia live-commerce profesional.
+- Crear base inicial de tarjetas reutilizables para LIVE.
+- Definir microcopy comercial por dispositivo.
+- Reducir lenguaje ERP/tecnico visible en fases posteriores.
+
+Cambios realizados:
+
+- `components/live/LiveCommerceCards.tsx`: agrega `LiveInfoCard`, `LiveMetricCard`, `LiveActionCard`, `LiveStatusCard`, `LiveWarningCard`, `LiveSuccessCard` y `LiveCompactCard`.
+- `app/live.tsx`: usa `LiveMetricCard` para homologar tarjetas de metricas demostrativas.
+- `locales/es/common.json`: ajusta microcopy visible para sustituir lenguaje tecnico como `Capturar`, `Alta`, `Sesion` y `Timeline`.
+- `docs/ERP_LIVE_UX_COPY_GUIDE.md`: guia de microcopy y terminos preferidos.
+- `docs/ERP_LIVE_DESIGN_SYSTEM.md`: base de design system LIVE.
+- `docs/ERP_LIVE_DEVICE_EXPERIENCE_STRATEGY.md`: estrategia desktop/tablet/mobile.
+
+Validaciones:
+
+- `npm run lint`: ejecutado, sin errores; quedan 55 warnings preexistentes fuera del alcance.
+- `npx tsc --noEmit`: ejecutado correctamente.
+- `npx expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: ejecutado correctamente.
+- `rg -n "Ã|Â|�" app components locales docs`: solo devuelve coincidencias historicas documentales previas; no se detectan coincidencias nuevas en el componente ni documentos de esta fase.
+
+Decision:
+
+- `GO tecnico` para lint, TypeScript y export web.
+- `GO UX runtime pendiente` hasta smoke visual mobile/tablet/desktop.
