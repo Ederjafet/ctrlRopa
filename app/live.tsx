@@ -2,7 +2,11 @@ import QRScannerModal from '@/components/qr/QRScannerModal';
 import LiveDesktopLayout from '@/components/live/LiveDesktopLayout';
 import LiveMobileLayout from '@/components/live/LiveMobileLayout';
 import LiveTabletLayout from '@/components/live/LiveTabletLayout';
-import { LiveMetricCard } from '@/components/live/LiveCommerceCards';
+import {
+  LiveActionCard,
+  LiveCompactCard,
+  LiveMetricCard,
+} from '@/components/live/LiveCommerceCards';
 import AppBackButton from '@/components/ui/AppBackButton';
 import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
@@ -93,21 +97,6 @@ function resolveLoadIssue(
 
 function formatMoney(value: number) {
   return `$${value.toFixed(2)}`;
-}
-
-function formatDateTime(value?: string | null) {
-  if (!value) return 'Sin fecha';
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-
-  return date.toLocaleString('es-MX', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }
 
 function normalize(value?: string | null) {
@@ -527,14 +516,6 @@ export default function LiveScreen() {
       helper: t('live.demoPinnedProductsHelp'),
     },
   ];
-  const demoTimeline = [
-    { time: '00:00', label: t('live.demoEventLiveStarted') },
-    { time: '03:20', label: t('live.demoEventViewerJoined') },
-    { time: '08:45', label: t('live.demoEventProductPinned') },
-    { time: '12:10', label: t('live.demoEventCommentReceived') },
-    { time: '15:30', label: t('live.demoEventReactionReceived') },
-    { time: '28:00', label: t('live.demoEventLiveClosed') },
-  ];
   const demoProducts = [
     {
       name: t('live.demoProductBlouse'),
@@ -549,10 +530,14 @@ export default function LiveScreen() {
       stat: t('live.demoProductClicks', { count: 14 }),
     },
   ];
+  const spotlightBadges = [
+    t('live.spotlightLastPieces'),
+    t('live.spotlightPopular'),
+    t('live.spotlightInterested', { count: 12 }),
+  ];
   const visibleDemoMetricCards = isTablet
     ? demoMetricCards.slice(0, 4)
     : demoMetricCards;
-  const visibleDemoTimeline = isTablet ? demoTimeline.slice(0, 3) : demoTimeline;
   const visibleRecentReservations = isTablet
     ? recentReservations.slice(0, 3)
     : recentReservations;
@@ -567,6 +552,21 @@ export default function LiveScreen() {
         selectedItem.sizeName || t('live.noSize'),
       ].join(' / ')
     : t('live.demoFeaturedProductHelp');
+  const featuredProductPrice =
+    selectedItem?.price !== null && selectedItem?.price !== undefined
+      ? formatMoney(Number(selectedItem.price))
+      : t('live.demoSpotlightPrice');
+  const activityFeed = [
+    ...recentReservations.slice(0, 3).map(({ customerName, itemCode }) =>
+      t('live.activityReservation', {
+        customer: customerName,
+        item: itemCode,
+      })
+    ),
+    t('live.activityComment', { customer: 'Carla', text: 'Tienes M?' }),
+    t('live.activityInterest', { customer: 'Maria' }),
+    t('live.activityProductPinned', { item: featuredProductName }),
+  ].slice(0, isTablet ? 4 : isDesktop ? 6 : 3);
   const createLiveBlockedReason = !newLiveNotes.trim()
     ? t('live.createLiveMissingNotes')
     : isSavingLive
@@ -962,10 +962,39 @@ export default function LiveScreen() {
                   },
                 ]}
               >
-                <AppText variant="title" bold>
-                  {featuredProductName}
-                </AppText>
-                <AppText color={theme.colors.mutedText}>{featuredProductMeta}</AppText>
+                <View style={styles.spotlightContent}>
+                  <AppText variant="caption" color={theme.colors.accent} bold>
+                    {t('live.productSpotlightTitle')}
+                  </AppText>
+                  <AppText variant="title" bold numberOfLines={2}>
+                    {featuredProductName}
+                  </AppText>
+                  <AppText color={theme.colors.mutedText} numberOfLines={2}>
+                    {featuredProductMeta}
+                  </AppText>
+                  <AppText variant="subtitle" color={theme.colors.accent} bold>
+                    {featuredProductPrice}
+                  </AppText>
+                  <View style={styles.spotlightBadgeRow}>
+                    {spotlightBadges.map((badge) => (
+                      <View
+                        key={badge}
+                        style={[
+                          styles.spotlightBadge,
+                          {
+                            backgroundColor: theme.colors.surface,
+                            borderColor: theme.colors.border,
+                            borderRadius: theme.radius.md,
+                          },
+                        ]}
+                      >
+                        <AppText variant="caption" bold>
+                          {badge}
+                        </AppText>
+                      </View>
+                    ))}
+                  </View>
+                </View>
                 <View style={styles.commentOverlay}>
                   <View
                     style={[
@@ -1156,19 +1185,16 @@ export default function LiveScreen() {
                   },
                 ]}
               >
-                <AppText bold>{t('live.demoTimelineTitle')}</AppText>
-                {visibleDemoTimeline.map((event) => (
-                  <View key={`${event.time}-${event.label}`} style={styles.demoTimelineRow}>
+                <AppText bold>{t('live.activityFeedTitle')}</AppText>
+                {activityFeed.map((event, index) => (
+                  <View key={`${event}-${index}`} style={styles.demoTimelineRow}>
                     <View
                       style={[
                         styles.demoTimelineDot,
                         { backgroundColor: theme.colors.accent },
                       ]}
                     />
-                    <AppText variant="caption" color={theme.colors.mutedText}>
-                      {event.time}
-                    </AppText>
-                    <AppText>{event.label}</AppText>
+                    <AppText>{event}</AppText>
                   </View>
                 ))}
               </View>
@@ -1340,7 +1366,7 @@ export default function LiveScreen() {
           </AppCard>
         ) : null}
 
-        <AppCard>
+        <LiveActionCard title={t('live.operatorConsoleTitle')} subtitle={t('live.operatorConsoleHelp')}>
           <AppText variant="subtitle" bold>
             {t('live.captureReservationTitle')}
           </AppText>
@@ -1437,7 +1463,7 @@ export default function LiveScreen() {
             loading={isSavingReservation}
             disabled={isSavingReservation}
           />
-        </AppCard>
+        </LiveActionCard>
 
           </View>
 
@@ -1470,27 +1496,22 @@ export default function LiveScreen() {
                     },
                   ]}
                 >
-                  <AppText bold>{itemCode}</AppText>
-                  <AppText>{customerName}</AppText>
-                  <AppText color={theme.colors.mutedText}>
-                    {formatMoney(Number(reservation.price || 0))}
-                    {settled ? ` - ${t('live.settled')}` : ''}
-                  </AppText>
-                  <AppText variant="caption" color={theme.colors.mutedText}>
-                    {t('live.liveNumber', {
-                      id: reservation.liveId || selectedLive?.id || '-',
-                    })}
-                  </AppText>
-                  <AppText variant="caption" color={theme.colors.mutedText}>
-                    {t('live.reservedBy', {
-                      seller: getReservationSellerLabel(reservation),
-                    })}
-                  </AppText>
-                  <AppText variant="caption" color={theme.colors.mutedText}>
-                    {t('live.date', {
-                      date: formatDateTime(reservation.createdAt),
-                    })}
-                  </AppText>
+                  <LiveCompactCard>
+                    <View style={styles.recentReservationHeader}>
+                      <View style={styles.recentReservationText}>
+                        <AppText bold numberOfLines={1}>{customerName}</AppText>
+                        <AppText color={theme.colors.mutedText} numberOfLines={1}>
+                          {itemCode}
+                        </AppText>
+                      </View>
+                      <AppText color={theme.colors.accent} bold>
+                        {formatMoney(Number(reservation.price || 0))}
+                      </AppText>
+                    </View>
+                    <AppText variant="caption" color={theme.colors.mutedText}>
+                      {settled ? t('live.settled') : getReservationSellerLabel(reservation)}
+                    </AppText>
+                  </LiveCompactCard>
                   <View style={styles.buttonRow}>
                     <View style={styles.buttonFill}>
                       <AppButton
@@ -1947,6 +1968,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
+  spotlightBadge: {
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  spotlightBadgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  spotlightContent: {
+    gap: 6,
+  },
   noticeBackdrop: {
     alignItems: 'center',
     flex: 1,
@@ -1967,6 +2001,16 @@ const styles = StyleSheet.create({
   recentRow: {
     borderBottomWidth: 1,
     paddingVertical: 12,
+  },
+  recentReservationHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
+  recentReservationText: {
+    flex: 1,
+    minWidth: 0,
   },
   sectionSpacing: {
     marginTop: 12,

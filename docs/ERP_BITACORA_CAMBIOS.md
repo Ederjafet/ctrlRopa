@@ -1942,3 +1942,38 @@ Decision:
 
 - `GO tecnico` para lint, TypeScript y export web.
 - `GO UX runtime pendiente` hasta smoke visual mobile/tablet/desktop.
+
+## 2026-05-19 - LIVE-O / operator console y product spotlight
+
+Tipo: UX frontend live-commerce, sin backend, migraciones, pagos reales, ventas reales ni integraciones externas.
+
+Objetivo:
+
+- Hacer que el producto sea protagonista visual.
+- Crear una consola de operador mas clara.
+- Reemplazar timeline/log por actividad humana.
+- Compactar metricas hacia formato streaming.
+
+Cambios realizados:
+
+- `app/live.tsx`: agrega Product Spotlight con precio, badges comerciales y urgencia visual.
+- `app/live.tsx`: agrega `Consola del operador` sobre el bloque de registro de reserva.
+- `app/live.tsx`: reemplaza eventos tipo timeline por `Actividad reciente` con mensajes humanos.
+- `app/live.tsx`: reservas recientes se muestran con `LiveCompactCard`.
+- `locales/es/common.json` y `locales/en/common.json`: agrega microcopy para spotlight, consola y activity feed.
+- `docs/ERP_LIVE_OPERATOR_CONSOLE.md`: documenta la consola del operador.
+- `docs/ERP_LIVE_PRODUCT_SPOTLIGHT.md`: documenta el producto protagonista.
+- `docs/ERP_LIVE_ACTIVITY_FEED.md`: documenta el feed humano.
+
+Validaciones:
+
+- `npx.cmd tsc --noEmit`: OK.
+- `npm.cmd run lint`: OK sin errores; persisten 55 warnings historicos fuera del alcance LIVE-O.
+- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
+- `rg -n "Ã|Â|�" app components locales docs`: solo devuelve coincidencias historicas documentales previas; no se detectan coincidencias nuevas en `app`, `components` ni `locales`.
+- `rg -n "Dashboard|Timeline|Capturar|Alta|Demo visual|\bLive\b" app/live.tsx components/live locales/es/common.json`: las coincidencias restantes son nombres tecnicos de tipos/estilos o claves internas; no se agrego terminologia visible nueva en espanol.
+
+Decision:
+
+- `GO tecnico` para lint, TypeScript y export web.
+- `GO UX runtime pendiente` hasta smoke visual mobile/tablet/desktop.

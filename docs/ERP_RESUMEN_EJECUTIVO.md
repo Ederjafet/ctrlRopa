@@ -53,6 +53,7 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 - LIVE-L: se separa visualmente `En vivo` por desktop/tablet/movil mediante componentes de layout y se documenta el flujo operativo real, adaptadores futuros por plataforma y reporte final deseado.
 - LIVE-M: se rediseña especificamente tablet para operacion real, priorizando captura, reservas recientes y producto visual compacto sin tocar backend ni logica financiera.
 - LIVE-N: se crea base inicial de design system y microcopy live-commerce para que `En vivo` deje de sentirse como ERP administrativo y avance hacia producto SaaS comercial.
+- LIVE-O: se incorpora Product Spotlight, consola del operador y activity feed humano para acercar `En vivo` a una experiencia moderna de streaming commerce.
 
 ## Madurez ERP estimada
 
