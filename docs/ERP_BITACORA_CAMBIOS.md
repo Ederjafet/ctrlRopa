@@ -1659,3 +1659,49 @@ Riesgos pendientes:
 Decision:
 
 - `GO documental` para usar el material como base de presentacion/demo.
+
+## 2026-05-18 - Refinamiento LIVE i18n global + datos reales
+
+Tipo: frontend acotado, UX/i18n y correccion de carga visible en LIVE, sin backend ni migraciones.
+
+Objetivo:
+
+- Mover el selector de idioma desde LIVE hacia `Configuracion -> Sistema`.
+- Persistir idioma global para pantallas preparadas con i18n.
+- Eliminar terminologia tecnica visible en espanol dentro de LIVE.
+- Mostrar eventos demo traducidos en lugar de codigos tecnicos.
+- Evitar que fallas de carga de clientes/prendas se oculten como listas vacias.
+
+Cambios realizados:
+
+- Se actualizo `services/i18n.ts` para persistir idioma global con `AsyncStorage` y proteger export web estatico.
+- Se actualizo `app/system.tsx` con selector ES/EN global y textos corregidos.
+- Se removio el selector local de idioma en `app/live.tsx`.
+- Se ajustaron filtros y mensajes de carga para clientes y prendas en LIVE.
+- Se actualizaron `locales/es/common.json` y `locales/en/common.json`.
+- Se actualizo `app/(tabs)/index.tsx` para evitar terminos visibles como `Live`/`Dashboard` en espanol.
+- Se creo `docs/ERP_LIVE_I18N_GLOBAL_REFINEMENT.md`.
+- Se creo `docs/ERP_LIVE_CUSTOMERS_ITEMS_FIXES.md`.
+
+Validaciones:
+
+- `rg -n "Ã|Â|�" app services locales`: sin coincidencias.
+- `npm run lint`: ejecutado, sin errores; quedan 55 warnings preexistentes fuera del alcance.
+- `npx tsc --noEmit`: ejecutado correctamente.
+- `npx expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: ejecutado correctamente.
+
+Causa raiz documentada:
+
+- Clientes: la carga fallida se convertia en arreglo vacio por `Promise.allSettled`, ocultando errores reales de API/token/tenant/branch.
+- Prendas: el filtro dependia de `item.status === 'AVAILABLE'` exacto y podia ocultar prendas por casing, mapeo incompleto o carga fallida.
+
+Riesgos pendientes:
+
+- i18n global aun no cubre todo el ERP; esta fase centraliza idioma y corrige LIVE/Sistema.
+- El fallback de prendas sin `status` debe revisarse cuando el contrato API garantice estatus normalizado.
+- Falta smoke visual runtime con backend activo para confirmar clientes y prendas reales visibles.
+
+Decision:
+
+- `GO tecnico` para build/export e i18n LIVE.
+- `GO runtime pendiente` hasta capturar evidencia visual de clientes/prendas reales en navegador.

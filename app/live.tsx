@@ -125,7 +125,7 @@ function isReservationSettled(reservation: Reservation, paid: number) {
 export default function LiveScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
-  const { i18n, t } = useTranslation('common');
+  const { t } = useTranslation('common');
 
   const [session, setSession] = useState<UserSession | null>(null);
   const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
@@ -137,6 +137,8 @@ export default function LiveScreen() {
   const [activateLiveToConfirm, setActivateLiveToConfirm] = useState<Live | null>(null);
   const [reservationIssue, setReservationIssue] = useState<string | null>(null);
   const [showDemoMetrics, setShowDemoMetrics] = useState(true);
+  const [customerLoadIssue, setCustomerLoadIssue] = useState<string | null>(null);
+  const [itemLoadIssue, setItemLoadIssue] = useState<string | null>(null);
 
   const [lives, setLives] = useState<Live[]>([]);
   const [selectedLive, setSelectedLive] = useState<Live | null>(null);
@@ -212,13 +214,24 @@ export default function LiveScreen() {
         customerResult.status === 'fulfilled' ? customerResult.value : [];
       const reservationData =
         reservationResult.status === 'fulfilled' ? reservationResult.value : [];
-
-      const availableItems = itemData.filter(
-        (item) => item.status === 'AVAILABLE'
+      setCustomerLoadIssue(
+        customerResult.status === 'rejected'
+          ? customerResult.reason?.message || t('live.customerLoadError')
+          : null
+      );
+      setItemLoadIssue(
+        itemResult.status === 'rejected'
+          ? itemResult.reason?.message || t('live.itemLoadError')
+          : null
       );
 
+      const availableItems = itemData.filter((item) => {
+        const status = normalizeStatus(item.status);
+        return !status || status === 'AVAILABLE';
+      });
+
       const activeCustomers = customerData.filter(
-        (customer) => customer.status !== 'INACTIVE'
+        (customer) => normalizeStatus(customer.status) !== 'INACTIVE'
       );
 
       setLives(liveData);
@@ -786,40 +799,6 @@ export default function LiveScreen() {
         <AppText variant="title" bold>
           {t('live.title')}
         </AppText>
-        <View style={styles.languageRow}>
-          <AppText variant="caption" color={theme.colors.mutedText}>
-            {t('language.label')}
-          </AppText>
-          <Pressable
-            onPress={() => void i18n.changeLanguage('es')}
-            style={({ pressed }) => [
-              styles.languageOption,
-              {
-                borderColor: i18n.language.startsWith('es')
-                  ? theme.colors.accent
-                  : theme.colors.border,
-                opacity: pressed ? 0.75 : 1,
-              },
-            ]}
-          >
-            <AppText variant="caption">{t('language.spanish')}</AppText>
-          </Pressable>
-          <Pressable
-            onPress={() => void i18n.changeLanguage('en')}
-            style={({ pressed }) => [
-              styles.languageOption,
-              {
-                borderColor: i18n.language.startsWith('en')
-                  ? theme.colors.accent
-                  : theme.colors.border,
-                opacity: pressed ? 0.75 : 1,
-              },
-            ]}
-          >
-            <AppText variant="caption">{t('language.english')}</AppText>
-          </Pressable>
-        </View>
-
         {liveNotice ? (
           <AppNoticeDropdown
             title={
@@ -1046,7 +1025,7 @@ export default function LiveScreen() {
                       },
                     ]}
                   >
-                    <AppText bold>Live #{live.id}</AppText>
+                    <AppText bold>{t('live.liveNumber', { id: live.id })}</AppText>
                     <AppText variant="caption" color={theme.colors.mutedText}>
                       {getLiveStatusLabel(live.status)}
                     </AppText>
@@ -1072,7 +1051,7 @@ export default function LiveScreen() {
           </AppText>
 
             <>
-              <AppText bold>Live #{selectedLive.id}</AppText>
+              <AppText bold>{t('live.liveNumber', { id: selectedLive.id })}</AppText>
               <AppText color={theme.colors.mutedText}>
                 {t('live.status', {
                   status: getLiveStatusLabel(selectedLive.status),
@@ -1134,7 +1113,7 @@ export default function LiveScreen() {
         {false && !selectedLiveIsOperable && filteredLives.length > 0 ? (
           <AppCard>
             <AppText variant="subtitle" bold>
-              Lives abiertos
+              {t('live.openLivesTitle')}
             </AppText>
 
             {filteredLives.map((live) => {
@@ -1157,14 +1136,14 @@ export default function LiveScreen() {
                     },
                   ]}
                 >
-                  <AppText bold>Live #{live.id}</AppText>
+                  <AppText bold>{t('live.liveNumber', { id: live.id })}</AppText>
                   <AppText color={theme.colors.mutedText}>
                     {getLiveStatusLabel(live.status)}
                     {live.notes ? ` · ${live.notes}` : ''}
                   </AppText>
                   {selected ? (
                     <AppText variant="caption" color={theme.colors.accent} bold>
-                      Live seleccionado
+                      {t('live.selectedLive')}
                     </AppText>
                   ) : null}
                 </Pressable>
@@ -1305,7 +1284,9 @@ export default function LiveScreen() {
                     {settled ? ` - ${t('live.settled')}` : ''}
                   </AppText>
                   <AppText variant="caption" color={theme.colors.mutedText}>
-                    Live: #{reservation.liveId || selectedLive?.id || '-'}
+                    {t('live.liveNumber', {
+                      id: reservation.liveId || selectedLive?.id || '-',
+                    })}
                   </AppText>
                   <AppText variant="caption" color={theme.colors.mutedText}>
                     {t('live.reservedBy', {
@@ -1370,7 +1351,7 @@ export default function LiveScreen() {
         {false && selectedLiveIsOperable && filteredLives.length > 0 ? (
           <AppCard>
             <AppText variant="subtitle" bold>
-              Lives abiertos
+              {t('live.openLivesTitle')}
             </AppText>
 
             {filteredLives.map((live) => {
@@ -1393,14 +1374,14 @@ export default function LiveScreen() {
                     },
                   ]}
                 >
-                  <AppText bold>Live #{live.id}</AppText>
+                  <AppText bold>{t('live.liveNumber', { id: live.id })}</AppText>
                   <AppText color={theme.colors.mutedText}>
                     {getLiveStatusLabel(live.status)}
                     {live.notes ? ` · ${live.notes}` : ''}
                   </AppText>
                   {selected ? (
                     <AppText variant="caption" color={theme.colors.accent} bold>
-                      Live seleccionado
+                      {t('live.selectedLive')}
                     </AppText>
                   ) : null}
                 </Pressable>
@@ -1442,7 +1423,11 @@ export default function LiveScreen() {
               onPress={() => selectCustomer(item)}
             />
           )}
-          ListEmptyComponent={<AppText>{t('live.noActiveCustomers')}</AppText>}
+          ListEmptyComponent={
+            <AppText>
+              {customerLoadIssue || t('live.noActiveCustomers')}
+            </AppText>
+          }
         />
       </AppBottomModal>
 
@@ -1479,7 +1464,11 @@ export default function LiveScreen() {
               </AppText>
             </AppOptionRow>
           )}
-          ListEmptyComponent={<AppText>{t('live.noAvailableItems')}</AppText>}
+          ListEmptyComponent={
+            <AppText>
+              {itemLoadIssue || t('live.noAvailableItems')}
+            </AppText>
+          }
         />
       </AppBottomModal>
 
@@ -1493,7 +1482,7 @@ export default function LiveScreen() {
         <AppText>{t('live.activateLiveModalBody')}</AppText>
         {activateLiveToConfirm ? (
           <AppText color={theme.colors.mutedText}>
-            Live #{activateLiveToConfirm.id}
+            {t('live.liveNumber', { id: activateLiveToConfirm.id })}
             {activateLiveToConfirm.notes ? ` - ${activateLiveToConfirm.notes}` : ''}
           </AppText>
         ) : null}
@@ -1535,7 +1524,7 @@ export default function LiveScreen() {
         </AppText>
         {closeLiveToConfirm ? (
           <AppText color={theme.colors.mutedText}>
-            Live #{closeLiveToConfirm.id}
+            {t('live.liveNumber', { id: closeLiveToConfirm.id })}
             {closeLiveToConfirm.notes ? ` - ${closeLiveToConfirm.notes}` : ''}
           </AppText>
         ) : null}
@@ -1690,19 +1679,6 @@ const styles = StyleSheet.create({
   },
   liveButtonGrid: {
     marginTop: 10,
-  },
-  languageOption: {
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  languageRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
-    marginTop: 4,
   },
   liveHistoryRow: {
     alignItems: 'center',

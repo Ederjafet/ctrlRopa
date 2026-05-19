@@ -87,6 +87,9 @@ Probabilidad:
 | Smoke visual LIVE no ejecutado en navegador real | MEDIO | MEDIA en QA local | Build/export puede pasar, pero errores visuales o de click ES/EN podrian no detectarse. | Levantar `8081`, capturar evidencia visual y repetir checklist LIVE-D. | Bloquear metricas runtime/Facebook hasta completar smoke visual. |
 | Permisos de log frontend bloqueados | MEDIO | MEDIA en QA local | `npm run web` puede operar sin log persistente o dificultar diagnostico de errores visuales. | Revisar permisos de `C:\HPSQ-SOFT\control-ropa\logs\frontend`. | Ejecutar con usuario autorizado o corregir ACL antes de smoke. |
 | Metricas demo confundidas con metricas reales | MEDIO | MEDIA en demos | Usuario comercial u operativo podria interpretar datos simulados como analytics productivos. | Badge `Demo visual`, textos explicitos y documentacion de alcance. | Ocultar panel demo y no avanzar a analytics reales sin backend/eventos tenant-aware. |
+| Idioma global parcialmente aplicado | MEDIO | MEDIA durante rollout i18n | El usuario puede cambiar ES/EN en Sistema, pero pantallas no migradas aun conservan literales directos. | Migrar i18n por modulo y documentar pantallas cubiertas. | Mantener espanol como fallback y revertir pantalla afectada si rompe navegacion. |
+| LIVE oculta fallas de carga como listas vacias | ALTO | MEDIA en QA/demo | Clientes o prendas pueden parecer inexistentes aunque la causa sea API, token, tenant o branch. | Mostrar `customerLoadIssue`/`itemLoadIssue` y validar logs/API antes de asumir ausencia de datos. | Revertir cambio frontend o volver a cargar despues de logout/login. |
+| Estatus de item no normalizado | MEDIO | MEDIA | Comparaciones exactas pueden ocultar prendas disponibles en LIVE. | Normalizar estatus en frontend y formalizar contrato API. | Usar busqueda directa por codigo/QR mientras se corrige contrato. |
 
 ## Acciones que deberian auditarse
 
@@ -129,6 +132,7 @@ Probabilidad:
 - LIVE-C normaliza UX visual de estados, pero backend sigue con estados actuales `OPEN/ACTIVE/CLOSED`.
 - LIVE-D no cierra smoke visual real hasta validar navegador en `8081` con evidencia.
 - LIVE-E agrega metricas demo visuales; no representan datos reales y no habilitan Facebook/analytics productivo.
+- Refinamiento LIVE i18n global centraliza idioma en Sistema, pero i18n completo del ERP sigue pendiente por modulos.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

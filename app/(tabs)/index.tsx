@@ -69,7 +69,7 @@ const operationAccessGroups: DashboardAccessGroup[] = [
     title: 'Inicio',
     accesses: [
       {
-        label: 'Mi dashboard',
+        label: 'Mi panel',
         route: '/dashboard',
       },
     ],
@@ -78,7 +78,7 @@ const operationAccessGroups: DashboardAccessGroup[] = [
     title: 'Venta y Atencion',
     accesses: [
       {
-        label: 'Live',
+        label: 'En vivo',
         channelCode: 'LIVE',
         permissionCode: 'DO_LIVE_RESERVATION',
         route: '/live',
@@ -188,7 +188,7 @@ const operationAccessGroups: DashboardAccessGroup[] = [
         route: '/movement-history',
       },
       {
-        label: 'Historial de lives',
+        label: 'Historial de transmisiones',
         permissionCode: 'VIEW_REPORTS',
         route: '/report-live',
       },
@@ -377,7 +377,7 @@ export default function HomeScreen() {
   return (
     <AppScreen>
       <AppText variant="title" bold>
-        {canSeeConfiguration ? 'Dashboard administrador' : 'Dashboard operativo'}
+        {canSeeConfiguration ? 'Panel administrador' : 'Panel operativo'}
       </AppText>
 
       <AppCard>
