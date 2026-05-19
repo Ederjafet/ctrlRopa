@@ -10,6 +10,7 @@ import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
 import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { ApiError } from '@/services/apiClient';
 import { Customer, getCustomersByBranch } from '@/services/customerService';
 import { getItemsByBranch, Item } from '@/services/itemService';
@@ -186,7 +187,9 @@ function LiveNoticeModal({ notice, onClose }: LiveNoticeModalProps) {
 export default function LiveScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
+  const { isDesktop, isTablet } = useResponsiveLayout();
   const { t } = useTranslation('common');
+  const isCommerceWide = isDesktop || isTablet;
 
   const [session, setSession] = useState<UserSession | null>(null);
   const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
@@ -538,6 +541,17 @@ export default function LiveScreen() {
       stat: t('live.demoProductClicks', { count: 14 }),
     },
   ];
+  const featuredProductName =
+    selectedItem?.productTypeName ||
+    selectedItem?.code ||
+    demoProducts[0]?.name ||
+    t('live.demoProductBlouse');
+  const featuredProductMeta = selectedItem
+    ? [
+        selectedItem.brandName || t('live.noBrand'),
+        selectedItem.sizeName || t('live.noSize'),
+      ].join(' / ')
+    : t('live.demoFeaturedProductHelp');
   const createLiveBlockedReason = !newLiveNotes.trim()
     ? t('live.createLiveMissingNotes')
     : isSavingLive
@@ -901,6 +915,84 @@ export default function LiveScreen() {
           </AppInfoCard>
         ) : null}
 
+        <View
+          style={[
+            styles.commerceColumns,
+            isCommerceWide ? styles.commerceColumnsWide : styles.commerceColumnsStack,
+          ]}
+        >
+          <View
+            style={[
+              styles.commerceColumn,
+              isCommerceWide ? styles.commerceSideColumn : styles.commerceFullColumn,
+            ]}
+          >
+            <AppCard>
+              <View style={styles.productVisualHeader}>
+                <View
+                  style={[
+                    styles.liveBadge,
+                    {
+                      backgroundColor: statusBackground,
+                      borderColor: statusColor,
+                    },
+                  ]}
+                >
+                  <AppText variant="caption" color={statusColor} bold>
+                    {t('live.title')}
+                  </AppText>
+                </View>
+                <AppText variant="caption" color={theme.colors.accent} bold>
+                  {demoMetricCards[0]?.value} {t('live.demoCurrentViewers')}
+                </AppText>
+              </View>
+              <View
+                style={[
+                  styles.productVisual,
+                  {
+                    backgroundColor: theme.colors.optionPressedBackground,
+                    borderColor: theme.colors.border,
+                    borderRadius: theme.radius.xl,
+                  },
+                ]}
+              >
+                <AppText variant="title" bold>
+                  {featuredProductName}
+                </AppText>
+                <AppText color={theme.colors.mutedText}>{featuredProductMeta}</AppText>
+                <View style={styles.commentOverlay}>
+                  <View
+                    style={[
+                      styles.commentBubble,
+                      {
+                        backgroundColor: theme.colors.surface,
+                        borderColor: theme.colors.border,
+                        borderRadius: theme.radius.lg,
+                      },
+                    ]}
+                  >
+                    <AppText variant="caption" bold>
+                      {t('live.demoCommentOne')}
+                    </AppText>
+                  </View>
+                  <View
+                    style={[
+                      styles.commentBubble,
+                      {
+                        backgroundColor: theme.colors.surface,
+                        borderColor: theme.colors.border,
+                        borderRadius: theme.radius.lg,
+                      },
+                    ]}
+                  >
+                    <AppText variant="caption">
+                      {t('live.demoCommentTwo')}
+                    </AppText>
+                  </View>
+                </View>
+              </View>
+            </AppCard>
+
         <AppCard>
           <View style={styles.statusHeader}>
             <View style={styles.statusTextBlock}>
@@ -1084,6 +1176,15 @@ export default function LiveScreen() {
             </AppText>
           )}
         </AppCard>
+
+          </View>
+
+          <View
+            style={[
+              styles.commerceColumn,
+              isCommerceWide ? styles.commerceMainColumn : styles.commerceFullColumn,
+            ]}
+          >
 
         {filteredLives.length > 0 ? (
           <AppCard>
@@ -1333,12 +1434,21 @@ export default function LiveScreen() {
           />
 
           <AppButton
-            title={t('live.addReservation')}
+            title={t('live.reserveNow')}
             onPress={handleCreateReservation}
             loading={isSavingReservation}
             disabled={isSavingReservation}
           />
         </AppCard>
+
+          </View>
+
+          <View
+            style={[
+              styles.commerceColumn,
+              isCommerceWide ? styles.commerceSideColumn : styles.commerceFullColumn,
+            ]}
+          >
 
         <AppCard>
           <AppText variant="subtitle" bold>
@@ -1436,6 +1546,9 @@ export default function LiveScreen() {
             )}
           </AppCard>
         ) : null}
+
+          </View>
+        </View>
 
         {false && selectedLiveIsOperable && filteredLives.length > 0 ? (
           <AppCard>
@@ -1689,6 +1802,40 @@ const styles = StyleSheet.create({
   buttonSpacing: {
     marginTop: 10,
   },
+  commerceColumn: {
+    gap: 12,
+    minWidth: 0,
+  },
+  commerceColumns: {
+    gap: 14,
+  },
+  commerceColumnsStack: {
+    flexDirection: 'column',
+  },
+  commerceColumnsWide: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+  },
+  commerceFullColumn: {
+    width: '100%',
+  },
+  commerceMainColumn: {
+    flex: 1.32,
+  },
+  commerceSideColumn: {
+    flex: 0.92,
+  },
+  commentBubble: {
+    borderWidth: 1,
+    maxWidth: '92%',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  commentOverlay: {
+    gap: 8,
+    marginTop: 18,
+    width: '100%',
+  },
   demoBadge: {
     borderWidth: 1,
     paddingHorizontal: 8,
@@ -1764,6 +1911,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
+  liveBadge: {
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
   liveButton: {
     borderWidth: 1,
     justifyContent: 'center',
@@ -1794,6 +1946,20 @@ const styles = StyleSheet.create({
   },
   modalList: {
     maxHeight: 420,
+  },
+  productVisual: {
+    borderWidth: 1,
+    minHeight: 240,
+    padding: 18,
+    justifyContent: 'flex-end',
+  },
+  productVisualHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
   noticeBackdrop: {
     alignItems: 'center',

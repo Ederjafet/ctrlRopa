@@ -1810,3 +1810,36 @@ Decision:
 
 - `GO tecnico` para lint, TypeScript y export web.
 - `GO runtime pendiente` hasta smoke visual en web/movil.
+
+## 2026-05-19 - LIVE-K / responsive tablet commerce UI
+
+Tipo: UX frontend tablet-first, sin backend, migraciones, pagos reales ni reportes.
+
+Objetivo:
+
+- Reorganizar `En vivo` hacia una experiencia live commerce moderna.
+- Optimizar visualmente tablet horizontal, desktop y demo comercial.
+- Mantener reservas/cobros actuales sin tocar reglas de negocio.
+
+Cambios realizados:
+
+- `app/live.tsx`: layout responsive por columnas para tablet/desktop con `useResponsiveLayout`.
+- `app/live.tsx`: columna visual con producto destacado, badge `En vivo`, espectadores y comentarios demo.
+- `app/live.tsx`: columna central enfocada en captura y CTA `Reservar ahora`.
+- `app/live.tsx`: columna derecha para reservas recientes y cierre.
+- `locales/es/common.json` y `locales/en/common.json`: nuevas claves i18n para producto visual y CTA.
+- `docs/ERP_LIVE_TABLET_COMMERCE_UI.md`: documentacion de alcance, validacion y riesgos.
+
+Validaciones:
+
+- `npm run lint`: ejecutado, sin errores; quedan 55 warnings preexistentes fuera del alcance.
+- `npx tsc --noEmit`: ejecutado correctamente.
+- `npx expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: ejecutado correctamente.
+- `rg -n "Ã|Â|�" app locales`: sin coincidencias.
+- `rg -n "\bDashboard\b|\bTimeline\b" app/live.tsx locales/es/common.json`: sin coincidencias.
+- `rg -n '": ".*Live' locales/es/common.json`: sin coincidencias; `Live` aparece solo en claves/identificadores tecnicos o textos ingleses.
+
+Decision:
+
+- `GO tecnico` para lint, TypeScript y export web.
+- `GO runtime pendiente` hasta smoke visual tablet/desktop/movil.

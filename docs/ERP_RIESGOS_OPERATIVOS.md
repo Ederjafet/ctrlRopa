@@ -94,6 +94,7 @@ Probabilidad:
 | Permisos QA LIVE incompletos | MEDIO | MEDIA en QA | Usuario QA puede entrar por ruta/cache pero no cargar clientes/prendas o no operar reservas. | Asegurar `DO_LIVE_RESERVATION`, `VIEW_CUSTOMERS`, `VIEW_INVENTORY`, canal LIVE y user_companies/user_branches. | Ejecutar script QA idempotente y reintentar con usuario correcto. |
 | Avisos visuales invasivos en En vivo | BAJO | MEDIA en QA/demo | Banners grandes pueden interrumpir captura y verse poco profesionales en presentacion. | Usar modal compacto para resultados de acciones y mantener errores secundarios en contexto. | Revertir a banner previo si el modal falla en runtime. |
 | Detalle de cobro dificil de leer en movil | MEDIO | MEDIA en flujo En vivo -> Pagos | Lista vertical larga aumenta errores del cajero al validar reserva, cliente, prenda y montos. | Agrupar datos en tarjetas responsive sin cambiar calculos ni endpoint. | Revertir solo layout frontend de `app/payments.tsx`. |
+| Layout En vivo tablet-first no validado en dispositivos reales | MEDIO | MEDIA durante demo | El layout puede verse bien en export web pero necesitar ajuste fino en Galaxy Tab/iPad reales. | Ejecutar smoke visual 1024x768, 1280x800, Galaxy Tab y iPad antes de demo comercial. | Revertir layout de `app/live.tsx` o forzar stack si hay desbordes. |
 | Estatus de item no normalizado | MEDIO | MEDIA | Comparaciones exactas pueden ocultar prendas disponibles en LIVE. | Normalizar estatus en frontend y formalizar contrato API. | Usar busqueda directa por codigo/QR mientras se corrige contrato. |
 
 ## Acciones que deberian auditarse
@@ -141,6 +142,7 @@ Probabilidad:
 - Correccion LIVE de permisos evita duplicar 403 secundarios, pero se debe validar en movil cual endpoint falla.
 - LIVE-I identifica que 403 de clientes/prendas probablemente es tenant/session, no permiso funcional directo; ejecutar script QA y relogin antes de abrir incidencias backend.
 - LIVE-J mejora avisos y detalle de cobro sin tocar backend; requiere smoke visual en movil para confirmar ergonomia.
+- LIVE-K reorganiza En vivo como comercio visual tablet-first; validar en tablets reales antes de usarlo como demo comercial formal.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

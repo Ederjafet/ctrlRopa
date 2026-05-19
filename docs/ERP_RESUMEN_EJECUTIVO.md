@@ -49,6 +49,7 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 - Correccion LIVE permisos: los 403 secundarios ya no se concatenan en un modal duplicado; quedan mensajes por recurso.
 - LIVE-I: se crea script QA para normalizar permisos, user_company, user_branch, canal LIVE y sesiones de usuarios QA afectados.
 - LIVE-J: se pule el flujo visual En vivo -> Reserva -> Pagos con notificaciones compactas y detalle de cobro agrupado/responsive, sin tocar backend ni logica financiera.
+- LIVE-K: se transforma `En vivo` a un layout tablet-first tipo live commerce con producto visual, captura central, reservas recientes y metricas demo compactas, manteniendo backend y finanzas intactos.
 
 ## Madurez ERP estimada
 
