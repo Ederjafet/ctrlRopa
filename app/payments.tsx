@@ -4,6 +4,7 @@ import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
+import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
 import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
@@ -26,6 +27,7 @@ import {
 import { getSession } from '@/services/sessionStorage';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 
 type PaymentTargetType = 'reservation' | 'order';
@@ -124,20 +126,26 @@ function getReservationTotal(reservation: ReservationSummary | null) {
   return normalizeNumber(reservation.price ?? 0);
 }
 
-function getSalesChannelLabel(code?: string | null) {
-  if (code === 'LIVE') return 'Live';
-  if (code === 'DOOR_RESERVATION') return 'Apartado puerta';
-  if (code === 'DOOR_SALE') return 'Venta puerta';
-  if (code === 'MIXED') return 'Mixto';
-  return code || 'Sin tipo';
+function getSalesChannelLabel(
+  code?: string | null,
+  t?: (key: string) => string
+) {
+  if (code === 'LIVE') return t ? t('payments.channelLive') : 'En vivo';
+  if (code === 'DOOR_RESERVATION') {
+    return t ? t('payments.channelDoorReservation') : 'Reserva de mostrador';
+  }
+  if (code === 'DOOR_SALE') return t ? t('payments.channelDoorSale') : 'Venta de mostrador';
+  if (code === 'MIXED') return t ? t('payments.channelMixed') : 'Mixto';
+  return code || (t ? t('payments.noType') : 'Sin tipo');
 }
 
-function getLiveLabel(reservation: ReservationSummary) {
+function getLiveLabel(reservation: ReservationSummary, t?: (key: string) => string) {
   if (!reservation.liveId) return '';
 
   const notes = reservation.liveNotes?.trim();
   const status = reservation.liveStatus ? ` (${reservation.liveStatus})` : '';
-  return notes ? `Live #${reservation.liveId} - ${notes}${status}` : `Live #${reservation.liveId}${status}`;
+  const label = t ? t('payments.liveLabel') : 'En vivo';
+  return notes ? `${label} #${reservation.liveId} - ${notes}${status}` : `${label} #${reservation.liveId}${status}`;
 }
 
 export default function PaymentsScreen() {
@@ -148,6 +156,7 @@ export default function PaymentsScreen() {
     returnTo?: string | string[];
   }>();
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
 
   const initialOrderId = firstParam(params.orderId);
   const initialReservationId = firstParam(params.reservationId);
@@ -583,12 +592,12 @@ export default function PaymentsScreen() {
       />
 
       <AppText variant="title" bold>
-        Pagos / Cobros
+        {t('payments.title')}
       </AppText>
 
       {isLiveContext ? (
         <AppButton
-          title="Volver al live activo"
+          title={t('payments.backToLive')}
           variant="secondary"
           onPress={() => router.replace('/live' as any)}
           style={styles.methodButton}
@@ -643,7 +652,7 @@ export default function PaymentsScreen() {
 
                 <AppText>{order.customerName || `Cliente #${order.customerId}`}</AppText>
                 <AppText variant="caption" color={theme.colors.mutedText}>
-                  {getSalesChannelLabel(order.salesChannelCode)} | Prendas: {order.itemCount}
+                  {getSalesChannelLabel(order.salesChannelCode, t)} | Prendas: {order.itemCount}
                 </AppText>
                 <AppText variant="caption" color={theme.colors.mutedText}>
                   Total {formatMoney(order.total)} | Pagado {formatMoney(order.paid)}
@@ -682,39 +691,67 @@ export default function PaymentsScreen() {
         <>
       <AppCard>
         <AppText variant="subtitle" bold>
-          Detalle
+          {t('payments.detailTitle')}
         </AppText>
 
         {isLoadingTarget ? (
-          <AppText>Cargando detalle...</AppText>
+          <AppText>{t('payments.loadingDetail')}</AppText>
         ) : targetType === 'reservation' && reservation ? (
           <>
-            <InfoRow label="Reserva" value={`#${reservation.id}`} />
-            <InfoRow
-              label="Cliente"
-              value={reservation.customerName || `ID ${reservation.customerId || '-'}`}
-            />
-            <InfoRow
-              label="Prenda"
-              value={reservation.itemCode || `ID ${reservation.itemId || '-'}`}
-            />
-            <InfoRow label="Estado" value={reservation.status || 'Sin estado'} />
-            <InfoRow
-              label="Canal"
-              value={getSalesChannelLabel(reservation.salesChannelCode)}
-            />
-            {reservation.liveId ? (
-              <InfoRow label="Live" value={getLiveLabel(reservation)} />
-            ) : null}
-            <InfoRow label="Total" value={formatMoney(total)} />
-            <InfoRow label="Pagado" value={formatMoney(totalPaid)} />
-            <InfoRow label="Pendiente" value={formatMoney(remaining)} />
-            {overpaidAmount > 0 ? (
-              <InfoRow label="Saldo a favor" value={formatMoney(overpaidAmount)} />
-            ) : null}
+            <AppResponsiveGrid tabletColumns={2} desktopColumns={3} style={styles.detailGrid}>
+              <PaymentDetailTile
+                title={t('payments.reservationStatusGroup')}
+                rows={[
+                  [t('payments.reservation'), `#${reservation.id}`],
+                  [t('payments.status'), reservation.status || t('payments.noStatus')],
+                ]}
+              />
+              <PaymentDetailTile
+                title={t('payments.customerItemGroup')}
+                rows={[
+                  [
+                    t('payments.customer'),
+                    reservation.customerName || `ID ${reservation.customerId || '-'}`,
+                  ],
+                  [
+                    t('payments.item'),
+                    reservation.itemCode || `ID ${reservation.itemId || '-'}`,
+                  ],
+                ]}
+              />
+              <PaymentDetailTile
+                title={t('payments.channelLiveGroup')}
+                rows={[
+                  [
+                    t('payments.channel'),
+                    getSalesChannelLabel(reservation.salesChannelCode, t),
+                  ],
+                  ...(reservation.liveId
+                    ? [[t('payments.liveLabel'), getLiveLabel(reservation, t)] as [string, string]]
+                    : []),
+                ]}
+              />
+            </AppResponsiveGrid>
+
+            <AppResponsiveGrid tabletColumns={3} desktopColumns={4} style={styles.summaryGrid}>
+              <PaymentSummaryTile label={t('payments.total')} value={formatMoney(total)} />
+              <PaymentSummaryTile label={t('payments.paid')} value={formatMoney(totalPaid)} />
+              <PaymentSummaryTile
+                label={t('payments.pending')}
+                value={formatMoney(remaining)}
+                tone={remaining > 0 ? 'warning' : 'success'}
+              />
+              {overpaidAmount > 0 ? (
+                <PaymentSummaryTile
+                  label={t('payments.overpaid')}
+                  value={formatMoney(overpaidAmount)}
+                />
+              ) : null}
+            </AppResponsiveGrid>
+
             {isReservationSettled ? (
               <AppText variant="caption" color={theme.colors.mutedText}>
-                Reserva liquidada. Ya no se permiten nuevos abonos normales desde esta pantalla.
+                {t('payments.reservationSettledHelp')}
               </AppText>
             ) : null}
           </>
@@ -879,6 +916,17 @@ type InfoRowProps = {
   value: string;
 };
 
+type PaymentDetailTileProps = {
+  title: string;
+  rows: [string, string][];
+};
+
+type PaymentSummaryTileProps = {
+  label: string;
+  value: string;
+  tone?: 'default' | 'success' | 'warning';
+};
+
 function InfoRow({ label, value }: InfoRowProps) {
   const { theme } = useAppTheme();
 
@@ -888,6 +936,69 @@ function InfoRow({ label, value }: InfoRowProps) {
         {label}
       </AppText>
       <AppText>{value}</AppText>
+    </View>
+  );
+}
+
+function PaymentDetailTile({ title, rows }: PaymentDetailTileProps) {
+  const { theme } = useAppTheme();
+
+  return (
+    <View
+      style={[
+        styles.detailTile,
+        {
+          backgroundColor: theme.colors.surface,
+          borderColor: theme.colors.border,
+          borderRadius: theme.radius.md,
+          padding: theme.spacing.md,
+        },
+      ]}
+    >
+      <AppText bold>{title}</AppText>
+      {rows.map(([label, value]) => (
+        <View key={label} style={styles.detailTileRow}>
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            {label}
+          </AppText>
+          <AppText bold>{value}</AppText>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function PaymentSummaryTile({
+  label,
+  value,
+  tone = 'default',
+}: PaymentSummaryTileProps) {
+  const { theme } = useAppTheme();
+  const color =
+    tone === 'success'
+      ? theme.colors.success
+      : tone === 'warning'
+        ? theme.colors.warning
+        : theme.colors.accent;
+
+  return (
+    <View
+      style={[
+        styles.summaryTile,
+        {
+          backgroundColor: theme.colors.surface,
+          borderColor: theme.colors.border,
+          borderRadius: theme.radius.md,
+          padding: theme.spacing.md,
+        },
+      ]}
+    >
+      <AppText variant="caption" color={theme.colors.mutedText}>
+        {label}
+      </AppText>
+      <AppText variant="subtitle" bold color={color}>
+        {value}
+      </AppText>
     </View>
   );
 }
@@ -903,6 +1014,27 @@ const styles = StyleSheet.create({
   },
   infoRow: {
     marginBottom: 10,
+  },
+  detailGrid: {
+    marginTop: 12,
+  },
+  detailTile: {
+    borderWidth: 1,
+    gap: 10,
+    marginBottom: 12,
+    minHeight: 118,
+  },
+  detailTileRow: {
+    gap: 2,
+  },
+  summaryGrid: {
+    marginTop: 2,
+  },
+  summaryTile: {
+    borderWidth: 1,
+    gap: 4,
+    marginBottom: 12,
+    minHeight: 78,
   },
   submitButton: {
     marginTop: 12,

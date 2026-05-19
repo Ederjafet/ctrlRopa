@@ -48,6 +48,7 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 - Refinamiento LIVE: idioma global movido a Sistema, terminologia espanola profesionalizada y seleccion de clientes/prendas con mensajes de carga mas claros.
 - Correccion LIVE permisos: los 403 secundarios ya no se concatenan en un modal duplicado; quedan mensajes por recurso.
 - LIVE-I: se crea script QA para normalizar permisos, user_company, user_branch, canal LIVE y sesiones de usuarios QA afectados.
+- LIVE-J: se pule el flujo visual En vivo -> Reserva -> Pagos con notificaciones compactas y detalle de cobro agrupado/responsive, sin tocar backend ni logica financiera.
 
 ## Madurez ERP estimada
 

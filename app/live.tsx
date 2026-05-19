@@ -5,7 +5,6 @@ import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInfoCard from '@/components/ui/AppInfoCard';
 import AppInput from '@/components/ui/AppInput';
-import AppNoticeDropdown from '@/components/ui/AppNoticeDropdown';
 import AppOptionRow from '@/components/ui/AppOptionRow';
 import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
 import AppScreen from '@/components/ui/AppScreen';
@@ -46,6 +45,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
   Pressable,
   StyleSheet,
   View,
@@ -58,8 +58,14 @@ type RecentLiveReservation = {
 };
 
 type LiveNotice = {
+  title: string;
   message: string;
   tone: 'success' | 'warning' | 'danger';
+};
+
+type LiveNoticeModalProps = {
+  notice: LiveNotice | null;
+  onClose: () => void;
 };
 
 function isForbiddenError(error: unknown) {
@@ -139,6 +145,42 @@ function getReservationSellerLabel(reservation: Reservation) {
 
 function isReservationSettled(reservation: Reservation, paid: number) {
   return paid >= Number(reservation.price || 0) && Number(reservation.price || 0) > 0;
+}
+
+function LiveNoticeModal({ notice, onClose }: LiveNoticeModalProps) {
+  const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
+
+  const color =
+    notice?.tone === 'danger'
+      ? theme.colors.danger
+      : notice?.tone === 'warning'
+        ? theme.colors.warning
+        : theme.colors.success;
+
+  return (
+    <Modal visible={!!notice} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={[styles.noticeBackdrop, { backgroundColor: theme.colors.backdrop }]}>
+        <View
+          style={[
+            styles.noticeDialog,
+            {
+              backgroundColor: theme.colors.modalBackground,
+              borderColor: color,
+              borderRadius: theme.radius.lg,
+              padding: theme.spacing.lg,
+            },
+          ]}
+        >
+          <AppText variant="subtitle" bold color={color}>
+            {notice?.title}
+          </AppText>
+          <AppText>{notice?.message}</AppText>
+          <AppButton title={t('common.understood')} onPress={onClose} />
+        </View>
+      </View>
+    </Modal>
+  );
 }
 
 export default function LiveScreen() {
@@ -579,6 +621,7 @@ export default function LiveScreen() {
       setSelectedLive(live);
       await saveSelectedLiveId(session.branchId, session.userId, live.id);
       setLiveNotice({
+        title: t('live.liveCreatedTitle'),
         message: t('live.liveCreatedDetail', {
           id: live.id,
           notes: live.notes || liveNotes,
@@ -586,10 +629,12 @@ export default function LiveScreen() {
         tone: 'success',
       });
       await loadData();
-
-      Alert.alert(t('live.title'), t('live.liveCreated'));
     } catch (err: any) {
-      Alert.alert(t('live.title'), err?.message || t('live.liveCreateError'));
+      setLiveNotice({
+        title: t('live.liveCreateErrorTitle'),
+        message: err?.message || t('live.liveCreateError'),
+        tone: 'danger',
+      });
     } finally {
       setIsSavingLive(false);
     }
@@ -607,11 +652,16 @@ export default function LiveScreen() {
       await saveSelectedLiveId(session.branchId, session.userId, updated.id);
       await loadData();
       setLiveNotice({
+        title: t('live.liveActivatedTitle'),
         message: t('live.liveActivated', { id: updated.id }),
         tone: 'success',
       });
     } catch (err: any) {
-      Alert.alert(t('live.title'), err?.message || t('live.liveActivationError'));
+      setLiveNotice({
+        title: t('live.liveActivationErrorTitle'),
+        message: err?.message || t('live.liveActivationError'),
+        tone: 'danger',
+      });
     } finally {
       setIsSavingLive(false);
     }
@@ -619,11 +669,6 @@ export default function LiveScreen() {
 
   const handleCloseLive = (live: Live) => {
     setCloseLiveToConfirm(live);
-    setLiveNotice({
-      message: t('live.closeConfirmNotice', { id: live.id }),
-      tone: 'warning',
-    });
-
   };
 
   const confirmCloseLive = async () => {
@@ -645,11 +690,13 @@ export default function LiveScreen() {
       }
       await loadData();
       setLiveNotice({
+        title: t('live.liveClosedTitle'),
         message: t('live.liveClosed', { id: closedLive.id }),
         tone: 'success',
       });
     } catch (err: any) {
       setLiveNotice({
+        title: t('live.liveCloseErrorTitle'),
         message: err?.message || t('live.liveCloseError'),
         tone: 'danger',
       });
@@ -737,12 +784,6 @@ export default function LiveScreen() {
   const handleCreateReservation = async () => {
     if (reservationPendingReason) {
       setReservationIssue(reservationPendingReason);
-      setLiveNotice({
-        message: t('live.reservationBlockedMessage', {
-          reason: reservationPendingReason,
-        }),
-        tone: 'warning',
-      });
       return;
     }
 
@@ -789,11 +830,13 @@ export default function LiveScreen() {
       await loadData();
 
       setLiveNotice({
+        title: t('live.reservationCreatedTitle'),
         message: t('live.reservationCreated', { id: reservation.id }),
         tone: 'success',
       });
     } catch (err: any) {
       setLiveNotice({
+        title: t('live.reservationCreateErrorTitle'),
         message: err?.message || t('live.reservationCreateError'),
         tone: 'danger',
       });
@@ -847,33 +890,15 @@ export default function LiveScreen() {
         <AppText variant="title" bold>
           {t('live.title')}
         </AppText>
-        {liveNotice ? (
-          <AppNoticeDropdown
-            title={
-              liveNotice.tone === 'success'
-                ? t('live.reservationCreatedTitle')
-                : t('live.reservationBlockedTitle')
-            }
-            message={liveNotice.message}
-            tone={liveNotice.tone}
-            onClose={() => setLiveNotice(null)}
-          />
-        ) : null}
         {liveLoadIssue ? (
-          <AppNoticeDropdown
-            title={t('live.liveLoadIssueTitle')}
-            message={liveLoadIssue}
-            tone="danger"
-            onClose={() => setLiveLoadIssue(null)}
-          />
+          <AppInfoCard title={t('live.liveLoadIssueTitle')}>
+            <AppText>{liveLoadIssue}</AppText>
+          </AppInfoCard>
         ) : null}
         {reservationLoadIssue ? (
-          <AppNoticeDropdown
-            title={t('live.reservationLoadIssueTitle')}
-            message={reservationLoadIssue}
-            tone="warning"
-            onClose={() => setReservationLoadIssue(null)}
-          />
+          <AppInfoCard title={t('live.reservationLoadIssueTitle')}>
+            <AppText>{reservationLoadIssue}</AppText>
+          </AppInfoCard>
         ) : null}
 
         <AppCard>
@@ -1641,6 +1666,11 @@ export default function LiveScreen() {
           </View>
         </View>
       </AppBottomModal>
+
+      <LiveNoticeModal
+        notice={liveNotice}
+        onClose={() => setLiveNotice(null)}
+      />
     </>
   );
 }
@@ -1764,6 +1794,23 @@ const styles = StyleSheet.create({
   },
   modalList: {
     maxHeight: 420,
+  },
+  noticeBackdrop: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  noticeDialog: {
+    borderWidth: 1,
+    elevation: 5,
+    gap: 14,
+    maxWidth: 420,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    width: '100%',
   },
   recentRow: {
     borderBottomWidth: 1,

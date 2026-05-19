@@ -1778,3 +1778,35 @@ Decision:
 
 - `GO documental/SQL QA`.
 - `GO runtime pendiente` hasta ejecutar SQL en QA/local, relogin y validar usuario afectado.
+
+## 2026-05-18 - LIVE-J / notificaciones y detalle de cobro
+
+Tipo: ajuste UX frontend, sin backend, migraciones ni logica financiera.
+
+Objetivo:
+
+- Reemplazar avisos grandes de En vivo por un modal compacto.
+- Mejorar la legibilidad del detalle de cobro de reserva en `Pagos / Cobros`.
+- Mantener i18n ES/EN y terminologia en espanol como `En vivo`.
+
+Cambios realizados:
+
+- `app/live.tsx`: nuevo modal compacto para notificaciones de exito/error de acciones de En vivo.
+- `app/live.tsx`: se elimino el `Alert.alert` duplicado al crear una transmision.
+- `app/payments.tsx`: detalle de reserva agrupado en tarjetas responsive.
+- `locales/es/common.json` y `locales/en/common.json`: claves nuevas para avisos de En vivo y detalle de pagos.
+- `docs/ERP_LIVE_PAYMENTS_UX_REFINEMENT.md`: documento de alcance y QA.
+
+Validaciones:
+
+- `npm run lint`: ejecutado, sin errores; quedan 55 warnings preexistentes fuera del alcance.
+- `npx tsc --noEmit`: ejecutado correctamente.
+- `npx expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: ejecutado correctamente.
+- `rg -n "Live|Dashboard|Timeline" app/live.tsx app/payments.tsx locales/es/common.json`: devuelve coincidencias en nombres de claves/variables y textos ingleses; los valores visibles en espanol agregados usan `En vivo`.
+- `rg -n "Ã|Â|�" app locales`: sin coincidencias.
+- `rg -n "Ã|Â|�" app locales docs`: devuelve coincidencias historicas documentales previas, no introducidas por esta fase.
+
+Decision:
+
+- `GO tecnico` para lint, TypeScript y export web.
+- `GO runtime pendiente` hasta smoke visual en web/movil.
