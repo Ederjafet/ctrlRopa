@@ -1943,6 +1943,43 @@ Decision:
 - `GO tecnico` para lint, TypeScript y export web.
 - `GO UX runtime pendiente` hasta smoke visual mobile/tablet/desktop.
 
+## 2026-05-19 - LIVE-P / flujo runtime multioperador
+
+Tipo: UX frontend live-commerce, sin backend, migraciones, pagos reales, ventas reales, reportes backend ni integraciones externas.
+
+Objetivo:
+
+- Hacer que `En vivo` se sienta como operacion multiusuario y no como formulario ERP.
+- Separar visualmente presentadora, operador y supervisor.
+- Dar sensacion de actividad viva sin sockets ni backend realtime.
+- Mejorar tablet como consola operativa principal.
+
+Cambios realizados:
+
+- `app/live.tsx`: agrega tarjetas de roles para presentadora, operador y supervisor.
+- `app/live.tsx`: agrega pulso de transmision compacto para tablet y desktop.
+- `app/live.tsx`: mejora Product Spotlight con prompt de producto al aire y urgencia visual.
+- `app/live.tsx`: reemplaza activity feed plano por filas con badge, timestamp y jerarquia visual.
+- `app/live.tsx`: agrega acciones rapidas del operador sobre el flujo de reserva.
+- `components/live/LiveTabletLayout.tsx`: ajusta proporciones para que producto y operacion respiren mejor en tablet.
+- `locales/es/common.json` y `locales/en/common.json`: agrega microcopy multirol, activity feed y pulso streaming.
+- `docs/ERP_LIVE_MULTI_OPERATOR_FLOW.md`: documenta flujo multioperador.
+- `docs/ERP_LIVE_RUNTIME_SIMULATION.md`: documenta simulacion runtime sin backend realtime.
+- `docs/ERP_LIVE_TABLET_OPERATION_GUIDE.md`: documenta uso operativo en tablet.
+
+Validaciones:
+
+- `npx.cmd tsc --noEmit`: OK.
+- `npm.cmd run lint`: OK sin errores; persisten 55 warnings historicos fuera del alcance LIVE-P.
+- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
+- `rg -n "Ã|Â|�" app components locales docs`: solo devuelve coincidencias historicas documentales previas; no se detectan coincidencias nuevas en `app`, `components` ni `locales`.
+- `rg -n "Live|Dashboard|Timeline|Capturar|Alta|Demo visual" app/live.tsx components/live locales/es/common.json`: las coincidencias restantes son nombres tecnicos internos o textos historicos no usados por el nuevo flujo.
+
+Decision:
+
+- `GO tecnico` para lint, TypeScript y export web.
+- `GO UX runtime pendiente` hasta smoke visual mobile/tablet/desktop.
+
 ## 2026-05-19 - LIVE-O / operator console y product spotlight
 
 Tipo: UX frontend live-commerce, sin backend, migraciones, pagos reales, ventas reales ni integraciones externas.

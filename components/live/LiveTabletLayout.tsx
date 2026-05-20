@@ -26,15 +26,15 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   operationColumn: {
-    flex: 1.28,
+    flex: 1.08,
     gap: 12,
-    maxWidth: '62%',
+    maxWidth: '56%',
     minWidth: 0,
   },
   productColumn: {
-    flex: 0.72,
+    flex: 0.92,
     gap: 12,
-    maxWidth: '38%',
+    maxWidth: '44%',
     minWidth: 0,
   },
 });

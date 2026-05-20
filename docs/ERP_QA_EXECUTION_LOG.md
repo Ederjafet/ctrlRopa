@@ -27,6 +27,7 @@ Fase: 1D - datos QA y evidencia
 | 2026-05-19 | LIVE-M | QA frontend tablet | Codex QA/Frontend | Rediseno tablet de En vivo: columna operativa prioritaria, metricas compactas, timeline resumido, reservas recientes limitadas visualmente | GO tecnico | Validacion fisica Galaxy Tab/iPad pendiente; no se tocaron backend, pagos, ventas ni reportes | GO runtime pendiente de smoke tablet real |
 | 2026-05-19 | LIVE-N | QA UX/frontend | Codex QA/UX | Base design system LIVE, microcopy guide y estrategia por dispositivo; metricas pasan a `LiveMetricCard`; lint, TypeScript y export web OK | GO tecnico | Smoke visual mobile/tablet/desktop pendiente; design system aplicado inicialmente solo a metricas | GO UX condicionado a validacion visual |
 | 2026-05-19 | LIVE-O | QA UX/frontend | Codex QA/UX | Product Spotlight, consola de operador, activity feed humano y tarjetas compactas de reservas; lint, TypeScript y export web OK | GO tecnico | Sin backend ni integraciones; smoke visual mobile/tablet/desktop pendiente | GO UX condicionado a validacion visual |
+| 2026-05-19 | LIVE-P | QA UX/frontend | Codex QA/UX | Flujo multioperador, pulso de transmision, feed con badges/timestamps y ajuste tablet; lint, TypeScript y export web OK | GO tecnico | Sin backend realtime; smoke visual mobile/tablet/desktop pendiente | GO UX condicionado a validacion visual |
 
 ## Reglas de registro
 

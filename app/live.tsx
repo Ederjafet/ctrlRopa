@@ -5,7 +5,9 @@ import LiveTabletLayout from '@/components/live/LiveTabletLayout';
 import {
   LiveActionCard,
   LiveCompactCard,
+  LiveInfoCard,
   LiveMetricCard,
+  LiveStatusCard,
 } from '@/components/live/LiveCommerceCards';
 import AppBackButton from '@/components/ui/AppBackButton';
 import AppBottomModal from '@/components/ui/AppBottomModal';
@@ -535,6 +537,45 @@ export default function LiveScreen() {
     t('live.spotlightPopular'),
     t('live.spotlightInterested', { count: 12 }),
   ];
+  const roleCards = [
+    {
+      title: t('live.presenterRoleTitle'),
+      helper: t('live.presenterRoleHelp'),
+      value: t('live.presenterRoleValue'),
+    },
+    {
+      title: t('live.operatorRoleTitle'),
+      helper: t('live.operatorRoleHelp'),
+      value: t('live.operatorRoleValue'),
+    },
+    {
+      title: t('live.supervisorRoleTitle'),
+      helper: t('live.supervisorRoleHelp'),
+      value: t('live.supervisorRoleValue'),
+    },
+  ];
+  const streamingMetricCards = [
+    {
+      label: t('live.streamViewers'),
+      value: demoMetricCards[0]?.value ?? '0',
+      helper: undefined,
+    },
+    {
+      label: t('live.streamReservations'),
+      value: String(recentReservations.length),
+      helper: undefined,
+    },
+    {
+      label: t('live.streamComments'),
+      value: selectedLiveStatus === 'CLOSED' ? '0' : '63',
+      helper: undefined,
+    },
+    {
+      label: t('live.streamReactions'),
+      value: selectedLiveStatus === 'CLOSED' ? '0' : '312',
+      helper: undefined,
+    },
+  ];
   const visibleDemoMetricCards = isTablet
     ? demoMetricCards.slice(0, 4)
     : demoMetricCards;
@@ -557,15 +598,33 @@ export default function LiveScreen() {
       ? formatMoney(Number(selectedItem.price))
       : t('live.demoSpotlightPrice');
   const activityFeed = [
-    ...recentReservations.slice(0, 3).map(({ customerName, itemCode }) =>
-      t('live.activityReservation', {
+    ...recentReservations.slice(0, 3).map(({ customerName, itemCode }, index) => ({
+      badge: t('live.activityBadgeReservation'),
+      label: t('live.activityReservation', {
         customer: customerName,
         item: itemCode,
-      })
-    ),
-    t('live.activityComment', { customer: 'Carla', text: 'Tienes M?' }),
-    t('live.activityInterest', { customer: 'Maria' }),
-    t('live.activityProductPinned', { item: featuredProductName }),
+      }),
+      time: t('live.activityMinutesAgo', { count: index + 1 }),
+      tone: 'success' as const,
+    })),
+    {
+      badge: t('live.activityBadgeComment'),
+      label: t('live.activityComment', { customer: 'Carla', text: 'Tienes M?' }),
+      time: t('live.activityNow'),
+      tone: 'neutral' as const,
+    },
+    {
+      badge: t('live.activityBadgeViewer'),
+      label: t('live.activityViewersOnProduct', { count: 14 }),
+      time: t('live.activityNow'),
+      tone: 'info' as const,
+    },
+    {
+      badge: t('live.activityBadgeProduct'),
+      label: t('live.activityProductPinned', { item: featuredProductName }),
+      time: t('live.activityMinutesAgo', { count: 4 }),
+      tone: 'accent' as const,
+    },
   ].slice(0, isTablet ? 4 : isDesktop ? 6 : 3);
   const createLiveBlockedReason = !newLiveNotes.trim()
     ? t('live.createLiveMissingNotes')
@@ -930,6 +989,29 @@ export default function LiveScreen() {
           </AppInfoCard>
         ) : null}
 
+        <AppResponsiveGrid
+          gap={10}
+          tabletColumns={3}
+          desktopColumns={3}
+          style={styles.roleGrid}
+        >
+          {roleCards.map((role) => (
+            <LiveStatusCard key={role.title} style={styles.roleCard}>
+              <View style={styles.roleCardHeader}>
+                <AppText variant="caption" color={theme.colors.accent} bold>
+                  {role.title}
+                </AppText>
+                <AppText variant="subtitle" bold>
+                  {role.value}
+                </AppText>
+              </View>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                {role.helper}
+              </AppText>
+            </LiveStatusCard>
+          ))}
+        </AppResponsiveGrid>
+
         <LiveLayout>
           <View style={styles.commerceColumn}>
             <AppCard>
@@ -944,7 +1026,7 @@ export default function LiveScreen() {
                   ]}
                 >
                   <AppText variant="caption" color={statusColor} bold>
-                    {t('live.title')}
+                    {t('live.liveBadgeActive')}
                   </AppText>
                 </View>
                 <AppText variant="caption" color={theme.colors.accent} bold>
@@ -975,6 +1057,17 @@ export default function LiveScreen() {
                   <AppText variant="subtitle" color={theme.colors.accent} bold>
                     {featuredProductPrice}
                   </AppText>
+                  <View style={styles.spotlightPulseRow}>
+                    <View
+                      style={[
+                        styles.livePulse,
+                        { backgroundColor: theme.colors.danger },
+                      ]}
+                    />
+                    <AppText variant="caption" bold>
+                      {t('live.spotlightLivePrompt')}
+                    </AppText>
+                  </View>
                   <View style={styles.spotlightBadgeRow}>
                     {spotlightBadges.map((badge) => (
                       <View
@@ -1028,6 +1121,27 @@ export default function LiveScreen() {
               </View>
             </AppCard>
 
+        <LiveInfoCard title={t('live.presenterPanelTitle')} subtitle={t('live.presenterPanelHelp')}>
+          <View style={styles.presenterActionRow}>
+            <View style={styles.presenterAction}>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                {t('live.presenterCurrentProduct')}
+              </AppText>
+              <AppText bold numberOfLines={1}>
+                {featuredProductName}
+              </AppText>
+            </View>
+            <View style={styles.presenterAction}>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                {t('live.presenterAudience')}
+              </AppText>
+              <AppText bold color={theme.colors.accent}>
+                {demoMetricCards[0]?.value}
+              </AppText>
+            </View>
+          </View>
+        </LiveInfoCard>
+
         <AppCard>
           <View style={styles.statusHeader}>
             <View style={styles.statusTextBlock}>
@@ -1062,7 +1176,7 @@ export default function LiveScreen() {
             <View style={styles.statusTextBlock}>
               <View style={styles.demoTitleRow}>
                 <AppText variant="subtitle" bold>
-                  {t('live.demoMetricsTitle')}
+                  {t('live.streamPulseTitle')}
                 </AppText>
                 <View
                   style={[
@@ -1074,13 +1188,13 @@ export default function LiveScreen() {
                   ]}
                 >
                   <AppText variant="caption" color={theme.colors.accent} bold>
-                    {t('live.demoModeBadge')}
+                    {t('live.streamPulseBadge')}
                   </AppText>
                 </View>
               </View>
               {!isTablet ? (
                 <AppText color={theme.colors.mutedText}>
-                  {t('live.demoMetricsHelp')}
+                  {t('live.streamPulseHelp')}
                 </AppText>
               ) : null}
             </View>
@@ -1111,7 +1225,7 @@ export default function LiveScreen() {
                 desktopColumns={3}
                 style={styles.demoMetricGrid}
               >
-                {visibleDemoMetricCards.map((metric) => (
+                {(isTablet ? streamingMetricCards : visibleDemoMetricCards).map((metric) => (
                   <LiveMetricCard
                     key={metric.label}
                     label={metric.label}
@@ -1187,14 +1301,49 @@ export default function LiveScreen() {
               >
                 <AppText bold>{t('live.activityFeedTitle')}</AppText>
                 {activityFeed.map((event, index) => (
-                  <View key={`${event}-${index}`} style={styles.demoTimelineRow}>
-                    <View
-                      style={[
-                        styles.demoTimelineDot,
-                        { backgroundColor: theme.colors.accent },
-                      ]}
-                    />
-                    <AppText>{event}</AppText>
+                  <View
+                    key={`${event.label}-${index}`}
+                    style={[
+                      styles.activityFeedRow,
+                      {
+                        borderColor: theme.colors.border,
+                        backgroundColor: theme.colors.surface,
+                      },
+                    ]}
+                  >
+                    <View style={styles.activityFeedMain}>
+                      <View
+                        style={[
+                          styles.activityBadge,
+                          {
+                            backgroundColor:
+                              event.tone === 'success'
+                                ? theme.colors.successBackground
+                                : theme.colors.infoCardBackground,
+                            borderColor:
+                              event.tone === 'success'
+                                ? theme.colors.success
+                                : theme.colors.accent,
+                          },
+                        ]}
+                      >
+                        <AppText
+                          variant="caption"
+                          color={
+                            event.tone === 'success'
+                              ? theme.colors.success
+                              : theme.colors.accent
+                          }
+                          bold
+                        >
+                          {event.badge}
+                        </AppText>
+                      </View>
+                      <AppText numberOfLines={2}>{event.label}</AppText>
+                    </View>
+                    <AppText variant="caption" color={theme.colors.mutedText}>
+                      {event.time}
+                    </AppText>
                   </View>
                 ))}
               </View>
@@ -1367,6 +1516,47 @@ export default function LiveScreen() {
         ) : null}
 
         <LiveActionCard title={t('live.operatorConsoleTitle')} subtitle={t('live.operatorConsoleHelp')}>
+          <View style={styles.operatorQuickRow}>
+            <View
+              style={[
+                styles.operatorQuickChip,
+                {
+                  backgroundColor: theme.colors.infoCardBackground,
+                  borderColor: theme.colors.accent,
+                },
+              ]}
+            >
+              <AppText variant="caption" color={theme.colors.accent} bold>
+                {t('live.operatorQuickReservation')}
+              </AppText>
+            </View>
+            <View
+              style={[
+                styles.operatorQuickChip,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border,
+                },
+              ]}
+            >
+              <AppText variant="caption" bold>
+                {t('live.operatorQuickProduct')}
+              </AppText>
+            </View>
+            <View
+              style={[
+                styles.operatorQuickChip,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border,
+                },
+              ]}
+            >
+              <AppText variant="caption" bold>
+                {t('live.operatorQuickCharge')}
+              </AppText>
+            </View>
+          </View>
           <AppText variant="subtitle" bold>
             {t('live.captureReservationTitle')}
           </AppText>
@@ -1396,8 +1586,8 @@ export default function LiveScreen() {
             />
           </View>
 
-          <View style={styles.sectionSpacing}>
-            <AppText bold>{t('live.item')}</AppText>
+            <View style={styles.sectionSpacing}>
+              <AppText bold>{t('live.item')}</AppText>
             <AppText>
               {selectedItem
                 ? `${selectedItem.code} - ${selectedItem.productTypeName || t('live.noType')}`
@@ -1448,6 +1638,12 @@ export default function LiveScreen() {
               </View>
             </View>
             </View>
+
+          <LiveCompactCard>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {t('live.quickReservationHint')}
+            </AppText>
+          </LiveCompactCard>
 
           <AppInput
             label={t('live.price')}
@@ -1812,6 +2008,24 @@ export default function LiveScreen() {
 }
 
 const styles = StyleSheet.create({
+  activityBadge: {
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  activityFeedMain: {
+    flex: 1,
+    gap: 6,
+    minWidth: 0,
+  },
+  activityFeedRow: {
+    alignItems: 'flex-start',
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'space-between',
+    padding: 10,
+  },
   buttonRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1929,6 +2143,10 @@ const styles = StyleSheet.create({
   liveButtonGrid: {
     marginTop: 10,
   },
+  livePulse: {
+    height: 9,
+    width: 9,
+  },
   liveHistoryRow: {
     alignItems: 'center',
     borderWidth: 1,
@@ -1968,6 +2186,34 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
+  operatorQuickChip: {
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  operatorQuickRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  presenterAction: {
+    flex: 1,
+    minWidth: 120,
+  },
+  presenterActionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  roleCard: {
+    minHeight: 104,
+  },
+  roleCardHeader: {
+    gap: 4,
+  },
+  roleGrid: {
+    marginTop: 8,
+  },
   spotlightBadge: {
     borderWidth: 1,
     paddingHorizontal: 8,
@@ -1980,6 +2226,11 @@ const styles = StyleSheet.create({
   },
   spotlightContent: {
     gap: 6,
+  },
+  spotlightPulseRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
   noticeBackdrop: {
     alignItems: 'center',
