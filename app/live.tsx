@@ -57,10 +57,12 @@ import {
   Alert,
   FlatList,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type RecentLiveReservation = {
   reservation: Reservation;
@@ -182,6 +184,7 @@ function LiveNoticeModal({ notice, onClose }: LiveNoticeModalProps) {
 export default function LiveScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const { isDesktop, isTablet } = useResponsiveLayout();
   const { t } = useTranslation('common');
   const LiveLayout = isDesktop
@@ -961,6 +964,8 @@ export default function LiveScreen() {
             normalize(reservationIssue).includes('item'))
         ? t('live.searchItem')
         : t('common.understood');
+  const liveHeaderSafeTop =
+    Platform.OS === 'android' ? Math.max(insets.top - 12, 8) : 0;
 
   if (isAllowed === null || isLoading) {
     return (
@@ -973,11 +978,21 @@ export default function LiveScreen() {
   return (
     <>
       <AppScreen>
-        <AppBackButton fallbackRoute="/" />
-
-        <AppText variant="title" bold>
-          {t('live.title')}
-        </AppText>
+        <View style={[styles.liveHeader, { paddingTop: liveHeaderSafeTop }]}>
+          <AppBackButton fallbackRoute="/" />
+          <View style={styles.liveHeaderText}>
+            <AppText variant="title" bold>
+              {t('live.title')}
+            </AppText>
+            <AppText color={theme.colors.mutedText} numberOfLines={2}>
+              {isTablet
+                ? t('live.tabletHeaderHelp')
+                : isDesktop
+                  ? t('live.desktopHeaderHelp')
+                  : t('live.mobileHeaderHelp')}
+            </AppText>
+          </View>
+        </View>
         {liveLoadIssue ? (
           <AppInfoCard title={t('live.liveLoadIssueTitle')}>
             <AppText>{liveLoadIssue}</AppText>
@@ -989,28 +1004,30 @@ export default function LiveScreen() {
           </AppInfoCard>
         ) : null}
 
-        <AppResponsiveGrid
-          gap={10}
-          tabletColumns={3}
-          desktopColumns={3}
-          style={styles.roleGrid}
-        >
-          {roleCards.map((role) => (
-            <LiveStatusCard key={role.title} style={styles.roleCard}>
-              <View style={styles.roleCardHeader}>
-                <AppText variant="caption" color={theme.colors.accent} bold>
-                  {role.title}
+        {isTablet || isDesktop ? (
+          <AppResponsiveGrid
+            gap={10}
+            tabletColumns={3}
+            desktopColumns={3}
+            style={styles.roleGrid}
+          >
+            {roleCards.map((role) => (
+              <LiveStatusCard key={role.title} style={styles.roleCard}>
+                <View style={styles.roleCardHeader}>
+                  <AppText variant="caption" color={theme.colors.accent} bold>
+                    {role.title}
+                  </AppText>
+                  <AppText variant="subtitle" bold numberOfLines={1}>
+                    {role.value}
+                  </AppText>
+                </View>
+                <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={2}>
+                  {role.helper}
                 </AppText>
-                <AppText variant="subtitle" bold>
-                  {role.value}
-                </AppText>
-              </View>
-              <AppText variant="caption" color={theme.colors.mutedText}>
-                {role.helper}
-              </AppText>
-            </LiveStatusCard>
-          ))}
-        </AppResponsiveGrid>
+              </LiveStatusCard>
+            ))}
+          </AppResponsiveGrid>
+        ) : null}
 
         <LiveLayout>
           <View style={styles.commerceColumn}>
@@ -2143,6 +2160,13 @@ const styles = StyleSheet.create({
   liveButtonGrid: {
     marginTop: 10,
   },
+  liveHeader: {
+    gap: 8,
+    marginBottom: 2,
+  },
+  liveHeaderText: {
+    gap: 4,
+  },
   livePulse: {
     height: 9,
     width: 9,
@@ -2206,7 +2230,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   roleCard: {
-    minHeight: 104,
+    minHeight: 92,
   },
   roleCardHeader: {
     gap: 4,

@@ -55,6 +55,7 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 - LIVE-N: se crea base inicial de design system y microcopy live-commerce para que `En vivo` deje de sentirse como ERP administrativo y avance hacia producto SaaS comercial.
 - LIVE-O: se incorpora Product Spotlight, consola del operador y activity feed humano para acercar `En vivo` a una experiencia moderna de streaming commerce.
 - LIVE-P: se agrega capa visual multioperador para presentadora, operador y supervisor; se prepara pulso runtime simulado y guia de operacion tablet sin backend realtime.
+- LIVE-Q: se atiende feedback QA de usabilidad, safe area Android/tablet, microcopy comercial y estado demo candidate condicionado.
 
 ## Madurez ERP estimada
 

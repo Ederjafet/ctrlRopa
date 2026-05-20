@@ -1943,6 +1943,42 @@ Decision:
 - `GO tecnico` para lint, TypeScript y export web.
 - `GO UX runtime pendiente` hasta smoke visual mobile/tablet/desktop.
 
+## 2026-05-19 - LIVE-Q / hardening UX y demo candidate
+
+Tipo: UX frontend LIVE, sin backend, APIs, migraciones, pagos, ventas, reportes, realtime ni integraciones externas.
+
+Objetivo:
+
+- Corregir empalme reportado con status bar Android/tablet.
+- Reducir texto y lenguaje tecnico.
+- Fortalecer jerarquia visual mobile/tablet/desktop.
+- Documentar feedback QA y estado demo candidate.
+
+Cambios realizados:
+
+- `app/live.tsx`: agrega resguardo superior local para header de LIVE usando `useSafeAreaInsets` y `Platform`.
+- `app/live.tsx`: reemplaza encabezado simple por header contextual por dispositivo.
+- `app/live.tsx`: oculta tarjetas multirol en movil para reducir ruido.
+- `app/live.tsx`: limita textos de tarjetas de rol para lectura rapida.
+- `locales/es/common.json` y `locales/en/common.json`: ajusta microcopy comercial/operativo.
+- `docs/ERP_LIVE_QA_FEEDBACK_REVIEW.md`: matriz de feedback QA.
+- `docs/ERP_LIVE_SAFE_AREA_MOBILE_FIXES.md`: documenta safe area local.
+- `docs/ERP_LIVE_USABILITY_HARDENING.md`: documenta endurecimiento UX.
+- `docs/ERP_LIVE_DEMO_CANDIDATE_STATUS.md`: estado demo candidate.
+
+Validaciones:
+
+- `npx.cmd tsc --noEmit`: OK.
+- `npm.cmd run lint`: OK sin errores; persisten 55 warnings historicos fuera del alcance LIVE-Q.
+- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
+- `rg -n "Ã|Â|�" app components locales docs`: solo devuelve coincidencias historicas documentales previas; no se detectan coincidencias nuevas en `app`, `components` ni `locales`.
+- `git diff --check`: OK; solo avisos LF/CRLF normales.
+
+Decision:
+
+- `GO tecnico` para lint, TypeScript, export web y diff check.
+- `GO demo candidate condicionado` hasta smoke visual en Android/tablet/iPad.
+
 ## 2026-05-19 - LIVE-P / flujo runtime multioperador
 
 Tipo: UX frontend live-commerce, sin backend, migraciones, pagos reales, ventas reales, reportes backend ni integraciones externas.
