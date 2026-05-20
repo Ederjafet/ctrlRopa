@@ -56,6 +56,7 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 - LIVE-O: se incorpora Product Spotlight, consola del operador y activity feed humano para acercar `En vivo` a una experiencia moderna de streaming commerce.
 - LIVE-P: se agrega capa visual multioperador para presentadora, operador y supervisor; se prepara pulso runtime simulado y guia de operacion tablet sin backend realtime.
 - LIVE-Q: se atiende feedback QA de usabilidad, safe area Android/tablet, microcopy comercial y estado demo candidate condicionado.
+- LIVE-R: tras reinicio abrupto se valida rama, arbol limpio, puerto 8081, Expo web, lint, TypeScript, export y checklist demo candidate; queda GO tecnico y GO demo condicionado a smoke fisico.
 
 ## Madurez ERP estimada
 

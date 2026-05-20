@@ -153,6 +153,7 @@ Probabilidad:
 - LIVE-O acerca `En vivo` a streaming commerce, pero indicadores de spotlight/feed siguen siendo visuales hasta integrar eventos reales.
 - LIVE-P separa roles y simula pulso runtime, pero la colaboracion real sigue bloqueada hasta tener eventos backend, roles LIVE y validacion tactil en tablet.
 - LIVE-Q corrige safe area y microcopy para demo, pero sigue pendiente smoke visual en Android/tablet/iPad antes de declararlo demo candidate final.
+- LIVE-R valida Expo/web y build tecnico tras reinicio, pero demo final sigue condicionado a evidencia fisica mobile/tablet y backend QA para flujo reserva/cobro.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

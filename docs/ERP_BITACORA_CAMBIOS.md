@@ -1979,6 +1979,45 @@ Decision:
 - `GO tecnico` para lint, TypeScript, export web y diff check.
 - `GO demo candidate condicionado` hasta smoke visual en Android/tablet/iPad.
 
+## 2026-05-20 - LIVE-R / smoke demo candidate
+
+Tipo: QA frontend LIVE, sin backend, APIs, migraciones, pagos, ventas, reportes, SQL, realtime, IA ni integraciones externas.
+
+Objetivo:
+
+- Validar estado tras reinicio abrupto.
+- Confirmar Expo/web en `8081`.
+- Ejecutar validacion tecnica final.
+- Documentar smoke por dispositivo y checklist final.
+
+Prechecks:
+
+- Rama actual: `feature/live-r-smoke-demo-candidate`.
+- `git status --short` inicial: limpio.
+- Puerto `8081`: libre antes de iniciar.
+- Procesos `node`: no detectados antes de iniciar.
+- Expo web: `http://localhost:8081`, `/login` y `/live` responden `200`.
+
+Cambios realizados:
+
+- `docs/ERP_LIVE_DEMO_CANDIDATE_VALIDATION.md`: evidencia y decision de demo candidate.
+- `docs/ERP_LIVE_DEVICE_SMOKE_RESULTS.md`: resultado por mobile/tablet/desktop.
+- `docs/ERP_LIVE_QA_FINAL_CHECKLIST.md`: checklist ejecutable de cierre.
+
+Validaciones:
+
+- `npm.cmd run lint`: OK sin errores; persisten 55 warnings historicos fuera del alcance.
+- `npx.cmd tsc --noEmit`: OK.
+- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
+- `git diff --check`: OK; solo avisos LF/CRLF normales.
+- `rg -n "Ã|Â|�" app components locales docs`: solo coincidencias historicas documentales previas.
+- `rg -n "Live|Dashboard|Timeline" app components locales/es/common.json`: coincidencias por nombres internos/legacy; valores visibles LIVE en espanol no usan esos terminos.
+
+Decision:
+
+- `GO tecnico` para demo candidate frontend.
+- `GO demo candidate condicionado` hasta smoke visual fisico y flujo funcional completo con backend QA activo.
+
 ## 2026-05-19 - LIVE-P / flujo runtime multioperador
 
 Tipo: UX frontend live-commerce, sin backend, migraciones, pagos reales, ventas reales, reportes backend ni integraciones externas.
