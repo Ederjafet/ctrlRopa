@@ -7,7 +7,6 @@ import {
   LiveCompactCard,
   LiveInfoCard,
   LiveMetricCard,
-  LiveStatusCard,
   LiveWarningCard,
 } from '@/components/live/LiveCommerceCards';
 import AppBackButton from '@/components/ui/AppBackButton';
@@ -121,6 +120,23 @@ function isVoidedPayment(payment: Payment) {
 
 function getPaymentAmount(payment: Payment) {
   return Number(payment.receivedAmount ?? payment.amount ?? 0);
+}
+
+function getItemStatusLabel(status: string | null | undefined, t: (key: string) => string) {
+  switch (normalizeStatus(status)) {
+    case 'AVAILABLE':
+      return t('live.itemStatusAvailable');
+    case 'RESERVED':
+      return t('live.itemStatusReserved');
+    case 'SOLD':
+      return t('live.itemStatusSold');
+    case 'DISABLED':
+      return t('live.itemStatusDisabled');
+    case 'ON_CONSIGNMENT':
+      return t('live.itemStatusConsignment');
+    default:
+      return t('live.itemStatusUnknown');
+  }
 }
 
 function mapLiveReservations(
@@ -547,13 +563,6 @@ export default function LiveScreen() {
       stat: t('live.demoProductClicks', { count: 14 }),
     },
   ];
-  const spotlightBadges = liveAnalyticsEnabled
-    ? [
-        t('live.spotlightLastPieces'),
-        t('live.spotlightPopular'),
-        t('live.spotlightInterested', { count: 12 }),
-      ]
-    : [t('live.productOnAirBadge')];
   const roleCards = [
     {
       title: t('live.presenterRoleTitle'),
@@ -599,26 +608,50 @@ export default function LiveScreen() {
   const visibleRecentReservations = isTablet
     ? recentReservations.slice(0, 3)
     : recentReservations;
+  const latestReservationProductCode = recentReservations[0]?.itemCode;
+  const hasActiveProduct = !!selectedItem || !!latestReservationProductCode;
   const featuredProductName =
     selectedItem?.productTypeName ||
     selectedItem?.code ||
-    demoProducts[0]?.name ||
-    t('live.demoProductBlouse');
+    latestReservationProductCode ||
+    t('live.noProductOnScreen');
   const featuredProductMeta = selectedItem
     ? [
         selectedItem.brandName || t('live.noBrand'),
         selectedItem.sizeName || t('live.noSize'),
+        session?.branchName || selectedLive?.branchName || t('live.noBranch'),
       ].join(' / ')
-    : t('live.demoFeaturedProductHelp');
+    : latestReservationProductCode
+      ? t('live.productFromRecentReservation')
+      : t('live.noProductOnScreenHelp');
   const featuredProductPrice =
     selectedItem?.price !== null && selectedItem?.price !== undefined
       ? formatMoney(Number(selectedItem.price))
-      : t('live.demoSpotlightPrice');
-  const featuredProductCode = selectedItem?.code || t('live.noActiveProductCode');
+      : t('live.noPriceDefined');
+  const featuredProductCode =
+    selectedItem?.code || latestReservationProductCode || t('live.noActiveProductCode');
   const featuredProductSize = selectedItem?.sizeName || t('live.noSize');
   const featuredProductStatus = selectedItem
-    ? t('live.productOnAir')
-    : t('live.productOnAirDemo');
+    ? getItemStatusLabel(selectedItem.status, t)
+    : latestReservationProductCode
+      ? t('live.productFromReservationStatus')
+      : t('live.noProductStatus');
+  const featuredProductBranch =
+    session?.branchName || selectedLive?.branchName || t('live.noBranch');
+  const spotlightBadges = hasActiveProduct
+    ? [
+        t('live.productOnAirBadge'),
+        featuredProductStatus,
+        featuredProductBranch,
+      ]
+    : [t('live.selectItemToShowBadge')];
+  const presenterMessage = !selectedLive
+    ? t('live.presenterNoLive')
+    : !hasActiveProduct
+      ? t('live.presenterNoProduct')
+      : selectedLiveStatus === 'ACTIVE'
+        ? t('live.presenterReadyActive')
+        : t('live.presenterReadyOpen');
   const shouldShowDemoMetrics = liveAnalyticsEnabled && showDemoMetrics;
   const activityFeed = [
     ...recentReservations.slice(0, 3).map(({ customerName, itemCode }, index) => ({
@@ -642,12 +675,16 @@ export default function LiveScreen() {
       time: t('live.activityNow'),
       tone: 'info' as const,
     },
-    {
-      badge: t('live.activityBadgeProduct'),
-      label: t('live.activityProductPinned', { item: featuredProductName }),
-      time: t('live.activityMinutesAgo', { count: 4 }),
-      tone: 'accent' as const,
-    },
+    ...(hasActiveProduct
+      ? [
+          {
+            badge: t('live.activityBadgeProduct'),
+            label: t('live.activityProductPinned', { item: featuredProductName }),
+            time: t('live.activityMinutesAgo', { count: 4 }),
+            tone: 'accent' as const,
+          },
+        ]
+      : []),
   ].slice(0, isTablet ? 4 : isDesktop ? 6 : 3);
   const createLiveBlockedReason = !newLiveNotes.trim()
     ? t('live.createLiveMissingNotes')
@@ -1025,28 +1062,36 @@ export default function LiveScreen() {
         ) : null}
 
         {isTablet || isDesktop ? (
-          <AppResponsiveGrid
-            gap={10}
-            tabletColumns={3}
-            desktopColumns={3}
-            style={styles.roleGrid}
-          >
-            {roleCards.map((role) => (
-              <LiveStatusCard key={role.title} style={styles.roleCard}>
-                <View style={styles.roleCardHeader}>
-                  <AppText variant="caption" color={theme.colors.accent} bold>
-                    {role.title}
+          <View style={styles.roleSection}>
+            <AppText variant="caption" color={theme.colors.mutedText} bold>
+              {t('live.teamRolesTitle')}
+            </AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {t('live.teamRolesHelp')}
+            </AppText>
+            <AppResponsiveGrid
+              gap={10}
+              tabletColumns={3}
+              desktopColumns={3}
+              style={styles.roleGrid}
+            >
+              {roleCards.map((role) => (
+                <LiveCompactCard key={role.title} style={styles.roleCard}>
+                  <View style={styles.roleCardHeader}>
+                    <AppText variant="caption" color={theme.colors.accent} bold>
+                      {role.title}
+                    </AppText>
+                    <AppText bold numberOfLines={1}>
+                      {role.value}
+                    </AppText>
+                  </View>
+                  <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={2}>
+                    {role.helper}
                   </AppText>
-                  <AppText variant="subtitle" bold numberOfLines={1}>
-                    {role.value}
-                  </AppText>
-                </View>
-                <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={2}>
-                  {role.helper}
-                </AppText>
-              </LiveStatusCard>
-            ))}
-          </AppResponsiveGrid>
+                </LiveCompactCard>
+              ))}
+            </AppResponsiveGrid>
+          </View>
         ) : null}
 
         <LiveLayout>
@@ -1063,7 +1108,7 @@ export default function LiveScreen() {
                   ]}
                 >
                   <AppText variant="caption" color={statusColor} bold>
-                    {t('live.liveBadgeActive')}
+                    {selectedLiveStatus === 'ACTIVE' ? t('live.liveBadgeActive') : statusLabel}
                   </AppText>
                 </View>
                 {liveAnalyticsEnabled ? (
@@ -1130,7 +1175,9 @@ export default function LiveScreen() {
                       ]}
                     />
                     <AppText variant="caption" bold>
-                      {t('live.spotlightLivePrompt')}
+                      {hasActiveProduct
+                        ? t('live.spotlightLivePrompt')
+                        : t('live.spotlightSelectProductPrompt')}
                     </AppText>
                   </View>
                   <View style={styles.spotlightBadgeRow}>
@@ -1188,7 +1235,7 @@ export default function LiveScreen() {
               </View>
             </AppCard>
 
-        <LiveInfoCard title={t('live.presenterPanelTitle')} subtitle={t('live.presenterPanelHelp')}>
+        <LiveInfoCard title={t('live.presenterPanelTitle')} subtitle={presenterMessage}>
             <View style={styles.presenterActionRow}>
               <View style={styles.presenterAction}>
                 <AppText variant="caption" color={theme.colors.mutedText}>
@@ -1208,6 +1255,14 @@ export default function LiveScreen() {
                   </AppText>
                 </View>
               ) : null}
+              <View style={styles.presenterAction}>
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  {t('live.presenterStatus')}
+                </AppText>
+                <AppText bold color={statusColor} numberOfLines={1}>
+                  {statusLabel}
+                </AppText>
+              </View>
           </View>
         </LiveInfoCard>
 
@@ -2315,13 +2370,18 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   roleCard: {
-    minHeight: 92,
+    minHeight: 78,
   },
   roleCardHeader: {
     gap: 4,
   },
   roleGrid: {
     marginTop: 8,
+  },
+  roleSection: {
+    gap: 4,
+    marginBottom: 10,
+    marginTop: 2,
   },
   spotlightBadge: {
     borderWidth: 1,

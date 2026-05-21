@@ -1981,6 +1981,43 @@ Decision:
 - `GO tecnico` para LAN/safe area/build/test.
 - `GO runtime QA` condicionado a reiniciar backend con CORS actualizado y repetir smoke fisico en equipo QA, Android y tablet.
 
+## 2026-05-20 - LIVE-U / producto activo real y presentadora
+
+Tipo: UX/frontend LIVE, sin backend, SQL, migraciones, pagos, ventas ni reportes.
+
+Objetivo:
+
+- Evitar que `Producto en pantalla` muestre datos demo cuando hay prenda seleccionada o reservas recientes.
+- Hacer que `Vista para presentadora` y `Estado operativo` reflejen transmision/producto real.
+- Aclarar que las tarjetas de roles son informativas, no botones.
+
+Cambios realizados:
+
+- `app/live.tsx`: el producto visible se resuelve por prenda seleccionada, ultima prenda reservada o fallback `Sin producto en pantalla`.
+- `app/live.tsx`: precio, codigo, talla, estado y sucursal usan datos reales disponibles o fallbacks claros.
+- `app/live.tsx`: vista para presentadora muestra mensaje segun transmision/producto actual.
+- `app/live.tsx`: estado operativo reduce microcopy y evita texto largo.
+- `app/live.tsx`: roles se agrupan en `Roles del equipo` y usan tarjetas compactas informativas.
+- `locales/es/common.json` y `locales/en/common.json`: se agregan textos localizados para producto real, estado presentadora y roles.
+- `docs/ERP_LIVE_ACTIVE_PRODUCT_REAL_DATA.md`: documenta fuentes y fallbacks del producto activo.
+- `docs/ERP_LIVE_PRESENTER_VIEW_STATE.md`: documenta estado de presentadora.
+- `docs/ERP_LIVE_ROLE_CARDS_CLARITY.md`: documenta decision UX de roles informativos.
+
+Pendiente:
+
+- `npm.cmd run lint`: OK sin errores; persisten warnings historicos fuera de LIVE-U.
+- `npx.cmd tsc --noEmit`: OK.
+- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
+- `git diff --check`: OK; solo avisos LF/CRLF.
+- `rg -n "Blusa verde|Demostración|Producto destacado para demostración comercial" app components locales`: sin coincidencias.
+- `rg -n "Ã|Â|�" app components locales docs`: solo coincidencias historicas documentales previas.
+- Pendiente smoke visual mobile/tablet/desktop.
+
+Decision:
+
+- `GO tecnico` para build/export.
+- `GO UX runtime` condicionado a smoke visual con datos reales QA.
+
 ## 2026-05-20 - LIVE-S / operacion QA, analiticos y producto activo
 
 Tipo: UX/frontend acotado para En vivo, sin backend, migraciones, ventas, pagos, reportes ni integraciones externas.

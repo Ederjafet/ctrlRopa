@@ -162,6 +162,8 @@ Probabilidad:
 - LIVE-T detecta CORS LAN incompleto; el backend debe reiniciarse/desplegarse con `http://192.168.0.128:8081` permitido para evitar preflight `403`.
 - LIVE-T refuerza safe area Android con `StatusBar.currentHeight` y guard adicional; dispositivos con notch extremo aun requieren smoke fisico.
 - LIVE-T valida conectividad local LAN y login directo QA `200`, pero login/reserva desde equipo QA y Android siguen pendientes de evidencia manual despues de reinicio backend.
+- LIVE-U usa ultima reserva como fallback de producto activo si no hay prenda seleccionada; puede mostrar solo codigo hasta enriquecer datos de reservacion o sincronizar producto activo real.
+- LIVE-U mantiene roles como tarjetas informativas; no deben interpretarse como control de permisos o cambio de vista hasta una fase futura.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.
