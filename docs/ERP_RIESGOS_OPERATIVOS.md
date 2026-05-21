@@ -164,6 +164,8 @@ Probabilidad:
 - LIVE-T valida conectividad local LAN y login directo QA `200`, pero login/reserva desde equipo QA y Android siguen pendientes de evidencia manual despues de reinicio backend.
 - LIVE-U usa ultima reserva como fallback de producto activo si no hay prenda seleccionada; puede mostrar solo codigo hasta enriquecer datos de reservacion o sincronizar producto activo real.
 - LIVE-U mantiene roles como tarjetas informativas; no deben interpretarse como control de permisos o cambio de vista hasta una fase futura.
+- LIVE-V persiste preferencias solo localmente; en multi-dispositivo cada equipo puede ver widgets distintos hasta tener persistencia backend por usuario/company.
+- LIVE-V permite ocultar widgets de supervision; QA debe validar que ocultarlos no tape alertas operativas necesarias.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

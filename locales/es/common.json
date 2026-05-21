@@ -22,7 +22,19 @@
     "liveAnalyticsDisabled": "Analíticos ocultos",
     "liveAnalyticsDisabledHelp": "Solo queda visible el flujo operativo de producto, cliente y reserva.",
     "liveAnalyticsEnable": "Mostrar analíticos",
-    "liveAnalyticsDisable": "Ocultar analíticos"
+    "liveAnalyticsDisable": "Ocultar analíticos",
+    "liveExperienceTitle": "Experiencia En vivo",
+    "liveExperienceHelp": "Personaliza la experiencia visual En vivo según la operación de tu equipo.",
+    "liveWidgetProductSpotlight": "Mostrar spotlight producto",
+    "liveWidgetPresenterView": "Mostrar vista presentadora",
+    "liveWidgetOperationalState": "Mostrar estado operativo",
+    "liveWidgetRoles": "Mostrar roles del equipo",
+    "liveWidgetAnalytics": "Mostrar analíticos",
+    "liveWidgetActivity": "Mostrar actividad En vivo",
+    "liveWidgetVisible": "Visible en En vivo.",
+    "liveWidgetHidden": "Oculto en En vivo.",
+    "liveWidgetShow": "Mostrar",
+    "liveWidgetHide": "Ocultar"
   },
   "live": {
     "title": "En vivo",
@@ -61,6 +73,7 @@
     "demoModeBadge": "Vista demostrativa",
     "demoHideMetrics": "Ocultar vista",
     "demoShowMetrics": "Mostrar vista",
+    "demoMetricsHiddenByPreference": "Analíticos ocultos",
     "demoMetricsCollapsed": "Los indicadores están ocultos. Puedes mostrarlos para presentación o validación visual.",
     "demoCurrentViewers": "Espectadores actuales",
     "demoCurrentViewersHelp": "Audiencia simulada en este momento.",

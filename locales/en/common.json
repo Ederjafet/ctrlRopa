@@ -22,7 +22,19 @@
     "liveAnalyticsDisabled": "Analytics hidden",
     "liveAnalyticsDisabledHelp": "Only the operational product, customer, and reservation flow remains visible.",
     "liveAnalyticsEnable": "Show analytics",
-    "liveAnalyticsDisable": "Hide analytics"
+    "liveAnalyticsDisable": "Hide analytics",
+    "liveExperienceTitle": "Live experience",
+    "liveExperienceHelp": "Customize the Live visual experience for your team's operation.",
+    "liveWidgetProductSpotlight": "Show product spotlight",
+    "liveWidgetPresenterView": "Show presenter view",
+    "liveWidgetOperationalState": "Show operational status",
+    "liveWidgetRoles": "Show team roles",
+    "liveWidgetAnalytics": "Show analytics",
+    "liveWidgetActivity": "Show Live activity",
+    "liveWidgetVisible": "Visible in Live.",
+    "liveWidgetHidden": "Hidden in Live.",
+    "liveWidgetShow": "Show",
+    "liveWidgetHide": "Hide"
   },
   "live": {
     "title": "Live",
@@ -61,6 +73,7 @@
     "demoModeBadge": "Visual demo",
     "demoHideMetrics": "Hide demo",
     "demoShowMetrics": "Show demo",
+    "demoMetricsHiddenByPreference": "Analytics hidden",
     "demoMetricsCollapsed": "Demo metrics are hidden. You can show them for a presentation or visual validation.",
     "demoCurrentViewers": "Current viewers",
     "demoCurrentViewersHelp": "Simulated audience right now.",

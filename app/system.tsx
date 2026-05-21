@@ -7,9 +7,11 @@ import { useAppTheme } from '@/context/AppThemeContext';
 import { hasRole } from '@/services/accessControl';
 import { changeAppLanguage } from '@/services/i18n';
 import {
-  getLiveAnalyticsEnabled,
-  setLiveAnalyticsEnabled,
-} from '@/services/liveAnalyticsPreference';
+  DEFAULT_LIVE_LAYOUT_PREFERENCES,
+  getLiveLayoutPreferences,
+  LiveLayoutPreferences,
+  setLiveLayoutPreference,
+} from '@/services/liveLayoutPreferences';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -27,17 +29,25 @@ export default function SystemScreen() {
   const { theme } = useAppTheme();
   const { i18n, t } = useTranslation('common');
   const [user, setUser] = useState<UserSession | null>(null);
-  const [liveAnalyticsEnabled, setLiveAnalyticsEnabledState] = useState(true);
+  const [livePreferences, setLivePreferences] = useState<LiveLayoutPreferences>(
+    DEFAULT_LIVE_LAYOUT_PREFERENCES
+  );
 
   useEffect(() => {
-    getSession().then(setUser);
-    getLiveAnalyticsEnabled().then(setLiveAnalyticsEnabledState);
+    getSession().then((currentUser) => {
+      setUser(currentUser);
+      getLiveLayoutPreferences(currentUser?.userId).then(setLivePreferences);
+    });
   }, []);
 
-  const toggleLiveAnalytics = async () => {
-    const nextValue = !liveAnalyticsEnabled;
-    setLiveAnalyticsEnabledState(nextValue);
-    await setLiveAnalyticsEnabled(nextValue);
+  const toggleLivePreference = async (key: keyof LiveLayoutPreferences) => {
+    const nextValue = !livePreferences[key];
+    const nextPreferences = await setLiveLayoutPreference(
+      key,
+      nextValue,
+      user?.userId
+    );
+    setLivePreferences(nextPreferences);
   };
 
   return (
@@ -96,32 +106,38 @@ export default function SystemScreen() {
         </View>
       </AppInfoCard>
 
-      <AppInfoCard title={t('system.liveAnalyticsTitle')}>
-        <AppText>{t('system.liveAnalyticsHelp')}</AppText>
-        <View style={styles.settingRow}>
-          <View style={styles.settingText}>
-            <AppText bold>
-              {liveAnalyticsEnabled
-                ? t('system.liveAnalyticsEnabled')
-                : t('system.liveAnalyticsDisabled')}
-            </AppText>
-            <AppText variant="caption" color={theme.colors.mutedText}>
-              {liveAnalyticsEnabled
-                ? t('system.liveAnalyticsEnabledHelp')
-                : t('system.liveAnalyticsDisabledHelp')}
-            </AppText>
-          </View>
-          <AppButton
-            title={
-              liveAnalyticsEnabled
-                ? t('system.liveAnalyticsDisable')
-                : t('system.liveAnalyticsEnable')
-            }
-            variant={liveAnalyticsEnabled ? 'secondary' : 'operation'}
-            onPress={toggleLiveAnalytics}
-            style={styles.settingButton}
-          />
-        </View>
+      <AppInfoCard title={t('system.liveExperienceTitle')}>
+        <AppText>{t('system.liveExperienceHelp')}</AppText>
+        <LivePreferenceRow
+          title={t('system.liveWidgetProductSpotlight')}
+          enabled={livePreferences.showProductSpotlight}
+          onPress={() => void toggleLivePreference('showProductSpotlight')}
+        />
+        <LivePreferenceRow
+          title={t('system.liveWidgetPresenterView')}
+          enabled={livePreferences.showPresenterView}
+          onPress={() => void toggleLivePreference('showPresenterView')}
+        />
+        <LivePreferenceRow
+          title={t('system.liveWidgetOperationalState')}
+          enabled={livePreferences.showOperationalState}
+          onPress={() => void toggleLivePreference('showOperationalState')}
+        />
+        <LivePreferenceRow
+          title={t('system.liveWidgetRoles')}
+          enabled={livePreferences.showRoles}
+          onPress={() => void toggleLivePreference('showRoles')}
+        />
+        <LivePreferenceRow
+          title={t('system.liveWidgetAnalytics')}
+          enabled={livePreferences.showAnalytics}
+          onPress={() => void toggleLivePreference('showAnalytics')}
+        />
+        <LivePreferenceRow
+          title={t('system.liveWidgetActivity')}
+          enabled={livePreferences.showActivityFeed}
+          onPress={() => void toggleLivePreference('showActivityFeed')}
+        />
       </AppInfoCard>
 
       <View style={styles.grid}>
@@ -158,6 +174,36 @@ export default function SystemScreen() {
         ) : null}
       </View>
     </AppScreen>
+  );
+}
+
+function LivePreferenceRow({
+  title,
+  enabled,
+  onPress,
+}: {
+  title: string;
+  enabled: boolean;
+  onPress: () => void;
+}) {
+  const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
+
+  return (
+    <View style={styles.settingRow}>
+      <View style={styles.settingText}>
+        <AppText bold>{title}</AppText>
+        <AppText variant="caption" color={theme.colors.mutedText}>
+          {enabled ? t('system.liveWidgetVisible') : t('system.liveWidgetHidden')}
+        </AppText>
+      </View>
+      <AppButton
+        title={enabled ? t('system.liveWidgetHide') : t('system.liveWidgetShow')}
+        variant={enabled ? 'secondary' : 'operation'}
+        onPress={onPress}
+        style={styles.settingButton}
+      />
+    </View>
   );
 }
 

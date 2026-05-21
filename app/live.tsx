@@ -42,7 +42,11 @@ import {
   getSelectedLiveId,
   saveSelectedLiveId,
 } from '@/services/liveWorkflowStorage';
-import { getLiveAnalyticsEnabled } from '@/services/liveAnalyticsPreference';
+import {
+  DEFAULT_LIVE_LAYOUT_PREFERENCES,
+  getLiveLayoutPreferences,
+  LiveLayoutPreferences,
+} from '@/services/liveLayoutPreferences';
 import {
   createReservation,
   getReservationsByBranch,
@@ -203,7 +207,7 @@ export default function LiveScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const { isDesktop, isTablet } = useResponsiveLayout();
+  const { isDesktop, isTablet, isPhone } = useResponsiveLayout();
   const { t } = useTranslation('common');
   const LiveLayout = isDesktop
     ? LiveDesktopLayout
@@ -221,7 +225,8 @@ export default function LiveScreen() {
   const [activateLiveToConfirm, setActivateLiveToConfirm] = useState<Live | null>(null);
   const [reservationIssue, setReservationIssue] = useState<string | null>(null);
   const [showDemoMetrics, setShowDemoMetrics] = useState(true);
-  const [liveAnalyticsEnabled, setLiveAnalyticsEnabled] = useState(true);
+  const [liveLayoutPreferences, setLiveLayoutPreferences] =
+    useState<LiveLayoutPreferences>(DEFAULT_LIVE_LAYOUT_PREFERENCES);
   const [liveLoadIssue, setLiveLoadIssue] = useState<string | null>(null);
   const [customerLoadIssue, setCustomerLoadIssue] = useState<string | null>(null);
   const [itemLoadIssue, setItemLoadIssue] = useState<string | null>(null);
@@ -249,22 +254,22 @@ export default function LiveScreen() {
   const [isCustomerModalVisible, setIsCustomerModalVisible] = useState(false);
   const [isItemModalVisible, setIsItemModalVisible] = useState(false);
   const [isScannerVisible, setIsScannerVisible] = useState(false);
-  const refreshLiveAnalyticsPreference = useCallback(async () => {
+  const refreshLiveLayoutPreferences = useCallback(async (userId?: number | null) => {
     try {
-      setLiveAnalyticsEnabled(await getLiveAnalyticsEnabled());
+      setLiveLayoutPreferences(await getLiveLayoutPreferences(userId));
     } catch {
-      setLiveAnalyticsEnabled(true);
+      setLiveLayoutPreferences(DEFAULT_LIVE_LAYOUT_PREFERENCES);
     }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      void refreshLiveAnalyticsPreference();
+      void refreshLiveLayoutPreferences(session?.userId);
       checkAccessAndLoad();
       // checkAccessAndLoad depends on the current screen state and intentionally
       // refreshes every time the route receives focus.
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [refreshLiveAnalyticsPreference])
+    }, [refreshLiveLayoutPreferences, session?.userId])
   );
 
   const checkAccessAndLoad = async () => {
@@ -296,6 +301,7 @@ export default function LiveScreen() {
     }
 
     setSession(currentSession);
+    await refreshLiveLayoutPreferences(currentSession.userId);
     setIsLoading(true);
 
     try {
@@ -480,6 +486,17 @@ export default function LiveScreen() {
             : '';
   const selectedLiveIsOperable = isLiveOperable(selectedLive);
   const selectedLiveStatus = normalizeStatus(selectedLive?.status);
+  const isMobileLayout = isPhone;
+  const showRolesWidget =
+    liveLayoutPreferences.showRoles && (isTablet || isDesktop);
+  const showProductSpotlightWidget = liveLayoutPreferences.showProductSpotlight;
+  const showPresenterViewWidget = liveLayoutPreferences.showPresenterView;
+  const showOperationalStateWidget = liveLayoutPreferences.showOperationalState;
+  const showAnalyticsWidget =
+    liveLayoutPreferences.showAnalytics && !isMobileLayout;
+  const showActivityFeedWidget =
+    liveLayoutPreferences.showActivityFeed && !isMobileLayout;
+  const showStreamingPanel = showAnalyticsWidget || showActivityFeedWidget;
   const statusColor =
     selectedLiveStatus === 'ACTIVE'
       ? theme.colors.success
@@ -652,7 +669,7 @@ export default function LiveScreen() {
       : selectedLiveStatus === 'ACTIVE'
         ? t('live.presenterReadyActive')
         : t('live.presenterReadyOpen');
-  const shouldShowDemoMetrics = liveAnalyticsEnabled && showDemoMetrics;
+  const shouldShowDemoMetrics = showAnalyticsWidget && showDemoMetrics;
   const activityFeed = [
     ...recentReservations.slice(0, 3).map(({ customerName, itemCode }, index) => ({
       badge: t('live.activityBadgeReservation'),
@@ -1061,7 +1078,7 @@ export default function LiveScreen() {
           </AppInfoCard>
         ) : null}
 
-        {isTablet || isDesktop ? (
+        {showRolesWidget ? (
           <View style={styles.roleSection}>
             <AppText variant="caption" color={theme.colors.mutedText} bold>
               {t('live.teamRolesTitle')}
@@ -1096,6 +1113,7 @@ export default function LiveScreen() {
 
         <LiveLayout>
           <View style={styles.commerceColumn}>
+            {showProductSpotlightWidget ? (
             <AppCard>
               <View style={styles.productVisualHeader}>
                 <View
@@ -1111,7 +1129,7 @@ export default function LiveScreen() {
                     {selectedLiveStatus === 'ACTIVE' ? t('live.liveBadgeActive') : statusLabel}
                   </AppText>
                 </View>
-                {liveAnalyticsEnabled ? (
+                {showAnalyticsWidget ? (
                   <AppText variant="caption" color={theme.colors.accent} bold>
                     {demoMetricCards[0]?.value} {t('live.demoCurrentViewers')}
                   </AppText>
@@ -1200,7 +1218,7 @@ export default function LiveScreen() {
                     ))}
                   </View>
                 </View>
-                {liveAnalyticsEnabled ? (
+                {showActivityFeedWidget ? (
                 <View style={styles.commentOverlay}>
                   <View
                     style={[
@@ -1234,7 +1252,9 @@ export default function LiveScreen() {
                 ) : null}
               </View>
             </AppCard>
+            ) : null}
 
+        {showPresenterViewWidget ? (
         <LiveInfoCard title={t('live.presenterPanelTitle')} subtitle={presenterMessage}>
             <View style={styles.presenterActionRow}>
               <View style={styles.presenterAction}>
@@ -1245,7 +1265,7 @@ export default function LiveScreen() {
                   {featuredProductName}
                 </AppText>
               </View>
-              {liveAnalyticsEnabled ? (
+              {showAnalyticsWidget ? (
                 <View style={styles.presenterAction}>
                   <AppText variant="caption" color={theme.colors.mutedText}>
                     {t('live.presenterAudience')}
@@ -1265,7 +1285,9 @@ export default function LiveScreen() {
               </View>
           </View>
         </LiveInfoCard>
+        ) : null}
 
+        {showOperationalStateWidget ? (
         <AppCard>
           <View style={styles.statusHeader}>
             <View style={styles.statusTextBlock}>
@@ -1294,8 +1316,9 @@ export default function LiveScreen() {
             </AppText>
           </View>
         </AppCard>
+        ) : null}
 
-        {liveAnalyticsEnabled ? (
+        {showStreamingPanel ? (
         <AppCard>
           <View style={styles.demoHeader}>
             <View style={styles.statusTextBlock}>
@@ -1326,16 +1349,19 @@ export default function LiveScreen() {
 
             <Pressable
               onPress={() => setShowDemoMetrics((current) => !current)}
+              disabled={!showAnalyticsWidget}
               style={({ pressed }) => [
                 styles.demoToggle,
                 {
                   borderColor: theme.colors.border,
-                  opacity: pressed ? 0.75 : 1,
+                  opacity: !showAnalyticsWidget ? 0.45 : pressed ? 0.75 : 1,
                 },
               ]}
             >
               <AppText variant="caption" bold>
-                {showDemoMetrics
+                {!showAnalyticsWidget
+                  ? t('live.demoMetricsHiddenByPreference')
+                  : showDemoMetrics
                   ? t('live.demoHideMetrics')
                   : t('live.demoShowMetrics')}
               </AppText>
@@ -1414,6 +1440,7 @@ export default function LiveScreen() {
               </View>
               ) : null}
 
+              {showActivityFeedWidget ? (
               <View
                 style={[
                   styles.demoPanel,
@@ -1472,11 +1499,48 @@ export default function LiveScreen() {
                   </View>
                 ))}
               </View>
+              ) : null}
             </>
           ) : (
-            <AppText color={theme.colors.mutedText}>
-              {t('live.demoMetricsCollapsed')}
-            </AppText>
+            <>
+              {showActivityFeedWidget ? (
+                <View
+                  style={[
+                    styles.demoPanel,
+                    isTablet ? styles.demoPanelTablet : null,
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor: theme.colors.surface,
+                    },
+                  ]}
+                >
+                  <AppText bold>{t('live.activityFeedTitle')}</AppText>
+                  {activityFeed.map((event, index) => (
+                    <View
+                      key={`${event.label}-${index}`}
+                      style={[
+                        styles.activityFeedRow,
+                        {
+                          borderColor: theme.colors.border,
+                          backgroundColor: theme.colors.surface,
+                        },
+                      ]}
+                    >
+                      <View style={styles.activityFeedMain}>
+                        <AppText numberOfLines={2}>{event.label}</AppText>
+                      </View>
+                      <AppText variant="caption" color={theme.colors.mutedText}>
+                        {event.time}
+                      </AppText>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <AppText color={theme.colors.mutedText}>
+                  {t('live.demoMetricsCollapsed')}
+                </AppText>
+              )}
+            </>
           )}
         </AppCard>
         ) : null}

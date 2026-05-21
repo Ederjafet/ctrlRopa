@@ -2018,6 +2018,41 @@ Decision:
 - `GO tecnico` para build/export.
 - `GO UX runtime` condicionado a smoke visual con datos reales QA.
 
+## 2026-05-20 - LIVE-V / widgets configurables En vivo
+
+Tipo: frontend/UX SaaS, persistencia local; sin backend, SQL, migraciones, pagos, ventas ni reportes.
+
+Objetivo:
+
+- Hacer configurables los widgets principales de En vivo.
+- Reducir peso visual de roles cuando el usuario/equipo no los necesita.
+- Preparar arquitectura futura para preferencias por usuario, empresa, rol y layout.
+
+Cambios realizados:
+
+- `services/liveLayoutPreferences.ts`: nuevo servicio local con preferencias por usuario o fallback por dispositivo.
+- `app/system.tsx`: agrega seccion `Experiencia En vivo` con toggles para spotlight, presentadora, estado operativo, roles, analiticos y actividad.
+- `app/live.tsx`: todos los widgets principales respetan preferencias; mobile oculta roles, analiticos y actividad automaticamente.
+- `locales/es/common.json` y `locales/en/common.json`: textos ES/EN para configuracion de widgets.
+- `docs/ERP_LIVE_WIDGET_CONFIGURATION.md`: documenta persistencia y evolucion backend futura.
+- `docs/ERP_LIVE_ROLE_VISIBILITY_STRATEGY.md`: documenta roles informativos y visibilidad.
+- `docs/ERP_LIVE_DEVICE_WIDGET_STRATEGY.md`: documenta comportamiento desktop/tablet/mobile.
+
+Pendiente:
+
+- `npm.cmd run lint`: OK sin errores; persisten 55 warnings historicos.
+- `npx.cmd tsc --noEmit`: OK.
+- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
+- `git diff --check`: OK; solo avisos LF/CRLF.
+- `rg -n "Ã|Â|�" app components services locales docs`: solo coincidencias historicas documentales previas.
+- Pendiente smoke runtime para confirmar persistencia tras reload en web/mobile.
+- Futura persistencia backend por usuario/company/layout.
+
+Decision:
+
+- `GO tecnico`.
+- `GO runtime QA` condicionado a validar Sistema -> Experiencia En vivo y reload en desktop/tablet/mobile.
+
 ## 2026-05-20 - LIVE-S / operacion QA, analiticos y producto activo
 
 Tipo: UX/frontend acotado para En vivo, sin backend, migraciones, ventas, pagos, reportes ni integraciones externas.
