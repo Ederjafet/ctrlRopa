@@ -8,6 +8,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  StatusBar,
   View,
   ViewStyle,
 } from 'react-native';
@@ -33,10 +34,21 @@ export default function AppScreen({
     responsive.horizontalPadding
   );
   const statusBarFallback =
-    Platform.OS === 'android' ? 24 : Platform.OS === 'ios' ? 44 : 0;
+    Platform.OS === 'android'
+      ? Math.max(StatusBar.currentHeight ?? 0, 28)
+      : Platform.OS === 'ios'
+        ? 44
+        : 0;
   const navigationBarFallback =
     Platform.OS === 'android' ? 56 : Platform.OS === 'ios' ? 34 : theme.spacing.md;
-  const topPadding = theme.spacing.lg + Math.max(insets.top, statusBarFallback);
+  const androidStatusBarGuard = Platform.OS === 'android' ? theme.spacing.sm : 0;
+  const webTouchDeviceTopGuard =
+    Platform.OS === 'web' && !responsive.isDesktop ? theme.spacing.sm : 0;
+  const topPadding =
+    theme.spacing.lg +
+    Math.max(insets.top, statusBarFallback) +
+    androidStatusBarGuard +
+    webTouchDeviceTopGuard;
   const bottomSafeArea = Math.max(insets.bottom, navigationBarFallback);
 
   useEffect(() => {

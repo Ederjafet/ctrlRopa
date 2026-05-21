@@ -158,6 +158,10 @@ Probabilidad:
 - LIVE-S muestra producto activo desde la prenda seleccionada, pero no existe sincronizacion realtime entre operadores.
 - LIVE-S habilita alta rapida de cliente desde En vivo; queda riesgo de duplicados hasta normalizar telefono y crear flujo formal de interesado.
 - LIVE-S solo mitiga reservas falsas con aviso UX; controles reales requieren reglas backend auditadas y liberacion de reservas vencidas.
+- LIVE-T corrige `localhost` web hacia host LAN dinamico; si backend corre en otro host/puerto se debe configurar `EXPO_PUBLIC_API_BASE_URL`.
+- LIVE-T detecta CORS LAN incompleto; el backend debe reiniciarse/desplegarse con `http://192.168.0.128:8081` permitido para evitar preflight `403`.
+- LIVE-T refuerza safe area Android con `StatusBar.currentHeight` y guard adicional; dispositivos con notch extremo aun requieren smoke fisico.
+- LIVE-T valida conectividad local LAN y login directo QA `200`, pero login/reserva desde equipo QA y Android siguen pendientes de evidencia manual despues de reinicio backend.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

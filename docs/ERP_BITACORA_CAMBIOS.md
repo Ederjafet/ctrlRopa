@@ -1943,6 +1943,44 @@ Decision:
 - `GO tecnico` para lint, TypeScript y export web.
 - `GO UX runtime pendiente` hasta smoke visual mobile/tablet/desktop.
 
+## 2026-05-20 - LIVE-T / LAN, CORS y safe area Android
+
+Tipo: hardening QA red/mobile/frontend/backend minimo; sin pagos, ventas, reportes, SQL ni migraciones.
+
+Objetivo:
+
+- Permitir acceso QA LAN desde `http://192.168.0.128:8081` hacia backend `http://192.168.0.128:8090`.
+- Evitar uso residual de `localhost`/`127.0.0.1` en frontend para QA remoto.
+- Corregir preflight CORS LAN sin debilitar autenticacion.
+- Reforzar safe area Android/Samsung para que headers no se empalmen con hora, senal o bateria.
+
+Cambios realizados:
+
+- `constants/api.ts`: mantiene host API dinamico basado en el hostname web y fallback LAN configurable.
+- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/config/CorsConfig.java`: agrega origen QA LAN `http://192.168.0.128:8081`.
+- `components/ui/AppScreen.tsx`: agrega guard adicional para Android y web touch device sobre el safe area existente.
+- `docs/ERP_LIVE_LAN_CONNECTIVITY.md`: documenta DEV `192.168.0.128`, QA cliente `192.168.0.149`, puertos `8081/8090`, CORS y causa del preflight.
+- `docs/ERP_LIVE_ANDROID_SAFE_AREA_HARDENING.md`: documenta el hardening Android.
+- `docs/ERP_LIVE_RESPONSIVE_OVERLAP_FIXES.md`: documenta ajustes de solapamiento.
+- `docs/ERP_LIVE_QA_MULTI_DEVICE_RESULTS.md`: registra evidencia LAN y pendientes.
+
+Validaciones:
+
+- `POST /api/auth/login` directo contra `192.168.0.128:8090` con usuario QA valido: `200`.
+- `OPTIONS /api/auth/login` con origen `http://192.168.0.128:8081` antes del ajuste CORS: `403`.
+- `rg -n "localhost|127.0.0.1|192.168.0.149" app services components constants`: sin coincidencias.
+- `npm.cmd run lint`: OK sin errores; persisten 55 warnings historicos.
+- `npx.cmd tsc --noEmit`: OK.
+- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
+- `git diff --check`: OK; solo avisos LF/CRLF.
+- `.\mvnw.cmd test`: OK, 28 tests, `BUILD SUCCESS`.
+- `rg -n "Ã|Â|�" app components locales docs`: solo coincidencias historicas documentales previas.
+
+Decision:
+
+- `GO tecnico` para LAN/safe area/build/test.
+- `GO runtime QA` condicionado a reiniciar backend con CORS actualizado y repetir smoke fisico en equipo QA, Android y tablet.
+
 ## 2026-05-20 - LIVE-S / operacion QA, analiticos y producto activo
 
 Tipo: UX/frontend acotado para En vivo, sin backend, migraciones, ventas, pagos, reportes ni integraciones externas.
@@ -1980,6 +2018,41 @@ Decision:
 
 - `GO tecnico` para lint, TypeScript y export web.
 - `GO operativo condicionado` a smoke visual mobile/tablet/desktop con backend QA activo.
+
+## 2026-05-20 - LIVE-T / LAN, safe area Android y responsive hardening
+
+Tipo: hardening frontend/red QA, sin backend funcional nuevo, SQL, ventas, pagos, reportes ni integraciones externas.
+
+Objetivo:
+
+- Corregir consumo API desde equipos QA LAN.
+- Reforzar safe area Android/Samsung/tablet.
+- Reducir riesgos de empalmes responsive en En vivo.
+
+Cambios realizados:
+
+- `constants/api.ts`: elimina fallback web a `localhost` y resuelve API por `window.location.hostname`.
+- `constants/api.ts`: actualiza fallback LAN configurable a `192.168.0.128`.
+- `components/ui/AppScreen.tsx`: usa `StatusBar.currentHeight` como fallback Android para evitar encimado superior.
+- `services/apiClient.ts`: se valida que mensajes visibles esten sin mojibake.
+- Se crean documentos de conectividad LAN, safe area Android, overlap responsive y resultados QA multi-dispositivo.
+
+Validaciones:
+
+- `http://192.168.0.128:8081`: HTTP 200.
+- `http://192.168.0.128:8090/api/health`: HTTP 200.
+- `netstat`: `8081` escucha en `0.0.0.0` y registra conexiones `ESTABLISHED` desde `192.168.0.149`.
+- `rg -n "localhost|127.0.0.1" app services components constants`: sin coincidencias.
+- `rg -n "Ã|Â|�" app services components constants locales`: sin coincidencias.
+- `npm.cmd run lint`: OK sin errores; persisten 55 warnings historicos fuera del alcance LIVE-T.
+- `npx.cmd tsc --noEmit`: OK.
+- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
+- `git diff --check`: OK; solo avisos LF/CRLF normales.
+
+Decision:
+
+- `GO tecnico` para base LAN/safe-area.
+- `GO demo multi-dispositivo condicionado` a smoke real desde equipo QA, Android y tablet.
 
 ## 2026-05-19 - LIVE-Q / hardening UX y demo candidate
 
