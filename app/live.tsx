@@ -8,6 +8,7 @@ import {
   LiveInfoCard,
   LiveMetricCard,
   LiveStatusCard,
+  LiveWarningCard,
 } from '@/components/live/LiveCommerceCards';
 import AppBackButton from '@/components/ui/AppBackButton';
 import AppBottomModal from '@/components/ui/AppBottomModal';
@@ -42,6 +43,7 @@ import {
   getSelectedLiveId,
   saveSelectedLiveId,
 } from '@/services/liveWorkflowStorage';
+import { getLiveAnalyticsEnabled } from '@/services/liveAnalyticsPreference';
 import {
   createReservation,
   getReservationsByBranch,
@@ -203,6 +205,7 @@ export default function LiveScreen() {
   const [activateLiveToConfirm, setActivateLiveToConfirm] = useState<Live | null>(null);
   const [reservationIssue, setReservationIssue] = useState<string | null>(null);
   const [showDemoMetrics, setShowDemoMetrics] = useState(true);
+  const [liveAnalyticsEnabled, setLiveAnalyticsEnabled] = useState(true);
   const [liveLoadIssue, setLiveLoadIssue] = useState<string | null>(null);
   const [customerLoadIssue, setCustomerLoadIssue] = useState<string | null>(null);
   const [itemLoadIssue, setItemLoadIssue] = useState<string | null>(null);
@@ -230,13 +233,22 @@ export default function LiveScreen() {
   const [isCustomerModalVisible, setIsCustomerModalVisible] = useState(false);
   const [isItemModalVisible, setIsItemModalVisible] = useState(false);
   const [isScannerVisible, setIsScannerVisible] = useState(false);
+  const refreshLiveAnalyticsPreference = useCallback(async () => {
+    try {
+      setLiveAnalyticsEnabled(await getLiveAnalyticsEnabled());
+    } catch {
+      setLiveAnalyticsEnabled(true);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
+      void refreshLiveAnalyticsPreference();
       checkAccessAndLoad();
       // checkAccessAndLoad depends on the current screen state and intentionally
       // refreshes every time the route receives focus.
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
+    }, [refreshLiveAnalyticsPreference])
   );
 
   const checkAccessAndLoad = async () => {
@@ -535,11 +547,13 @@ export default function LiveScreen() {
       stat: t('live.demoProductClicks', { count: 14 }),
     },
   ];
-  const spotlightBadges = [
-    t('live.spotlightLastPieces'),
-    t('live.spotlightPopular'),
-    t('live.spotlightInterested', { count: 12 }),
-  ];
+  const spotlightBadges = liveAnalyticsEnabled
+    ? [
+        t('live.spotlightLastPieces'),
+        t('live.spotlightPopular'),
+        t('live.spotlightInterested', { count: 12 }),
+      ]
+    : [t('live.productOnAirBadge')];
   const roleCards = [
     {
       title: t('live.presenterRoleTitle'),
@@ -600,6 +614,12 @@ export default function LiveScreen() {
     selectedItem?.price !== null && selectedItem?.price !== undefined
       ? formatMoney(Number(selectedItem.price))
       : t('live.demoSpotlightPrice');
+  const featuredProductCode = selectedItem?.code || t('live.noActiveProductCode');
+  const featuredProductSize = selectedItem?.sizeName || t('live.noSize');
+  const featuredProductStatus = selectedItem
+    ? t('live.productOnAir')
+    : t('live.productOnAirDemo');
+  const shouldShowDemoMetrics = liveAnalyticsEnabled && showDemoMetrics;
   const activityFeed = [
     ...recentReservations.slice(0, 3).map(({ customerName, itemCode }, index) => ({
       badge: t('live.activityBadgeReservation'),
@@ -1046,9 +1066,11 @@ export default function LiveScreen() {
                     {t('live.liveBadgeActive')}
                   </AppText>
                 </View>
-                <AppText variant="caption" color={theme.colors.accent} bold>
-                  {demoMetricCards[0]?.value} {t('live.demoCurrentViewers')}
-                </AppText>
+                {liveAnalyticsEnabled ? (
+                  <AppText variant="caption" color={theme.colors.accent} bold>
+                    {demoMetricCards[0]?.value} {t('live.demoCurrentViewers')}
+                  </AppText>
+                ) : null}
               </View>
               <View
                 style={[
@@ -1074,6 +1096,32 @@ export default function LiveScreen() {
                   <AppText variant="subtitle" color={theme.colors.accent} bold>
                     {featuredProductPrice}
                   </AppText>
+                  <View style={styles.productMetaRow}>
+                    <View style={styles.productMetaItem}>
+                      <AppText variant="caption" color={theme.colors.mutedText}>
+                        {t('live.productCode')}
+                      </AppText>
+                      <AppText bold numberOfLines={1}>
+                        {featuredProductCode}
+                      </AppText>
+                    </View>
+                    <View style={styles.productMetaItem}>
+                      <AppText variant="caption" color={theme.colors.mutedText}>
+                        {t('live.productSize')}
+                      </AppText>
+                      <AppText bold numberOfLines={1}>
+                        {featuredProductSize}
+                      </AppText>
+                    </View>
+                    <View style={styles.productMetaItem}>
+                      <AppText variant="caption" color={theme.colors.mutedText}>
+                        {t('live.productStatus')}
+                      </AppText>
+                      <AppText bold color={theme.colors.accent} numberOfLines={1}>
+                        {featuredProductStatus}
+                      </AppText>
+                    </View>
+                  </View>
                   <View style={styles.spotlightPulseRow}>
                     <View
                       style={[
@@ -1105,6 +1153,7 @@ export default function LiveScreen() {
                     ))}
                   </View>
                 </View>
+                {liveAnalyticsEnabled ? (
                 <View style={styles.commentOverlay}>
                   <View
                     style={[
@@ -1135,27 +1184,30 @@ export default function LiveScreen() {
                     </AppText>
                   </View>
                 </View>
+                ) : null}
               </View>
             </AppCard>
 
         <LiveInfoCard title={t('live.presenterPanelTitle')} subtitle={t('live.presenterPanelHelp')}>
-          <View style={styles.presenterActionRow}>
-            <View style={styles.presenterAction}>
-              <AppText variant="caption" color={theme.colors.mutedText}>
-                {t('live.presenterCurrentProduct')}
-              </AppText>
-              <AppText bold numberOfLines={1}>
-                {featuredProductName}
-              </AppText>
-            </View>
-            <View style={styles.presenterAction}>
-              <AppText variant="caption" color={theme.colors.mutedText}>
-                {t('live.presenterAudience')}
-              </AppText>
-              <AppText bold color={theme.colors.accent}>
-                {demoMetricCards[0]?.value}
-              </AppText>
-            </View>
+            <View style={styles.presenterActionRow}>
+              <View style={styles.presenterAction}>
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  {t('live.presenterCurrentProduct')}
+                </AppText>
+                <AppText bold numberOfLines={1}>
+                  {featuredProductName}
+                </AppText>
+              </View>
+              {liveAnalyticsEnabled ? (
+                <View style={styles.presenterAction}>
+                  <AppText variant="caption" color={theme.colors.mutedText}>
+                    {t('live.presenterAudience')}
+                  </AppText>
+                  <AppText bold color={theme.colors.accent}>
+                    {demoMetricCards[0]?.value}
+                  </AppText>
+                </View>
+              ) : null}
           </View>
         </LiveInfoCard>
 
@@ -1188,6 +1240,7 @@ export default function LiveScreen() {
           </View>
         </AppCard>
 
+        {liveAnalyticsEnabled ? (
         <AppCard>
           <View style={styles.demoHeader}>
             <View style={styles.statusTextBlock}>
@@ -1234,7 +1287,7 @@ export default function LiveScreen() {
             </Pressable>
           </View>
 
-          {showDemoMetrics ? (
+          {shouldShowDemoMetrics ? (
             <>
               <AppResponsiveGrid
                 gap={isTablet ? 8 : 12}
@@ -1371,6 +1424,7 @@ export default function LiveScreen() {
             </AppText>
           )}
         </AppCard>
+        ) : null}
 
           </View>
 
@@ -1592,15 +1646,28 @@ export default function LiveScreen() {
                 : t('live.selectCustomerHelp')}
             </AppText>
 
-            <AppButton
-              title={
-                selectedCustomer
-                  ? t('live.changeCustomer')
-                  : t('live.selectCustomer')
-              }
-              variant="operation"
-              onPress={() => setIsCustomerModalVisible(true)}
-            />
+            <View style={styles.buttonRow}>
+              <View style={styles.buttonFill}>
+                <AppButton
+                  title={
+                    selectedCustomer
+                      ? t('live.changeCustomer')
+                      : t('live.selectCustomer')
+                  }
+                  variant="operation"
+                  onPress={() => setIsCustomerModalVisible(true)}
+                />
+              </View>
+              <View style={styles.buttonFill}>
+                <AppButton
+                  title={t('live.quickCustomer')}
+                  variant="secondary"
+                  onPress={() =>
+                    router.push('/customers-create?returnTo=/live' as any)
+                  }
+                />
+              </View>
+            </View>
           </View>
 
             <View style={styles.sectionSpacing}>
@@ -1661,6 +1728,15 @@ export default function LiveScreen() {
               {t('live.quickReservationHint')}
             </AppText>
           </LiveCompactCard>
+
+          <LiveWarningCard style={styles.reservationRiskCard}>
+            <AppText variant="caption" color={theme.colors.warning} bold>
+              {t('live.reservationRiskTitle')}
+            </AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {t('live.reservationRiskHelp')}
+            </AppText>
+          </LiveWarningCard>
 
           <AppInput
             label={t('live.price')}
@@ -2210,6 +2286,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
+  productMetaItem: {
+    flex: 1,
+    minWidth: 92,
+  },
+  productMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
   operatorQuickChip: {
     borderWidth: 1,
     paddingHorizontal: 10,
@@ -2286,6 +2371,9 @@ const styles = StyleSheet.create({
   recentReservationText: {
     flex: 1,
     minWidth: 0,
+  },
+  reservationRiskCard: {
+    marginTop: 4,
   },
   sectionSpacing: {
     marginTop: 12,

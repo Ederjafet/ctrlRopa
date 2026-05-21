@@ -30,6 +30,7 @@ Fase: 1D - datos QA y evidencia
 | 2026-05-19 | LIVE-P | QA UX/frontend | Codex QA/UX | Flujo multioperador, pulso de transmision, feed con badges/timestamps y ajuste tablet; lint, TypeScript y export web OK | GO tecnico | Sin backend realtime; smoke visual mobile/tablet/desktop pendiente | GO UX condicionado a validacion visual |
 | 2026-05-19 | LIVE-Q | QA UX/frontend | Codex QA/UX | Safe area Android/tablet, microcopy comercial, reduccion de ruido mobile y documentacion demo candidate; lint, TypeScript, export web y diff check OK | GO tecnico | Smoke visual Android/tablet/iPad pendiente | GO demo condicionado |
 | 2026-05-20 | LIVE-R | QA frontend/demo | Codex QA/Frontend | Precheck post-reinicio, Expo web 8081, rutas `/`, `/login`, `/live`, lint, TypeScript, export web, diff check, busquedas mojibake/terminos | GO tecnico | Smoke visual fisico y flujo funcional con backend QA activo pendientes | GO demo condicionado |
+| 2026-05-20 | LIVE-S | QA operacional/frontend | Codex QA/Frontend | Analiticos desde Sistema, producto al aire, cliente rapido, aviso antifalsas reservas y ajustes responsive acotados | GO tecnico parcial | Falta smoke fisico mobile/tablet/desktop y validacion con backend QA activo | GO condicionado |
 
 ## Reglas de registro
 

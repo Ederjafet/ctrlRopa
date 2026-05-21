@@ -9,12 +9,17 @@ import AppText from '@/components/ui/AppText';
 import { createCustomer } from '@/services/customerService';
 import { getSession } from '@/services/sessionStorage';
 
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert } from 'react-native';
 
 export default function CustomersCreateScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
+  const returnTo = Array.isArray(params.returnTo)
+    ? params.returnTo[0]
+    : params.returnTo;
+  const returnRoute = returnTo || '/customers';
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -58,7 +63,9 @@ export default function CustomersCreateScreen() {
       });
 
       Alert.alert('Cliente', 'Cliente creado correctamente.');
-      router.replace(`/customers/${customer.id}` as any);
+      router.replace(
+        returnTo ? (returnRoute as any) : (`/customers/${customer.id}` as any)
+      );
     } catch (e: any) {
       Alert.alert('Error', e.message || 'No se pudo crear el cliente.');
     } finally {
@@ -68,7 +75,7 @@ export default function CustomersCreateScreen() {
 
   return (
     <AppScreen>
-      <AppBackButton fallbackRoute="/customers" preferHistory={false} />
+      <AppBackButton fallbackRoute={returnRoute} preferHistory={false} />
 
       <AppText variant="title" bold>
         Nuevo cliente

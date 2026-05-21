@@ -57,6 +57,7 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 - LIVE-P: se agrega capa visual multioperador para presentadora, operador y supervisor; se prepara pulso runtime simulado y guia de operacion tablet sin backend realtime.
 - LIVE-Q: se atiende feedback QA de usabilidad, safe area Android/tablet, microcopy comercial y estado demo candidate condicionado.
 - LIVE-R: tras reinicio abrupto se valida rama, arbol limpio, puerto 8081, Expo web, lint, TypeScript, export y checklist demo candidate; queda GO tecnico y GO demo condicionado a smoke fisico.
+- LIVE-S: se atiende feedback QA operativo con analiticos activables desde Sistema, producto activo visible, alta rapida de cliente desde En vivo y aviso operativo contra reservas falsas; no se tocaron backend, finanzas, reportes ni integraciones.
 
 ## Madurez ERP estimada
 

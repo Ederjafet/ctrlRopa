@@ -1943,6 +1943,44 @@ Decision:
 - `GO tecnico` para lint, TypeScript y export web.
 - `GO UX runtime pendiente` hasta smoke visual mobile/tablet/desktop.
 
+## 2026-05-20 - LIVE-S / operacion QA, analiticos y producto activo
+
+Tipo: UX/frontend acotado para En vivo, sin backend, migraciones, ventas, pagos, reportes ni integraciones externas.
+
+Objetivo:
+
+- Atender feedback QA operativo sin ampliar el alcance tecnico.
+- Permitir ocultar analiticos visuales desde Sistema.
+- Hacer mas claro el producto activo para presentadora/operador.
+- Dar salida operativa al cliente nuevo durante En vivo.
+- Documentar controles contra reservas falsas sin bloquear operacion normal.
+
+Cambios realizados:
+
+- `services/liveAnalyticsPreference.ts`: nueva preferencia local para analiticos de En vivo.
+- `app/system.tsx`: agrega control en Sistema para mostrar/ocultar analiticos.
+- `app/live.tsx`: respeta la preferencia global y oculta metricas/actividad demo cuando esta desactivada.
+- `app/live.tsx`: Product Spotlight muestra codigo, talla y estado de producto al aire.
+- `app/live.tsx`: agrega accion `Crear cliente rapido` desde el flujo de reserva.
+- `app/live.tsx`: agrega aviso compacto de verificacion para reducir reservas falsas.
+- `app/customers-create.tsx`: respeta `returnTo=/live` para regresar al flujo En vivo.
+- `locales/es/common.json` y `locales/en/common.json`: agrega microcopy ES/EN para analiticos, producto activo, cliente rapido y verificacion.
+- Se crean documentos LIVE-S de analiticos, producto activo, cliente nuevo, reservas falsas y feedback QA.
+
+Validaciones:
+
+- `npx.cmd tsc --noEmit`: OK durante implementacion.
+- `npm.cmd run lint`: OK sin errores; persisten 55 warnings historicos fuera del alcance LIVE-S.
+- `npx.cmd tsc --noEmit`: OK.
+- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
+- `git diff --check`: OK; solo avisos LF/CRLF normales.
+- `rg -n "Ã|Â|�" app components locales docs`: solo coincidencias historicas documentales previas.
+
+Decision:
+
+- `GO tecnico` para lint, TypeScript y export web.
+- `GO operativo condicionado` a smoke visual mobile/tablet/desktop con backend QA activo.
+
 ## 2026-05-19 - LIVE-Q / hardening UX y demo candidate
 
 Tipo: UX frontend LIVE, sin backend, APIs, migraciones, pagos, ventas, reportes, realtime ni integraciones externas.

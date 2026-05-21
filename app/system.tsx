@@ -1,10 +1,15 @@
 import AppBackButton from '@/components/ui/AppBackButton';
+import AppButton from '@/components/ui/AppButton';
 import AppInfoCard from '@/components/ui/AppInfoCard';
 import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { hasRole } from '@/services/accessControl';
 import { changeAppLanguage } from '@/services/i18n';
+import {
+  getLiveAnalyticsEnabled,
+  setLiveAnalyticsEnabled,
+} from '@/services/liveAnalyticsPreference';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -22,10 +27,18 @@ export default function SystemScreen() {
   const { theme } = useAppTheme();
   const { i18n, t } = useTranslation('common');
   const [user, setUser] = useState<UserSession | null>(null);
+  const [liveAnalyticsEnabled, setLiveAnalyticsEnabledState] = useState(true);
 
   useEffect(() => {
     getSession().then(setUser);
+    getLiveAnalyticsEnabled().then(setLiveAnalyticsEnabledState);
   }, []);
+
+  const toggleLiveAnalytics = async () => {
+    const nextValue = !liveAnalyticsEnabled;
+    setLiveAnalyticsEnabledState(nextValue);
+    await setLiveAnalyticsEnabled(nextValue);
+  };
 
   return (
     <AppScreen>
@@ -80,6 +93,34 @@ export default function SystemScreen() {
               {t('language.english')}
             </AppText>
           </Pressable>
+        </View>
+      </AppInfoCard>
+
+      <AppInfoCard title={t('system.liveAnalyticsTitle')}>
+        <AppText>{t('system.liveAnalyticsHelp')}</AppText>
+        <View style={styles.settingRow}>
+          <View style={styles.settingText}>
+            <AppText bold>
+              {liveAnalyticsEnabled
+                ? t('system.liveAnalyticsEnabled')
+                : t('system.liveAnalyticsDisabled')}
+            </AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {liveAnalyticsEnabled
+                ? t('system.liveAnalyticsEnabledHelp')
+                : t('system.liveAnalyticsDisabledHelp')}
+            </AppText>
+          </View>
+          <AppButton
+            title={
+              liveAnalyticsEnabled
+                ? t('system.liveAnalyticsDisable')
+                : t('system.liveAnalyticsEnable')
+            }
+            variant={liveAnalyticsEnabled ? 'secondary' : 'operation'}
+            onPress={toggleLiveAnalytics}
+            style={styles.settingButton}
+          />
         </View>
       </AppInfoCard>
 
@@ -159,6 +200,20 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
     marginTop: 12,
+  },
+  settingButton: {
+    minWidth: 180,
+  },
+  settingRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 12,
+  },
+  settingText: {
+    flex: 1,
+    minWidth: 220,
   },
   tile: {
     borderWidth: 1,

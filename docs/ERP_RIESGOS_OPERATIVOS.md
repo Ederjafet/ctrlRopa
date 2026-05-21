@@ -154,6 +154,10 @@ Probabilidad:
 - LIVE-P separa roles y simula pulso runtime, pero la colaboracion real sigue bloqueada hasta tener eventos backend, roles LIVE y validacion tactil en tablet.
 - LIVE-Q corrige safe area y microcopy para demo, pero sigue pendiente smoke visual en Android/tablet/iPad antes de declararlo demo candidate final.
 - LIVE-R valida Expo/web y build tecnico tras reinicio, pero demo final sigue condicionado a evidencia fisica mobile/tablet y backend QA para flujo reserva/cobro.
+- LIVE-S agrega preferencia local de analiticos; en multi-dispositivo puede haber diferencia visual hasta persistirla por usuario/company.
+- LIVE-S muestra producto activo desde la prenda seleccionada, pero no existe sincronizacion realtime entre operadores.
+- LIVE-S habilita alta rapida de cliente desde En vivo; queda riesgo de duplicados hasta normalizar telefono y crear flujo formal de interesado.
+- LIVE-S solo mitiga reservas falsas con aviso UX; controles reales requieren reglas backend auditadas y liberacion de reservas vencidas.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.
