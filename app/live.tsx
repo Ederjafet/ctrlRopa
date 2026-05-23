@@ -48,11 +48,19 @@ import {
   LiveLayoutPreferences,
 } from '@/services/liveLayoutPreferences';
 import {
+  canCreateLiveCustomer,
+  canCreateLiveItem,
+  canOperateLive,
+  canSelectLiveCustomer,
+  canSelectLiveItem,
+  canViewLive,
+  canViewLiveAnalytics,
+} from '@/services/livePermissionGuards';
+import {
   createReservation,
   getReservationsByBranch,
   Reservation,
 } from '@/services/reservationService';
-import { validateRouteAccess } from '@/services/routeGuard';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
@@ -274,7 +282,8 @@ export default function LiveScreen() {
 
   const checkAccessAndLoad = async () => {
     try {
-      const allowed = await validateRouteAccess('LIVE', 'DO_LIVE_RESERVATION');
+      const currentSession = await getSession();
+      const allowed = canViewLive(currentSession);
 
       if (!allowed) {
         router.replace('/access-denied');
@@ -305,11 +314,17 @@ export default function LiveScreen() {
     setIsLoading(true);
 
     try {
+      const canLoadCustomers = canSelectLiveCustomer(currentSession);
+      const canLoadItems = canSelectLiveItem(currentSession);
       const [liveResult, itemResult, customerResult, reservationResult] =
         await Promise.allSettled([
           getLivesByBranch(currentSession.branchId),
-          getItemsByBranch(currentSession.branchId),
-          getCustomersByBranch(currentSession.branchId),
+          canLoadItems
+            ? getItemsByBranch(currentSession.branchId)
+            : Promise.resolve([]),
+          canLoadCustomers
+            ? getCustomersByBranch(currentSession.branchId)
+            : Promise.resolve([]),
           getReservationsByBranch(currentSession.branchId),
         ]);
 
@@ -330,7 +345,9 @@ export default function LiveScreen() {
 
       setLiveLoadIssue(nextLiveLoadIssue);
       setCustomerLoadIssue(
-        customerResult.status === 'rejected'
+        !canLoadCustomers
+          ? t('live.customerPermissionError')
+          : customerResult.status === 'rejected'
           ? resolveLoadIssue(
               customerResult.reason,
               t('live.customerLoadError'),
@@ -339,7 +356,9 @@ export default function LiveScreen() {
           : null
       );
       setItemLoadIssue(
-        itemResult.status === 'rejected'
+        !canLoadItems
+          ? t('live.itemPermissionError')
+          : itemResult.status === 'rejected'
           ? resolveLoadIssue(
               itemResult.reason,
               t('live.itemLoadError'),
@@ -486,6 +505,12 @@ export default function LiveScreen() {
             : '';
   const selectedLiveIsOperable = isLiveOperable(selectedLive);
   const selectedLiveStatus = normalizeStatus(selectedLive?.status);
+  const mayOperateLive = canOperateLive(session);
+  const maySelectCustomer = canSelectLiveCustomer(session);
+  const mayCreateCustomer = canCreateLiveCustomer(session);
+  const maySelectItem = canSelectLiveItem(session);
+  const mayCreateItem = canCreateLiveItem(session);
+  const mayViewAnalytics = canViewLiveAnalytics(session);
   const isMobileLayout = isPhone;
   const showRolesWidget =
     liveLayoutPreferences.showRoles && (isTablet || isDesktop);
@@ -493,10 +518,15 @@ export default function LiveScreen() {
   const showPresenterViewWidget = liveLayoutPreferences.showPresenterView;
   const showOperationalStateWidget = liveLayoutPreferences.showOperationalState;
   const showAnalyticsWidget =
-    liveLayoutPreferences.showAnalytics && !isMobileLayout;
+    liveLayoutPreferences.showAnalytics && mayViewAnalytics && !isMobileLayout;
   const showActivityFeedWidget =
-    liveLayoutPreferences.showActivityFeed && !isMobileLayout;
+    liveLayoutPreferences.showActivityFeed && mayViewAnalytics && !isMobileLayout;
   const showStreamingPanel = showAnalyticsWidget || showActivityFeedWidget;
+  const hasLeftColumnWidgets =
+    showProductSpotlightWidget ||
+    showPresenterViewWidget ||
+    showOperationalStateWidget ||
+    showStreamingPanel;
   const statusColor =
     selectedLiveStatus === 'ACTIVE'
       ? theme.colors.success
@@ -761,6 +791,15 @@ export default function LiveScreen() {
       return;
     }
 
+    if (!canOperateLive(session)) {
+      setLiveNotice({
+        title: t('live.permissionDeniedTitle'),
+        message: t('live.liveOperatePermissionError'),
+        tone: 'warning',
+      });
+      return;
+    }
+
     if (!newLiveNotes.trim()) {
       Alert.alert(t('live.title'), t('live.createLiveMissingNotes'));
       return;
@@ -808,6 +847,16 @@ export default function LiveScreen() {
   const handleActivateLive = async (live: Live) => {
     if (!session) return;
 
+    if (!canOperateLive(session)) {
+      setLiveNotice({
+        title: t('live.permissionDeniedTitle'),
+        message: t('live.liveOperatePermissionError'),
+        tone: 'warning',
+      });
+      setActivateLiveToConfirm(null);
+      return;
+    }
+
     setIsSavingLive(true);
 
     try {
@@ -833,6 +882,15 @@ export default function LiveScreen() {
   };
 
   const handleCloseLive = (live: Live) => {
+    if (!canOperateLive(session)) {
+      setLiveNotice({
+        title: t('live.permissionDeniedTitle'),
+        message: t('live.liveOperatePermissionError'),
+        tone: 'warning',
+      });
+      return;
+    }
+
     setCloseLiveToConfirm(live);
   };
 
@@ -871,12 +929,30 @@ export default function LiveScreen() {
   };
 
   const selectCustomer = (customer: Customer) => {
+    if (!canSelectLiveCustomer(session)) {
+      setLiveNotice({
+        title: t('live.permissionDeniedTitle'),
+        message: t('live.customerPermissionError'),
+        tone: 'warning',
+      });
+      return;
+    }
+
     setSelectedCustomer(customer);
     setCustomerSearch('');
     setIsCustomerModalVisible(false);
   };
 
   const selectItem = (item: Item) => {
+    if (!canSelectLiveItem(session)) {
+      setLiveNotice({
+        title: t('live.permissionDeniedTitle'),
+        message: t('live.itemPermissionError'),
+        tone: 'warning',
+      });
+      return;
+    }
+
     setSelectedItem(item);
     setPriceText(
       item.price !== null && item.price !== undefined ? String(item.price) : ''
@@ -886,6 +962,15 @@ export default function LiveScreen() {
   };
 
   const addItemByCode = (value: string) => {
+    if (!canSelectLiveItem(session)) {
+      setLiveNotice({
+        title: t('live.permissionDeniedTitle'),
+        message: t('live.itemPermissionError'),
+        tone: 'warning',
+      });
+      return;
+    }
+
     const cleanValue = value.trim();
 
     if (!cleanValue) return;
@@ -913,6 +998,11 @@ export default function LiveScreen() {
   const validateReservation = () => {
     if (!session) {
       Alert.alert(t('live.sessionTitle'), t('live.noActiveSession'));
+      return false;
+    }
+
+    if (!canOperateLive(session)) {
+      setReservationIssue(t('live.liveOperatePermissionError'));
       return false;
     }
 
@@ -1111,7 +1201,7 @@ export default function LiveScreen() {
           </View>
         ) : null}
 
-        <LiveLayout>
+        <LiveLayout compact={!hasLeftColumnWidgets}>
           <View style={styles.commerceColumn}>
             {showProductSpotlightWidget ? (
             <AppCard>
@@ -1265,7 +1355,7 @@ export default function LiveScreen() {
                   {featuredProductName}
                 </AppText>
               </View>
-              {showAnalyticsWidget ? (
+                {showAnalyticsWidget ? (
                 <View style={styles.presenterAction}>
                   <AppText variant="caption" color={theme.colors.mutedText}>
                     {t('live.presenterAudience')}
@@ -1549,15 +1639,23 @@ export default function LiveScreen() {
 
           <View style={styles.commerceColumn}>
 
-        {filteredLives.length > 0 ? (
-          <AppCard>
+        <AppCard style={styles.operationHeaderCard}>
+          <View style={styles.operationHeaderTop}>
             <AppText variant="subtitle" bold>
-              {t('live.openLivesTitle')}
+              {t('live.operationBlockTitle')}
             </AppText>
             <AppText color={theme.colors.mutedText}>
-              {t('live.openLivesHelp')}
+              {selectedLive
+                ? t('live.operationBlockActiveHelp')
+                : t('live.operationBlockHelp')}
             </AppText>
+          </View>
 
+        {filteredLives.length > 0 ? (
+          <View style={[styles.operationSection, { borderColor: theme.colors.border }]}>
+            <AppText variant="caption" color={theme.colors.mutedText} bold>
+              {t('live.openLivesTitle')}
+            </AppText>
             <AppResponsiveGrid tabletColumns={2} desktopColumns={3} style={styles.liveButtonGrid}>
               {filteredLives.map((live) => {
                 const selected = selectedLive?.id === live.id;
@@ -1594,31 +1692,29 @@ export default function LiveScreen() {
                 );
               })}
             </AppResponsiveGrid>
-          </AppCard>
+          </View>
         ) : null}
 
         {selectedLive ? (
-          <AppCard>
-          <AppText variant="subtitle" bold>
-            {t('live.liveSessionTitle')}
-          </AppText>
-
+          <View style={[styles.operationSection, { borderColor: theme.colors.border }]}>
             <>
-              <AppText bold>{t('live.liveNumber', { id: selectedLive.id })}</AppText>
+              <View style={styles.liveSessionCompactHeader}>
+                <AppText bold>{t('live.liveNumber', { id: selectedLive.id })}</AppText>
+                <AppText color={statusColor} bold>
+                  {getLiveStatusLabel(selectedLive.status)}
+                </AppText>
+              </View>
               <AppText color={theme.colors.mutedText}>
-                {t('live.status', {
-                  status: getLiveStatusLabel(selectedLive.status),
-                })}
+                {selectedLive.notes || t('live.capturingHelp')}
               </AppText>
               {selectedLive.status !== 'CLOSED' ? (
                 <AppText variant="caption" color={theme.colors.accent} bold>
                   {t('live.capturingHelp')}
                 </AppText>
               ) : null}
-              {selectedLive.notes ? <AppText>{selectedLive.notes}</AppText> : null}
 
               <View style={styles.buttonRow}>
-                {selectedLive.status === 'OPEN' ? (
+                {mayOperateLive && selectedLive.status === 'OPEN' ? (
                   <View style={styles.buttonFill}>
                     <AppButton
                       title={t('live.activateLive')}
@@ -1629,38 +1725,47 @@ export default function LiveScreen() {
                 ) : null}
               </View>
             </>
-          </AppCard>
+          </View>
         ) : (
-          <AppInfoCard title={t('live.liveSessionTitle')}>
+          <View style={[styles.operationSection, { borderColor: theme.colors.border }]}>
             <AppText color={theme.colors.infoCardText}>
               {t('live.liveSessionEmpty')}
             </AppText>
-          </AppInfoCard>
+          </View>
         )}
 
-        <AppCard>
-          <AppText variant="subtitle" bold>
+          <View style={[styles.operationSection, { borderColor: theme.colors.border }]}>
+          <AppText variant="caption" color={theme.colors.mutedText} bold>
             {t('live.createLiveTitle')}
           </AppText>
           <AppText color={theme.colors.mutedText}>
             {t('live.createLiveHelp')}
           </AppText>
 
-          <AppInput
-            label={t('live.locationNotesLabel')}
-            value={newLiveNotes}
-            onChangeText={setNewLiveNotes}
-            placeholder={t('live.locationNotesPlaceholder')}
-            multiline
-          />
+          {mayOperateLive ? (
+            <>
+              <AppInput
+                label={t('live.locationNotesLabel')}
+                value={newLiveNotes}
+                onChangeText={setNewLiveNotes}
+                placeholder={t('live.locationNotesPlaceholder')}
+                multiline
+              />
 
-          <AppButton
-            title={t('live.createLive')}
-            onPress={handleCreateLive}
-            loading={isSavingLive}
-            disabled={isSavingLive || !newLiveNotes.trim()}
-            disabledReason={createLiveBlockedReason}
-          />
+              <AppButton
+                title={t('live.createLive')}
+                onPress={handleCreateLive}
+                loading={isSavingLive}
+                disabled={isSavingLive || !newLiveNotes.trim()}
+                disabledReason={createLiveBlockedReason}
+              />
+            </>
+          ) : (
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {t('live.presenterReadOnlyHelp')}
+            </AppText>
+          )}
+          </View>
         </AppCard>
 
         {false && !selectedLiveIsOperable && filteredLives.length > 0 ? (
@@ -1759,34 +1864,54 @@ export default function LiveScreen() {
 
           <View style={styles.sectionSpacing}>
             <AppText bold>{t('live.customer')}</AppText>
+            <LiveCompactCard style={styles.captureChoiceCard}>
+            <AppText variant="caption" color={theme.colors.mutedText} bold>
+              {t('live.existingCustomerTitle')}
+            </AppText>
             <AppText>
               {selectedCustomer
                 ? selectedCustomer.name
                 : t('live.selectCustomerHelp')}
             </AppText>
+            {maySelectCustomer ? (
+              <AppButton
+                title={
+                  selectedCustomer
+                    ? t('live.changeCustomer')
+                    : t('live.selectCustomer')
+                }
+                variant="operation"
+                onPress={() => setIsCustomerModalVisible(true)}
+              />
+            ) : (
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                {t('live.customerPermissionError')}
+              </AppText>
+            )}
+            </LiveCompactCard>
 
-            <View style={styles.buttonRow}>
-              <View style={styles.buttonFill}>
-                <AppButton
-                  title={
-                    selectedCustomer
-                      ? t('live.changeCustomer')
-                      : t('live.selectCustomer')
-                  }
-                  variant="operation"
-                  onPress={() => setIsCustomerModalVisible(true)}
-                />
-              </View>
-              <View style={styles.buttonFill}>
-                <AppButton
-                  title={t('live.quickCustomer')}
-                  variant="secondary"
-                  onPress={() =>
-                    router.push('/customers-create?returnTo=/live' as any)
-                  }
-                />
-              </View>
+            {mayCreateCustomer ? (
+            <View style={styles.secondaryFlowGroup}>
+              <AppText variant="caption" color={theme.colors.mutedText} bold>
+                {t('live.newCustomerQuestion')}
+              </AppText>
+              <Pressable
+                onPress={() => router.push('/customers-create?returnTo=/live' as any)}
+                style={({ pressed }) => [
+                  styles.ghostAction,
+                  {
+                    borderColor: theme.colors.border,
+                    borderRadius: theme.radius.md,
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}
+              >
+                <AppText variant="caption" color={theme.colors.mutedText} bold>
+                  {t('live.quickCustomer')}
+                </AppText>
+              </Pressable>
             </View>
+            ) : null}
           </View>
 
             <View style={styles.sectionSpacing}>
@@ -1797,49 +1922,78 @@ export default function LiveScreen() {
                 : t('live.itemHelp')}
             </AppText>
 
+            <View style={styles.capturePrimaryGroup}>
             <AppInput
-              placeholder={t('live.scanPlaceholder')}
+              label={t('live.productCodeQrLabel')}
+              placeholder={t('live.productCodeQrPlaceholder')}
               value={scanInput}
               onChangeText={setScanInput}
               onSubmitEditing={() => addItemByCode(scanInput)}
+              style={styles.guidedInput}
+              editable={maySelectItem}
             />
 
-            <View style={styles.buttonRow}>
-              <View style={styles.buttonFill}>
+            {maySelectItem ? (
                 <AppButton
-                  title={t('live.addByCode')}
+                  title={t('live.addItemPrimary')}
                   variant="operation"
                   onPress={() => addItemByCode(scanInput)}
                 />
-              </View>
+              ) : (
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  {t('live.itemPermissionError')}
+                </AppText>
+              )}
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                {t('live.productCodeQrHelp')}
+              </AppText>
+            </View>
 
-              <View style={styles.buttonFill}>
+            {maySelectItem ? (
+            <View style={styles.secondaryFlowGroup}>
+              <AppText variant="caption" color={theme.colors.mutedText} bold>
+                {t('live.noCodeQuestion')}
+              </AppText>
+              <View style={styles.buttonRow}>
+                <View style={styles.buttonFill}>
+                  <AppButton
+                    title={t('live.searchItem')}
+                    variant="secondary"
+                    onPress={() => setIsItemModalVisible(true)}
+                  />
+                </View>
+                <View style={styles.buttonFill}>
                 <AppButton
                   title={t('live.scanQr')}
                   variant="secondary"
                   onPress={() => setIsScannerVisible(true)}
                 />
+                </View>
               </View>
             </View>
-
-            <View style={styles.buttonRow}>
-              <View style={styles.buttonFill}>
-                <AppButton
-                  title={t('live.searchItem')}
-                  variant="secondary"
-                  onPress={() => setIsItemModalVisible(true)}
-                />
-              </View>
-              <View style={styles.buttonFill}>
-                <AppButton
-                  title={t('live.quickItem')}
-                  variant="secondary"
-                  onPress={() =>
-                    router.push('/items-create?returnTo=/live' as any)
-                  }
-                />
-              </View>
+            ) : null}
+            {mayCreateItem ? (
+            <View style={styles.tertiaryFlowGroup}>
+              <AppText variant="caption" color={theme.colors.mutedText} bold>
+                {t('live.itemDoesNotExistQuestion')}
+              </AppText>
+              <Pressable
+                onPress={() => router.push('/items-create?returnTo=/live' as any)}
+                style={({ pressed }) => [
+                  styles.ghostAction,
+                  {
+                    borderColor: theme.colors.border,
+                    borderRadius: theme.radius.md,
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}
+              >
+                <AppText variant="caption" color={theme.colors.mutedText} bold>
+                  {t('live.quickItem')}
+                </AppText>
+              </Pressable>
             </View>
+            ) : null}
             </View>
 
           <LiveCompactCard>
@@ -1869,7 +2023,8 @@ export default function LiveScreen() {
             title={t('live.reserveNow')}
             onPress={handleCreateReservation}
             loading={isSavingReservation}
-            disabled={isSavingReservation}
+            disabled={isSavingReservation || !mayOperateLive}
+            disabledReason={!mayOperateLive ? t('live.liveOperatePermissionError') : undefined}
           />
         </LiveActionCard>
 
@@ -1966,7 +2121,7 @@ export default function LiveScreen() {
                 disabled
                 style={styles.buttonSpacing}
               />
-            ) : (
+            ) : mayOperateLive ? (
               <AppButton
                 title={t('live.closeLive')}
                 variant="danger"
@@ -1974,6 +2129,10 @@ export default function LiveScreen() {
                 loading={isSavingLive}
                 style={styles.buttonSpacing}
               />
+            ) : (
+              <AppText variant="caption" color={theme.colors.mutedText} style={styles.buttonSpacing}>
+                {t('live.presenterReadOnlyHelp')}
+              </AppText>
             )}
           </AppCard>
         ) : null}
@@ -2242,7 +2401,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
-    marginTop: 10,
+    marginTop: 8,
   },
   buttonFill: {
     flex: 1,
@@ -2252,8 +2411,14 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   commerceColumn: {
-    gap: 12,
+    gap: 10,
     minWidth: 0,
+  },
+  captureChoiceCard: {
+    gap: 8,
+  },
+  capturePrimaryGroup: {
+    gap: 6,
   },
   commentBubble: {
     borderWidth: 1,
@@ -2270,6 +2435,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 4,
+  },
+  guidedInput: {
+    minHeight: 54,
+  },
+  ghostAction: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   demoBar: {
     borderTopLeftRadius: 4,
@@ -2348,12 +2522,12 @@ const styles = StyleSheet.create({
   liveButton: {
     borderWidth: 1,
     justifyContent: 'center',
-    marginBottom: 10,
-    minHeight: 92,
-    padding: 12,
+    marginBottom: 8,
+    minHeight: 72,
+    padding: 10,
   },
   liveButtonGrid: {
-    marginTop: 10,
+    marginTop: 8,
   },
   liveHeader: {
     gap: 8,
@@ -2423,6 +2597,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  operationHeaderCard: {
+    gap: 10,
+  },
+  operationHeaderTop: {
+    gap: 4,
+  },
+  operationSection: {
+    borderTopWidth: 1,
+    gap: 8,
+    marginTop: 8,
+    paddingTop: 8,
   },
   presenterAction: {
     flex: 1,
@@ -2503,6 +2689,10 @@ const styles = StyleSheet.create({
     marginTop: 12,
     gap: 8,
   },
+  secondaryFlowGroup: {
+    gap: 6,
+    marginTop: 4,
+  },
   statusHeader: {
     alignItems: 'flex-start',
     flexDirection: 'row',
@@ -2521,5 +2711,20 @@ const styles = StyleSheet.create({
   statusTextBlock: {
     flex: 1,
     minWidth: 220,
+  },
+  tertiaryAction: {
+    maxWidth: 280,
+    opacity: 0.88,
+  },
+  tertiaryFlowGroup: {
+    gap: 6,
+    marginTop: 4,
+  },
+  liveSessionCompactHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
   },
 });

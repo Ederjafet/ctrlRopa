@@ -61,6 +61,9 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 - LIVE-T: se corrige base de conectividad LAN para QA con host API dinamico, CORS LAN para `http://192.168.0.128:8081`, login directo QA validado contra `192.168.0.128:8090` y safe area Android reforzada; queda pendiente reiniciar backend y smoke fisico Android/tablet/equipo QA.
 - LIVE-U: se reemplaza el producto demo del spotlight por datos reales disponibles de prenda seleccionada o ultima reserva; la vista presentadora y estado operativo quedan ligados a transmision/producto actual, con roles informativos no accionables.
 - LIVE-V: se agrega configuracion local de widgets En vivo desde Sistema para spotlight, vista presentadora, estado operativo, roles, analiticos y actividad; mobile oculta automaticamente widgets de alto ruido.
+- LIVE-W: se reorganiza la captura En vivo como flujo guiado, priorizando cliente existente, codigo/QR de prenda, busqueda secundaria y altas rapidas terciarias.
+- LIVE-W adicional: se agrega colapso real de layout cuando widgets estan ocultos, la consola del operador gana prioridad visual y las altas rapidas se vuelven acciones discretas para reducir ruido operacional.
+- LIVE-X: se agregan helpers frontend de permisos LIVE para diferenciar presentadora, operador y supervisor; Sistema y Usuarios reciben guard de navegacion directa. Queda pendiente AUTH-A para cerrar permisos backend en lecturas/altas de customers/items/live listados.
 
 ## Madurez ERP estimada
 

@@ -2053,6 +2053,39 @@ Decision:
 - `GO tecnico`.
 - `GO runtime QA` condicionado a validar Sistema -> Experiencia En vivo y reload en desktop/tablet/mobile.
 
+## 2026-05-20 - LIVE-W / captura operacional guiada
+
+Tipo: UX/frontend LIVE, sin backend, SQL, migraciones, pagos, ventas, reportes ni integraciones.
+
+Objetivo:
+
+- Reducir confusion en captura de cliente y prenda durante transmisiones.
+- Separar acciones principales, secundarias y terciarias.
+- Hacer que la consola se sienta mas operativa y menos formulario ERP.
+
+Cambios realizados:
+
+- `app/live.tsx`: bloque cliente separa cliente existente y cliente nuevo.
+- `app/live.tsx`: bloque prenda prioriza input `Codigo o QR de la prenda` y CTA `Agregar prenda`.
+- `app/live.tsx`: busqueda/QR quedan en bloque secundario `¿No tienes codigo?`.
+- `app/live.tsx`: `Crear cliente rapido` y `Crear prenda rapida` quedan como acciones terciarias.
+- `locales/es/common.json` y `locales/en/common.json`: textos nuevos ES/EN para flujo guiado.
+- Documentacion LIVE-W creada para captura operacional, prenda, operador y mobile.
+
+Pendiente:
+
+- `npm.cmd run lint`: OK sin errores; persisten 55 warnings historicos.
+- `npx.cmd tsc --noEmit`: OK.
+- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
+- `git diff --check`: OK; solo avisos LF/CRLF.
+- `rg -n "Ã|Â|�" app components services locales docs`: solo coincidencias historicas documentales previas.
+- Pendiente validar visualmente mobile Android, tablet landscape y desktop ancho.
+
+Decision:
+
+- `GO tecnico`.
+- `GO UX runtime` condicionado a smoke visual operacional.
+
 ## 2026-05-20 - LIVE-S / operacion QA, analiticos y producto activo
 
 Tipo: UX/frontend acotado para En vivo, sin backend, migraciones, ventas, pagos, reportes ni integraciones externas.
@@ -2272,3 +2305,81 @@ Decision:
 
 - `GO tecnico` para lint, TypeScript y export web.
 - `GO UX runtime pendiente` hasta smoke visual mobile/tablet/desktop.
+
+## 2026-05-21 - LIVE-W / refinamiento operacional compacto
+
+Tipo: UX frontend En vivo, sin backend, SQL, migraciones, pagos, ventas, reportes ni integraciones externas.
+
+Objetivo:
+
+- Rebalancear el layout cuando widgets configurables estan ocultos.
+- Reducir ruido visual y competencia entre acciones.
+- Hacer que la consola del operador domine el flujo principal.
+- Separar acciones primarias, secundarias y terciarias.
+
+Cambios realizados:
+
+- `components/live/LiveDesktopLayout.tsx`: modo `compact` para eliminar columna vacia y redistribuir consola/reservas.
+- `components/live/LiveTabletLayout.tsx`: modo `compact` de una columna operativa amplia.
+- `components/live/LiveMobileLayout.tsx`: omite columna vacia en modo compacto.
+- `app/live.tsx`: activa layout compacto cuando no hay widgets de contexto visibles.
+- `app/live.tsx`: altas rapidas de cliente/prenda pasan a estilo discreto tipo ghost.
+- `app/live.tsx`: `Crear prenda rapida` queda separado bajo `La prenda no existe?`.
+- `locales/es/common.json` y `locales/en/common.json`: agrega microcopy para bloque operacional y excepcion de prenda inexistente.
+- `docs/ERP_LIVE_OPERATIONAL_LAYOUT_REBALANCE.md`: documenta redistribucion de layout.
+- `docs/ERP_LIVE_CAPTURE_VISUAL_HIERARCHY.md`: documenta jerarquia primaria/secundaria/terciaria.
+- `docs/ERP_LIVE_COMPACT_OPERATOR_FLOW.md`: documenta flujo compacto del operador.
+- `docs/ERP_LIVE_WIDGET_COLLAPSE_STRATEGY.md`: documenta colapso de widgets.
+
+Validaciones:
+
+- `npm.cmd run lint`: OK sin errores; persisten 55 warnings historicos fuera del alcance LIVE-W adicional.
+- `npx.cmd tsc --noEmit`: OK.
+- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
+- `git diff --check`: OK; solo avisos LF/CRLF normales.
+- `rg -n "Ã|Â|�" app components locales docs`: solo coincidencias historicas documentales previas; no se detectan coincidencias nuevas en `app`, `components` ni `locales`.
+
+Decision:
+
+- `GO tecnico condicionado` hasta completar smoke visual mobile/tablet/desktop con widgets ocultos.
+
+## 2026-05-21 - LIVE-X / permisos por rol presentadora-operador-supervisor
+
+Tipo: hardening frontend de permisos y documentacion de seguridad, sin backend funcional, SQL, migraciones, pagos, ventas ni reportes.
+
+Objetivo:
+
+- Diferenciar experiencia En vivo por rol/permisos.
+- Evitar que usuarios sin permisos naveguen directo a secciones sensibles.
+- Documentar brechas backend antes de AUTH-A.
+
+Cambios realizados:
+
+- `services/livePermissionGuards.ts`: helpers `canViewLive`, `canOperateLive`, `canCreateLiveCustomer`, `canCreateLiveItem`, `canViewLiveAnalytics`, `canConfigureSystem`, `canManageUsers`.
+- `app/live.tsx`: acciones de cliente, prenda, reserva, crear/activar/cerrar transmision y analiticos respetan permisos.
+- `app/live.tsx`: usuarios sin permiso de operacion ven mensajes claros y no botones de acciones no permitidas.
+- `app/system.tsx`: guard frontend para navegacion directa a Sistema.
+- `app/users.tsx`: guard frontend para navegacion directa a Usuarios.
+- `docs/ERP_LIVE_ROLE_PERMISSION_MATRIX.md`: matriz presentadora/operador/supervisor.
+- `docs/ERP_LIVE_OPERATOR_PRESENTER_ACCESS.md`: experiencia esperada por usuario QA.
+- `docs/ERP_PERMISSION_GUARDS_REVIEW.md`: diagnostico de guards frontend/backend.
+- `docs/ERP_QA_ROLE_ACCESS_VALIDATION.md`: checklist de validacion QA por usuario.
+
+Hallazgos:
+
+- `LiveService.create/activate/close` y `ReservationService.create` ya validan permisos backend.
+- `LiveService.findByBranch/findById`, `CustomerService` e `ItemService` tienen validaciones tenant, pero falta completar permiso funcional backend en lecturas/altas.
+
+Decision:
+
+- `GO tecnico frontend`.
+- `NO-GO seguridad SaaS completa` hasta AUTH-A/backend permission hardening.
+
+Validaciones:
+
+- `npm.cmd run lint`: OK sin errores; persisten warnings historicos fuera del alcance LIVE-X.
+- `npx.cmd tsc --noEmit`: OK.
+- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
+- `git diff --check`: OK; solo avisos LF/CRLF normales.
+- `rg -n "Ã|Â|�" app components services locales docs`: solo coincidencias historicas documentales previas; no se detectan coincidencias nuevas en `app`, `components`, `services` ni `locales`.
+- Maven no se ejecuto porque no se modifico Java/backend.

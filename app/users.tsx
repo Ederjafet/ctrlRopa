@@ -5,6 +5,8 @@ import AppInput from '@/components/ui/AppInput';
 import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
+import { canManageUsers } from '@/services/livePermissionGuards';
+import { getSession } from '@/services/sessionStorage';
 import {
   activateUser,
   AdminUser,
@@ -49,6 +51,12 @@ export default function UsersScreen() {
   const loadUsers = async () => {
     try {
       setIsLoading(true);
+      const session = await getSession();
+      if (!canManageUsers(session)) {
+        router.replace('/access-denied');
+        return;
+      }
+
       const data = await getUsers();
       setUsers(data);
     } catch (error: any) {

@@ -166,6 +166,9 @@ Probabilidad:
 - LIVE-U mantiene roles como tarjetas informativas; no deben interpretarse como control de permisos o cambio de vista hasta una fase futura.
 - LIVE-V persiste preferencias solo localmente; en multi-dispositivo cada equipo puede ver widgets distintos hasta tener persistencia backend por usuario/company.
 - LIVE-V permite ocultar widgets de supervision; QA debe validar que ocultarlos no tape alertas operativas necesarias.
+- LIVE-W cambia jerarquia visual sin tocar logica; requiere smoke mobile/tablet para confirmar que las acciones secundarias siguen siendo faciles de encontrar.
+- LIVE-W adicional compacta layout y oculta columnas sin widgets; requiere smoke con widgets completos y ocultos para confirmar que no se pierde contexto operativo.
+- LIVE-X diferencia permisos en frontend, pero backend todavia tiene endpoints de lectura/alta con tenant validation sin permiso funcional completo; no declarar seguridad SaaS completa hasta AUTH-A.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

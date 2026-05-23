@@ -6,6 +6,7 @@ import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { hasRole } from '@/services/accessControl';
 import { changeAppLanguage } from '@/services/i18n';
+import { canConfigureSystem } from '@/services/livePermissionGuards';
 import {
   DEFAULT_LIVE_LAYOUT_PREFERENCES,
   getLiveLayoutPreferences,
@@ -35,10 +36,15 @@ export default function SystemScreen() {
 
   useEffect(() => {
     getSession().then((currentUser) => {
+      if (!canConfigureSystem(currentUser)) {
+        router.replace('/access-denied');
+        return;
+      }
+
       setUser(currentUser);
       getLiveLayoutPreferences(currentUser?.userId).then(setLivePreferences);
     });
-  }, []);
+  }, [router]);
 
   const toggleLivePreference = async (key: keyof LiveLayoutPreferences) => {
     const nextValue = !livePreferences[key];

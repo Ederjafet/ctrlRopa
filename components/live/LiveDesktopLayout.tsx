@@ -3,10 +3,20 @@ import { StyleSheet, View } from 'react-native';
 
 type Props = {
   children: ReactNode;
+  compact?: boolean;
 };
 
-export default function LiveDesktopLayout({ children }: Props) {
+export default function LiveDesktopLayout({ children, compact = false }: Props) {
   const [left, center, right] = Children.toArray(children);
+
+  if (compact) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.compactMainColumn}>{center}</View>
+        <View style={styles.compactSideColumn}>{right}</View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -26,6 +36,16 @@ const styles = StyleSheet.create({
   mainColumn: {
     flex: 1.32,
     gap: 12,
+    minWidth: 0,
+  },
+  compactMainColumn: {
+    flex: 1.45,
+    gap: 10,
+    minWidth: 0,
+  },
+  compactSideColumn: {
+    flex: 0.85,
+    gap: 10,
     minWidth: 0,
   },
   sideColumn: {
