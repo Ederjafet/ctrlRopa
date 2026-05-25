@@ -402,3 +402,26 @@ Pendiente backlog:
 | AUTH-F4 pruebas backend RBAC | P0 | CRITICO | AUTH-F3 | 401/403 cubiertos por permiso, tenant y sesion |
 | AUTH-F5 alinear frontend | P1 | ALTO | AUTH-F3 | UI deja de usar dependencias inexistentes como si fueran permisos reales |
 | AUTH-F6 smoke QA rol-endpoint | P1 | ALTO | AUTH-F4/F5 | QA_A/QA_B/admin/vendedor/sin permisos validados por pantalla y endpoint |
+
+## Avance AUTH-F2
+
+Epic: aprobacion documental de catalogo RBAC minimo.
+
+Completado:
+
+- Crear `docs/AUTH_F2_RBAC_CATALOG_APPROVAL.md`.
+- Separar permisos confirmados, propuestos, postergados y dependencias.
+- Recomendar MVP documental: `CREATE_CUSTOMER`, `EDIT_CUSTOMER`, `VIEW_PAYMENTS`.
+- Marcar `VIEW_SALES` como recomendado condicionado.
+- Postergar permisos finos de items, batches, reservas y LIVE.
+
+Pendiente backlog:
+
+| Tarea | Prioridad | Riesgo | Dependencia | Criterio de aceptacion |
+|---|---|---|---|---|
+| Aprobar MVP RBAC con negocio | P0 | CRITICO | AUTH-F2 | Lista final de permisos sin ambiguedad |
+| AUTH-F2B crear migracion catalogo | P0 | ALTO | aprobacion MVP | Permisos insertados idempotentemente sin asignaciones peligrosas |
+| AUTH-F2C actualizar QA seeds | P0 | ALTO | migracion catalogo | Usuarios QA prueban permisos nuevos sin tocar productivo |
+| AUTH-F2D alinear frontend catalogo | P1 | ALTO | migracion + QA | UI muestra permisos reales y elimina huerfanas |
+| AUTH-F2E enforcement clientes/pagos lectura | P0 | CRITICO | catalogo + pruebas | Endpoints P0 responden 403 sin permiso |
+| AUTH-F2F pruebas negativas API | P0 | CRITICO | enforcement | Tests cubren permitido/no permitido por rol |

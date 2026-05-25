@@ -2722,3 +2722,30 @@ Decision:
 
 - `GO diagnostico`.
 - `NO-GO` para crear permisos o enforcement masivo hasta aprobar matriz AUTH-F.
+
+## 2026-05-24 - AUTH-F2 propuesta de catalogo RBAC minimo
+
+Tipo: aprobacion documental de catalogo RBAC, sin Java, frontend funcional, SQL, migraciones, roles reales, pagos, ventas ni reportes.
+
+Objetivo:
+
+- Convertir la matriz AUTH-F1 en una propuesta formal de permisos minimos candidatos.
+- Separar permisos a crear primero, permisos a postergar y dependencias RBAC validas/huerfanas.
+
+Cambios realizados:
+
+- `docs/AUTH_F2_RBAC_CATALOG_APPROVAL.md`: nuevo documento de propuesta de catalogo RBAC minimo.
+- `docs/AUTH_F_RBAC_PERMISSION_MATRIX.md`: referencia a AUTH-F2 como documento de aprobacion de catalogo.
+- `docs/ERP_RIESGOS_OPERATIVOS.md`: se documenta que AUTH-F2 no implementa permisos todavia.
+- `docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md`: se agrega backlog AUTH-F2.
+
+Decision recomendada:
+
+- MVP candidato: `CREATE_CUSTOMER`, `EDIT_CUSTOMER`, `VIEW_PAYMENTS`.
+- `VIEW_SALES` queda recomendado de forma condicionada por su relacion con pagos/ventas/reportes.
+- No incluir todavia permisos finos de items, batches, reservas o LIVE hasta cerrar pruebas y roles.
+
+Estado:
+
+- `GO documental condicionado`.
+- `NO-GO` para migraciones/enforcement hasta aprobacion de catalogo y plan AUTH-F2B/F2E.

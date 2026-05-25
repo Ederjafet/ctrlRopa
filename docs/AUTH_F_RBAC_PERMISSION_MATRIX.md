@@ -3,6 +3,8 @@
 Fecha: 2026-05-24  
 Rama: `feature/auth-f-rbac-permission-matrix`
 
+Nota AUTH-F2: la propuesta formal de catalogo minimo recomendado queda documentada en `docs/AUTH_F2_RBAC_CATALOG_APPROVAL.md`. Esta matriz AUTH-F1 se conserva como diagnostico base y no implica permisos nuevos creados.
+
 ## Objetivo
 
 Iniciar AUTH-F como fase de diagnostico y matriz RBAC. Esta fase no cambia permisos productivos, no agrega migraciones, no toca SQL y no modifica enforcement funcional. El resultado es una base formal para decidir subfases posteriores de RBAC avanzado.

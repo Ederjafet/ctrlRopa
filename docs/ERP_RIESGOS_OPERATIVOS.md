@@ -181,6 +181,7 @@ Probabilidad:
 - AUTH-A detecta dependencia huerfana `VIEW_PAYMENTS`; no usarla como enforcement ni prometer separacion de consulta/registro de pagos hasta definir permiso real en catalogo/backend.
 - AUTH-F inicia como matriz diagnostica; mientras no exista enforcement backend por endpoint, el frontend no debe considerarse barrera de seguridad suficiente.
 - AUTH-F confirma huecos P0 en permisos finos de clientes y pagos: no existe `CREATE_CUSTOMER` ni `VIEW_PAYMENTS`, por lo que no se debe prometer RBAC granular en esos flujos hasta una subfase posterior.
+- AUTH-F2 propone catalogo minimo pero no lo implementa; hasta crear migracion, seeds, frontend y enforcement, `CREATE_CUSTOMER`, `EDIT_CUSTOMER`, `VIEW_PAYMENTS` y `VIEW_SALES` siguen siendo decisiones pendientes, no permisos reales.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.
