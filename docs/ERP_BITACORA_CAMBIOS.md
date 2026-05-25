@@ -2694,3 +2694,31 @@ Decision:
 
 - `GO tecnico condicionado` para merge a `develop`.
 - Siguiente fase recomendada: `AUTH-F matriz permiso-endpoint y enforcement backend`.
+
+## 2026-05-24 - AUTH-F inicio matriz RBAC permiso-endpoint
+
+Tipo: diagnostico documental RBAC, sin SQL, migraciones, cambios productivos, pagos, ventas ni reportes.
+
+Objetivo:
+
+- Crear matriz formal de permisos existentes, pantallas frontend, endpoints backend y huecos de enforcement.
+- Confirmar permisos faltantes o ambiguos antes de proponer migraciones o enforcement backend.
+
+Cambios realizados:
+
+- `docs/AUTH_F_RBAC_PERMISSION_MATRIX.md`: nueva matriz AUTH-F con inventario de permisos, endpoints, pantallas, huecos y recomendaciones.
+- `docs/AUTH_FRONTEND_PERMISSION_GUARDS.md`: referencia a AUTH-F como fuente de matriz completa.
+- `docs/ERP_RIESGOS_OPERATIVOS.md`: se agrega riesgo operativo de RBAC fino pendiente.
+- `docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md`: se agrega backlog AUTH-F.
+
+Hallazgos:
+
+- `VIEW_PAYMENTS` no existe en catalogo revisado.
+- No existe permiso funcional especifico para alta de clientes (`CREATE_CUSTOMER` o equivalente).
+- `CREATE_ITEM` y `EDIT_ITEM` aparecen como dependencias preparatorias frontend, no como permisos persistidos confirmados.
+- Hay pantallas con guard frontend donde el backend aun debe confirmar enforcement funcional fino.
+
+Decision:
+
+- `GO diagnostico`.
+- `NO-GO` para crear permisos o enforcement masivo hasta aprobar matriz AUTH-F.

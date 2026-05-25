@@ -179,6 +179,8 @@ Probabilidad:
 - AUTH-A muestra dependencias sugeridas de permisos solo como advertencia frontend; si se requiere cumplimiento estricto, debe implementarse enforcement backend antes de operar roles productivos complejos.
 - AUTH-A confirma que no existe permiso funcional persistido para `CREATE_CUSTOMER`; el alta de clientes debe quedar como deuda de RBAC backend antes de declarar separacion fina lectura/creacion.
 - AUTH-A detecta dependencia huerfana `VIEW_PAYMENTS`; no usarla como enforcement ni prometer separacion de consulta/registro de pagos hasta definir permiso real en catalogo/backend.
+- AUTH-F inicia como matriz diagnostica; mientras no exista enforcement backend por endpoint, el frontend no debe considerarse barrera de seguridad suficiente.
+- AUTH-F confirma huecos P0 en permisos finos de clientes y pagos: no existe `CREATE_CUSTOMER` ni `VIEW_PAYMENTS`, por lo que no se debe prometer RBAC granular en esos flujos hasta una subfase posterior.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

@@ -3,6 +3,8 @@
 Fecha: 2026-05-22  
 Rama: `feature/auth-a-rbac-single-session`
 
+Nota AUTH-F: la matriz completa permiso-endpoint/pantalla queda documentada en `docs/AUTH_F_RBAC_PERMISSION_MATRIX.md`. Este documento conserva el alcance frontend de AUTH-A y sus advertencias no bloqueantes.
+
 ## Objetivo
 
 Alinear la navegacion frontend con permisos reales devueltos por login y `/api/me`, sin reemplazar la seguridad backend.
@@ -116,6 +118,7 @@ Regla actual:
 
 ## Pendiente
 
+- Usar `docs/AUTH_F_RBAC_PERMISSION_MATRIX.md` como fuente para la siguiente aprobacion de catalogo RBAC.
 - Completar guards en todos los modulos no P0: pagos, ventas, reportes, consignaciones, devoluciones, envios e incidencias.
 - Normalizar nombres de permisos para cubrir lectura/alta/edicion por modulo.
 - Confirmar matriz completa de dependencias RBAC y mover enforcement a backend si el negocio la aprueba.

@@ -378,3 +378,27 @@ Pendiente backlog:
 | Completar guards de rutas no P0 | P1 | ALTO | matriz permisos | Pagos/ventas/reportes/modulos secundarios bloquean acceso directo |
 | Permisos backend en lecturas/altas por modulo | P0/P1 | CRITICO | matriz endpoints | Ningun endpoint sensible depende solo del frontend |
 | Motivo de revocacion persistente | P2 | MEDIO | migracion futura | `user_api_sessions` registra motivo auditado |
+
+## Avance AUTH-F
+
+Epic: matriz RBAC permiso-endpoint y diagnostico de enforcement.
+
+Completado:
+
+- Crear `docs/AUTH_F_RBAC_PERMISSION_MATRIX.md`.
+- Inventariar permisos existentes por modulo.
+- Mapear endpoints backend contra permiso actual/esperado.
+- Mapear pantallas frontend contra permiso UI.
+- Documentar huecos de enforcement y permisos faltantes.
+- Confirmar deuda `VIEW_PAYMENTS` y `CREATE_CUSTOMER`.
+
+Pendiente backlog:
+
+| Tarea | Prioridad | Riesgo | Dependencia | Criterio de aceptacion |
+|---|---|---|---|---|
+| AUTH-F1 aprobar catalogo RBAC final | P0 | CRITICO | matriz AUTH-F | Negocio aprueba nombres y alcance de permisos faltantes |
+| AUTH-F2 migracion de permisos aprobados | P0 | ALTO | AUTH-F1 | Flyway agrega permisos sin asignacion insegura |
+| AUTH-F3 enforcement backend P0 | P0 | CRITICO | AUTH-F1/F2 | Clientes, pagos consulta, inventario y LIVE bloquean por permiso funcional |
+| AUTH-F4 pruebas backend RBAC | P0 | CRITICO | AUTH-F3 | 401/403 cubiertos por permiso, tenant y sesion |
+| AUTH-F5 alinear frontend | P1 | ALTO | AUTH-F3 | UI deja de usar dependencias inexistentes como si fueran permisos reales |
+| AUTH-F6 smoke QA rol-endpoint | P1 | ALTO | AUTH-F4/F5 | QA_A/QA_B/admin/vendedor/sin permisos validados por pantalla y endpoint |
