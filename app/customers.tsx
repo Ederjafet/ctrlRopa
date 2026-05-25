@@ -11,6 +11,8 @@ import {
     getCustomersByBranch,
 } from '@/services/customerService';
 
+import { ApiError } from '@/services/apiClient';
+import { canAccessByPermission } from '@/services/accessControl';
 import { getSession } from '@/services/sessionStorage';
 
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -43,11 +45,20 @@ export default function CustomersScreen() {
     const session = await getSession();
     if (!session) return;
 
+    if (!canAccessByPermission(session, 'VIEW_CUSTOMERS')) {
+      router.replace('/access-denied' as any);
+      return;
+    }
+
     try {
       setIsLoading(true);
       const data = await getCustomersByBranch(session.branchId);
       setCustomers(data);
       setFiltered(data);
+    } catch (err: any) {
+      if (!(err instanceof ApiError && err.suppressUserNotification)) {
+        throw err;
+      }
     } finally {
       setIsLoading(false);
     }

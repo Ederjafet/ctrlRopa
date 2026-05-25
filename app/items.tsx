@@ -6,6 +6,8 @@ import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 
+import { ApiError } from '@/services/apiClient';
+import { hasAnyPermission } from '@/services/accessControl';
 import { getItemStatusLabel } from '@/services/itemLabels';
 import { getItemsByBranch, Item, ItemStatus } from '@/services/itemService';
 import { getSession } from '@/services/sessionStorage';
@@ -55,6 +57,11 @@ export default function ItemsScreen() {
     const session = await getSession();
     if (!session) return;
 
+    if (!hasAnyPermission(session, ['VIEW_INVENTORY', 'MANAGE_INVENTORY'])) {
+      router.replace('/access-denied' as any);
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError('');
@@ -62,6 +69,9 @@ export default function ItemsScreen() {
       setItems(data);
       setFiltered(data);
     } catch (err: any) {
+      if (err instanceof ApiError && err.suppressUserNotification) {
+        return;
+      }
       const message = err?.message || 'No se pudo cargar el inventario.';
       setError(message);
       Alert.alert('Inventario', message);

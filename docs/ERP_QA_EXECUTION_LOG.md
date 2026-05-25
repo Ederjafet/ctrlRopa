@@ -37,6 +37,10 @@ Fase: 1D - datos QA y evidencia
 | 2026-05-20 | LIVE-W | QA UX/frontend | Codex QA/Frontend | Captura guiada cliente/prenda, jerarquia de acciones, i18n ES/EN, lint, TypeScript, export web y diff check | GO tecnico | Smoke visual mobile/tablet/desktop pendiente | GO UX condicionado |
 | 2026-05-21 | LIVE-W adicional | QA UX/frontend | Codex QA/Frontend | Rebalanceo compacto con widgets ocultos, acciones terciarias discretas, layout desktop/tablet/mobile adaptable; lint, TypeScript, export web, diff check y busqueda mojibake | GO tecnico | Smoke visual real con widgets ocultos pendiente | GO UX condicionado |
 | 2026-05-21 | LIVE-X | QA permisos/frontend | Codex QA/Security | Revision permisos LIVE, guards frontend, matriz rol presentadora-operador-supervisor y documentacion de riesgos backend | GO tecnico frontend | Validacion runtime con usuarios QA_A/QA_B/sinpermisos pendiente; hardening backend AUTH-A pendiente | GO condicionado |
+| 2026-05-22 | AUTH-A | QA backend/frontend | Codex QA/Security | RBAC login, bloqueo `NO_ACCESS`, sesion unica, company en login/me, guards directos Clientes/Inventario/Lotes y Maven test | GO tecnico parcial | Smoke runtime con usuarios QA y doble dispositivo pendiente | GO condicionado |
+| 2026-05-23 | AUTH-A ajuste | QA frontend/auth | Codex QA/Frontend | Manejo frontend de `401` por token revocado: limpiar sesion, volver a login y mostrar aviso | PENDIENTE VALIDACION | Smoke multi-dispositivo pendiente | GO condicionado |
+| 2026-05-23 | AUTH-A backend | QA backend/auth | Codex QA/Backend | Endurecimiento de `ApiTokenFilter`, `CurrentUser` y `TenantResolver` para rechazar token revocado/no ultima sesion activa | GO tecnico | Smoke multi-dispositivo runtime pendiente | GO condicionado |
+| 2026-05-23 | AUTH-A UX | QA frontend/auth | Codex QA/Frontend | Ajuste de mensaje al cerrar sesion por otro equipo y supresion de `NetworkError` secundario en P0 | PENDIENTE VALIDACION | Repetir smoke equipo viejo `/items` | GO condicionado |
 
 ## Reglas de registro
 

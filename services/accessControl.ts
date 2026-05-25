@@ -12,6 +12,10 @@ export function hasAnyRole(user: UserSession | null, codes: string[]): boolean {
   return codes.some((code) => hasRole(user, code));
 }
 
+export function isNoAccess(user: UserSession | null): boolean {
+  return hasRole(user, 'NO_ACCESS') || (user?.effectivePermissions?.length ?? 0) === 0;
+}
+
 export function getRoleCodes(user: UserSession | null): string[] {
   return user?.roles?.map((role) => role.code) ?? [];
 }
@@ -36,6 +40,17 @@ export function hasPermission(
       (permission) => permission.code === code
     ) === true
   );
+}
+
+export function can(user: UserSession | null, permissionCode: string): boolean {
+  return hasPermission(user, permissionCode);
+}
+
+export function hasAnyPermission(
+  user: UserSession | null,
+  permissionCodes: string[]
+): boolean {
+  return permissionCodes.some((permissionCode) => hasPermission(user, permissionCode));
 }
 
 export function canAccess(

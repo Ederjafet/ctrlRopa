@@ -30,7 +30,22 @@ function isActive(user: AdminUser) {
 function roleSummary(user: AdminUser) {
   const roles = user.roles ?? [];
   if (roles.length === 0) return 'Sin roles';
-  return roles.map((role) => role.code || role.name).join(', ');
+  return roles
+    .map((role) => {
+      const name = role.name || role.code;
+      return role.code ? `${name} (${role.code.toLowerCase()})` : name;
+    })
+    .join(', ');
+}
+
+function inheritedPermissionCount(user: AdminUser) {
+  const directKeys = new Set(
+    (user.directPermissions ?? []).map((permission) => permission.code || String(permission.id))
+  );
+
+  return (user.effectivePermissions ?? []).filter(
+    (permission) => !directKeys.has(permission.code || String(permission.id))
+  ).length;
 }
 
 export default function UsersScreen() {
@@ -162,6 +177,7 @@ export default function UsersScreen() {
           const active = isActive(item);
           const directPermissions = item.directPermissions ?? [];
           const effectivePermissions = item.effectivePermissions ?? [];
+          const inheritedPermissions = inheritedPermissionCount(item);
 
           return (
             <AppCard>
@@ -200,7 +216,13 @@ export default function UsersScreen() {
               {item.phone ? <AppText style={styles.meta}>Teléfono: {item.phone}</AppText> : null}
 
               <AppText variant="caption" color={theme.colors.mutedText} style={styles.meta}>
-                Permisos directos: {directPermissions.length} · Permisos efectivos: {effectivePermissions.length}
+                Permisos directos del usuario: {directPermissions.length}
+              </AppText>
+              <AppText variant="caption" color={theme.colors.mutedText} style={styles.metaCompact}>
+                Permisos heredados por roles: {inheritedPermissions}
+              </AppText>
+              <AppText variant="caption" color={theme.colors.mutedText} style={styles.metaCompact}>
+                Permisos efectivos totales: {effectivePermissions.length}
               </AppText>
 
               <View style={styles.actions}>
@@ -264,6 +286,9 @@ const styles = StyleSheet.create({
   },
   meta: {
     marginTop: 6,
+  },
+  metaCompact: {
+    marginTop: 2,
   },
   actions: {
     flexDirection: 'row',

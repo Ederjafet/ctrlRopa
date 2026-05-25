@@ -64,12 +64,14 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 - LIVE-W: se reorganiza la captura En vivo como flujo guiado, priorizando cliente existente, codigo/QR de prenda, busqueda secundaria y altas rapidas terciarias.
 - LIVE-W adicional: se agrega colapso real de layout cuando widgets estan ocultos, la consola del operador gana prioridad visual y las altas rapidas se vuelven acciones discretas para reducir ruido operacional.
 - LIVE-X: se agregan helpers frontend de permisos LIVE para diferenciar presentadora, operador y supervisor; Sistema y Usuarios reciben guard de navegacion directa. Queda pendiente AUTH-A para cerrar permisos backend en lecturas/altas de customers/items/live listados.
+- AUTH-A: login backend ahora bloquea `NO_ACCESS`, usuarios sin permisos efectivos y usuarios sin company/branch activa asignada; se revocan sesiones activas previas del mismo usuario y login/me devuelven company activa. Frontend agrega helpers generales y guards directos para Clientes, Inventario y Lotes. No se creo migracion Flyway porque `user_api_sessions` ya contiene columnas requeridas.
+- AUTH-A ajuste: el frontend ahora reacciona ante `401` de token revocado, limpia sesion local, redirige a `/login` y muestra aviso de sesion cerrada por login en otro equipo.
 
 ## Madurez ERP estimada
 
 | Area | Madurez |
 |---|---:|
-| Usuarios y permisos | 72% |
+| Usuarios y permisos | 78% |
 | Clientes | 68% |
 | Proveedores | 45% |
 | Inventario | 70% |
@@ -81,13 +83,13 @@ La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de
 | Reportes | 50% |
 | Dashboard | 55% |
 | Auditoria | 38% |
-| Seguridad | 65% |
-| Multi-compania / SaaS readiness | 66% |
+| Seguridad | 70% |
+| Multi-compania / SaaS readiness | 68% |
 | QA | 78% |
 | UX homogenea | 52% |
 | Trazabilidad | 50% |
 | Gobernanza ERP | 76% |
-| ERP readiness general | 73% |
+| ERP readiness general | 74% |
 
 ## Prioridad inmediata
 

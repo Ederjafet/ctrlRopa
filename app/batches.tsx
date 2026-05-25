@@ -11,6 +11,8 @@ import {
   getBatchesByBranch,
   getBatchStatusLabel,
 } from '@/services/batchService';
+import { ApiError } from '@/services/apiClient';
+import { hasAnyPermission } from '@/services/accessControl';
 import { getSession } from '@/services/sessionStorage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
@@ -51,6 +53,11 @@ export default function BatchesScreen() {
     const session = await getSession();
     if (!session) return;
 
+    if (!hasAnyPermission(session, ['VIEW_INVENTORY', 'MANAGE_INVENTORY'])) {
+      router.replace('/access-denied' as any);
+      return;
+    }
+
     setCanManageInventory(
       session.effectivePermissions?.some(
         (permission) => permission.code === 'MANAGE_INVENTORY'
@@ -64,6 +71,9 @@ export default function BatchesScreen() {
       const data = await getBatchesByBranch(session.branchId);
       setBatches(data);
     } catch (err: any) {
+      if (err instanceof ApiError && err.suppressUserNotification) {
+        return;
+      }
       setError(err?.message || 'No se pudieron cargar los lotes.');
     } finally {
       setLoading(false);

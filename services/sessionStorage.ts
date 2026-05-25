@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const USER_KEY = 'user_session';
+const AUTH_NOTICE_KEY = 'auth_notice';
 
 export type Channel = {
   id: number;
@@ -28,6 +29,9 @@ export type UserSession = {
   email: string;
   sessionToken?: string;
   passwordChangeRequired?: boolean;
+  companyId?: number;
+  companyCode?: string;
+  companyName?: string;
   branchId: number;
   branchName: string;
   channels: Channel[];
@@ -53,7 +57,32 @@ export async function getSession(): Promise<UserSession | null> {
 }
 
 export async function clearSession() {
-  await AsyncStorage.removeItem(USER_KEY);
+  const keys = await AsyncStorage.getAllKeys();
+  const sessionKeys = keys.filter((key) =>
+    [
+      USER_KEY,
+      'session',
+      'auth_session',
+      'auth_token',
+      'token',
+      'user',
+      'current_user',
+    ].includes(key) || key.startsWith('selected_live_')
+  );
+
+  if (sessionKeys.length > 0) {
+    await AsyncStorage.multiRemove(sessionKeys);
+  }
+}
+
+export async function saveAuthNotice(message: string) {
+  await AsyncStorage.setItem(AUTH_NOTICE_KEY, message);
+}
+
+export async function consumeAuthNotice(): Promise<string> {
+  const message = await AsyncStorage.getItem(AUTH_NOTICE_KEY);
+  await AsyncStorage.removeItem(AUTH_NOTICE_KEY);
+  return message ?? '';
 }
 
 export async function touchSession() {

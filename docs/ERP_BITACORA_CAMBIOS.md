@@ -2383,3 +2383,314 @@ Validaciones:
 - `git diff --check`: OK; solo avisos LF/CRLF normales.
 - `rg -n "Ã|Â|�" app components services locales docs`: solo coincidencias historicas documentales previas; no se detectan coincidencias nuevas en `app`, `components`, `services` ni `locales`.
 - Maven no se ejecuto porque no se modifico Java/backend.
+
+## 2026-05-22 - AUTH-A / RBAC login y sesion unica
+
+Tipo: hardening backend/frontend de autorizacion y sesiones, sin pagos, ventas, reportes, SQL destructivo ni migraciones Flyway.
+
+Objetivo:
+
+- Bloquear login de usuarios sin permisos efectivos o con rol `NO_ACCESS`.
+- Exigir company/branch activa y asignacion `user_branches` antes de crear sesion.
+- Revocar sesiones activas anteriores del mismo usuario al iniciar sesion.
+- Exponer company activa en login y `/api/me`.
+- Agregar helpers frontend de permisos y guards directos en pantallas P0.
+
+Cambios realizados:
+
+- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/auth/AuthService.java`: valida roles/permisos/company/branch antes de crear sesion y revoca sesiones previas.
+- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/auth/LoginResponse.java`: agrega `company`.
+- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/config/ApiTokenFilter.java`: diferencia token revocado por sesion iniciada en otro dispositivo.
+- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/security/me/MeService.java`: devuelve tenant activo.
+- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/security/me/MeResponse.java`: agrega `company`.
+- `services/sessionStorage.ts` y `services/authService.ts`: almacenan company activa.
+- `services/accessControl.ts`: agrega `can`, `hasAnyPermission` e `isNoAccess`.
+- `app/customers.tsx`, `app/items.tsx`, `app/batches.tsx`: bloquean navegacion directa si faltan permisos.
+- `docs/AUTH_RBAC_LOGIN_GUARDS.md`, `docs/AUTH_SINGLE_ACTIVE_SESSION.md`, `docs/AUTH_FRONTEND_PERMISSION_GUARDS.md`, `docs/AUTH_QA_VALIDATION_PLAN.md`: documentacion AUTH-A.
+
+Validaciones:
+
+- `.\mvnw.cmd test`: OK, 28 pruebas, Flyway valida 43 migraciones.
+- `npm.cmd run lint`: OK sin errores; persisten 59 warnings historicos.
+- `npx.cmd tsc --noEmit`: OK.
+- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
+- `git diff --check`: OK; solo avisos LF/CRLF normales.
+- `rg -n "NO_ACCESS|revoked_at|user_api_sessions|permissions" backend/control-ropa/src app services components docs`: OK, confirma trazas esperadas.
+- `rg -n "Ã|Â|�" app components services locales docs`: solo coincidencias historicas documentales previas.
+
+Decision:
+
+- `GO tecnico`.
+- `GO release condicionado` hasta completar smoke runtime con usuarios QA y confirmar revocacion multi-dispositivo.
+
+## 2026-05-23 - AUTH-A ajuste / cierre frontend por sesion revocada
+
+Tipo: hardening frontend de autenticacion, sin backend, SQL, migraciones, pagos, ventas ni reportes.
+
+Objetivo:
+
+- Evitar que un equipo siga navegando cuando su token ya fue revocado por login del mismo usuario en otro equipo.
+- Mostrar mensaje claro en `/login`.
+
+Cambios realizados:
+
+- `services/apiClient.ts`: todo request protegido con `401` limpia sesion, guarda aviso y redirige a `/login`.
+- `services/sessionStorage.ts`: agrega aviso temporal de autenticacion.
+- `app/login.tsx`: consume el aviso y muestra `Tu sesión se cerró porque iniciaste sesión en otro equipo.`.
+- `docs/AUTH_SINGLE_ACTIVE_SESSION.md` y `docs/AUTH_FRONTEND_PERMISSION_GUARDS.md`: documentan comportamiento esperado.
+
+Validaciones:
+
+- `npm.cmd run lint`: OK sin errores; persisten 59 warnings historicos.
+- `npx.cmd tsc --noEmit`: OK.
+- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
+- `git diff --check`: OK; solo avisos LF/CRLF normales.
+
+Decision:
+
+- `GO tecnico`.
+- `GO runtime condicionado` a smoke multi-dispositivo real.
+
+## 2026-05-23 - AUTH-A ajuste / sincronizacion session branch
+
+Tipo: hardening frontend de sesion tenant-aware, sin backend, SQL, migraciones, pagos, ventas ni reportes.
+
+Objetivo:
+
+- Evitar que una sesion local vieja siga usando branch anterior, por ejemplo `/api/items/branch/4`, cuando `/api/me` ya resuelve branch activa 6.
+- Evitar que `NetworkError` quede como estado final en pantallas protegidas.
+
+Cambios realizados:
+
+- `services/sessionStorage.ts`: `clearSession` elimina `user_session`, posibles keys legacy y seleccion local `selected_live_*`.
+- `services/apiClient.ts`: valida `/api/me` antes de requests protegidos, sincroniza company/branch/permisos y reescribe rutas `/branch/{old}` a `/branch/{active}`.
+- `services/apiClient.ts`: si `/api/me` no se puede validar por red en request protegido, limpia sesion y redirige a `/login` con aviso.
+- `docs/AUTH_SINGLE_ACTIVE_SESSION.md`: documenta sincronizacion y manejo de branch vieja.
+
+Validaciones:
+
+- `npm.cmd run lint`: OK sin errores; persisten 59 warnings historicos.
+- `npx.cmd tsc --noEmit`: OK.
+- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
+- `git diff --check`: OK; solo avisos LF/CRLF normales.
+
+Decision:
+
+- `GO tecnico`.
+- `GO runtime condicionado` a smoke multi-dispositivo.
+
+## 2026-05-23 - AUTH-A ajuste backend / rechazo runtime de token revocado
+
+Tipo: hardening backend de sesion API, sin pagos, ventas, reportes, SQL destructivo ni migraciones.
+
+Objetivo:
+
+- Corregir escenario donde SQL mostraba una sola sesion activa pero el token anterior seguia recibiendo `200` en runtime.
+- Forzar `401` real para token revocado o no correspondiente a la ultima sesion activa del usuario.
+
+Cambios realizados:
+
+- `ApiTokenFilter`: reemplaza validacion por conteo con validacion explicita de fila `user_api_sessions`.
+- `ApiTokenFilter`: valida `revoked_at`, `expires_at`, `absolute_expires_at`, usuario activo, company/branch activa y ultima sesion activa.
+- `ApiTokenFilter`: agrega logs temporales con `sessionId`, `userId`, hash parcial, timestamps de sesion y resultado.
+- `ApiTokenFilter.refreshSession`: solo refresca sesiones no revocadas y no expiradas.
+- `CurrentUser`: exige que el token pertenezca a la ultima sesion activa.
+- `TenantResolver`: exige que el token pertenezca a la ultima sesion activa.
+- `AuthService.revokeActiveSessionsForUser`: revoca cualquier sesion no revocada del usuario antes de crear una nueva, aunque ya estuviera expirada.
+
+Validaciones:
+
+- `.\mvnw.cmd test`: OK, 28 pruebas, Flyway valida 43 migraciones.
+
+Decision:
+
+- `GO backend tecnico`.
+- `GO runtime condicionado` a repetir smoke multi-dispositivo y confirmar que equipo 1 recibe `401` en `/api/me`.
+
+## 2026-05-23 - AUTH-A ajuste UX / mensaje de sesion cerrada
+
+Tipo: refinamiento frontend de UX de autenticacion, sin backend, SQL, migraciones, pagos, ventas ni reportes.
+
+Objetivo:
+
+- Evitar que el equipo viejo muestre `NetworkError` cuando la validacion de sesion ya esta redirigiendo a `/login`.
+- Priorizar el mensaje `Tu sesión se cerró porque iniciaste sesión en otro equipo.`.
+
+Cambios realizados:
+
+- `services/apiClient.ts`: agrega `SessionRedirectError` y marca errores de redireccion de sesion con `suppressUserNotification`.
+- `services/apiClient.ts`: si falla la validacion protegida de `/api/me`, limpia sesion y redirige con mensaje de sesion cerrada por otro equipo.
+- `app/items.tsx`, `app/customers.tsx`, `app/batches.tsx`: ignoran errores suprimibles de redireccion de sesion para no mostrar toast/alert secundario.
+
+Validaciones:
+
+- `npm.cmd run lint`: OK sin errores; persisten 59 warnings historicos.
+- `npx.cmd tsc --noEmit`: OK.
+- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
+- `git diff --check`: OK; solo avisos LF/CRLF normales.
+
+Decision:
+
+- `GO tecnico`.
+- `GO runtime condicionado` a repetir smoke multi-dispositivo.
+
+## 2026-05-23 - AUTH-A ajuste UX / permisos y dependencias sugeridas
+
+Tipo: refinamiento frontend/documental de permisos, sin backend, SQL, migraciones, pagos, ventas ni reportes.
+
+Objetivo:
+
+- Mostrar permisos con descripcion humana como texto principal y codigo tecnico como referencia secundaria.
+- Agregar advertencias no bloqueantes para dependencias sugeridas de permisos.
+
+Cambios realizados:
+
+- `app/users-form.tsx`: selector de permisos directos adicionales muestra descripcion primero, codigo en minusculas y estado `Agregar`/`Incluido`.
+- `app/system-roles.tsx`: selector de permisos del rol usa la misma jerarquia visual.
+- `services/permissionDependencies.ts`: matriz local de dependencias sugeridas, solo para advertencia visual.
+- `docs/AUTH_FRONTEND_PERMISSION_GUARDS.md`: documenta que las dependencias son frontend/documentales y no enforcement backend.
+
+Riesgos:
+
+- Las dependencias aun no bloquean guardado ni se validan en backend.
+- La matriz debe confirmarse con negocio antes de convertirla en regla fuerte.
+
+Decision:
+
+- `GO UX tecnico`.
+- `GO seguridad condicionado` a implementar enforcement backend en una fase posterior si se aprueba la matriz RBAC.
+
+## 2026-05-23 - AUTH-A ajuste UX / roles homologados y revision crear clientes
+
+Tipo: refinamiento frontend/documental de seguridad, sin backend, SQL, migraciones, pagos, ventas ni reportes.
+
+Objetivo:
+
+- Homologar la jerarquia visual de roles y permisos.
+- Revisar si existe permiso funcional especifico para crear clientes.
+
+Cambios realizados:
+
+- `app/users-form.tsx`: selector de roles muestra nombre humano, codigo tecnico en minusculas y estado `Agregar`/`Seleccionado`.
+- `app/users.tsx`: resumen de roles muestra nombre humano con codigo tecnico secundario.
+- `app/system-roles.tsx`: tarjetas de roles muestran nombre humano, codigo tecnico secundario y permisos incluidos.
+- `docs/AUTH_FRONTEND_PERMISSION_GUARDS.md`: documenta el hallazgo sobre alta de clientes.
+- `docs/AUTH_RBAC_LOGIN_GUARDS.md`: registra que AUTH-A no agrega permisos nuevos.
+
+Hallazgo crear clientes:
+
+- No se encontro permiso persistido `CREATE_CUSTOMER`, `CREATE_CUSTOMERS`, `ADD_CUSTOMER` ni `MANAGE_CUSTOMERS` en migraciones/datasets revisados.
+- `PermissionCode.java` no define permiso especifico de alta de clientes.
+- `CustomerController.create` y `CustomerService.create` validan tenant/company/branch y datos, pero no ejecutan `accessService.assertCan(...)` para un permiso funcional de creacion.
+- Frontend `customers.tsx` protege la pantalla con `VIEW_CUSTOMERS`; `customers-create.tsx` no tiene guard especifico de creacion.
+
+Riesgo:
+
+- No declarar RBAC fino de clientes completo hasta definir permiso funcional de alta/edicion y enforcement backend.
+
+Decision:
+
+- `GO UX tecnico`.
+- `NO-GO` para declarar separacion lectura/creacion de clientes hasta fase posterior de hardening RBAC backend.
+
+## 2026-05-23 - AUTH-A ajuste UX / filtros, grupos y dependencias RBAC
+
+Tipo: refinamiento frontend/documental de administracion RBAC, sin backend, SQL, migraciones, pagos, ventas ni reportes.
+
+Objetivo:
+
+- Homologar listados de roles/permisos con nombre humano, codigo tecnico y estado.
+- Agregar filtro a permisos directos adicionales del usuario.
+- Ordenar permisos por grupo inferido y descripcion humana.
+- Ampliar advertencias no bloqueantes de dependencias sugeridas.
+
+Cambios realizados:
+
+- `services/permissionDependencies.ts`: agrega agrupacion visual, filtro por grupo/codigo/nombre, orden por modulo y dependencias con descripcion humana.
+- `app/users-form.tsx`: permisos directos adicionales ahora tienen buscador y grupos visuales.
+- `app/system-roles.tsx`: permisos existentes en rol se agrupan y ordenan igual que los permisos directos.
+- `docs/AUTH_FRONTEND_PERMISSION_GUARDS.md`: agrega hallazgos del catalogo RBAC, permisos faltantes probables y pendientes backend.
+
+Dependencias agregadas como advertencia:
+
+- `REASSIGN_CUSTOMERS` -> `VIEW_CUSTOMERS`.
+- `APPLY_CUSTOMER_BALANCE` -> `VIEW_CUSTOMERS`.
+- `CREATE_CLOSE_CUSTOMER_PACKAGE` -> `VIEW_CUSTOMERS`.
+- `VIEW_CUSTOMER_ORDERS` -> `VIEW_CUSTOMERS`.
+- `REGISTER_PAYMENTS` -> `VIEW_PAYMENTS`.
+- `VOID_PAYMENT` -> `VIEW_PAYMENTS`.
+- `MANAGE_INVENTORY` -> `VIEW_INVENTORY`.
+- `CREATE_ITEM` -> `VIEW_INVENTORY`.
+- `EDIT_ITEM` -> `VIEW_INVENTORY`.
+- `VIEW_REPORT_*` -> `VIEW_REPORTS`.
+
+Decision:
+
+- `GO UX tecnico`.
+- `NO-GO` para enforcement RBAC fino hasta AUTH-F/backend.
+
+## 2026-05-23 - AUTH-A ajuste UX / estados y dependencias visibles
+
+Tipo: refinamiento frontend/documental RBAC, sin backend, SQL, migraciones, pagos, ventas ni reportes.
+
+Objetivo:
+
+- Homologar visualmente los estados `Agregar`, `Incluido` y `Seleccionado`.
+- Mostrar dependencias sugeridas con lenguaje humano cuando existan en catalogo.
+- Distinguir dependencias huerfanas que todavia no existen como permisos reales.
+
+Cambios realizados:
+
+- `app/system-roles.tsx`: el estado `Incluido`/`Agregar` queda dentro del mismo bloque visual del permiso, igual que permisos directos.
+- `app/users-form.tsx`: mantiene la misma estructura visual en permisos directos y roles asignables.
+- `services/permissionDependencies.ts`: ahora valida si la dependencia existe en el catalogo visible antes de construir el mensaje.
+- `docs/AUTH_FRONTEND_PERMISSION_GUARDS.md`: documenta dependencias validas y huerfanas.
+
+Hallazgos:
+
+- `VIEW_PAYMENTS` no se encontro en `PermissionCode.java` ni en migraciones revisadas.
+- `VIEW_DEPOSIT_REPORTS` existe, pero no reemplaza a `VIEW_PAYMENTS`.
+- Dependencias validas actualmente: `VIEW_CUSTOMERS`, `VIEW_INVENTORY`, `VIEW_REPORTS`.
+- Dependencia huerfana actual: `VIEW_PAYMENTS`.
+
+Decision:
+
+- `GO UX tecnico`.
+- `NO-GO` para tratar `VIEW_PAYMENTS` como permiso accionable hasta definirlo formalmente.
+
+## 2026-05-23 - AUTH-A cierre controlado
+
+Tipo: cierre tecnico/documental de AUTH-A, sin SQL, migraciones, pagos, ventas ni reportes.
+
+Objetivo:
+
+- Congelar AUTH-A como fase de login seguro, sesion unica, tenant/session en frontend y guards basicos.
+- Evitar seguir ampliando AUTH-A hacia RBAC avanzado.
+- Dejar permisos finos, matriz permiso-endpoint y enforcement backend para AUTH-F/RBAC avanzado.
+
+Estado:
+
+- Login seguro validado.
+- Usuarios `NO_ACCESS` y usuarios con 0 permisos efectivos bloqueados.
+- Sesion unica por usuario implementada.
+- Tokens viejos revocados rechazados por backend.
+- Frontend limpia sesion y vuelve a `/login` con mensaje claro.
+- Company/branch activa se propaga en login y `/api/me`.
+- Guards frontend basicos implementados en pantallas P0.
+- Dependencias de permisos quedan como advertencias frontend/documentales.
+
+Deuda aceptada:
+
+- No existe `VIEW_PAYMENTS` en catalogo actual.
+- No existe permiso funcional especifico de alta de clientes.
+- No declarar RBAC fino completo.
+- Enforcement backend por endpoint queda pendiente para AUTH-F.
+
+Cambio menor de cierre:
+
+- `ApiTokenFilter`: logs temporales de validacion de sesion bajan de `INFO` a `DEBUG` para reducir ruido operativo sin perder trazabilidad tecnica.
+
+Decision:
+
+- `GO tecnico condicionado` para merge a `develop`.
+- Siguiente fase recomendada: `AUTH-F matriz permiso-endpoint y enforcement backend`.

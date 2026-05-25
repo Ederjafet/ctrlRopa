@@ -8,6 +8,12 @@ type LoginResponse = {
   sessionToken?: string;
   passwordChangeRequired?: boolean;
 
+  company?: {
+    id: number;
+    code: string;
+    name: string;
+  };
+
   branch: {
     id: number;
     code: string;
@@ -50,6 +56,9 @@ function toSession(data: LoginResponse | MeResponse): UserSession {
     email: data.email,
     sessionToken: data.sessionToken,
     passwordChangeRequired: data.passwordChangeRequired,
+    companyId: data.company?.id,
+    companyCode: data.company?.code,
+    companyName: data.company?.name,
     branchId: data.branch.id,
     branchName: data.branch.name,
     channels: data.channels ?? [],

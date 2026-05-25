@@ -353,3 +353,28 @@ Pendiente backlog:
 | LIVE-F diseno tecnico final Facebook | P1 | ALTO | permisos Meta validados | Adapter especificado con seguridad y rate limit |
 | LIVE-G integracion Facebook runtime | P2 | CRITICO | LIVE-E/F + QA tenant | Tokens por company, sin datos cross-company |
 | LIVE-H dashboard analytics | P2 | ALTO | metricas internas/externas | Viewers, engagement y resumen post-live por company |
+
+## Avance AUTH-A
+
+Epic: autorizacion efectiva y sesiones tenant-aware seguras.
+
+Completado:
+
+- Bloquear login con rol `NO_ACCESS`.
+- Bloquear login con cero permisos efectivos.
+- Bloquear login sin company activa en `user_companies`.
+- Bloquear login sin branch activa/asignada en `user_branches`.
+- Revocar sesiones activas anteriores del mismo usuario antes de crear una nueva.
+- Devolver company activa en login y `/api/me`.
+- Agregar helpers frontend `can`, `hasAnyPermission`, `isNoAccess`.
+- Agregar guards directos en `Clientes`, `Inventario` y `Lotes`.
+
+Pendiente backlog:
+
+| Tarea | Prioridad | Riesgo | Dependencia | Criterio de aceptacion |
+|---|---|---|---|---|
+| Smoke runtime `qa.sinpermisos` | P0 | CRITICO | dataset QA actualizado | Login rechazado sin crear sesion |
+| Smoke doble dispositivo | P0 | ALTO | backend desplegado | Token anterior queda revocado y responde mensaje claro |
+| Completar guards de rutas no P0 | P1 | ALTO | matriz permisos | Pagos/ventas/reportes/modulos secundarios bloquean acceso directo |
+| Permisos backend en lecturas/altas por modulo | P0/P1 | CRITICO | matriz endpoints | Ningun endpoint sensible depende solo del frontend |
+| Motivo de revocacion persistente | P2 | MEDIO | migracion futura | `user_api_sessions` registra motivo auditado |

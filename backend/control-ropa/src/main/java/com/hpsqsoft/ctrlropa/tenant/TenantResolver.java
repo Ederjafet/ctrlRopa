@@ -100,6 +100,14 @@ public class TenantResolver {
                   AND s.revoked_at IS NULL
                   AND s.expires_at > CURRENT_TIMESTAMP
                   AND (s.absolute_expires_at IS NULL OR s.absolute_expires_at > CURRENT_TIMESTAMP)
+                  AND s.id = (
+                    SELECT MAX(active_s.id)
+                    FROM user_api_sessions active_s
+                    WHERE active_s.user_id = s.user_id
+                      AND active_s.revoked_at IS NULL
+                      AND active_s.expires_at > CURRENT_TIMESTAMP
+                      AND (active_s.absolute_expires_at IS NULL OR active_s.absolute_expires_at > CURRENT_TIMESTAMP)
+                  )
                   AND u.status = 'ACTIVE'
                   AND b.status = 'ACTIVE'
                   AND b.company_id = c.id

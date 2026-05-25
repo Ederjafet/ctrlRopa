@@ -1,6 +1,8 @@
 package com.hpsqsoft.ctrlropa.security.me;
 
 import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
+import com.hpsqsoft.ctrlropa.tenant.CurrentTenantContext;
+import com.hpsqsoft.ctrlropa.tenant.TenantResolver;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -14,10 +16,12 @@ public class MeService {
 
     private final JdbcTemplate jdbcTemplate;
     private final CurrentUser currentUser;
+    private final TenantResolver tenantResolver;
 
-    public MeService(JdbcTemplate jdbcTemplate, CurrentUser currentUser) {
+    public MeService(JdbcTemplate jdbcTemplate, CurrentUser currentUser, TenantResolver tenantResolver) {
         this.jdbcTemplate = jdbcTemplate;
         this.currentUser = currentUser;
+        this.tenantResolver = tenantResolver;
     }
 
     public MeResponse getMe() {
@@ -29,7 +33,18 @@ public class MeService {
             throw new AccessDeniedException("Usuario inactivo");
         }
 
-        MeResponse.BranchInfo branch = findBranch(user.branchId());
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        MeResponse.CompanyInfo company = new MeResponse.CompanyInfo(
+                tenant.getCompanyId(),
+                tenant.getCompanyCode(),
+                tenant.getCompanyName()
+        );
+        MeResponse.BranchInfo branch = new MeResponse.BranchInfo(
+                tenant.getBranchId(),
+                tenant.getBranchCode(),
+                tenant.getBranchName(),
+                "ACTIVE"
+        );
         List<MeResponse.RoleInfo> roles = findRoles(userId);
         List<MeResponse.PermissionInfo> permissions = findPermissions(userId);
         List<MeResponse.ChannelInfo> channels = findChannels(user.branchId());
@@ -41,6 +56,7 @@ public class MeService {
                 user.phone(),
                 user.status(),
                 user.passwordChangeRequired(),
+                company,
                 branch,
                 roles,
                 permissions,

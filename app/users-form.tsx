@@ -9,6 +9,12 @@ import AppSelectorField from '@/components/ui/AppSelectorField';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import {
+  formatPermissionCode,
+  groupPermissionsForDisplay,
+  matchesPermissionSearch,
+  getSuggestedDependencyWarnings,
+} from '@/services/permissionDependencies';
+import {
   AdminBranch,
   AdminPermission,
   AdminRole,
@@ -106,6 +112,9 @@ export default function UsersFormScreen() {
   const [assignedBranchesModalVisible, setAssignedBranchesModalVisible] = useState(false);
   const [rolesModalVisible, setRolesModalVisible] = useState(false);
   const [permissionsModalVisible, setPermissionsModalVisible] = useState(false);
+  const [draftRoleIds, setDraftRoleIds] = useState<number[]>([]);
+  const [draftPermissionIds, setDraftPermissionIds] = useState<number[]>([]);
+  const [permissionSearch, setPermissionSearch] = useState('');
 
   const loadData = useCallback(async () => {
     try {
@@ -166,6 +175,55 @@ export default function UsersFormScreen() {
     () => selectedNames(branches, mergeIds(form.branchIds, form.branchId), 'Seleccionar sucursales'),
     [branches, form.branchId, form.branchIds]
   );
+
+  const draftPermissionCodes = useMemo(
+    () =>
+      permissions
+        .filter((permission) => draftPermissionIds.includes(permission.id))
+        .map((permission) => permission.code),
+    [draftPermissionIds, permissions]
+  );
+
+  const groupedPermissionOptions = useMemo(
+    () =>
+      groupPermissionsForDisplay(
+        permissions.filter((permission) => matchesPermissionSearch(permission, permissionSearch))
+      ),
+    [permissionSearch, permissions]
+  );
+
+  const openRolesModal = () => {
+    setDraftRoleIds(form.roleIds);
+    setRolesModalVisible(true);
+  };
+
+  const cancelRolesModal = () => {
+    setDraftRoleIds(form.roleIds);
+    setRolesModalVisible(false);
+  };
+
+  const saveRolesModal = () => {
+    setForm((current) => ({ ...current, roleIds: draftRoleIds }));
+    setRolesModalVisible(false);
+  };
+
+  const openPermissionsModal = () => {
+    setDraftPermissionIds(form.permissionIds);
+    setPermissionSearch('');
+    setPermissionsModalVisible(true);
+  };
+
+  const cancelPermissionsModal = () => {
+    setDraftPermissionIds(form.permissionIds);
+    setPermissionSearch('');
+    setPermissionsModalVisible(false);
+  };
+
+  const savePermissionsModal = () => {
+    setForm((current) => ({ ...current, permissionIds: draftPermissionIds }));
+    setPermissionSearch('');
+    setPermissionsModalVisible(false);
+  };
 
   const validate = () => {
     if (!form.name.trim()) {
@@ -328,14 +386,14 @@ export default function UsersFormScreen() {
             label="Roles"
             value={selectedNames(roles, form.roleIds, 'Seleccionar roles')}
             placeholder="Seleccionar roles"
-            onPress={() => setRolesModalVisible(true)}
+            onPress={openRolesModal}
           />
 
           <AppSelectorField
-            label="Permisos adicionales"
+            label="Permisos directos adicionales"
             value={selectedNames(permissions, form.permissionIds, 'Sin permisos adicionales')}
-            placeholder="Seleccionar permisos adicionales"
-            onPress={() => setPermissionsModalVisible(true)}
+            placeholder="Seleccionar permisos directos"
+            onPress={openPermissionsModal}
           />
 
           <AppText color={theme.colors.mutedText} variant="caption">
@@ -449,67 +507,112 @@ export default function UsersFormScreen() {
       <AppBottomModal
         visible={rolesModalVisible}
         title="Seleccionar roles"
-        onClose={() => setRolesModalVisible(false)}
+        onClose={cancelRolesModal}
+        maxHeight="88%"
+        showCancelButton={false}
+        footer={
+          <View style={styles.modalFooterActions}>
+            <View style={styles.modalFooterButton}>
+              <AppButton title="Cancelar" variant="secondary" onPress={cancelRolesModal} />
+            </View>
+            <View style={styles.modalFooterButton}>
+              <AppButton title="Guardar" onPress={saveRolesModal} />
+            </View>
+          </View>
+        }
       >
         {roles.map((role) => {
-          const selected = form.roleIds.includes(role.id);
+          const selected = draftRoleIds.includes(role.id);
           return (
             <AppOptionRow
               key={role.id}
-              title={role.code}
-              subtitle={role.name}
+              title={role.name}
+              subtitle={formatPermissionCode(role.code)}
               onPress={() =>
-                setForm((current) => ({
-                  ...current,
-                  roleIds: toggleId(current.roleIds, role.id),
-                }))
+                setDraftRoleIds((current) => toggleId(current, role.id))
               }
             >
               <AppText color={selected ? theme.colors.accent : theme.colors.mutedText} bold={selected}>
-                {selected ? 'Seleccionado' : 'Tocar para seleccionar'}
+                {selected ? 'Seleccionado' : 'Agregar'}
               </AppText>
             </AppOptionRow>
           );
         })}
 
-        <View style={styles.modalActions}>
-          <AppButton title="Listo" onPress={() => setRolesModalVisible(false)} />
-        </View>
       </AppBottomModal>
 
       <AppBottomModal
         visible={permissionsModalVisible}
-        title="Permisos adicionales"
-        onClose={() => setPermissionsModalVisible(false)}
+        title="Permisos directos adicionales"
+        onClose={cancelPermissionsModal}
+        maxHeight="88%"
+        showCancelButton={false}
+        footer={
+          <View style={styles.modalFooterActions}>
+            <View style={styles.modalFooterButton}>
+              <AppButton title="Cancelar" variant="secondary" onPress={cancelPermissionsModal} />
+            </View>
+            <View style={styles.modalFooterButton}>
+              <AppButton title="Guardar permisos" onPress={savePermissionsModal} />
+            </View>
+          </View>
+        }
       >
         <AppText color={theme.colors.mutedText} style={styles.modalDescription}>
-          Estos permisos se agregan directamente al usuario además de los que obtiene por rol.
+          Estos permisos se agregan directamente al usuario y se suman a los heredados por sus roles.
         </AppText>
 
-        {permissions.map((permission) => {
-          const selected = form.permissionIds.includes(permission.id);
-          return (
-            <AppOptionRow
-              key={permission.id}
-              title={permission.code}
-              subtitle={permission.name}
-              onPress={() =>
-                setForm((current) => ({
-                  ...current,
-                  permissionIds: toggleId(current.permissionIds, permission.id),
-                }))
-              }
-            >
-              <AppText color={selected ? theme.colors.accent : theme.colors.mutedText} bold={selected}>
-                {selected ? 'Seleccionado' : 'Tocar para seleccionar'}
-              </AppText>
-            </AppOptionRow>
-          );
-        })}
+        <AppInput
+          placeholder="Buscar por permiso, codigo o grupo"
+          value={permissionSearch}
+          onChangeText={setPermissionSearch}
+        />
 
-        <View style={styles.modalActions}>
-          <AppButton title="Listo" onPress={() => setPermissionsModalVisible(false)} />
-        </View>
+        {groupedPermissionOptions.length === 0 ? (
+          <AppText color={theme.colors.mutedText} style={styles.emptyPermissions}>
+            No se encontraron permisos con ese filtro.
+          </AppText>
+        ) : (
+          groupedPermissionOptions.map((group) => (
+            <View key={group.group} style={styles.permissionGroup}>
+              <AppText variant="caption" color={theme.colors.mutedText} bold>
+                {group.group}
+              </AppText>
+
+              {group.permissions.map((permission) => {
+                const selected = draftPermissionIds.includes(permission.id);
+                const dependencyWarnings = selected
+                  ? getSuggestedDependencyWarnings(permission.code, draftPermissionCodes, permissions)
+                  : [];
+                return (
+                  <AppOptionRow
+                    key={permission.id}
+                    title={permission.name}
+                    subtitle={formatPermissionCode(permission.code)}
+                    onPress={() =>
+                      setDraftPermissionIds((current) => toggleId(current, permission.id))
+                    }
+                  >
+                    <View style={styles.permissionStatusRow}>
+                      <AppText color={selected ? theme.colors.accent : theme.colors.mutedText} bold={selected}>
+                        {selected ? 'Incluido' : 'Agregar'}
+                      </AppText>
+                    </View>
+                    {dependencyWarnings.map((warning) => (
+                      <AppText
+                        key={warning.text}
+                        variant="caption"
+                        color={theme.colors.warning}
+                      >
+                        {warning.text}
+                      </AppText>
+                    ))}
+                  </AppOptionRow>
+                );
+              })}
+            </View>
+          ))
+        )}
       </AppBottomModal>
     </>
   );
@@ -531,6 +634,22 @@ const styles = StyleSheet.create({
   },
   modalActions: {
     marginTop: 12,
+  },
+  modalFooterActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  modalFooterButton: {
+    flex: 1,
+  },
+  emptyPermissions: {
+    marginTop: 10,
+  },
+  permissionGroup: {
+    marginTop: 14,
+  },
+  permissionStatusRow: {
+    alignItems: 'flex-start',
   },
   switchRow: {
     alignItems: 'center',

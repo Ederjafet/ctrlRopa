@@ -61,13 +61,18 @@ public class AuthService {
             throw new AccessDeniedException("Usuario inactivo");
         }
 
+        List<LoginResponse.RoleInfo> roles = findRoles(user.id());
+        List<LoginResponse.PermissionInfo> effectivePermissions = findEffectivePermissions(user.id());
+        assertAuthorizedForLogin(user, roles, effectivePermissions);
+        DefaultTenantRow tenant = findDefaultTenantForUser(user.id());
+
         boolean passwordExpired = isPasswordExpired(user.passwordUpdatedAt(), securitySettings);
         if (passwordExpired) {
             markPasswordChangeRequired(user.id());
         }
 
         registerSuccessfulLogin(user.id());
-        String sessionToken = createApiSession(user.id(), securitySettings);
+        String sessionToken = createApiSession(user.id(), securitySettings, tenant);
         auditSecurityEvent("AUTH_LOGIN_SUCCESS", "/api/auth/login", 200, user.id(), user.branchId(), user.name(), "Login exitoso");
 
         return new LoginResponse(
@@ -79,9 +84,10 @@ public class AuthService {
                 sessionToken,
                 securitySettings.getSessionTimeoutMinutes(),
                 Boolean.TRUE.equals(user.passwordChangeRequired()) || passwordExpired,
-                findBranch(user.branchId()),
-                findRoles(user.id()),
-                findEffectivePermissions(user.id()),
+                findCompany(tenant.companyId()),
+                findBranch(tenant.branchId()),
+                roles,
+                effectivePermissions,
                 findChannels(user.branchId())
         );
     }
@@ -157,12 +163,12 @@ public class AuthService {
         }
     }
 
-    private String createApiSession(Long userId, SecuritySettingsResponse settings) {
+    private String createApiSession(Long userId, SecuritySettingsResponse settings, DefaultTenantRow tenant) {
         byte[] randomBytes = new byte[32];
         secureRandom.nextBytes(randomBytes);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
         Integer absoluteHours = settings.getAbsoluteSessionTimeoutHours();
-        DefaultTenantRow tenant = findDefaultTenantForUser(userId);
+        revokeActiveSessionsForUser(userId);
 
         jdbcTemplate.update(
                 """
@@ -202,6 +208,34 @@ public class AuthService {
         return token;
     }
 
+    private void revokeActiveSessionsForUser(Long userId) {
+        jdbcTemplate.update(
+                """
+                UPDATE user_api_sessions
+                SET revoked_at = CURRENT_TIMESTAMP
+                WHERE user_id = ?
+                  AND revoked_at IS NULL
+                """,
+                userId
+        );
+    }
+
+    private void assertAuthorizedForLogin(AuthUserRow user,
+                                          List<LoginResponse.RoleInfo> roles,
+                                          List<LoginResponse.PermissionInfo> effectivePermissions) {
+        boolean hasNoAccessRole = roles.stream().anyMatch(role -> "NO_ACCESS".equals(role.getCode()));
+
+        if (hasNoAccessRole) {
+            auditSecurityEvent("AUTH_LOGIN_DENIED", "/api/auth/login", 403, user.id(), user.branchId(), user.name(), "Usuario con rol NO_ACCESS");
+            throw new AccessDeniedException("No tienes permisos asignados para acceder al sistema");
+        }
+
+        if (effectivePermissions.isEmpty()) {
+            auditSecurityEvent("AUTH_LOGIN_DENIED", "/api/auth/login", 403, user.id(), user.branchId(), user.name(), "Usuario sin permisos efectivos");
+            throw new AccessDeniedException("No tienes permisos asignados para acceder al sistema");
+        }
+    }
+
     private DefaultTenantRow findDefaultTenantForUser(Long userId) {
         return jdbcTemplate.query(
                 """
@@ -212,8 +246,10 @@ public class AuthService {
                 JOIN branches b ON b.id = u.branch_id
                 JOIN companies c ON c.id = b.company_id
                 JOIN user_companies uc ON uc.user_id = u.id
-                                      AND uc.company_id = c.id
-                                      AND uc.status = 'ACTIVE'
+                                    AND uc.company_id = c.id
+                                    AND uc.status = 'ACTIVE'
+                JOIN user_branches ub ON ub.user_id = u.id
+                                    AND ub.branch_id = b.id
                 WHERE u.id = ?
                   AND u.status = 'ACTIVE'
                   AND b.status = 'ACTIVE'
@@ -553,6 +589,22 @@ public class AuthService {
                         rs.getString("status")
                 ),
                 branchId
+        );
+    }
+
+    private LoginResponse.CompanyInfo findCompany(Long companyId) {
+        return jdbcTemplate.queryForObject(
+                """
+                SELECT id, code, name
+                FROM companies
+                WHERE id = ?
+                """,
+                (rs, rowNum) -> new LoginResponse.CompanyInfo(
+                        rs.getLong("id"),
+                        rs.getString("code"),
+                        rs.getString("name")
+                ),
+                companyId
         );
     }
 

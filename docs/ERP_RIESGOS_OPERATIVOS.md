@@ -169,6 +169,16 @@ Probabilidad:
 - LIVE-W cambia jerarquia visual sin tocar logica; requiere smoke mobile/tablet para confirmar que las acciones secundarias siguen siendo faciles de encontrar.
 - LIVE-W adicional compacta layout y oculta columnas sin widgets; requiere smoke con widgets completos y ocultos para confirmar que no se pierde contexto operativo.
 - LIVE-X diferencia permisos en frontend, pero backend todavia tiene endpoints de lectura/alta con tenant validation sin permiso funcional completo; no declarar seguridad SaaS completa hasta AUTH-A.
+- AUTH-A reduce el riesgo de sesiones multiples y usuarios sin permisos, pero el smoke runtime con `qa.sinpermisos`, QA_A/QA_B y doble dispositivo sigue pendiente antes de declararlo cerrado.
+- AUTH-A no agrega `revocation_reason` porque la columna no existe; la trazabilidad detallada de motivo de revocacion queda como deuda futura si se requiere auditoria mas granular.
+- AUTH-A agrega guards directos en Clientes/Inventario/Lotes; otros modulos siguen necesitando revision completa de permisos frontend/backend antes de SaaS real.
+- AUTH-A ajuste depende de que el backend responda `401` para token revocado; si algun endpoint transforma el error en `403` o mensaje generico, el frontend puede no mostrar la causa exacta aunque limpiara sesion solo ante `401`.
+- AUTH-A sincroniza branch local con `/api/me` antes de requests protegidos; esto reduce branch vieja en storage, pero aumenta una llamada previa de validacion por request hasta optimizar cache/TTL.
+- AUTH-A backend agrega logs temporales de validacion de sesion; deben retirarse o bajar a `DEBUG` despues de cerrar el smoke multi-dispositivo para evitar ruido operativo.
+- AUTH-A backend ahora exige ultima sesion activa; si hay procesos batch o clientes antiguos compartiendo usuario, quedaran cerrados al iniciar sesion en otro equipo.
+- AUTH-A muestra dependencias sugeridas de permisos solo como advertencia frontend; si se requiere cumplimiento estricto, debe implementarse enforcement backend antes de operar roles productivos complejos.
+- AUTH-A confirma que no existe permiso funcional persistido para `CREATE_CUSTOMER`; el alta de clientes debe quedar como deuda de RBAC backend antes de declarar separacion fina lectura/creacion.
+- AUTH-A detecta dependencia huerfana `VIEW_PAYMENTS`; no usarla como enforcement ni prometer separacion de consulta/registro de pagos hasta definir permiso real en catalogo/backend.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

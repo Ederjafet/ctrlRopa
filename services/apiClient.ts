@@ -1,5 +1,14 @@
 import { API_BASE_URL } from '@/constants/api';
-import { clearSession, getSession, isSessionExpired, touchSession } from '@/services/sessionStorage';
+import {
+  clearSession,
+  getSession,
+  isSessionExpired,
+  saveAuthNotice,
+  saveSession,
+  touchSession,
+  UserSession,
+} from '@/services/sessionStorage';
+import { router } from 'expo-router';
 
 type ApiMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -13,11 +22,20 @@ type ApiOptions = {
 export class ApiError extends Error {
   status: number;
   rawMessage: string;
+  suppressUserNotification: boolean;
 
-  constructor(status: number, rawMessage: string) {
+  constructor(status: number, rawMessage: string, suppressUserNotification = false) {
     super(extractApiErrorMessage(rawMessage) || friendlyStatusMessage(status));
     this.status = status;
     this.rawMessage = rawMessage;
+    this.suppressUserNotification = suppressUserNotification;
+  }
+}
+
+export class SessionRedirectError extends ApiError {
+  constructor(message: string) {
+    super(401, JSON.stringify({ message }), true);
+    this.name = 'SessionRedirectError';
   }
 }
 
@@ -47,6 +65,109 @@ function extractApiErrorMessage(rawMessage: string): string {
   return rawMessage;
 }
 
+function isRevokedSessionMessage(message: string): boolean {
+  const normalized = message
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  return (
+    normalized.includes('sesion se cerro') ||
+    normalized.includes('iniciaste sesion en otro dispositivo') ||
+    normalized.includes('iniciaste sesion en otro equipo')
+  );
+}
+
+async function handleUnauthorizedSession(rawMessage: string) {
+  const apiMessage = extractApiErrorMessage(rawMessage);
+  const message = isRevokedSessionMessage(apiMessage)
+    ? 'Tu sesión se cerró porque iniciaste sesión en otro equipo.'
+    : apiMessage || 'Tu sesión expiró. Inicia sesión nuevamente.';
+
+  await clearSession();
+  await saveAuthNotice(message);
+  router.replace('/login');
+}
+
+async function redirectSessionToLogin(
+  message = 'Tu sesión se cerró porque iniciaste sesión en otro equipo.'
+): Promise<never> {
+  await clearSession();
+  await saveAuthNotice(message);
+  router.replace('/login');
+  throw new SessionRedirectError(message);
+}
+
+function shouldValidateSession(path: string): boolean {
+  return !path.startsWith('/api/me') && !path.startsWith('/api/auth/');
+}
+
+function replaceBranchPath(path: string, previousBranchId: number, nextBranchId: number): string {
+  return path.replace(`/branch/${previousBranchId}`, `/branch/${nextBranchId}`);
+}
+
+async function validateServerSession(session: UserSession): Promise<UserSession> {
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}/api/me`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(session.sessionToken ? { Authorization: `Bearer ${session.sessionToken}` } : {}),
+      },
+    });
+  } catch {
+    return await redirectSessionToLogin();
+  }
+
+  const text = await response.text();
+
+  if (response.status === 401) {
+    const apiMessage = extractApiErrorMessage(text);
+    await redirectSessionToLogin(
+      isRevokedSessionMessage(apiMessage)
+        ? 'Tu sesión se cerró porque iniciaste sesión en otro equipo.'
+        : apiMessage || 'Tu sesión expiró. Inicia sesión nuevamente.'
+    );
+  }
+
+  if (!response.ok || !text) return session;
+
+  try {
+    const me = JSON.parse(text);
+    const nextBranchId = Number(me?.branch?.id);
+    const nextCompanyId = me?.company?.id ? Number(me.company.id) : session.companyId;
+    const hasBranchMismatch = Number.isFinite(nextBranchId) && nextBranchId !== session.branchId;
+    const hasCompanyMismatch =
+      Number.isFinite(nextCompanyId) &&
+      session.companyId !== undefined &&
+      nextCompanyId !== session.companyId;
+
+    if (hasBranchMismatch || hasCompanyMismatch) {
+      const updatedSession = {
+        ...session,
+        companyId: Number.isFinite(nextCompanyId) ? nextCompanyId : session.companyId,
+        companyCode: me?.company?.code ?? session.companyCode,
+        companyName: me?.company?.name ?? session.companyName,
+        branchId: Number.isFinite(nextBranchId) ? nextBranchId : session.branchId,
+        branchName: me?.branch?.name ?? session.branchName,
+        channels: me?.channels ?? session.channels,
+        roles: me?.roles ?? session.roles,
+        effectivePermissions: me?.permissions ?? session.effectivePermissions,
+        passwordChangeRequired: me?.passwordChangeRequired ?? session.passwordChangeRequired,
+      };
+
+      await saveSession(updatedSession);
+      return updatedSession;
+    }
+  } catch {
+    return session;
+  }
+
+  return session;
+}
+
 export async function apiRequest<T>(
   path: string,
   options: ApiOptions = {}
@@ -54,13 +175,25 @@ export async function apiRequest<T>(
   const method = options.method ?? 'GET';
   const includeSession = options.includeSession ?? true;
   const session = includeSession ? await getSession() : null;
-  const url = `${API_BASE_URL}${path}`;
   const startedAt = Date.now();
+  let requestPath = path;
+  let activeSession = session;
 
   if (includeSession && session && isSessionExpired(session)) {
     await clearSession();
+    await saveAuthNotice('Tu sesión expiró. Inicia sesión nuevamente.');
+    router.replace('/login');
     throw new ApiError(401, JSON.stringify({ message: 'La sesión expiró por inactividad.' }));
   }
+
+  if (includeSession && session && shouldValidateSession(path)) {
+    activeSession = await validateServerSession(session);
+    if (activeSession.branchId !== session.branchId) {
+      requestPath = replaceBranchPath(path, session.branchId, activeSession.branchId);
+    }
+  }
+
+  const url = `${API_BASE_URL}${requestPath}`;
 
   let response: Response;
 
@@ -70,7 +203,7 @@ export async function apiRequest<T>(
       method,
       headers: {
         'Content-Type': 'application/json',
-        ...(session?.sessionToken ? { Authorization: `Bearer ${session.sessionToken}` } : {}),
+        ...(activeSession?.sessionToken ? { Authorization: `Bearer ${activeSession.sessionToken}` } : {}),
         ...(options.headers ?? {}),
       },
       body: options.body ? JSON.stringify(options.body) : undefined,
@@ -91,7 +224,7 @@ export async function apiRequest<T>(
 
   if (!response.ok) {
     if (includeSession && response.status === 401) {
-      await clearSession();
+      await handleUnauthorizedSession(text);
     }
     throw new ApiError(response.status, text || friendlyStatusMessage(response.status));
   }

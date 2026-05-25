@@ -7,6 +7,12 @@ import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import {
+  formatPermissionCode,
+  groupPermissionsForDisplay,
+  getSuggestedDependencyWarnings,
+  matchesPermissionSearch,
+} from '@/services/permissionDependencies';
+import {
   AdminPermission,
   AdminRole,
   createRole,
@@ -78,13 +84,18 @@ export default function SystemRolesScreen() {
   };
 
   const filteredPermissions = useMemo(() => {
-    const value = search.trim().toLowerCase();
-    if (!value) return permissions;
-
-    return permissions.filter((permission) =>
-      `${permission.code} ${permission.name}`.toLowerCase().includes(value)
+    return groupPermissionsForDisplay(
+      permissions.filter((permission) => matchesPermissionSearch(permission, search))
     );
   }, [permissions, search]);
+
+  const selectedPermissionCodes = useMemo(
+    () =>
+      permissions
+        .filter((permission) => form.permissionIds.includes(permission.id))
+        .map((permission) => permission.code),
+    [form.permissionIds, permissions]
+  );
 
   const openNew = () => {
     setForm(emptyForm);
@@ -175,8 +186,10 @@ export default function SystemRolesScreen() {
             <AppCard key={role.id}>
               <View style={styles.roleHeader}>
                 <View style={styles.roleText}>
-                  <AppText bold>{role.code}</AppText>
-                  <AppText>{role.name}</AppText>
+                  <AppText bold>{role.name}</AppText>
+                  <AppText variant="caption" color={theme.colors.mutedText}>
+                    {formatPermissionCode(role.code)}
+                  </AppText>
                   <AppText variant="caption" color={theme.colors.mutedText}>
                     Permisos incluidos: {permissionIds(role).length}
                   </AppText>
@@ -195,6 +208,17 @@ export default function SystemRolesScreen() {
         title={form.id ? 'Editar rol' : 'Nuevo rol'}
         onClose={() => setModalVisible(false)}
         maxHeight="92%"
+        showCancelButton={false}
+        footer={
+          <View style={styles.modalActions}>
+            <View style={styles.modalActionButton}>
+              <AppButton title="Cancelar" variant="secondary" onPress={() => setModalVisible(false)} />
+            </View>
+            <View style={styles.modalActionButton}>
+              <AppButton title={saving ? 'Guardando...' : 'Guardar rol'} loading={saving} onPress={save} />
+            </View>
+          </View>
+        }
       >
         <AppInput
           label="Código"
@@ -225,40 +249,62 @@ export default function SystemRolesScreen() {
             onChangeText={setSearch}
           />
 
-          {filteredPermissions.map((permission) => {
-            const selected = form.permissionIds.includes(permission.id);
-            return (
-              <Pressable
-                key={permission.id}
-                onPress={() =>
-                  setForm((current) => ({
-                    ...current,
-                    permissionIds: toggleId(current.permissionIds, permission.id),
-                  }))
-                }
-                style={[
-                  styles.permissionRow,
-                  { borderBottomColor: theme.colors.border },
-                ]}
-              >
-                <View style={styles.permissionText}>
-                  <AppText bold={selected}>{permission.code}</AppText>
-                  <AppText variant="caption" color={theme.colors.mutedText}>
-                    {permission.name}
-                  </AppText>
-                </View>
-                <AppText color={selected ? theme.colors.accent : theme.colors.mutedText} bold={selected}>
-                  {selected ? 'Incluido' : 'Agregar'}
+          {filteredPermissions.length === 0 ? (
+            <AppText color={theme.colors.mutedText} style={styles.emptyPermissions}>
+              No se encontraron permisos con ese filtro.
+            </AppText>
+          ) : (
+            filteredPermissions.map((group) => (
+              <View key={group.group} style={styles.permissionGroup}>
+                <AppText variant="caption" color={theme.colors.mutedText} bold>
+                  {group.group}
                 </AppText>
-              </Pressable>
-            );
-          })}
+
+                {group.permissions.map((permission) => {
+                  const selected = form.permissionIds.includes(permission.id);
+                  const dependencyWarnings = selected
+                    ? getSuggestedDependencyWarnings(permission.code, selectedPermissionCodes, permissions)
+                    : [];
+                  return (
+                    <Pressable
+                      key={permission.id}
+                      onPress={() =>
+                        setForm((current) => ({
+                          ...current,
+                          permissionIds: toggleId(current.permissionIds, permission.id),
+                        }))
+                      }
+                      style={[
+                        styles.permissionRow,
+                        { borderBottomColor: theme.colors.border },
+                      ]}
+                    >
+                      <View style={styles.permissionText}>
+                        <AppText bold={selected}>{permission.name}</AppText>
+                        <AppText variant="caption" color={theme.colors.mutedText}>
+                          {formatPermissionCode(permission.code)}
+                        </AppText>
+                        <AppText color={selected ? theme.colors.accent : theme.colors.mutedText} bold={selected}>
+                          {selected ? 'Incluido' : 'Agregar'}
+                        </AppText>
+                        {dependencyWarnings.map((warning) => (
+                          <AppText
+                            key={warning.text}
+                            variant="caption"
+                            color={theme.colors.warning}
+                          >
+                            {warning.text}
+                          </AppText>
+                        ))}
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ))
+          )}
         </AppCard>
 
-        <View style={styles.modalActions}>
-          <AppButton title={saving ? 'Guardando...' : 'Guardar rol'} loading={saving} onPress={save} />
-          <AppButton title="Cancelar" variant="secondary" onPress={() => setModalVisible(false)} />
-        </View>
       </AppBottomModal>
     </>
   );
@@ -266,8 +312,14 @@ export default function SystemRolesScreen() {
 
 const styles = StyleSheet.create({
   modalActions: {
+    flexDirection: 'row',
     gap: 10,
-    marginTop: 12,
+  },
+  modalActionButton: {
+    flex: 1,
+  },
+  emptyPermissions: {
+    marginTop: 10,
   },
   permissionRow: {
     alignItems: 'center',
@@ -279,6 +331,9 @@ const styles = StyleSheet.create({
   },
   permissionText: {
     flex: 1,
+  },
+  permissionGroup: {
+    marginTop: 14,
   },
   roleAction: {
     minWidth: 110,

@@ -1,10 +1,13 @@
 import {
   canAccess,
   canAccessByPermission,
+  can,
   hasChannel,
+  hasAnyPermission,
   hasPermission,
   hasRole,
   isAdmin,
+  isNoAccess,
 } from '@/services/accessControl';
 import { UserSession } from '@/services/sessionStorage';
 
@@ -54,12 +57,16 @@ export function canConfigureSystem(user: UserSession | null): boolean {
   return (
     isAdmin(user) ||
     hasRole(user, 'QA_TENANT_ADMIN') ||
-    hasPermission(user, 'MANAGE_ROLES') ||
-    hasPermission(user, 'MANAGE_BRANCH_CHANNELS') ||
-    hasPermission(user, 'MANAGE_SECURITY_SETTINGS')
+    hasAnyPermission(user, [
+      'MANAGE_ROLES',
+      'MANAGE_BRANCH_CHANNELS',
+      'MANAGE_SECURITY_SETTINGS',
+    ])
   );
 }
 
 export function canManageUsers(user: UserSession | null): boolean {
-  return canAccessByPermission(user, 'MANAGE_USERS');
+  return can(user, 'MANAGE_USERS');
 }
+
+export { can, hasAnyPermission, hasRole, isNoAccess };

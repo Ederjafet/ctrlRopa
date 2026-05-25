@@ -12,6 +12,7 @@ public class LoginResponse {
     private String sessionToken;
     private Integer sessionTimeoutMinutes;
     private Boolean passwordChangeRequired;
+    private CompanyInfo company;
     private BranchInfo branch;
     private List<RoleInfo> roles;
     private List<PermissionInfo> effectivePermissions;
@@ -25,6 +26,7 @@ public class LoginResponse {
                          String sessionToken,
                          Integer sessionTimeoutMinutes,
                          Boolean passwordChangeRequired,
+                         CompanyInfo company,
                          BranchInfo branch,
                          List<RoleInfo> roles,
                          List<PermissionInfo> effectivePermissions,
@@ -37,6 +39,7 @@ public class LoginResponse {
         this.sessionToken = sessionToken;
         this.sessionTimeoutMinutes = sessionTimeoutMinutes;
         this.passwordChangeRequired = passwordChangeRequired;
+        this.company = company;
         this.branch = branch;
         this.roles = roles;
         this.effectivePermissions = effectivePermissions;
@@ -51,10 +54,27 @@ public class LoginResponse {
     public String getSessionToken() { return sessionToken; }
     public Integer getSessionTimeoutMinutes() { return sessionTimeoutMinutes; }
     public Boolean getPasswordChangeRequired() { return passwordChangeRequired; }
+    public CompanyInfo getCompany() { return company; }
     public BranchInfo getBranch() { return branch; }
     public List<RoleInfo> getRoles() { return roles; }
     public List<PermissionInfo> getEffectivePermissions() { return effectivePermissions; }
     public List<ChannelInfo> getChannels() { return channels; }
+
+    public static class CompanyInfo {
+        private Long id;
+        private String code;
+        private String name;
+
+        public CompanyInfo(Long id, String code, String name) {
+            this.id = id;
+            this.code = code;
+            this.name = name;
+        }
+
+        public Long getId() { return id; }
+        public String getCode() { return code; }
+        public String getName() { return name; }
+    }
 
     public static class BranchInfo {
         private Long id;
