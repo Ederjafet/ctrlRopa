@@ -11,6 +11,8 @@ Nota AUTH-F4: el hardening runtime cross-tenant P0 para clientes, items, batches
 
 Nota AUTH-F5: el hardening de consumidores secundarios y financieros derivados queda documentado en `docs/AUTH_F5_SECONDARY_FINANCIAL_HARDENING.md`. Incluye reportes, reservaciones, paquetes, envios, saldos, refunds, customer orders, direcciones e historial propietario.
 
+Nota AUTH-F6: la suite reproducible de regresion negativa SaaS queda documentada en `docs/AUTH_F6_SAAS_NEGATIVE_REGRESSION_SUITE.md` y se ejecuta con `docs/qa/10-auth-f6-saas-negative-regression-smoke.sh`.
+
 ## Objetivo
 
 Iniciar AUTH-F como fase de diagnostico y matriz RBAC. Esta fase no cambia permisos productivos, no agrega migraciones, no toca SQL y no modifica enforcement funcional. El resultado es una base formal para decidir subfases posteriores de RBAC avanzado.

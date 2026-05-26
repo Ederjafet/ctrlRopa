@@ -54,6 +54,23 @@ Pendiente:
 - Ejecutar smoke curl QA_A/QA_B por endpoint secundario con datos reales.
 - Definir permisos finos para reportes, paquetes, envios y saldos en fase RBAC avanzada.
 
+## Actualizacion AUTH-F6 - Suite de regresion negativa SaaS
+
+Fecha: 2026-05-26
+Estado: suite inicial reproducible.
+
+Alcance ejecutado:
+
+- Documento `AUTH_F6_SAAS_NEGATIVE_REGRESSION_SUITE.md`.
+- Script Git Bash `docs/qa/10-auth-f6-saas-negative-regression-smoke.sh`.
+- Login QA_A/QA_B, validacion de token revocado y checks negativos por branch/id/codigo/QR/folio.
+- Salida `PASS/FAIL/SKIP` y `exit 1` si un endpoint cross-tenant devuelve `200`.
+
+Pendiente:
+
+- Alimentar variables `QA_B_*_ID` cuando existan datos QA secundarios reales para paquetes, envios, refunds y reservaciones especificas.
+- Incluir el smoke en checklist de merge/release antes de declarar SaaS financiero completo.
+
 ## Principios de ejecucion futura
 
 - No big bang.

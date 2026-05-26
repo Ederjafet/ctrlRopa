@@ -1,5 +1,26 @@
 # ERP - Bitacora de cambios
 
+## 2026-05-26 - AUTH-F6 suite de regresion negativa SaaS
+
+Tipo: QA seguridad, smoke reproducible, regresion cross-tenant.
+
+Objetivo:
+
+- Crear una suite ejecutable para evitar regresiones de fuga SaaS entre QA_A, QA_B y DEFAULT.
+
+Cambios realizados:
+
+- Se creo `docs/AUTH_F6_SAAS_NEGATIVE_REGRESSION_SUITE.md`.
+- Se creo `docs/qa/10-auth-f6-saas-negative-regression-smoke.sh`.
+- El smoke usa `API_BASE_URL` configurable, login QA_A/QA_B, extraccion de `sessionToken` con `sed`, validaciones `PASS/FAIL/SKIP` y `exit 1` si un dato ajeno responde `200`.
+- Se cubren clientes, items, batches, pagos, ventas, reportes, reservaciones, direcciones, saldos y casos opcionales de paquetes/envios/refunds.
+- Se valida token revocado con segundo login del mismo usuario.
+- Smoke runtime local ejecutado con Git Bash explicito: `PASS=20`, `FAIL=0`, `SKIP=5`.
+
+Pendientes:
+
+- Ejecutar smoke completo con IDs reales de paquetes, envios, refunds y folios de lote cuando el dataset QA los tenga disponibles.
+
 ## 2026-05-25 - AUTH-F5 hardening consumidores secundarios y financieros derivados
 
 Tipo: seguridad backend, tenant validation secundaria, hardening financiero derivado.
