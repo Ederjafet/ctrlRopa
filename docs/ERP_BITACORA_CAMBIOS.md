@@ -1,5 +1,36 @@
 # ERP - Bitacora de cambios
 
+## 2026-05-25 - AUTH-F5 hardening consumidores secundarios y financieros derivados
+
+Tipo: seguridad backend, tenant validation secundaria, hardening financiero derivado.
+
+Objetivo:
+
+- Extender el bloqueo cross-tenant/cross-branch a reportes, reservaciones, paquetes, envios, saldos, devoluciones, pedidos, direcciones e historial propietario.
+
+Cambios realizados:
+
+- Se creo `TenantAccessGuard` para centralizar validacion de company activa y branch activa.
+- `ReservationService` valida branch activa para branch, reserva, item, cliente, caja y transmision.
+- `CustomerAddressService` y `CustomerOwnerHistoryService` validan el cliente contra la branch activa.
+- `BalanceService` valida customer/order/movement/package/branch antes de consultar o aplicar saldo.
+- `CustomerOrderService` valida orden y listados por branch contra branch activa.
+- `CustomerPackageService` valida paquete, folio, cliente, item, venta y reserva; lookups code/QR usan company activa.
+- `ShipmentService` valida envio, folio, paquete, direccion y branch activa.
+- `RefundService` valida refund/return/customer/status por branch activa y lookups de item por company activa.
+- Reportes diarios, remisiones, control live e historial de movimientos validan branch activa antes de calcular.
+- Se creo `docs/AUTH_F5_SECONDARY_FINANCIAL_HARDENING.md`.
+
+Pruebas ejecutadas:
+
+- OK: `.\mvnw.cmd test` desde `backend/control-ropa`.
+- Resultado: `BUILD SUCCESS`, 47 tests, 0 failures, 0 errors.
+
+Riesgos pendientes:
+
+- Ejecutar smoke curl completo QA_A/QA_B sobre cada endpoint secundario con datos reales.
+- Crear permisos finos futuros para reportes/paquetes/envios/saldos si el negocio requiere diferenciacion por rol.
+
 ## 2026-05-25 - AUTH-F4 runtime cross-tenant hardening P0
 
 Tipo: seguridad backend, runtime QA, tenant validation P0.

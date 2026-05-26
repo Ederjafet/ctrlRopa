@@ -31,6 +31,29 @@ Pendiente:
 
 - Extender hardening a reportes, reservaciones, paquetes, envios, saldos y devoluciones antes de declarar SaaS financiero completo.
 
+## Actualizacion AUTH-F5 - Consumidores secundarios y financieros derivados
+
+Fecha: 2026-05-25
+Estado: completado tecnico condicionado.
+
+Alcance ejecutado:
+
+- Hardening backend en reportes, reservaciones, paquetes, envios, saldos, devoluciones, pedidos, direcciones e historial propietario.
+- Creacion de `TenantAccessGuard` para validar company activa y branch activa antes de consultar u operar recursos secundarios.
+- Lookups derivados por folio/codigo/QR en paquetes/refunds ahora validan tenant activo.
+- Prueba negativa central para branch activa vs branch ajena.
+
+Criterios cubiertos:
+
+- Branch externa devuelve `403` desde el guard central.
+- Reportes por branch ajena se bloquean antes de calcular totales.
+- Consumidores secundarios no deben aceptar ids/folios de otra branch activa.
+
+Pendiente:
+
+- Ejecutar smoke curl QA_A/QA_B por endpoint secundario con datos reales.
+- Definir permisos finos para reportes, paquetes, envios y saldos en fase RBAC avanzada.
+
 ## Principios de ejecucion futura
 
 - No big bang.

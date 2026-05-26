@@ -17,6 +17,8 @@ import com.hpsqsoft.ctrlropa.sale.SaleStatus;
 import com.hpsqsoft.ctrlropa.security.access.AccessService;
 import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
 import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
+import com.hpsqsoft.ctrlropa.tenant.CurrentTenantContext;
+import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +39,7 @@ public class RefundService {
     private final SaleRepository saleRepository;
     private final AccessService accessService;
     private final CurrentUser currentUser;
+    private final TenantAccessGuard tenantAccessGuard;
 
     public RefundService(RefundRepository refundRepository,
                          CustomerReturnRepository returnRepository,
@@ -46,7 +49,8 @@ public class RefundService {
                          ItemRepository itemRepository,
                          SaleRepository saleRepository,
                          AccessService accessService,
-                         CurrentUser currentUser) {
+                         CurrentUser currentUser,
+                         TenantAccessGuard tenantAccessGuard) {
         this.refundRepository = refundRepository;
         this.returnRepository = returnRepository;
         this.allocationRepository = allocationRepository;
@@ -56,6 +60,7 @@ public class RefundService {
         this.saleRepository = saleRepository;
         this.accessService = accessService;
         this.currentUser = currentUser;
+        this.tenantAccessGuard = tenantAccessGuard;
     }
 
     public RefundResponse create(CreateRefundRequest request) {
@@ -74,6 +79,7 @@ public class RefundService {
         }
 
         Sale sale = customerReturn.getSale();
+        tenantAccessGuard.requireBranch(sale.getBranch().getId(), "La devolucion no pertenece a la sucursal activa");
 
         BigDecimal refundableAvailable = calculateRefundableAvailable(sale.getId());
 
@@ -177,6 +183,9 @@ public class RefundService {
 
     @Transactional(readOnly = true)
     public List<RefundResponse> findByReturn(Long returnId) {
+        CustomerReturn customerReturn = returnRepository.findById(returnId)
+                .orElseThrow(() -> new IllegalArgumentException("Devolucion no encontrada"));
+        tenantAccessGuard.requireBranch(customerReturn.getSale().getBranch().getId(), "La devolucion no pertenece a la sucursal activa");
         return refundRepository.findByCustomerReturnIdOrderByCreatedAtDesc(returnId)
                 .stream()
                 .map(this::toResponse)
@@ -185,6 +194,7 @@ public class RefundService {
 
     @Transactional(readOnly = true)
     public List<RefundResponse> findByCustomer(Long customerId) {
+        validateCustomerRefundAccess(customerId);
         return refundRepository.findByCustomerIdOrderByCreatedAtDesc(customerId)
                 .stream()
                 .map(this::toResponse)
@@ -193,15 +203,19 @@ public class RefundService {
 
     @Transactional(readOnly = true)
     public List<RefundResponse> findByStatus(RefundStatus status) {
+        CurrentTenantContext tenant = tenantAccessGuard.requireCurrentTenant();
         return refundRepository.findByStatusOrderByCreatedAtDesc(status)
                 .stream()
+                .filter(refund -> tenant.getBranchId() == null || tenant.getBranchId().equals(refund.getBranchId()))
                 .map(this::toResponse)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public RefundLookupResponse lookupByItemCode(String code) {
-        Item item = itemRepository.findByCode(code)
+        Item item = itemRepository.findByCompanyIdAndCode(
+                        tenantAccessGuard.requireCurrentTenant().getCompanyId(),
+                        code)
                 .orElseThrow(() -> new IllegalArgumentException("Item no encontrado con código: " + code));
 
         return buildLookup(item);
@@ -209,7 +223,9 @@ public class RefundService {
 
     @Transactional(readOnly = true)
     public RefundLookupResponse lookupByQrCode(String qrCode) {
-        Item item = itemRepository.findByQrCode(qrCode)
+        Item item = itemRepository.findByCompanyIdAndQrCode(
+                        tenantAccessGuard.requireCurrentTenant().getCompanyId(),
+                        qrCode)
                 .orElseThrow(() -> new IllegalArgumentException("Item no encontrado con QR: " + qrCode));
 
         return buildLookup(item);
@@ -251,8 +267,20 @@ public class RefundService {
     }
 
     private Refund findEntity(Long id) {
-        return refundRepository.findById(id)
+        Refund refund = refundRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Refund no encontrado con id: " + id));
+        tenantAccessGuard.requireBranch(refund.getBranchId(), "El refund no pertenece a la sucursal activa");
+        return refund;
+    }
+
+    private void validateCustomerRefundAccess(Long customerId) {
+        refundRepository.findByCustomerIdOrderByCreatedAtDesc(customerId)
+                .stream()
+                .findFirst()
+                .ifPresent(refund -> tenantAccessGuard.requireBranch(
+                        refund.getBranchId(),
+                        "El cliente no pertenece a la sucursal activa"
+                ));
     }
 
     private void validatePositiveAmount(BigDecimal amount) {

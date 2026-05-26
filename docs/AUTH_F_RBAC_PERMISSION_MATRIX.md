@@ -9,6 +9,8 @@ Nota AUTH-F3: la implementacion inicial del catalogo y enforcement P0 queda docu
 
 Nota AUTH-F4: el hardening runtime cross-tenant P0 para clientes, items, batches, pagos y ventas queda documentado en `docs/AUTH_F4_CROSS_TENANT_RUNTIME_HARDENING.md`.
 
+Nota AUTH-F5: el hardening de consumidores secundarios y financieros derivados queda documentado en `docs/AUTH_F5_SECONDARY_FINANCIAL_HARDENING.md`. Incluye reportes, reservaciones, paquetes, envios, saldos, refunds, customer orders, direcciones e historial propietario.
+
 ## Objetivo
 
 Iniciar AUTH-F como fase de diagnostico y matriz RBAC. Esta fase no cambia permisos productivos, no agrega migraciones, no toca SQL y no modifica enforcement funcional. El resultado es una base formal para decidir subfases posteriores de RBAC avanzado.

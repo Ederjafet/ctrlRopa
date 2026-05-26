@@ -20,6 +20,7 @@ import com.hpsqsoft.ctrlropa.security.access.AccessService;
 import com.hpsqsoft.ctrlropa.security.access.ChannelCode;
 import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
 import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
+import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +44,7 @@ public class ReservationService {
     private final CurrentUser currentUser;
     private final CustomerOrderService customerOrderService;
     private final JdbcTemplate jdbcTemplate;
+    private final TenantAccessGuard tenantAccessGuard;
 
     public ReservationService(ReservationRepository repository,
                               ItemRepository itemRepository,
@@ -54,7 +56,8 @@ public class ReservationService {
                               AccessService accessService,
                               CurrentUser currentUser,
                               CustomerOrderService customerOrderService,
-                              JdbcTemplate jdbcTemplate) {
+                              JdbcTemplate jdbcTemplate,
+                              TenantAccessGuard tenantAccessGuard) {
         this.repository = repository;
         this.itemRepository = itemRepository;
         this.customerRepository = customerRepository;
@@ -66,10 +69,12 @@ public class ReservationService {
         this.currentUser = currentUser;
         this.customerOrderService = customerOrderService;
         this.jdbcTemplate = jdbcTemplate;
+        this.tenantAccessGuard = tenantAccessGuard;
     }
 
     @Transactional(readOnly = true)
     public List<ReservationResponse> findByBranch(Long branchId) {
+        tenantAccessGuard.requireBranch(branchId, "La sucursal de reservas no pertenece al tenant activo");
         return repository.findByBranchIdOrderByCreatedAtDesc(branchId)
                 .stream()
                 .map(this::toResponse)
@@ -78,6 +83,7 @@ public class ReservationService {
 
     @Transactional(readOnly = true)
     public List<ReservationResponse> findActiveWithoutBox(Long branchId) {
+        tenantAccessGuard.requireBranch(branchId, "La sucursal de reservas no pertenece al tenant activo");
         return repository.findByBoxIsNullAndBranchIdAndStatusOrderByCreatedAtDesc(branchId, ReservationStatus.ACTIVE)
                 .stream()
                 .map(this::toResponse)
@@ -86,6 +92,9 @@ public class ReservationService {
 
     @Transactional(readOnly = true)
     public List<ReservationResponse> findByBox(Long boxId) {
+        Box box = boxRepository.findById(boxId)
+                .orElseThrow(() -> new IllegalArgumentException("Caja no encontrada"));
+        tenantAccessGuard.requireBranch(box.getBranch().getId(), "La caja no pertenece a la sucursal activa");
         return repository.findByBoxIdOrderByCreatedAtAsc(boxId)
                 .stream()
                 .map(this::toResponse)
@@ -99,9 +108,11 @@ public class ReservationService {
 
     public ReservationResponse create(CreateReservationRequest request) {
         Long userId = currentUser.getUserId();
+        tenantAccessGuard.requireBranch(request.getBranchId(), "La sucursal de la reserva no pertenece al tenant activo");
 
         Item item = itemRepository.findById(request.getItemId())
                 .orElseThrow(() -> new IllegalArgumentException("Item no encontrado"));
+        tenantAccessGuard.requireBranch(item.getBranch().getId(), "El item no pertenece a la sucursal activa");
 
         if (item.getStatus() != ItemStatus.AVAILABLE) {
             throw new IllegalArgumentException("El item no está disponible");
@@ -109,6 +120,7 @@ public class ReservationService {
 
         Customer customer = customerRepository.findById(request.getCustomerId())
                 .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado"));
+        tenantAccessGuard.requireBranch(customer.getBranch().getId(), "El cliente no pertenece a la sucursal activa");
 
         Branch branch = branchRepository.findById(request.getBranchId())
                 .orElseThrow(() -> new IllegalArgumentException("Sucursal no encontrada"));
@@ -116,12 +128,21 @@ public class ReservationService {
         SalesChannel salesChannel = salesChannelRepository.findById(request.getSalesChannelId())
                 .orElseThrow(() -> new IllegalArgumentException("Canal de venta no encontrado"));
 
+        if (!item.getBranch().getId().equals(branch.getId())) {
+            throw new IllegalArgumentException("El item no pertenece a la sucursal indicada");
+        }
+
+        if (!customer.getBranch().getId().equals(branch.getId())) {
+            throw new IllegalArgumentException("El cliente no pertenece a la sucursal indicada");
+        }
+
         validateReservationCreateAccess(userId, salesChannel.getCode(), branch.getId());
 
         Live live = null;
         if (request.getLiveId() != null) {
             live = liveRepository.findById(request.getLiveId())
                     .orElseThrow(() -> new IllegalArgumentException("Live no encontrado"));
+            tenantAccessGuard.requireBranch(live.getBranch().getId(), "La transmision no pertenece a la sucursal activa");
 
             if (live.getStatus() != LiveStatus.OPEN && live.getStatus() != LiveStatus.ACTIVE) {
                 throw new IllegalArgumentException("El live no está disponible para reservar");
@@ -192,6 +213,7 @@ public class ReservationService {
 
         Box box = boxRepository.findById(boxId)
                 .orElseThrow(() -> new IllegalArgumentException("Caja no encontrada"));
+        tenantAccessGuard.requireBranch(box.getBranch().getId(), "La caja no pertenece a la sucursal activa");
 
         if (!box.getBranch().getId().equals(existing.getBranch().getId())) {
             throw new IllegalArgumentException("La caja no pertenece a la misma sucursal de la reserva");
@@ -295,8 +317,10 @@ public class ReservationService {
     }
 
     private Reservation findEntityById(Long id) {
-        return repository.findById(id)
+        Reservation reservation = repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada con id: " + id));
+        tenantAccessGuard.requireBranch(reservation.getBranch().getId(), "La reserva no pertenece a la sucursal activa");
+        return reservation;
     }
 
     private ReservationResponse toResponse(Reservation entity) {

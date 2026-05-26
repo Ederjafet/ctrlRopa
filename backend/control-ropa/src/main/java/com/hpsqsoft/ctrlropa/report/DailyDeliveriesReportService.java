@@ -5,6 +5,7 @@ import com.hpsqsoft.ctrlropa.branch.BranchRepository;
 import com.hpsqsoft.ctrlropa.security.access.AccessService;
 import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
 import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
+import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,15 +24,18 @@ public class DailyDeliveriesReportService {
     private final BranchRepository branchRepository;
     private final AccessService accessService;
     private final CurrentUser currentUser;
+    private final TenantAccessGuard tenantAccessGuard;
 
     public DailyDeliveriesReportService(JdbcTemplate jdbcTemplate,
-                                        BranchRepository branchRepository,
-                                        AccessService accessService,
-                                        CurrentUser currentUser) {
+                                       BranchRepository branchRepository,
+                                       AccessService accessService,
+                                       CurrentUser currentUser,
+                                       TenantAccessGuard tenantAccessGuard) {
         this.jdbcTemplate = jdbcTemplate;
         this.branchRepository = branchRepository;
         this.accessService = accessService;
         this.currentUser = currentUser;
+        this.tenantAccessGuard = tenantAccessGuard;
     }
 
     public DailyDeliveriesReportResponse getDailyDeliveriesReport(DailyDeliveriesReportRequest request) {
@@ -49,6 +53,7 @@ public class DailyDeliveriesReportService {
 
         Branch branch = branchRepository.findById(request.getBranchId())
                 .orElseThrow(() -> new IllegalArgumentException("Sucursal no encontrada"));
+        tenantAccessGuard.requireBranch(branch.getId(), "La sucursal del reporte no pertenece al tenant activo");
 
         LocalDate date = request.getDate();
         LocalDateTime start = date.atStartOfDay();

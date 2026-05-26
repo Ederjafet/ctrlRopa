@@ -2,6 +2,7 @@ package com.hpsqsoft.ctrlropa.customer;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
 
 import java.util.List;
 
@@ -11,15 +12,19 @@ public class CustomerOwnerHistoryService {
 
     private final CustomerOwnerHistoryRepository repository;
     private final CustomerRepository customerRepository;
+    private final TenantAccessGuard tenantAccessGuard;
 
     public CustomerOwnerHistoryService(CustomerOwnerHistoryRepository repository,
-                                       CustomerRepository customerRepository) {
+                                       CustomerRepository customerRepository,
+                                       TenantAccessGuard tenantAccessGuard) {
         this.repository = repository;
         this.customerRepository = customerRepository;
+        this.tenantAccessGuard = tenantAccessGuard;
     }
 
     @Transactional(readOnly = true)
     public List<CustomerOwnerHistoryResponse> findByCustomer(Long customerId) {
+        findCustomerInActiveTenant(customerId);
         return repository.findByCustomerIdOrderByChangedAtDesc(customerId)
                 .stream()
                 .map(this::toResponse)
@@ -27,8 +32,7 @@ public class CustomerOwnerHistoryService {
     }
 
     public CustomerOwnerHistoryResponse reassign(Long customerId, Long toUserId, String reason, Long changedByUserId) {
-        Customer customer = customerRepository.findById(customerId)
-                .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado"));
+        Customer customer = findCustomerInActiveTenant(customerId);
 
         CustomerOwnerHistory history = new CustomerOwnerHistory();
         history.setCustomerId(customerId);
@@ -54,5 +58,12 @@ public class CustomerOwnerHistoryService {
                 entity.getChangedAt(),
                 entity.getChangedByUserId()
         );
+    }
+
+    private Customer findCustomerInActiveTenant(Long customerId) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado"));
+        tenantAccessGuard.requireBranch(customer.getBranch().getId(), "El cliente no pertenece a la sucursal activa");
+        return customer;
     }
 }
