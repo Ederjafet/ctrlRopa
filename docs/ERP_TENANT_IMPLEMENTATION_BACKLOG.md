@@ -9,6 +9,28 @@ Tipo: backlog documental, sin implementacion
 
 Convertir el analisis de Fase 2A/2B en un backlog tecnico ordenado para implementar multi-compania con bajo riesgo, evitando fuga de datos entre clientes y manteniendo trazabilidad HPSQ-SOFT.
 
+## Actualizacion AUTH-F4 - Runtime cross-tenant hardening P0
+
+Fecha: 2026-05-25
+Estado: completado tecnico condicionado.
+
+Alcance ejecutado:
+
+- Validacion runtime QA_A/QA_B para clientes, items, batches, pagos y ventas.
+- Correccion backend de lookups P0 por id/codigo/QR/folio para validar branch activa.
+- Pruebas negativas automatizadas para clientes, items, batches y pagos; se conservan pruebas de pagos/ventas de AUTH-F3.
+
+Criterios cubiertos:
+
+- QA_A no lista branch QA_B.
+- QA_B no lista branch QA_A.
+- Codigo/QR/folio duplicado resuelve al tenant propio.
+- Pago/venta DEFAULT por id se bloquea desde QA_A/QA_B.
+
+Pendiente:
+
+- Extender hardening a reportes, reservaciones, paquetes, envios, saldos y devoluciones antes de declarar SaaS financiero completo.
+
 ## Principios de ejecucion futura
 
 - No big bang.

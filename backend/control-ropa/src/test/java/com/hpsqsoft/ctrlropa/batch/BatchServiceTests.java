@@ -109,6 +109,17 @@ class BatchServiceTests {
     }
 
     @Test
+    void findByFolioFromAnotherActiveBranchIsRejected() {
+        Batch batch = batch();
+        batch.setBranch(branch(company(), 11L));
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(tenantResolver.resolveCurrent()).thenReturn(tenant());
+        when(batchRepository.findByCompanyIdAndFolio(1L, "L-2026-QA")).thenReturn(Optional.of(batch));
+
+        assertThrows(AccessDeniedException.class, () -> service.findByFolio("L-2026-QA"));
+    }
+
+    @Test
     void branchFromAnotherCompanyIsRejectedBeforeQuery() {
         when(currentUser.getUserId()).thenReturn(99L);
         when(tenantResolver.resolveCurrent()).thenReturn(tenant());
@@ -168,8 +179,12 @@ class BatchServiceTests {
     }
 
     private Branch branch(Company company) {
+        return branch(company, 10L);
+    }
+
+    private Branch branch(Company company, Long id) {
         Branch branch = new Branch();
-        branch.setId(10L);
+        branch.setId(id);
         branch.setCompany(company);
         branch.setCode("QA_CTR");
         branch.setName("QA Centro");

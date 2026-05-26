@@ -7,6 +7,8 @@ Nota AUTH-F2: la propuesta formal de catalogo minimo recomendado queda documenta
 
 Nota AUTH-F3: la implementacion inicial del catalogo y enforcement P0 queda documentada en `docs/AUTH_F3_RBAC_PERMISSIONS_ENFORCEMENT.md`.
 
+Nota AUTH-F4: el hardening runtime cross-tenant P0 para clientes, items, batches, pagos y ventas queda documentado en `docs/AUTH_F4_CROSS_TENANT_RUNTIME_HARDENING.md`.
+
 ## Objetivo
 
 Iniciar AUTH-F como fase de diagnostico y matriz RBAC. Esta fase no cambia permisos productivos, no agrega migraciones, no toca SQL y no modifica enforcement funcional. El resultado es una base formal para decidir subfases posteriores de RBAC avanzado.

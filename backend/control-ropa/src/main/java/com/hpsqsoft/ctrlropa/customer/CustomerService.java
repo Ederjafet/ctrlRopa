@@ -9,6 +9,7 @@ import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
 import com.hpsqsoft.ctrlropa.tenant.CurrentTenantContext;
 import com.hpsqsoft.ctrlropa.tenant.TenantResolver;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,7 +50,9 @@ public class CustomerService {
     @Transactional(readOnly = true)
     public CustomerResponse findById(Long id) {
         assertCan(PermissionCode.VIEW_CUSTOMERS);
-        return toResponse(findEntityById(id, currentCompanyId()));
+        Customer customer = findEntityById(id, currentCompanyId());
+        assertCustomerBelongsToCurrentTenant(customer);
+        return toResponse(customer);
     }
 
     @Transactional(readOnly = true)
@@ -84,6 +87,7 @@ public class CustomerService {
         assertCan(PermissionCode.EDIT_CUSTOMER);
         Long companyId = currentCompanyId();
         Customer existing = findEntityById(id, companyId);
+        assertCustomerBelongsToCurrentTenant(existing);
 
         if (!existing.getPhone().equals(request.getPhone())
                 && repository.existsByCompanyIdAndBranchIdAndPhone(
@@ -113,6 +117,7 @@ public class CustomerService {
     public CustomerResponse deactivate(Long id) {
         assertCan(PermissionCode.EDIT_CUSTOMER);
         Customer existing = findEntityById(id, currentCompanyId());
+        assertCustomerBelongsToCurrentTenant(existing);
         existing.setStatus(Status.INACTIVE);
         return toResponse(repository.save(existing));
     }
@@ -170,6 +175,15 @@ public class CustomerService {
     private Customer findEntityById(Long id, Long companyId) {
         return repository.findByCompanyIdAndId(companyId, id)
                 .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado con id: " + id));
+    }
+
+    private void assertCustomerBelongsToCurrentTenant(Customer customer) {
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        Long branchId = customer.getBranch().getId();
+        tenantResolver.assertBranchBelongsToCompany(branchId, tenant.getCompanyId());
+        if (tenant.getBranchId() != null && !tenant.getBranchId().equals(branchId)) {
+            throw new AccessDeniedException("El cliente no pertenece a la sucursal activa");
+        }
     }
 
     private Status resolveUpdatedStatus(Customer existing, Customer request) {

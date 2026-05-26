@@ -84,6 +84,17 @@ class CustomerServiceTests {
     }
 
     @Test
+    void customerLookupByIdFromAnotherActiveBranchIsRejected() {
+        Customer customer = customer();
+        customer.setBranch(branch(company(), 11L));
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(tenantResolver.resolveCurrent()).thenReturn(tenant());
+        when(repository.findByCompanyIdAndId(1L, 7L)).thenReturn(Optional.of(customer));
+
+        assertThrows(AccessDeniedException.class, () -> service.findById(7L));
+    }
+
+    @Test
     void branchFromAnotherCompanyIsRejectedBeforeQuery() {
         when(currentUser.getUserId()).thenReturn(99L);
         when(tenantResolver.resolveCurrent()).thenReturn(tenant());
@@ -161,8 +172,12 @@ class CustomerServiceTests {
     }
 
     private Branch branch(Company company) {
+        return branch(company, 10L);
+    }
+
+    private Branch branch(Company company, Long id) {
         Branch branch = new Branch();
-        branch.setId(10L);
+        branch.setId(id);
         branch.setCompany(company);
         branch.setCode("QA_CTR");
         branch.setName("QA Centro");

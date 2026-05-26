@@ -103,6 +103,15 @@ class PaymentServiceAccessTests {
         assertEquals(6L, response.getBranchId());
     }
 
+    @Test
+    void findPaymentsByCustomerFromAnotherActiveBranchIsRejected() {
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(paymentRepository.findByCustomerIdOrderByCreatedAtDesc(20L)).thenReturn(List.of(payment(1L, 4L)));
+        when(tenantResolver.resolveCurrent()).thenReturn(tenant(2L, 6L));
+
+        assertThrows(AccessDeniedException.class, () -> service.findByCustomer(20L));
+    }
+
     private static CurrentTenantContext tenant(Long companyId, Long branchId) {
         return new CurrentTenantContext(companyId, "QA_A", "Empresa QA A", branchId, "QA_A_CTR", "QA A Centro", 99L);
     }

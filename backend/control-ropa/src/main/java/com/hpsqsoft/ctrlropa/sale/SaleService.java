@@ -107,6 +107,9 @@ public class SaleService {
 
         Branch branch = branchRepository.findById(request.getBranchId())
                 .orElseThrow(() -> new IllegalArgumentException("Sucursal no encontrada"));
+        assertBranchBelongsToCurrentTenant(branch.getId());
+        assertBranchBelongsToCurrentTenant(item.getBranch().getId());
+        assertBranchBelongsToCurrentTenant(customer.getBranch().getId());
 
         SalesChannel salesChannel = salesChannelRepository.findById(request.getSalesChannelId())
                 .orElseThrow(() -> new IllegalArgumentException("Canal no encontrado"));

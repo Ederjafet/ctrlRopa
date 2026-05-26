@@ -13,6 +13,7 @@ import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
 import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
 import com.hpsqsoft.ctrlropa.tenant.CurrentTenantContext;
 import com.hpsqsoft.ctrlropa.tenant.TenantResolver;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -388,7 +389,12 @@ public class BatchService {
     }
 
     private void validateBatchBranch(Batch batch) {
-        tenantResolver.assertBranchBelongsToCompany(batch.getBranch().getId(), batch.getCompany().getId());
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        Long branchId = batch.getBranch().getId();
+        tenantResolver.assertBranchBelongsToCompany(branchId, tenant.getCompanyId());
+        if (tenant.getBranchId() != null && !tenant.getBranchId().equals(branchId)) {
+            throw new AccessDeniedException("El lote no pertenece a la sucursal activa");
+        }
     }
 
     private long countTenantItems(Batch batch) {

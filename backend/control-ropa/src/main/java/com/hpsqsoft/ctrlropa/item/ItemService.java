@@ -15,6 +15,7 @@ import com.hpsqsoft.ctrlropa.inventory.StorageLocationRepository;
 import com.hpsqsoft.ctrlropa.tenant.CurrentTenantContext;
 import com.hpsqsoft.ctrlropa.tenant.TenantResolver;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -97,13 +98,16 @@ public class ItemService {
 
     @Transactional(readOnly = true)
     public ItemResponse findById(Long id) {
-        return toResponse(findEntityById(id, currentCompanyId()));
+        Item item = findEntityById(id, currentCompanyId());
+        assertItemBelongsToCurrentTenant(item);
+        return toResponse(item);
     }
 
     @Transactional(readOnly = true)
     public ItemResponse findByCode(String code) {
         Item entity = repository.findByCompanyIdAndCode(currentCompanyId(), code)
                 .orElseThrow(() -> new IllegalArgumentException("Item no encontrado con código: " + code));
+        assertItemBelongsToCurrentTenant(entity);
         return toResponse(entity);
     }
     
@@ -112,6 +116,7 @@ public class ItemService {
         Item item = repository.findByCompanyIdAndCode(currentCompanyId(), code)
                 .orElseThrow(() -> new IllegalArgumentException("Item no encontrado con código: " + code));
 
+        assertItemBelongsToCurrentTenant(item);
         return buildLookup(item);
     }
 
@@ -120,6 +125,7 @@ public class ItemService {
         Item item = repository.findByCompanyIdAndQrCode(currentCompanyId(), qrCode)
                 .orElseThrow(() -> new IllegalArgumentException("Item no encontrado con QR: " + qrCode));
 
+        assertItemBelongsToCurrentTenant(item);
         return buildLookup(item);
     }
 
@@ -292,6 +298,7 @@ public class ItemService {
     public ItemResponse update(Long id, UpdateItemRequest request) {
         Long companyId = currentCompanyId();
         Item existing = findEntityById(id, companyId);
+        assertItemBelongsToCurrentTenant(existing);
 
         if (existing.getStatus() != ItemStatus.AVAILABLE) {
             throw new IllegalArgumentException("Solo se pueden editar items disponibles");
@@ -346,6 +353,7 @@ public class ItemService {
     public ItemResponse changeLocation(Long id, Long storageLocationId) {
         Long companyId = currentCompanyId();
         Item existing = findEntityById(id, companyId);
+        assertItemBelongsToCurrentTenant(existing);
 
         if (existing.getStatus() != ItemStatus.AVAILABLE) {
             throw new IllegalArgumentException("Solo se pueden editar items disponibles");
@@ -386,6 +394,15 @@ public class ItemService {
     private Item findEntityById(Long id, Long companyId) {
         return repository.findByCompanyIdAndId(companyId, id)
                 .orElseThrow(() -> new IllegalArgumentException("Item no encontrado con id: " + id));
+    }
+
+    private void assertItemBelongsToCurrentTenant(Item item) {
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        Long branchId = item.getBranch().getId();
+        tenantResolver.assertBranchBelongsToCompany(branchId, tenant.getCompanyId());
+        if (tenant.getBranchId() != null && !tenant.getBranchId().equals(branchId)) {
+            throw new AccessDeniedException("El item no pertenece a la sucursal activa");
+        }
     }
 
     private ItemResponse toResponse(Item entity) {

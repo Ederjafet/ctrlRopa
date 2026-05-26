@@ -1,5 +1,39 @@
 # ERP - Bitacora de cambios
 
+## 2026-05-25 - AUTH-F4 runtime cross-tenant hardening P0
+
+Tipo: seguridad backend, runtime QA, tenant validation P0.
+
+Objetivo:
+
+- Validar runtime real QA_A/QA_B y bloquear fugas cross-tenant/cross-branch en clientes, items, batches, pagos y ventas.
+
+Cambios realizados:
+
+- `CustomerService`: `findById`, `update` y `deactivate` validan branch activa del token.
+- `ItemService`: `findById`, `findByCode`, `lookupByCode`, `lookupByQrCode`, `update` y `changeLocation` validan branch activa.
+- `BatchService`: `validateBatchBranch` valida contra tenant activo, company activa y branch activa.
+- `PaymentService`: `findByCustomer`, `findByReservation`, `voidPayment`, `createByItemCode`, `createByQrCode` y target de venta/reserva validan tenant/branch activa.
+- `SaleService`: `create` valida branch activa para branch solicitada, item y customer.
+- Se creo `docs/AUTH_F4_CROSS_TENANT_RUNTIME_HARDENING.md` con comandos reproducibles y evidencia HTTP.
+
+Evidencia runtime:
+
+- QA_A branch `6` pudo consultar datos propios.
+- QA_A contra branch `7` devolvio `403` en listados.
+- QA_A contra customer QA_B devolvio `404`.
+- QA_A contra pago/venta DEFAULT id `1` devolvio `403`.
+- QA_A y QA_B resuelven codigo/QR/folio duplicados a su propio tenant.
+
+Pruebas ejecutadas:
+
+- OK: `.\mvnw.cmd test` desde `backend/control-ropa`.
+- Resultado: `BUILD SUCCESS`, 44 tests, 0 failures, 0 errors.
+
+Riesgos pendientes:
+
+- Reportes, reservaciones, paquetes, envios, saldos y devoluciones aun requieren hardening equivalente antes de declarar SaaS financiero completo.
+
 ## 2026-05-25 - AUTH-F3 fix robustez cliente legacy status null
 
 Tipo: robustez backend, datos legacy.

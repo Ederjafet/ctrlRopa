@@ -109,6 +109,16 @@ class ItemServiceTests {
     }
 
     @Test
+    void itemLookupByCodeFromAnotherActiveBranchIsRejected() {
+        Item item = item();
+        item.setBranch(branch(company(), 11L));
+        when(tenantResolver.resolveCurrent()).thenReturn(tenant());
+        when(repository.findByCompanyIdAndCode(1L, "ITEM-QA-001")).thenReturn(Optional.of(item));
+
+        assertThrows(AccessDeniedException.class, () -> service.findByCode("ITEM-QA-001"));
+    }
+
+    @Test
     void branchFromAnotherCompanyIsRejectedBeforeQuery() {
         when(tenantResolver.resolveCurrent()).thenReturn(tenant());
         doThrow(new AccessDeniedException("cross-company"))
@@ -132,8 +142,12 @@ class ItemServiceTests {
     }
 
     private Branch branch(Company company) {
+        return branch(company, 10L);
+    }
+
+    private Branch branch(Company company, Long id) {
         Branch branch = new Branch();
-        branch.setId(10L);
+        branch.setId(id);
         branch.setCompany(company);
         branch.setCode("QA_CTR");
         branch.setName("QA Centro");
