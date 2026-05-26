@@ -108,7 +108,7 @@ const operationAccessGroups: DashboardAccessGroup[] = [
       },
       {
         label: 'Pagos / Cobros',
-        permissionCode: 'REGISTER_PAYMENTS',
+        permissionCode: 'VIEW_PAYMENTS',
         route: '/payments',
       },
     ],

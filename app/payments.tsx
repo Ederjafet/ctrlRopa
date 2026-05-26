@@ -8,6 +8,7 @@ import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
 import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
+import { canAccessByPermission } from '@/services/accessControl';
 import { apiRequest } from '@/services/apiClient';
 import { getPaymentMethods, PaymentMethod } from '@/services/catalogService';
 import {
@@ -397,6 +398,11 @@ export default function PaymentsScreen() {
       const load = async () => {
         try {
           setIsLoading(true);
+          const session = await getSession();
+          if (!session || !canAccessByPermission(session, 'VIEW_PAYMENTS')) {
+            router.replace('/access-denied' as any);
+            return;
+          }
           await loadPaymentMethods();
           await loadPendingOrders();
           await loadTargetData();
@@ -459,6 +465,11 @@ export default function PaymentsScreen() {
 
     if (!session) {
       Alert.alert('Sesión', 'No se encontro sesión activa.');
+      return;
+    }
+
+    if (!canAccessByPermission(session, 'REGISTER_PAYMENTS')) {
+      Alert.alert('Pagos', 'No tienes permisos para registrar pagos.');
       return;
     }
 

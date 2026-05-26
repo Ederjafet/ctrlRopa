@@ -13,6 +13,8 @@ public final class PermissionCode {
     public static final String MANAGE_SECURITY_SETTINGS = "MANAGE_SECURITY_SETTINGS";
 
     public static final String VIEW_CUSTOMERS = "VIEW_CUSTOMERS";
+    public static final String CREATE_CUSTOMER = "CREATE_CUSTOMER";
+    public static final String EDIT_CUSTOMER = "EDIT_CUSTOMER";
     public static final String VIEW_CUSTOMER_ORDERS = "VIEW_CUSTOMER_ORDERS";
     public static final String VIEW_INVENTORY = "VIEW_INVENTORY";
     public static final String MANAGE_INVENTORY = "MANAGE_INVENTORY";
@@ -21,6 +23,7 @@ public final class PermissionCode {
     public static final String DO_DOOR_SALE = "DO_DOOR_SALE";
     public static final String DO_DOOR_RESERVATION = "DO_DOOR_RESERVATION";
 
+    public static final String VIEW_PAYMENTS = "VIEW_PAYMENTS";
     public static final String REGISTER_PAYMENTS = "REGISTER_PAYMENTS";
     public static final String APPLY_CUSTOMER_BALANCE = "APPLY_CUSTOMER_BALANCE";
     public static final String VOID_PAYMENT = "VOID_PAYMENT";
@@ -29,6 +32,7 @@ public final class PermissionCode {
     public static final String MANAGE_SHIPMENTS = "MANAGE_SHIPMENTS";
 
     public static final String CANCEL_RESERVATION = "CANCEL_RESERVATION";
+    public static final String VIEW_SALES = "VIEW_SALES";
     public static final String CANCEL_SALE = "CANCEL_SALE";
 
     public static final String REQUEST_REFUND = "REQUEST_REFUND";

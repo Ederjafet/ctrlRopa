@@ -33,7 +33,7 @@ export function canSelectLiveCustomer(user: UserSession | null): boolean {
 }
 
 export function canCreateLiveCustomer(user: UserSession | null): boolean {
-  return canSelectLiveCustomer(user);
+  return canOperateLive(user) && canAccessByPermission(user, 'CREATE_CUSTOMER');
 }
 
 export function canSelectLiveItem(user: UserSession | null): boolean {

@@ -29,7 +29,7 @@ public class OperationMenuService {
 
         List<OperationMenuResponse.MenuModule> modules = new ArrayList<>();
 
-        modules.add(permissionOnly("CUSTOMERS", "Clientes", userId, PermissionCode.VIEW_INVENTORY));
+        modules.add(permissionOnly("CUSTOMERS", "Clientes", userId, PermissionCode.VIEW_CUSTOMERS));
         modules.add(permissionOnly("INVENTORY", "Inventario", userId, PermissionCode.VIEW_INVENTORY));
 
         modules.add(permissionAndChannel(
@@ -59,7 +59,7 @@ public class OperationMenuService {
                 ChannelCode.DOOR_RESERVATION
         ));
 
-        modules.add(permissionOnly("PAYMENTS", "Pagos", userId, PermissionCode.REGISTER_PAYMENTS));
+        modules.add(permissionOnly("PAYMENTS", "Pagos", userId, PermissionCode.VIEW_PAYMENTS));
         modules.add(permissionOnly("BALANCE", "Saldo a favor", userId, PermissionCode.APPLY_CUSTOMER_BALANCE));
         modules.add(permissionOnly("PACKAGES", "Paquetes", userId, PermissionCode.CREATE_CLOSE_CUSTOMER_PACKAGE));
         modules.add(permissionOnly("SHIPMENTS", "Envíos", userId, PermissionCode.MANAGE_SHIPMENTS));

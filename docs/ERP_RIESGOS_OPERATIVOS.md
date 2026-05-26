@@ -42,6 +42,8 @@ Probabilidad:
 | Limites de plan solo en frontend | ALTO | MEDIA | Cliente podria exceder usuarios, sucursales o modulos por API. | Validacion backend contra `company_subscriptions`. | Desactivar recurso excedente con proceso administrativo. |
 | Soporte HPSQ-SOFT modifica datos financieros | CRITICO | BAJA/MEDIA | Riesgo de saldos/caja incorrectos y responsabilidad operativa. | Prohibir por defecto; herramienta auditada y aprobacion formal si se requiere. | Auditoria, reversa operacional y bloqueo de sesion soporte. |
 | Endpoint P0 sin tenant validation | CRITICO | ALTA durante migracion | Un id directo, folio o branchId podria exponer datos de otra empresa. | Usar `ERP_TENANT_ENDPOINT_MATRIX.md`, bloquear release si endpoint P0 queda sin `company_id`. | Deshabilitar multi-compania o bloquear endpoint afectado. |
+| Consulta por id de pagos/ventas sin tenant validation | CRITICO | ALTA detectada en AUTH-F3 | Usuario con permiso funcional podia consultar pago/venta de otra branch/company por id directo. | AUTH-F3 fix: `PaymentService.findById` y `SaleService.findById` validan company/branch activa; pruebas negativas agregadas. | Revertir fix solo si se bloquea endpoint afectado; no liberar SaaS multi-company sin esta validacion. |
+| Datos legacy con status null | ALTO | MEDIA detectada en AUTH-F3 | Un registro antiguo con estado nulo puede causar 500 al mapear respuesta aunque permisos y tenant sean correctos. | AUTH-F3 fix: `CustomerService.update` normaliza cliente legacy a `ACTIVE` y `toResponse` usa fallback seguro. | Revertir fix solo si se corrige dato legacy por SQL controlado y se mantiene fallback defensivo. |
 | Tabla P0 sin company_id/backfill | CRITICO | ALTA durante migracion | Datos existentes podrian quedar huerfanos o mezclados. | Usar `ERP_TENANT_TABLE_MATRIX.md`, conteos antes/despues, migracion gradual. | Restaurar backup o mantener columna nullable hasta corregir. |
 | Accion HPSQ-SOFT sin auditoria SaaS | CRITICO | MEDIA | No se podria explicar quien suspendio, cambio plan o accedio a soporte. | Usar `ERP_SAAS_AUDIT_ACTIONS_MATRIX.md`, motivo y doble confirmacion cuando aplique. | Revocar permisos SaaS y suspender consola. |
 | CurrentTenantContext incompleto | CRITICO | MEDIA durante implementacion | Servicios podrian validar usuario pero no company/branch/plan, dejando huecos cross-company. | Diseno Fase 2C, tenant resolver central, pruebas negativas. | Bloquear endpoints tenant o revertir foundation. |
@@ -138,6 +140,8 @@ Probabilidad:
 - Fase 2M convierte batches en tenant-aware para endpoints directos; aun falta dataset Empresa A/B, proveedores tenant-aware y revision de consumidores legacy.
 - Fase 2N crea dataset QA Empresa A/B; el aislamiento real sigue pendiente hasta ejecutar runtime smoke y capturar evidencia.
 - Fase 2O valida aislamiento A/B para customers/items/batches directos; SaaS real sigue bloqueado para ventas/pagos/live/reportes.
+- AUTH-F3 corrigio fuga tenant en consultas por id de pagos/ventas; antes de declarar cobertura financiera SaaS completa faltan pruebas negativas de otros endpoints financieros/reportes por id, customerId, reservationId y branchId explicitos.
+- AUTH-F3 corrigio robustez de clientes legacy con `status = NULL`; conviene auditar nulos legacy similares antes de endurecer mas modulos.
 - LIVE-B documenta metricas/engagement/Facebook; no implementar runtime sin normalizar estados, company_id y eventos internos.
 - LIVE-C normaliza UX visual de estados, pero backend sigue con estados actuales `OPEN/ACTIVE/CLOSED`.
 - LIVE-D no cierra smoke visual real hasta validar navegador en `8081` con evidencia.
@@ -182,6 +186,8 @@ Probabilidad:
 - AUTH-F inicia como matriz diagnostica; mientras no exista enforcement backend por endpoint, el frontend no debe considerarse barrera de seguridad suficiente.
 - AUTH-F confirma huecos P0 en permisos finos de clientes y pagos: no existe `CREATE_CUSTOMER` ni `VIEW_PAYMENTS`, por lo que no se debe prometer RBAC granular en esos flujos hasta una subfase posterior.
 - AUTH-F2 propone catalogo minimo pero no lo implementa; hasta crear migracion, seeds, frontend y enforcement, `CREATE_CUSTOMER`, `EDIT_CUSTOMER`, `VIEW_PAYMENTS` y `VIEW_SALES` siguen siendo decisiones pendientes, no permisos reales.
+- AUTH-F3 crea permisos y enforcement P0 inicial; roles productivos reales no reciben permisos nuevos, por lo que QA/productivo deben actualizar asignaciones de forma controlada antes de validar flujos completos.
+- AUTH-F3 protege consultas de pagos/ventas; pantallas o integraciones que antes dependian solo de `REGISTER_PAYMENTS` o `DO_DOOR_SALE` pueden requerir `VIEW_PAYMENTS`/`VIEW_SALES` en roles.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

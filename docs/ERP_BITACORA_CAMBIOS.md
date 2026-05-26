@@ -1,5 +1,54 @@
 # ERP - Bitacora de cambios
 
+## 2026-05-25 - AUTH-F3 fix robustez cliente legacy status null
+
+Tipo: robustez backend, datos legacy.
+
+Objetivo:
+
+- Corregir 500 en `PUT /api/customers/{id}` cuando un cliente legacy tiene `status = NULL`.
+
+Cambios realizados:
+
+- `CustomerService.update` conserva el status existente cuando el request no trae status.
+- Si el cliente legacy tenia status nulo, `update` lo normaliza a `Status.ACTIVE` al guardar.
+- `CustomerService.toResponse` usa fallback seguro `ACTIVE` si recibe status nulo.
+- Se mantuvieron sin cambios `EDIT_CUSTOMER`, tenant validation y scope por company.
+
+Pruebas ejecutadas:
+
+- OK: `.\mvnw.cmd test` desde `backend/control-ropa`.
+- Resultado: `BUILD SUCCESS`, 40 tests, 0 failures, 0 errors.
+
+Riesgos pendientes:
+
+- Revisar si existen otros registros legacy con columnas obligatorias nulas en tablas P0 antes de avanzar a enforcement mas fino.
+
+## 2026-05-25 - AUTH-F3 fix tenant en pagos/ventas por ID
+
+Tipo: seguridad backend, tenant validation P0.
+
+Objetivo:
+
+- Corregir fuga detectada en smoke runtime donde un usuario QA_A con permisos `VIEW_PAYMENTS`/`VIEW_SALES` podia consultar por id pagos o ventas de otra branch/company.
+
+Cambios realizados:
+
+- `PaymentService.findById` mantiene `VIEW_PAYMENTS` y ahora valida que el pago pertenece a la company/branch activa del token.
+- `SaleService.findById` mantiene `VIEW_SALES` y ahora valida que la venta pertenece a la company/branch activa del token.
+- `SaleService.findByBranch` tambien valida branch activa para evitar listados cross-branch por URL.
+- Se agregaron pruebas negativas y positivas para pagos/ventas por id con branch activa vs branch ajena.
+
+Pruebas ejecutadas:
+
+- OK: `.\mvnw.cmd test` desde `backend/control-ropa`.
+- Resultado: `BUILD SUCCESS`, 38 tests, 0 failures, 0 errors.
+
+Riesgos pendientes:
+
+- Mantener smoke runtime con `qa.a.vendedor@local.test` para confirmar que `GET /api/payments/1` y `GET /api/sales/1` ya no devuelven datos de `QA_CTR` cuando la branch activa es `QA_A_CTR`.
+- Revisar en fases siguientes otros endpoints financieros/reportes por id o por branch explicita.
+
 ## 2026-05-11 - Fase 0
 
 Tipo: documentacion inicial ERP.
@@ -2749,3 +2798,38 @@ Estado:
 
 - `GO documental condicionado`.
 - `NO-GO` para migraciones/enforcement hasta aprobacion de catalogo y plan AUTH-F2B/F2E.
+
+## 2026-05-24 - AUTH-F3 catalogo RBAC y enforcement P0 inicial
+
+Tipo: cambio controlado de seguridad RBAC, con migracion Flyway, script QA, enforcement backend P0, frontend alineado y documentacion.
+
+Objetivo:
+
+- Crear permisos aprobados `CREATE_CUSTOMER`, `EDIT_CUSTOMER`, `VIEW_PAYMENTS`, `VIEW_SALES`.
+- Aplicar enforcement inicial en clientes, consultas de pagos y consultas de ventas.
+- Mantener intacta la logica funcional de pagos, ventas y reportes.
+
+Cambios realizados:
+
+- `V44__auth_f3_rbac_catalog_permissions.sql`: crea permisos RBAC minimos sin asignarlos a roles productivos.
+- `PermissionCode.java`: agrega codigos nuevos.
+- `CustomerService`: lectura requiere `VIEW_CUSTOMERS`, alta `CREATE_CUSTOMER`, edicion/desactivacion `EDIT_CUSTOMER`.
+- `PaymentService`: consultas `GET` requieren `VIEW_PAYMENTS`; registro/anulacion conservan permisos existentes.
+- `SaleService`: consultas `GET` requieren `VIEW_SALES`; crear/cancelar conservan permisos existentes.
+- `OperationMenuService`: clientes usa `VIEW_CUSTOMERS` y pagos usa `VIEW_PAYMENTS`.
+- Frontend clientes/pagos/LIVE alinea guards con permisos nuevos.
+- `docs/qa/09-auth-f3-rbac-permissions-qa.sql`: asigna permisos nuevos solo a roles QA A/B.
+- `docs/AUTH_F3_RBAC_PERMISSIONS_ENFORCEMENT.md`: documenta alcance, endpoints protegidos, riesgos y rollback.
+
+Pruebas:
+
+- `.\mvnw.cmd test`: `BUILD SUCCESS`, 34 tests, 0 failures, Flyway V44 validada/aplicada localmente.
+- `npm.cmd run lint`: exitoso con warnings preexistentes.
+- `npx.cmd tsc --noEmit`: exitoso.
+- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: exitoso.
+- `git diff --check`: sin errores, solo warnings CRLF.
+
+Decision:
+
+- `GO tecnico condicionado`.
+- Pendiente ejecutar script QA y smoke QA con roles A/B antes de declarar cierre runtime final AUTH-F3.

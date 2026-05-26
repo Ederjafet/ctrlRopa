@@ -163,3 +163,11 @@ No declarar RBAC fino completo hasta que existan:
 - Enforcement backend por endpoint.
 - Pruebas negativas automatizadas y smoke QA por rol.
 
+## Seguimiento AUTH-F3
+
+AUTH-F3 implementa el catalogo minimo y enforcement P0 inicial. Ver:
+
+- `docs/AUTH_F3_RBAC_PERMISSIONS_ENFORCEMENT.md`
+
+AUTH-F2 se conserva como documento de aprobacion; los permisos dejan de ser propuesta solo cuando la migracion V44 y el enforcement AUTH-F3 esten aplicados y validados.
+

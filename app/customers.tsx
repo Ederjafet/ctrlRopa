@@ -34,6 +34,7 @@ export default function CustomersScreen() {
   const [filtered, setFiltered] = useState<Customer[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [canCreateCustomer, setCanCreateCustomer] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -49,6 +50,8 @@ export default function CustomersScreen() {
       router.replace('/access-denied' as any);
       return;
     }
+
+    setCanCreateCustomer(canAccessByPermission(session, 'CREATE_CUSTOMER'));
 
     try {
       setIsLoading(true);
@@ -101,10 +104,12 @@ export default function CustomersScreen() {
         Clientes
       </AppText>
 
-      <AppButton
-        title="Nuevo cliente"
-        onPress={() => router.push('/customers-create' as any)}
-      />
+      {canCreateCustomer ? (
+        <AppButton
+          title="Nuevo cliente"
+          onPress={() => router.push('/customers-create' as any)}
+        />
+      ) : null}
 
       <View style={styles.search}>
         <AppInput

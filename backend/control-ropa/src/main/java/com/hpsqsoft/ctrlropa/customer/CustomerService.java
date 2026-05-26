@@ -3,6 +3,9 @@ package com.hpsqsoft.ctrlropa.customer;
 import com.hpsqsoft.ctrlropa.branch.Branch;
 import com.hpsqsoft.ctrlropa.branch.BranchRepository;
 import com.hpsqsoft.ctrlropa.common.Status;
+import com.hpsqsoft.ctrlropa.security.access.AccessService;
+import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
+import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
 import com.hpsqsoft.ctrlropa.tenant.CurrentTenantContext;
 import com.hpsqsoft.ctrlropa.tenant.TenantResolver;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -18,17 +21,24 @@ public class CustomerService {
     private final CustomerRepository repository;
     private final BranchRepository branchRepository;
     private final TenantResolver tenantResolver;
+    private final AccessService accessService;
+    private final CurrentUser currentUser;
 
     public CustomerService(CustomerRepository repository,
                            BranchRepository branchRepository,
-                           TenantResolver tenantResolver) {
+                           TenantResolver tenantResolver,
+                           AccessService accessService,
+                           CurrentUser currentUser) {
         this.repository = repository;
         this.branchRepository = branchRepository;
         this.tenantResolver = tenantResolver;
+        this.accessService = accessService;
+        this.currentUser = currentUser;
     }
 
     @Transactional(readOnly = true)
     public List<CustomerResponse> findByBranch(Long branchId) {
+        assertCan(PermissionCode.VIEW_CUSTOMERS);
         CurrentTenantContext tenant = resolveAndValidateBranch(branchId);
         return repository.findByCompanyIdAndBranchIdOrderByNameAsc(tenant.getCompanyId(), branchId)
                 .stream()
@@ -38,11 +48,13 @@ public class CustomerService {
 
     @Transactional(readOnly = true)
     public CustomerResponse findById(Long id) {
+        assertCan(PermissionCode.VIEW_CUSTOMERS);
         return toResponse(findEntityById(id, currentCompanyId()));
     }
 
     @Transactional(readOnly = true)
     public CustomerResponse findByBranchAndPhone(Long branchId, String phone) {
+        assertCan(PermissionCode.VIEW_CUSTOMERS);
         CurrentTenantContext tenant = resolveAndValidateBranch(branchId);
         Customer entity = repository.findByCompanyIdAndBranchIdAndPhone(tenant.getCompanyId(), branchId, phone)
                 .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado"));
@@ -50,6 +62,7 @@ public class CustomerService {
     }
 
     public CustomerResponse create(Long branchId, Customer entity) {
+        assertCan(PermissionCode.CREATE_CUSTOMER);
         CurrentTenantContext tenant = resolveAndValidateBranch(branchId);
         Branch branch = branchRepository.findById(branchId)
                 .orElseThrow(() -> new IllegalArgumentException("Sucursal no encontrada"));
@@ -68,6 +81,7 @@ public class CustomerService {
     }
 
     public CustomerResponse update(Long id, Customer request) {
+        assertCan(PermissionCode.EDIT_CUSTOMER);
         Long companyId = currentCompanyId();
         Customer existing = findEntityById(id, companyId);
 
@@ -90,13 +104,14 @@ public class CustomerService {
         existing.setEmail(request.getEmail());
         existing.setIsGeneric(request.getIsGeneric());
         existing.setGenericType(request.getGenericType());
-        existing.setStatus(request.getStatus());
+        existing.setStatus(resolveUpdatedStatus(existing, request));
 
         Customer saved = saveSafely(existing);
         return toResponse(saved);
     }
 
     public CustomerResponse deactivate(Long id) {
+        assertCan(PermissionCode.EDIT_CUSTOMER);
         Customer existing = findEntityById(id, currentCompanyId());
         existing.setStatus(Status.INACTIVE);
         return toResponse(repository.save(existing));
@@ -104,6 +119,7 @@ public class CustomerService {
 
     @Transactional(readOnly = true)
     public CustomerResponse findGenericByType(Long branchId, GenericType genericType) {
+        assertCan(PermissionCode.VIEW_CUSTOMERS);
         CurrentTenantContext tenant = resolveAndValidateBranch(branchId);
         Customer entity = repository.findByCompanyIdAndBranchIdAndIsGenericTrueAndGenericType(
                         tenant.getCompanyId(),
@@ -141,6 +157,10 @@ public class CustomerService {
         return tenantResolver.resolveCurrent().getCompanyId();
     }
 
+    private void assertCan(String permissionCode) {
+        accessService.assertCan(currentUser.getUserId(), permissionCode);
+    }
+
     private CurrentTenantContext resolveAndValidateBranch(Long branchId) {
         CurrentTenantContext tenant = tenantResolver.resolveCurrent();
         tenantResolver.assertBranchBelongsToCompany(branchId, tenant.getCompanyId());
@@ -150,6 +170,21 @@ public class CustomerService {
     private Customer findEntityById(Long id, Long companyId) {
         return repository.findByCompanyIdAndId(companyId, id)
                 .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado con id: " + id));
+    }
+
+    private Status resolveUpdatedStatus(Customer existing, Customer request) {
+        if (request.getStatus() != null) {
+            return request.getStatus();
+        }
+        if (existing.getStatus() != null) {
+            return existing.getStatus();
+        }
+        return Status.ACTIVE;
+    }
+
+    private String statusName(Customer entity) {
+        Status status = entity.getStatus() == null ? Status.ACTIVE : entity.getStatus();
+        return status.name();
     }
 
     private CustomerResponse toResponse(Customer entity) {
@@ -165,7 +200,7 @@ public class CustomerService {
                 entity.getEmail(),
                 entity.getIsGeneric(),
                 entity.getGenericType(),
-                entity.getStatus().name()
+                statusName(entity)
         );
     }
 }

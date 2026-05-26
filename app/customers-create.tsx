@@ -6,12 +6,13 @@ import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
 import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 
+import { canAccessByPermission } from '@/services/accessControl';
 import { createCustomer } from '@/services/customerService';
 import { getSession } from '@/services/sessionStorage';
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Alert } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert } from 'react-native';
 
 export default function CustomersCreateScreen() {
   const router = useRouter();
@@ -25,6 +26,22 @@ export default function CustomersCreateScreen() {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
+
+  useEffect(() => {
+    const checkAccess = async () => {
+      const session = await getSession();
+
+      if (!session || !canAccessByPermission(session, 'CREATE_CUSTOMER')) {
+        router.replace('/access-denied' as any);
+        return;
+      }
+
+      setIsCheckingAccess(false);
+    };
+
+    checkAccess();
+  }, [router]);
 
   const handleSave = async () => {
     const cleanName = name.trim();
@@ -45,6 +62,11 @@ export default function CustomersCreateScreen() {
 
     if (!session) {
       Alert.alert('Sesión', 'No se encontró sesión activa.');
+      return;
+    }
+
+    if (!canAccessByPermission(session, 'CREATE_CUSTOMER')) {
+      router.replace('/access-denied' as any);
       return;
     }
 
@@ -72,6 +94,14 @@ export default function CustomersCreateScreen() {
       setIsSaving(false);
     }
   };
+
+  if (isCheckingAccess) {
+    return (
+      <AppScreen>
+        <ActivityIndicator />
+      </AppScreen>
+    );
+  }
 
   return (
     <AppScreen>

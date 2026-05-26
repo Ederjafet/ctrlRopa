@@ -425,3 +425,27 @@ Pendiente backlog:
 | AUTH-F2D alinear frontend catalogo | P1 | ALTO | migracion + QA | UI muestra permisos reales y elimina huerfanas |
 | AUTH-F2E enforcement clientes/pagos lectura | P0 | CRITICO | catalogo + pruebas | Endpoints P0 responden 403 sin permiso |
 | AUTH-F2F pruebas negativas API | P0 | CRITICO | enforcement | Tests cubren permitido/no permitido por rol |
+
+## Avance AUTH-F3
+
+Epic: catalogo RBAC minimo y enforcement P0 inicial.
+
+Completado:
+
+- Crear migracion `V44__auth_f3_rbac_catalog_permissions.sql`.
+- Agregar permisos `CREATE_CUSTOMER`, `EDIT_CUSTOMER`, `VIEW_PAYMENTS`, `VIEW_SALES`.
+- Crear script QA `docs/qa/09-auth-f3-rbac-permissions-qa.sql`.
+- Agregar enforcement backend P0 para clientes, consultas de pagos y consultas de ventas.
+- Alinear frontend clientes, pagos y alta rapida LIVE.
+- Agregar pruebas negativas unitarias de permisos.
+- Crear `docs/AUTH_F3_RBAC_PERMISSIONS_ENFORCEMENT.md`.
+
+Pendiente backlog:
+
+| Tarea | Prioridad | Riesgo | Dependencia | Criterio de aceptacion |
+|---|---|---|---|---|
+| Ejecutar script QA AUTH-F3 | P0 | ALTO | backup QA | Roles QA reciben permisos y sesiones se revocan |
+| Smoke QA A/B RBAC | P0 | CRITICO | script QA | Admin/vendedor operan segun permiso y sin permisos recibe 403/login bloqueado |
+| Validar frontend completo | P0 | ALTO | build web | Pantallas no quedan ocultas para roles QA actualizados |
+| AUTH-F4 extender direcciones cliente | P1 | ALTO | decision negocio | Direcciones respetan `EDIT_CUSTOMER` si se aprueba |
+| AUTH-F5 asignacion productiva controlada | P1 | CRITICO | smoke QA | Roles reales reciben permisos nuevos con aprobacion |
