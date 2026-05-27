@@ -95,6 +95,32 @@ Pendiente:
 - AUTH-G2 debe crear consulta protegida para soporte/admin.
 - Definir retencion, archivado y alertas por patrones de seguridad.
 
+## Actualizacion AUTH-H - Consulta protegida de auditoria de seguridad
+
+Fecha: 2026-05-26
+Estado: implementado tecnico condicionado.
+
+Alcance ejecutado:
+
+- Endpoint `GET /api/security/audit-events`.
+- Permiso requerido: `MANAGE_SECURITY_SETTINGS`.
+- Filtros por evento, email, company, branch, status, fecha y path.
+- Paginacion basica y orden descendente.
+- Smoke automatico `docs/qa/11-auth-h-security-audit-smoke.sh`.
+- Reportes Markdown/CSV bajo `qa-reports/`.
+
+Criterios cubiertos:
+
+- Usuario sin permiso no debe consultar auditoria.
+- Usuario con `MANAGE_SECURITY_SETTINGS` consulta eventos.
+- Smoke genera `LOGIN_BLOCKED_NO_ACCESS` y `TOKEN_REVOKED`, luego valida que ambos existen.
+
+Pendiente:
+
+- UI minima futura en Sistema/Seguridad.
+- Evaluar permiso dedicado `VIEW_SECURITY_AUDIT`.
+- Definir retencion y archivado.
+
 ## Principios de ejecucion futura
 
 - No big bang.

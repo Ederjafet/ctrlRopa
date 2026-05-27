@@ -102,7 +102,7 @@ Validacion tecnica:
 
 ## Proximos pasos recomendados
 
-- AUTH-G2: endpoint protegido solo admin/soporte para consultar eventos de auditoria.
+- AUTH-H: endpoint protegido solo admin/soporte para consultar eventos de auditoria. Implementado en `docs/AUTH_H_SECURITY_AUDIT_CONSOLE.md`.
 - AUTH-G3: filtros por usuario, company, evento, rango de fechas y recurso.
 - AUTH-G4: retencion/archivado de eventos y politicas de privacidad.
 - AUTH-G5: alertas para patrones repetidos de `TOKEN_REVOKED`, `PERMISSION_DENIED` o `BRANCH_DENIED`.

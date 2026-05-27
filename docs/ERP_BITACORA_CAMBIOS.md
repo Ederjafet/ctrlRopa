@@ -1,5 +1,35 @@
 # ERP - Bitacora de cambios
 
+## 2026-05-26 - AUTH-H consola protegida de auditoria de seguridad
+
+Tipo: seguridad backend, consulta administrativa, smoke automatizado.
+
+Objetivo:
+
+- Consultar `security_audit_events` desde un endpoint protegido y automatizar evidencia de eventos de seguridad.
+
+Cambios realizados:
+
+- Se creo `GET /api/security/audit-events`.
+- El endpoint exige `MANAGE_SECURITY_SETTINGS`.
+- Se agregaron filtros por `eventType`, `email`, `companyId`, `branchId`, `statusCode`, `dateFrom`, `dateTo` y `path`.
+- Se agrego paginacion basica y orden descendente por `occurred_at`.
+- Se creo `docs/qa/11-auth-h-security-audit-smoke.sh`.
+- El smoke genera reportes Markdown/CSV en `qa-reports/`.
+- Se creo `docs/AUTH_H_SECURITY_AUDIT_CONSOLE.md`.
+
+Validaciones ejecutadas:
+
+- OK: `.\mvnw.cmd test` desde `backend/control-ropa`.
+- Resultado backend: `BUILD SUCCESS`, 50 tests, 0 failures, 0 errors.
+- OK: `bash docs/qa/11-auth-h-security-audit-smoke.sh`.
+- Resultado smoke: `PASS=9`, `FAIL=0`, `SKIP=0`.
+
+Pendientes:
+
+- UI administrativa futura para consultar auditoria desde Sistema/Seguridad.
+- Evaluar permiso dedicado `VIEW_SECURITY_AUDIT` en RBAC avanzado.
+
 ## 2026-05-26 - AUTH-G auditoria de eventos de seguridad
 
 Tipo: seguridad backend, auditoria, trazabilidad de accesos bloqueados.
