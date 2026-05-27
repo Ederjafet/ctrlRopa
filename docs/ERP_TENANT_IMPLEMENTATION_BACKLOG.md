@@ -196,6 +196,32 @@ Pendiente:
 - Evaluar archivado historico antes de reducir retencion por debajo de 180 dias.
 - Definir alertas por patrones repetidos de bloqueo.
 
+## Actualizacion AUTH-J2 - Resumen estadistico de auditoria
+
+Fecha: 2026-05-27
+Estado: implementado tecnico condicionado.
+
+Alcance ejecutado:
+
+- Endpoint `GET /api/security/audit-events/summary`.
+- Permiso requerido `VIEW_SECURITY_AUDIT`.
+- Filtros por fecha, company, branch, email y tipo de evento.
+- Totales `totalEvents`, `total401`, `total403`.
+- Agrupaciones por evento, status, company, branch, email y path.
+- Eventos criticos recientes sin metadata sensible.
+- Smoke `docs/qa/13-auth-j2-security-audit-summary-smoke.sh` con reporte Markdown/CSV.
+
+Criterios cubiertos:
+
+- Soporte con `VIEW_SECURITY_AUDIT` consulta resumen.
+- Admin tenant sin permiso recibe `403`.
+- El resumen no expone tokens, passwords ni `metadataJson`.
+
+Pendiente:
+
+- Crear UI compacta de resumen si soporte necesita una vista ejecutiva dentro de `/system-security-audit`.
+- Evaluar indices compuestos si el volumen de auditoria crece.
+
 ## Principios de ejecucion futura
 
 - No big bang.

@@ -1,5 +1,37 @@
 # ERP - Bitacora de cambios
 
+## 2026-05-27 - AUTH-J2 resumen estadistico de auditoria
+
+Tipo: backend, seguridad, analitica operativa.
+
+Objetivo:
+
+- Consultar un resumen de eventos de seguridad sin revisar evento por evento.
+
+Cambios realizados:
+
+- Se creo `GET /api/security/audit-events/summary`.
+- El endpoint exige `VIEW_SECURITY_AUDIT`.
+- Se agrego `SecurityAuditSummaryResponse`.
+- Se agregaron totales `totalEvents`, `total401` y `total403`.
+- Se agregaron agrupaciones por evento, status, company, branch, email y path.
+- Se agregaron eventos criticos recientes sin `metadataJson`.
+- Se creo `docs/qa/13-auth-j2-security-audit-summary-smoke.sh`.
+- Se creo `docs/AUTH_J2_SECURITY_AUDIT_SUMMARY.md`.
+- Se ampliaron pruebas backend de `SecurityAuditEventQueryServiceTests`.
+
+Restricciones respetadas:
+
+- No se expusieron tokens, passwords ni metadata sensible.
+- No se cambio la limpieza AUTH-J1.
+- No se tocaron pagos, ventas ni reportes funcionales.
+
+Validaciones ejecutadas:
+
+- OK: `.\mvnw.cmd test`, 60 tests, 0 failures, 0 errors.
+- OK: `docs/qa/13-auth-j2-security-audit-summary-smoke.sh`, `PASS=9`, `FAIL=0`, `SKIP=0`.
+- OK: `git diff --check`, solo warnings CRLF.
+
 ## 2026-05-27 - AUTH-J1 retencion y limpieza segura de auditoria
 
 Tipo: backend, seguridad, retencion operativa.

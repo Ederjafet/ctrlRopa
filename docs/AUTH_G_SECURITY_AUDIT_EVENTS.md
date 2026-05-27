@@ -110,9 +110,16 @@ AUTH-J1 agrega limpieza automatica segura de eventos antiguos:
 
 La limpieza elimina solo eventos con `occurred_at` anterior a `now - retention-days`. Si la retencion es `0` o negativa, no elimina nada.
 
+## Resumen estadistico
+
+AUTH-J2 agrega `GET /api/security/audit-events/summary` con permiso `VIEW_SECURITY_AUDIT`.
+
+El resumen incluye totales `401/403`, agrupaciones por evento/status/company/branch, usuarios/rutas frecuentes y eventos criticos recientes sin exponer `metadata_json`, tokens ni passwords.
+
 ## Proximos pasos recomendados
 
 - AUTH-H: endpoint protegido solo admin/soporte para consultar eventos de auditoria. Implementado en `docs/AUTH_H_SECURITY_AUDIT_CONSOLE.md`.
 - AUTH-G3: filtros por usuario, company, evento, rango de fechas y recurso.
 - AUTH-J1: retencion automatica de eventos. Implementada en `docs/AUTH_J1_SECURITY_AUDIT_RETENTION.md`.
+- AUTH-J2: resumen estadistico de auditoria. Implementado en `docs/AUTH_J2_SECURITY_AUDIT_SUMMARY.md`.
 - AUTH-G5: alertas para patrones repetidos de `TOKEN_REVOKED`, `PERMISSION_DENIED` o `BRANCH_DENIED`.

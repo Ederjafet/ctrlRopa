@@ -11,12 +11,24 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 @Service
 public class SecurityAuditEventQueryService {
 
     private static final int MAX_PAGE_SIZE = 200;
+    private static final int SUMMARY_GROUP_LIMIT = 10;
+    private static final List<String> CRITICAL_EVENTS = List.of(
+            SecurityAuditEventType.TOKEN_INVALID.name(),
+            SecurityAuditEventType.TOKEN_REVOKED.name(),
+            SecurityAuditEventType.PERMISSION_DENIED.name(),
+            SecurityAuditEventType.BRANCH_DENIED.name(),
+            SecurityAuditEventType.COMPANY_DENIED.name(),
+            SecurityAuditEventType.CROSS_TENANT_DENIED.name(),
+            SecurityAuditEventType.LOGIN_BLOCKED_NO_ACCESS.name(),
+            SecurityAuditEventType.LOGIN_BLOCKED_NO_EFFECTIVE_PERMISSIONS.name()
+    );
 
     private final JdbcTemplate jdbcTemplate;
     private final CurrentUser currentUser;
@@ -107,6 +119,118 @@ public class SecurityAuditEventQueryService {
         );
 
         return new SecurityAuditEventResponse(events, safePage, safeSize, total == null ? 0L : total);
+    }
+
+    @Transactional(readOnly = true)
+    public SecurityAuditSummaryResponse summary(String eventType,
+                                                String email,
+                                                Long companyId,
+                                                Long branchId,
+                                                String dateFrom,
+                                                String dateTo) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_SECURITY_AUDIT);
+
+        QueryParts queryParts = buildWhere(eventType, email, companyId, branchId, null, dateFrom, dateTo, null);
+
+        long totalEvents = count(queryParts, null);
+        long total401 = count(queryParts, "status_code = 401");
+        long total403 = count(queryParts, "status_code = 403");
+
+        return new SecurityAuditSummaryResponse(
+                totalEvents,
+                total401,
+                total403,
+                countBy(queryParts, "event_type", "event_type IS NOT NULL"),
+                countBy(queryParts, "status_code", "status_code IS NOT NULL"),
+                countBy(queryParts, "company_id", "company_id IS NOT NULL"),
+                countBy(queryParts, "branch_id", "branch_id IS NOT NULL"),
+                countBy(queryParts, "email", "email IS NOT NULL AND email <> ''"),
+                countBy(queryParts, "path", "path IS NOT NULL AND path <> ''"),
+                recentCriticalEvents(queryParts)
+        );
+    }
+
+    private long count(QueryParts queryParts, String extraClause) {
+        QueryParts scoped = appendClause(queryParts, extraClause);
+        Long total = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM security_audit_events WHERE " + scoped.where(),
+                Long.class,
+                scoped.params().toArray()
+        );
+        return total == null ? 0L : total;
+    }
+
+    private List<SecurityAuditSummaryResponse.CountLine> countBy(QueryParts queryParts,
+                                                                 String column,
+                                                                 String extraClause) {
+        QueryParts scoped = appendClause(queryParts, extraClause);
+        List<Object> params = new ArrayList<>(scoped.params());
+        params.add(SUMMARY_GROUP_LIMIT);
+
+        return jdbcTemplate.query(
+                """
+                SELECT CAST(%s AS CHAR) AS line_key, COUNT(*) AS total
+                FROM security_audit_events
+                WHERE %s
+                GROUP BY %s
+                ORDER BY total DESC, line_key ASC
+                LIMIT ?
+                """.formatted(column, scoped.where(), column),
+                (rs, rowNum) -> new SecurityAuditSummaryResponse.CountLine(
+                        rs.getString("line_key"),
+                        rs.getLong("total")
+                ),
+                params.toArray()
+        );
+    }
+
+    private List<SecurityAuditSummaryResponse.CriticalEventLine> recentCriticalEvents(QueryParts queryParts) {
+        String placeholders = String.join(",", CRITICAL_EVENTS.stream().map(event -> "?").toList());
+        QueryParts critical = appendClause(queryParts, "event_type IN (" + placeholders + ")", CRITICAL_EVENTS.toArray());
+        List<Object> params = new ArrayList<>(critical.params());
+        params.add(SUMMARY_GROUP_LIMIT);
+
+        return jdbcTemplate.query(
+                """
+                SELECT
+                  id,
+                  occurred_at,
+                  event_type,
+                  email,
+                  company_id,
+                  branch_id,
+                  http_method,
+                  path,
+                  status_code,
+                  reason
+                FROM security_audit_events
+                WHERE %s
+                ORDER BY occurred_at DESC, id DESC
+                LIMIT ?
+                """.formatted(critical.where()),
+                (rs, rowNum) -> new SecurityAuditSummaryResponse.CriticalEventLine(
+                        rs.getLong("id"),
+                        toLocalDateTime(rs.getTimestamp("occurred_at")),
+                        rs.getString("event_type"),
+                        rs.getString("email"),
+                        rs.getObject("company_id", Long.class),
+                        rs.getObject("branch_id", Long.class),
+                        rs.getString("http_method"),
+                        rs.getString("path"),
+                        rs.getObject("status_code", Integer.class),
+                        rs.getString("reason")
+                ),
+                params.toArray()
+        );
+    }
+
+    private QueryParts appendClause(QueryParts queryParts, String extraClause, Object... extraParams) {
+        if (!hasText(extraClause)) {
+            return queryParts;
+        }
+        List<Object> params = new ArrayList<>(queryParts.params());
+        params.addAll(Arrays.asList(extraParams));
+        return new QueryParts(queryParts.where() + " AND " + extraClause, params);
     }
 
     private QueryParts buildWhere(String eventType,

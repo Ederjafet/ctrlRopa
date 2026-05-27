@@ -105,5 +105,6 @@ AUTH-J1 no cambia los datos almacenados y no agrega nuevos campos. Se mantiene l
 
 ## Siguiente fase recomendada
 
-- AUTH-J2: archivado/export controlado si soporte requiere conservar evidencia mas alla de la retencion.
-- AUTH-J3: alertas por patrones repetidos de `TOKEN_REVOKED`, `PERMISSION_DENIED` o `BRANCH_DENIED`.
+- AUTH-J2: resumen estadistico para analizar eventos disponibles sin revisar linea por linea. Implementado en `docs/AUTH_J2_SECURITY_AUDIT_SUMMARY.md`.
+- AUTH-J3: archivado/export controlado si soporte requiere conservar evidencia mas alla de la retencion.
+- AUTH-J4: alertas por patrones repetidos de `TOKEN_REVOKED`, `PERMISSION_DENIED` o `BRANCH_DENIED`.

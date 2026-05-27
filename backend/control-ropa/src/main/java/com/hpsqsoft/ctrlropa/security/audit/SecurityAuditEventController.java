@@ -30,4 +30,16 @@ public class SecurityAuditEventController {
     ) {
         return service.findEvents(eventType, email, companyId, branchId, statusCode, dateFrom, dateTo, path, page, size);
     }
+
+    @GetMapping("/summary")
+    public SecurityAuditSummaryResponse summary(
+            @RequestParam(required = false) String dateFrom,
+            @RequestParam(required = false) String dateTo,
+            @RequestParam(required = false) Long companyId,
+            @RequestParam(required = false) Long branchId,
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) String eventType
+    ) {
+        return service.summary(eventType, email, companyId, branchId, dateFrom, dateTo);
+    }
 }

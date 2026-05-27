@@ -26,6 +26,10 @@ El acceso solo se muestra si el usuario tiene `VIEW_SECURITY_AUDIT`. Si un usuar
 
 `GET /api/security/audit-events`
 
+Endpoint backend adicional disponible desde AUTH-J2:
+
+`GET /api/security/audit-events/summary`
+
 Permiso backend requerido:
 
 `VIEW_SECURITY_AUDIT`
@@ -113,4 +117,5 @@ Responsabilidades:
 - AUTH-I2: permiso dedicado `VIEW_SECURITY_AUDIT`, backend/frontend alineados y smoke automatizado.
 - AUTH-I3: descarga CSV desde UI si soporte lo necesita.
 - AUTH-J1: retencion automatica segura de eventos.
+- AUTH-J2: resumen estadistico backend; UI de resumen queda para fase posterior.
 - AUTH-J2/J3: archivado y alertas si se aprueban para operacion.

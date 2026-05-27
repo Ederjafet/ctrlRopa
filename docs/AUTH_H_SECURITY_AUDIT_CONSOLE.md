@@ -12,6 +12,10 @@ Crear una consulta administrativa protegida para `security_audit_events` y un sm
 
 `GET /api/security/audit-events`
 
+Endpoint de resumen agregado en AUTH-J2:
+
+`GET /api/security/audit-events/summary`
+
 Permiso requerido:
 
 - AUTH-H original: `MANAGE_SECURITY_SETTINGS`.
@@ -138,4 +142,5 @@ Resultado validado:
 - AUTH-I: UI minima en Sistema/Seguridad para filtros frecuentes. Implementada en `docs/AUTH_I_SECURITY_AUDIT_UI.md`.
 - AUTH-I2: permiso dedicado `VIEW_SECURITY_AUDIT`.
 - AUTH-J1: retencion automatica segura de eventos. Implementada en `docs/AUTH_J1_SECURITY_AUDIT_RETENTION.md`.
+- AUTH-J2: resumen estadistico de auditoria. Implementado en `docs/AUTH_J2_SECURITY_AUDIT_SUMMARY.md`.
 - AUTH-G/H futuro: archivado y alertas por patrones repetidos.
