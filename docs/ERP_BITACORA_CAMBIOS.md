@@ -1,5 +1,28 @@
 # ERP - Bitacora de cambios
 
+## 2026-05-27 - AUTH-J3 dashboard visual de auditoria
+
+Tipo: frontend protegido, seguridad, soporte operativo.
+
+Objetivo:
+
+- Mostrar un resumen visual compacto de auditoria en `/system-security-audit`.
+
+Cambios realizados:
+
+- Se agrego `getSecurityAuditSummary` en `services/securityAuditService.ts`.
+- La pantalla `/system-security-audit` ahora consulta `GET /api/security/audit-events/summary`.
+- Se agregaron tarjetas de Total eventos, Total 401 y Total 403.
+- Se agregaron secciones de eventos por tipo, eventos por status, top usuarios, top endpoints y eventos criticos recientes.
+- El error del resumen queda aislado y no rompe el listado de eventos.
+- Se creo `docs/AUTH_J3_SECURITY_AUDIT_DASHBOARD.md`.
+
+Restricciones respetadas:
+
+- No se agregaron librerias.
+- No se expone `metadataJson`, tokens, passwords ni cuerpos de request.
+- No se tocaron backend, migraciones, pagos, ventas ni reportes funcionales.
+
 ## 2026-05-27 - AUTH-J2 resumen estadistico de auditoria
 
 Tipo: backend, seguridad, analitica operativa.

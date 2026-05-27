@@ -7,8 +7,12 @@ import { useAppTheme } from '@/context/AppThemeContext';
 import { hasPermission } from '@/services/accessControl';
 import {
   getSecurityAuditEvents,
+  getSecurityAuditSummary,
+  SecurityAuditCountLine,
+  SecurityAuditCriticalEventLine,
   SecurityAuditEventFilters,
   SecurityAuditEventLine,
+  SecurityAuditSummaryResponse,
 } from '@/services/securityAuditService';
 import { getSession } from '@/services/sessionStorage';
 import { useRouter } from 'expo-router';
@@ -36,8 +40,11 @@ export default function SystemSecurityAuditScreen() {
   const { theme } = useAppTheme();
   const [authorized, setAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
   const [filters, setFilters] = useState<SecurityAuditEventFilters>(DEFAULT_FILTERS);
   const [events, setEvents] = useState<SecurityAuditEventLine[]>([]);
+  const [summary, setSummary] = useState<SecurityAuditSummaryResponse | null>(null);
   const [total, setTotal] = useState(0);
 
   const page = filters.page ?? 0;
@@ -66,6 +73,25 @@ export default function SystemSecurityAuditScreen() {
     }
   }, []);
 
+  const loadSummary = useCallback(async (nextFilters: SecurityAuditEventFilters) => {
+    setSummaryLoading(true);
+    setSummaryError(null);
+    try {
+      const data = await getSecurityAuditSummary({
+        eventType: nextFilters.eventType,
+        email: nextFilters.email,
+        dateFrom: nextFilters.dateFrom,
+        dateTo: nextFilters.dateTo,
+      });
+      setSummary(data);
+    } catch (err: any) {
+      setSummary(null);
+      setSummaryError(err?.message || 'No se pudo cargar el resumen.');
+    } finally {
+      setSummaryLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     getSession().then((session) => {
       if (!hasPermission(session, 'VIEW_SECURITY_AUDIT')) {
@@ -73,19 +99,23 @@ export default function SystemSecurityAuditScreen() {
         return;
       }
       setAuthorized(true);
+      void loadSummary(DEFAULT_FILTERS);
       void loadEvents(DEFAULT_FILTERS);
     });
-  }, [loadEvents, router]);
+  }, [loadEvents, loadSummary, router]);
 
   const updateFilter = (key: keyof SecurityAuditEventFilters, value: string) => {
     setFilters((current) => ({ ...current, [key]: value, page: 0 }));
   };
 
   const search = () => {
-    void loadEvents({ ...filters, page: 0 });
+    const nextFilters = { ...filters, page: 0 };
+    void loadSummary(nextFilters);
+    void loadEvents(nextFilters);
   };
 
   const clear = () => {
+    void loadSummary(DEFAULT_FILTERS);
     void loadEvents(DEFAULT_FILTERS);
   };
 
@@ -118,6 +148,12 @@ export default function SystemSecurityAuditScreen() {
           Consulta eventos de acceso denegado, tokens revocados y bloqueos de seguridad.
         </AppText>
       </AppCard>
+
+      <SecurityAuditSummaryDashboard
+        summary={summary}
+        loading={summaryLoading}
+        error={summaryError}
+      />
 
       <AppCard>
         <AppText variant="subtitle" bold>
@@ -220,6 +256,144 @@ export default function SystemSecurityAuditScreen() {
         </View>
       </AppCard>
     </AppScreen>
+  );
+}
+
+function SecurityAuditSummaryDashboard({
+  summary,
+  loading,
+  error,
+}: {
+  summary: SecurityAuditSummaryResponse | null;
+  loading: boolean;
+  error: string | null;
+}) {
+  const { theme } = useAppTheme();
+
+  return (
+    <AppCard>
+      <View style={styles.listHeader}>
+        <View>
+          <AppText variant="subtitle" bold>
+            Resumen de seguridad
+          </AppText>
+          <AppText color={theme.colors.mutedText}>
+            Vista rapida de bloqueos, usuarios y rutas frecuentes.
+          </AppText>
+        </View>
+        {loading ? <ActivityIndicator /> : null}
+      </View>
+
+      {error ? (
+        <View style={[styles.summaryWarning, { borderColor: theme.colors.warning }]}>
+          <AppText color={theme.colors.warning}>{error}</AppText>
+        </View>
+      ) : null}
+
+      <View style={styles.metricGrid}>
+        <AuditMetricCard label="Total eventos" value={summary?.totalEvents ?? 0} />
+        <AuditMetricCard label="Total 401" value={summary?.total401 ?? 0} tone="danger" />
+        <AuditMetricCard label="Total 403" value={summary?.total403 ?? 0} tone="warning" />
+      </View>
+
+      <View style={styles.summaryGrid}>
+        <AuditSummarySection title="Eventos por tipo" items={summary?.byEventType ?? []} />
+        <AuditSummarySection title="Eventos por status" items={summary?.byStatusCode ?? []} />
+        <AuditSummarySection title="Top usuarios" items={summary?.topEmails ?? []} />
+        <AuditSummarySection title="Top endpoints" items={summary?.topPaths ?? []} />
+      </View>
+
+      <View style={styles.criticalSection}>
+        <AppText bold>Eventos criticos recientes</AppText>
+        {summary?.recentCriticalEvents?.length ? (
+          summary.recentCriticalEvents.map((event) => (
+            <CriticalEventRow key={event.id} event={event} />
+          ))
+        ) : (
+          <AppText color={theme.colors.mutedText}>
+            No hay eventos criticos recientes con estos filtros.
+          </AppText>
+        )}
+      </View>
+    </AppCard>
+  );
+}
+
+function AuditMetricCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone?: 'danger' | 'warning';
+}) {
+  const { theme } = useAppTheme();
+  const color = tone === 'danger'
+    ? theme.colors.danger
+    : tone === 'warning'
+      ? theme.colors.warning
+      : theme.colors.text;
+
+  return (
+    <View style={[styles.metricCard, { borderColor: theme.colors.border }]}>
+      <AppText variant="caption" color={theme.colors.mutedText}>
+        {label}
+      </AppText>
+      <AppText variant="title" bold color={color}>
+        {value}
+      </AppText>
+    </View>
+  );
+}
+
+function AuditSummarySection({
+  title,
+  items,
+}: {
+  title: string;
+  items: SecurityAuditCountLine[];
+}) {
+  const { theme } = useAppTheme();
+
+  return (
+    <View style={[styles.summarySection, { borderColor: theme.colors.border }]}>
+      <AppText bold>{title}</AppText>
+      {items.length === 0 ? (
+        <AppText color={theme.colors.mutedText}>Sin datos.</AppText>
+      ) : (
+        items.map((item) => (
+          <View key={`${title}-${item.key}`} style={styles.summaryLine}>
+            <AppText style={styles.summaryKey}>{item.key || '-'}</AppText>
+            <AppText bold>{item.count}</AppText>
+          </View>
+        ))
+      )}
+    </View>
+  );
+}
+
+function CriticalEventRow({ event }: { event: SecurityAuditCriticalEventLine }) {
+  const { theme } = useAppTheme();
+
+  return (
+    <View style={[styles.criticalRow, { borderBottomColor: theme.colors.border }]}>
+      <View style={styles.eventHeader}>
+        <View style={styles.eventTitle}>
+          <AppText bold>{event.eventType}</AppText>
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            {formatDate(event.occurredAt)}
+          </AppText>
+        </View>
+        <AppText bold color={event.statusCode === 401 ? theme.colors.danger : theme.colors.accent}>
+          {event.statusCode ?? '-'}
+        </AppText>
+      </View>
+      <AppText color={theme.colors.mutedText}>
+        {event.email || 'Sin email'} · {event.httpMethod || '-'} {event.path || '-'}
+      </AppText>
+      {event.reason ? <AppText>{event.reason}</AppText> : null}
+    </View>
   );
 }
 
@@ -336,6 +510,15 @@ const styles = StyleSheet.create({
   detailWide: {
     minWidth: 260,
   },
+  criticalRow: {
+    borderBottomWidth: 1,
+    gap: 4,
+    paddingVertical: 10,
+  },
+  criticalSection: {
+    gap: 8,
+    marginTop: 14,
+  },
   eventHeader: {
     alignItems: 'flex-start',
     flexDirection: 'row',
@@ -384,5 +567,46 @@ const styles = StyleSheet.create({
     gap: 10,
     justifyContent: 'space-between',
     marginTop: 14,
+  },
+  metricCard: {
+    borderWidth: 1,
+    flex: 1,
+    gap: 4,
+    minWidth: 150,
+    padding: 12,
+  },
+  metricGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 12,
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 14,
+  },
+  summaryKey: {
+    flex: 1,
+    minWidth: 0,
+  },
+  summaryLine: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
+  summarySection: {
+    borderWidth: 1,
+    flex: 1,
+    gap: 8,
+    minWidth: 220,
+    padding: 12,
+  },
+  summaryWarning: {
+    borderWidth: 1,
+    marginTop: 10,
+    padding: 10,
   },
 });

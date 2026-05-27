@@ -158,13 +158,13 @@ Resultado validado:
 
 ## Limitaciones
 
-- No hay UI para el resumen en AUTH-J2.
+- AUTH-J2 no agrego UI para el resumen; AUTH-J3 lo muestra en `/system-security-audit`.
 - No se agregan graficas ni export desde frontend.
 - No se cambia la retencion de AUTH-J1.
 - No se agregan indices nuevos; si el volumen crece, evaluar indices compuestos por `occurred_at`, `event_type`, `status_code`, `email` y `path`.
 
 ## Siguiente fase recomendada
 
-- AUTH-J3: UI compacta de resumen en `/system-security-audit`.
+- AUTH-J3: UI compacta de resumen en `/system-security-audit`. Implementada en `docs/AUTH_J3_SECURITY_AUDIT_DASHBOARD.md`.
 - AUTH-J4: alertas por patrones repetidos.
 - AUTH-J5: archivado/export historico si soporte lo requiere.

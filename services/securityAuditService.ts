@@ -37,6 +37,37 @@ export type SecurityAuditEventResponse = {
   total: number;
 };
 
+export type SecurityAuditCountLine = {
+  key: string;
+  count: number;
+};
+
+export type SecurityAuditCriticalEventLine = {
+  id: number;
+  occurredAt?: string | null;
+  eventType: string;
+  email?: string | null;
+  companyId?: number | null;
+  branchId?: number | null;
+  httpMethod?: string | null;
+  path?: string | null;
+  statusCode?: number | null;
+  reason?: string | null;
+};
+
+export type SecurityAuditSummaryResponse = {
+  totalEvents: number;
+  total401: number;
+  total403: number;
+  byEventType: SecurityAuditCountLine[];
+  byStatusCode: SecurityAuditCountLine[];
+  byCompany: SecurityAuditCountLine[];
+  byBranch: SecurityAuditCountLine[];
+  topEmails: SecurityAuditCountLine[];
+  topPaths: SecurityAuditCountLine[];
+  recentCriticalEvents: SecurityAuditCriticalEventLine[];
+};
+
 export async function getSecurityAuditEvents(
   filters: SecurityAuditEventFilters
 ): Promise<SecurityAuditEventResponse> {
@@ -53,6 +84,22 @@ export async function getSecurityAuditEvents(
 
   return apiRequest<SecurityAuditEventResponse>(
     `/api/security/audit-events?${query.toString()}`
+  );
+}
+
+export async function getSecurityAuditSummary(
+  filters: Pick<SecurityAuditEventFilters, 'eventType' | 'email' | 'dateFrom' | 'dateTo'>
+): Promise<SecurityAuditSummaryResponse> {
+  const query = new URLSearchParams();
+
+  addParam(query, 'eventType', filters.eventType);
+  addParam(query, 'email', filters.email);
+  addParam(query, 'dateFrom', filters.dateFrom);
+  addParam(query, 'dateTo', filters.dateTo);
+
+  const suffix = query.toString();
+  return apiRequest<SecurityAuditSummaryResponse>(
+    `/api/security/audit-events/summary${suffix ? `?${suffix}` : ''}`
   );
 }
 

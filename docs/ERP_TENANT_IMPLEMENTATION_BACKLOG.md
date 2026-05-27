@@ -222,6 +222,30 @@ Pendiente:
 - Crear UI compacta de resumen si soporte necesita una vista ejecutiva dentro de `/system-security-audit`.
 - Evaluar indices compuestos si el volumen de auditoria crece.
 
+## Actualizacion AUTH-J3 - Dashboard visual de auditoria
+
+Fecha: 2026-05-27
+Estado: implementado frontend condicionado.
+
+Alcance ejecutado:
+
+- Dashboard compacto en `/system-security-audit`.
+- Consumo de `GET /api/security/audit-events/summary` con `VIEW_SECURITY_AUDIT`.
+- Tarjetas Total eventos, Total 401 y Total 403.
+- Secciones de eventos por tipo, status, usuarios frecuentes, endpoints frecuentes y eventos criticos recientes.
+- Error de summary aislado para no romper el listado.
+
+Criterios cubiertos:
+
+- Soporte con `VIEW_SECURITY_AUDIT` puede ver resumen y listado.
+- Usuario sin permiso sigue bloqueado por guard existente.
+- No se muestra `metadataJson`, tokens, passwords ni cuerpos de request.
+
+Pendiente:
+
+- Smoke visual en navegador con `qa.soporte@local.test` y `qa.a.admin@local.test`.
+- Evaluar alertas visuales por patrones repetidos.
+
 ## Principios de ejecucion futura
 
 - No big bang.

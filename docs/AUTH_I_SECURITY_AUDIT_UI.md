@@ -30,6 +30,8 @@ Endpoint backend adicional disponible desde AUTH-J2:
 
 `GET /api/security/audit-events/summary`
 
+AUTH-J3 consume este endpoint para mostrar un dashboard compacto arriba del listado.
+
 Permiso backend requerido:
 
 `VIEW_SECURITY_AUDIT`
@@ -69,6 +71,21 @@ Cada evento muestra:
 - Motivo
 
 No se muestra `metadataJson` por default para evitar ruido visual y reducir riesgo de exponer informacion tecnica innecesaria.
+
+## Dashboard de resumen
+
+Desde AUTH-J3 la pantalla muestra:
+
+- Total eventos
+- Total 401
+- Total 403
+- Eventos por tipo
+- Eventos por status
+- Top usuarios
+- Top endpoints
+- Eventos criticos recientes
+
+El resumen reutiliza filtros compatibles: fecha desde/hasta, email y tipo de evento. `statusCode` y `path` siguen aplicando al listado.
 
 ## Paginacion
 
@@ -117,5 +134,6 @@ Responsabilidades:
 - AUTH-I2: permiso dedicado `VIEW_SECURITY_AUDIT`, backend/frontend alineados y smoke automatizado.
 - AUTH-I3: descarga CSV desde UI si soporte lo necesita.
 - AUTH-J1: retencion automatica segura de eventos.
-- AUTH-J2: resumen estadistico backend; UI de resumen queda para fase posterior.
-- AUTH-J2/J3: archivado y alertas si se aprueban para operacion.
+- AUTH-J2: resumen estadistico backend.
+- AUTH-J3: dashboard compacto de resumen en esta pantalla.
+- AUTH-J4/J5: archivado y alertas si se aprueban para operacion.
