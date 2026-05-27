@@ -11,6 +11,7 @@ public final class PermissionCode {
     public static final String MANAGE_BRANCHES = "MANAGE_BRANCHES";
     public static final String MANAGE_CATALOGS = "MANAGE_CATALOGS";
     public static final String MANAGE_SECURITY_SETTINGS = "MANAGE_SECURITY_SETTINGS";
+    public static final String VIEW_SECURITY_AUDIT = "VIEW_SECURITY_AUDIT";
 
     public static final String VIEW_CUSTOMERS = "VIEW_CUSTOMERS";
     public static final String CREATE_CUSTOMER = "CREATE_CUSTOMER";

@@ -41,7 +41,7 @@ public class SecurityAuditEventQueryService {
                                                  String path,
                                                  Integer page,
                                                  Integer size) {
-        accessService.assertCan(currentUser.getUserId(), PermissionCode.MANAGE_SECURITY_SETTINGS);
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_SECURITY_AUDIT);
 
         int safePage = page == null || page < 0 ? 0 : page;
         int safeSize = size == null || size < 1 ? 50 : Math.min(size, MAX_PAGE_SIZE);

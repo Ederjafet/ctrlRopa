@@ -4,7 +4,7 @@ import AppInfoCard from '@/components/ui/AppInfoCard';
 import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
-import { hasRole } from '@/services/accessControl';
+import { hasPermission, hasRole } from '@/services/accessControl';
 import { changeAppLanguage } from '@/services/i18n';
 import { canConfigureSystem } from '@/services/livePermissionGuards';
 import {
@@ -176,6 +176,13 @@ export default function SystemScreen() {
             title="Sesiones y bloqueos"
             description="Desbloquea usuarios y cierra sesiones activas desde soporte."
             onPress={() => router.push('/system-sessions' as any)}
+          />
+        ) : null}
+        {hasPermission(user, 'VIEW_SECURITY_AUDIT') ? (
+          <SystemTile
+            title="Auditoria de seguridad"
+            description="Consulta accesos bloqueados, tokens revocados y eventos de permisos."
+            onPress={() => router.push('/system-security-audit' as any)}
           />
         ) : null}
       </View>

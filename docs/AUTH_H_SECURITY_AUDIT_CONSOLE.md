@@ -14,13 +14,14 @@ Crear una consulta administrativa protegida para `security_audit_events` y un sm
 
 Permiso requerido:
 
-- `MANAGE_SECURITY_SETTINGS`
+- AUTH-H original: `MANAGE_SECURITY_SETTINGS`.
+- AUTH-I2 vigente: `VIEW_SECURITY_AUDIT`.
 
 Motivo:
 
 - Ya existe en el catalogo RBAC.
 - Es el permiso administrativo mas cercano a configuracion/operacion de seguridad.
-- No se crea `VIEW_SECURITY_AUDIT` en AUTH-H; queda como propuesta futura si se quiere separar lectura de auditoria de configuracion de seguridad.
+- No se creo `VIEW_SECURITY_AUDIT` en AUTH-H; AUTH-I2 lo crea y lo adopta para separar lectura de auditoria de configuracion de seguridad.
 
 ## Filtros disponibles
 
@@ -89,7 +90,7 @@ Variables:
 | Variable | Default | Uso |
 |---|---|---|
 | `API_BASE_URL` | `http://localhost:8090` | API objetivo. |
-| `ADMIN_EMAIL` | `qa.soporte@local.test` | Usuario con `MANAGE_SECURITY_SETTINGS` para consultar auditoria. |
+| `ADMIN_EMAIL` | `qa.soporte@local.test` | Usuario con permiso de consulta de auditoria. En AUTH-I2 debe tener `VIEW_SECURITY_AUDIT`. |
 | `AUDITED_EMAIL` | `qa.a.admin@local.test` | Usuario usado para provocar token revocado. |
 | `NO_ACCESS_EMAIL` | `qa.sinpermisos@local.test` | Usuario usado para provocar `LOGIN_BLOCKED_NO_ACCESS`. |
 | `QA_PASSWORD` | `Qa12345!` | Password QA conocida. |
@@ -128,12 +129,12 @@ Resultado validado:
 ## Limitaciones
 
 - AUTH-H no agrega una pantalla frontend completa; deja backend protegido y smoke automatico listo.
-- `qa.a.admin@local.test` no tiene `MANAGE_SECURITY_SETTINGS`; es admin tenant operativo, no admin de seguridad. Para consulta de auditoria se usa `qa.soporte@local.test`.
-- No se crea `VIEW_SECURITY_AUDIT`; si se necesita separar lectura de auditoria de configuracion, debe aprobarse en una fase RBAC posterior.
+- `qa.a.admin@local.test` no debe tener `VIEW_SECURITY_AUDIT`; es admin tenant operativo, no admin de seguridad. Para consulta de auditoria se usa `qa.soporte@local.test`.
+- El smoke AUTH-H queda como evidencia historica. Para validar el permiso dedicado se debe usar `docs/qa/12-auth-i2-view-security-audit-smoke.sh`.
 - No hay retencion/archivado automatico de eventos todavia.
 
 ## Proximos pasos
 
-- AUTH-H2: UI minima en Sistema/Seguridad para filtros frecuentes.
-- AUTH-H3: permiso dedicado `VIEW_SECURITY_AUDIT`, si se aprueba.
+- AUTH-I: UI minima en Sistema/Seguridad para filtros frecuentes. Implementada en `docs/AUTH_I_SECURITY_AUDIT_UI.md`.
+- AUTH-I2: permiso dedicado `VIEW_SECURITY_AUDIT`.
 - AUTH-G/H futuro: retencion, archivado y alertas por patrones repetidos.

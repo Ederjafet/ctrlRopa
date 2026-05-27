@@ -121,6 +121,55 @@ Pendiente:
 - Evaluar permiso dedicado `VIEW_SECURITY_AUDIT`.
 - Definir retencion y archivado.
 
+## Actualizacion AUTH-I - UI minima de auditoria de seguridad
+
+Fecha: 2026-05-27
+Estado: implementado frontend condicionado.
+
+Alcance ejecutado:
+
+- Ruta `/system-security-audit`.
+- Acceso desde Sistema visible solo con `MANAGE_SECURITY_SETTINGS`.
+- Servicio frontend `securityAuditService`.
+- Filtros por evento, email, status, ruta y fechas.
+- Listado paginado con campos principales del evento.
+
+Criterios cubiertos:
+
+- La pantalla usa `apiClient` y mantiene manejo centralizado de `401/403`.
+- Usuarios sin permiso no ven el tile y la ruta directa redirige a acceso denegado.
+- No se muestran tokens ni passwords.
+
+Pendiente:
+
+- Smoke visual real con usuario soporte y usuario admin tenant sin permiso.
+- AUTH-I2 implementa el permiso dedicado `VIEW_SECURITY_AUDIT`.
+
+## Actualizacion AUTH-I2 - Permiso dedicado VIEW_SECURITY_AUDIT
+
+Fecha: 2026-05-27
+Estado: implementado tecnico condicionado.
+
+Alcance ejecutado:
+
+- Migracion `V46__auth_i2_view_security_audit_permission.sql`.
+- Nuevo permiso `VIEW_SECURITY_AUDIT`.
+- Endpoint `GET /api/security/audit-events` cambia de `MANAGE_SECURITY_SETTINGS` a `VIEW_SECURITY_AUDIT`.
+- UI `/system-security-audit` y tile en Sistema usan el permiso dedicado.
+- Script QA `docs/qa/12-auth-i2-view-security-audit-qa.sql`.
+- Smoke `docs/qa/12-auth-i2-view-security-audit-smoke.sh` con reporte Markdown/CSV.
+
+Criterios cubiertos:
+
+- `qa.soporte@local.test` debe consultar auditoria si tiene `VIEW_SECURITY_AUDIT`.
+- `qa.a.admin@local.test` debe recibir `403` y no ver el tile.
+- `MANAGE_SECURITY_SETTINGS` queda reservado para configuracion de seguridad.
+
+Pendiente:
+
+- Ejecutar smoke runtime en ambiente QA con backend actualizado y script QA aplicado.
+- Definir asignacion productiva del permiso en matriz RBAC avanzada.
+
 ## Principios de ejecucion futura
 
 - No big bang.

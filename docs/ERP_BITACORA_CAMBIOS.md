@@ -1,5 +1,58 @@
 # ERP - Bitacora de cambios
 
+## 2026-05-27 - AUTH-I2 permiso dedicado para auditoria de seguridad
+
+Tipo: RBAC, backend protegido, frontend protegido, QA automatizado.
+
+Objetivo:
+
+- Separar la consulta de auditoria de seguridad de la administracion de configuracion de seguridad.
+
+Cambios realizados:
+
+- Se creo la migracion `V46__auth_i2_view_security_audit_permission.sql`.
+- Se agrego el permiso `VIEW_SECURITY_AUDIT` al catalogo backend.
+- `GET /api/security/audit-events` ahora requiere `VIEW_SECURITY_AUDIT`.
+- La ruta `/system-security-audit` y el tile de Sistema ahora usan `VIEW_SECURITY_AUDIT`.
+- Se creo `docs/qa/12-auth-i2-view-security-audit-qa.sql` para asignacion QA controlada a soporte.
+- Se creo `docs/qa/12-auth-i2-view-security-audit-smoke.sh` con reportes Markdown/CSV.
+- Se creo `docs/AUTH_I2_VIEW_SECURITY_AUDIT_PERMISSION.md`.
+
+Pendientes:
+
+- Ejecutar smoke visual en navegador con `qa.soporte@local.test` y prueba negativa con `qa.a.admin@local.test`.
+- Definir asignacion productiva formal del permiso antes de exponerlo fuera de QA.
+
+## 2026-05-27 - AUTH-I UI minima de auditoria de seguridad
+
+Tipo: frontend protegido, seguridad, soporte operativo.
+
+Objetivo:
+
+- Consultar eventos de `security_audit_events` desde Sistema sin usar Workbench ni curl.
+
+Cambios realizados:
+
+- Se creo la ruta `/system-security-audit`.
+- Se agrego el tile `Auditoria de seguridad` en Sistema. AUTH-I2 lo cambia a `VIEW_SECURITY_AUDIT`.
+- Se creo `services/securityAuditService.ts`.
+- La pantalla consume `GET /api/security/audit-events` usando `apiClient`.
+- Se agregaron filtros por evento, email, status, ruta y rango de fechas.
+- Se agrego listado paginado con fecha, evento, email, company, branch, metodo, ruta, status y motivo.
+- No se muestra `metadataJson` por default.
+- Se creo `docs/AUTH_I_SECURITY_AUDIT_UI.md`.
+
+Validaciones ejecutadas:
+
+- OK: `npm.cmd run lint` sin errores; warnings preexistentes.
+- OK: `npx.cmd tsc --noEmit`.
+- OK: `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`.
+
+Pendientes:
+
+- Smoke visual real con `qa.soporte@local.test` y prueba negativa con `qa.a.admin@local.test`.
+- AUTH-I2 implementa el permiso dedicado `VIEW_SECURITY_AUDIT`.
+
 ## 2026-05-26 - AUTH-H consola protegida de auditoria de seguridad
 
 Tipo: seguridad backend, consulta administrativa, smoke automatizado.

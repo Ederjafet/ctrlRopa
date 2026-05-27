@@ -15,6 +15,8 @@ Nota AUTH-F6: la suite reproducible de regresion negativa SaaS queda documentada
 
 Nota AUTH-G: la auditoria de eventos de seguridad queda documentada en `docs/AUTH_G_SECURITY_AUDIT_EVENTS.md`. Agrega persistencia de bloqueos 401/403 relevantes sin cambiar el catalogo RBAC ni el enforcement funcional.
 
+Nota AUTH-I2: el permiso dedicado `VIEW_SECURITY_AUDIT` queda documentado en `docs/AUTH_I2_VIEW_SECURITY_AUDIT_PERMISSION.md`. Se usa para consultar `GET /api/security/audit-events`; `MANAGE_SECURITY_SETTINGS` queda para configuracion de seguridad.
+
 ## Objetivo
 
 Iniciar AUTH-F como fase de diagnostico y matriz RBAC. Esta fase no cambia permisos productivos, no agrega migraciones, no toca SQL y no modifica enforcement funcional. El resultado es una base formal para decidir subfases posteriores de RBAC avanzado.
@@ -58,7 +60,7 @@ Fuera de alcance:
 | Reservas | `DO_LIVE_RESERVATION`, `DO_DOOR_RESERVATION`, `CANCEL_RESERVATION` |
 | Reportes | `VIEW_REPORTS`, `VIEW_DEPOSIT_REPORTS` en migracion/dataset, no presente en `PermissionCode.java` |
 | En vivo | `DO_LIVE_RESERVATION` |
-| Sistema/Usuarios | `MANAGE_USERS`, `MANAGE_ROLES`, `MANAGE_SECURITY_SETTINGS`, `MANAGE_BRANCHES`, `MANAGE_BRANCH_CHANNELS`, `MANAGE_CATALOGS`, `MANAGE_BRANDING` |
+| Sistema/Usuarios | `MANAGE_USERS`, `MANAGE_ROLES`, `MANAGE_SECURITY_SETTINGS`, `VIEW_SECURITY_AUDIT`, `MANAGE_BRANCHES`, `MANAGE_BRANCH_CHANNELS`, `MANAGE_CATALOGS`, `MANAGE_BRANDING` |
 | Transferencias | `MANAGE_TRANSFERS`, `SEND_TRANSFERS`, `RECEIVE_TRANSFERS`, `CANCEL_TRANSFERS` |
 | Consignaciones | `MANAGE_CONSIGNMENTS`, `SETTLE_CONSIGNMENTS`, `CANCEL_CONSIGNMENTS` |
 | Caja | `MANAGE_CASH_CLOSURES` |
@@ -106,6 +108,7 @@ Notas:
 | Roles | `/api/roles/**` | `RoleAdminController` | Si | Sesion activa | `MANAGE_ROLES` | `MANAGE_ROLES` | Medio |
 | Permisos | `GET /api/permissions` | `PermissionAdminController` | Si | Sesion activa | Admin usuarios/roles segun servicio | `MANAGE_ROLES` o `MANAGE_SECURITY_SETTINGS` | Medio |
 | Seguridad | `/api/security/settings/**` | `SecuritySettingsController` | Parcial | No aplica/publico en `/public` | `MANAGE_SECURITY_SETTINGS` para privado | Mantener | Medio |
+| Auditoria seguridad | `GET /api/security/audit-events` | `SecurityAuditEventController` | Si | Sesion activa | `VIEW_SECURITY_AUDIT` desde AUTH-I2 | Mantener lectura separada de configuracion | Medio |
 | Sesiones | `/api/security/sessions/**` | `SecuritySessionsController` | Si | Sesion activa | Administracion seguridad | `MANAGE_SECURITY_SETTINGS` | Alto si se expone sin permiso |
 | Apariencia | `/api/appearance` | `AppearanceSettingsController` | Si | Sesion activa | `MANAGE_BRANDING` | `MANAGE_BRANDING` | Medio |
 | Sucursales | `/api/branches/**` | `BranchController` | Si | Parcial por branch | No confirmado permiso funcional | `MANAGE_BRANCHES` para escritura, lectura por tenant | Alto |

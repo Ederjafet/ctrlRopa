@@ -43,7 +43,7 @@ class SecurityAuditEventQueryServiceTests {
                 20
         );
 
-        verify(accessService).assertCan(10L, PermissionCode.MANAGE_SECURITY_SETTINGS);
+        verify(accessService).assertCan(10L, PermissionCode.VIEW_SECURITY_AUDIT);
         assertEquals(0L, response.getTotal());
     }
 }
