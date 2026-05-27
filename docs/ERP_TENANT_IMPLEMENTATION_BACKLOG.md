@@ -72,6 +72,29 @@ Pendiente:
 - Alimentar variables `QA_B_*_ID` cuando existan datos QA secundarios reales para paquetes, envios, refunds y reservaciones especificas.
 - Incluir el smoke en checklist de merge/release antes de declarar SaaS financiero completo.
 
+## Actualizacion AUTH-G - Auditoria de eventos de seguridad
+
+Fecha: 2026-05-26
+Estado: implementado tecnico condicionado.
+
+Alcance ejecutado:
+
+- Migracion `V45__auth_g_security_audit_events.sql`.
+- Tabla dedicada `security_audit_events` para eventos 401/403 relevantes.
+- Integracion en `ApiTokenFilter`, `AuthService`, `AccessService` y `TenantAccessGuard`.
+- Eventos iniciales: token invalido/revocado, sesion revocada, permiso denegado, login bloqueado, branch/company denegada.
+
+Criterios cubiertos:
+
+- No se guardan passwords ni tokens completos.
+- La auditoria no relaja permisos ni cambia reglas de negocio.
+- Pruebas unitarias verifican auditoria de permiso faltante y branch/company bloqueada.
+
+Pendiente:
+
+- AUTH-G2 debe crear consulta protegida para soporte/admin.
+- Definir retencion, archivado y alertas por patrones de seguridad.
+
 ## Principios de ejecucion futura
 
 - No big bang.

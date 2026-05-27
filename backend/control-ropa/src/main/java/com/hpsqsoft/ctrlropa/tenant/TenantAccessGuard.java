@@ -1,5 +1,7 @@
 package com.hpsqsoft.ctrlropa.tenant;
 
+import com.hpsqsoft.ctrlropa.security.audit.SecurityAuditEventType;
+import com.hpsqsoft.ctrlropa.security.audit.SecurityAuditService;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,9 +11,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class TenantAccessGuard {
 
     private final TenantResolver tenantResolver;
+    private final SecurityAuditService securityAuditService;
 
-    public TenantAccessGuard(TenantResolver tenantResolver) {
+    public TenantAccessGuard(TenantResolver tenantResolver, SecurityAuditService securityAuditService) {
         this.tenantResolver = tenantResolver;
+        this.securityAuditService = securityAuditService;
     }
 
     public CurrentTenantContext requireCurrentTenant() {
@@ -24,8 +28,36 @@ public class TenantAccessGuard {
 
     public CurrentTenantContext requireBranch(Long branchId, String message) {
         CurrentTenantContext tenant = tenantResolver.resolveCurrent();
-        tenantResolver.assertBranchBelongsToCompany(branchId, tenant.getCompanyId());
+        try {
+            tenantResolver.assertBranchBelongsToCompany(branchId, tenant.getCompanyId());
+        } catch (AccessDeniedException ex) {
+            securityAuditService.record(
+                    SecurityAuditEventType.COMPANY_DENIED,
+                    tenant.getUserId(),
+                    null,
+                    tenant.getCompanyId(),
+                    tenant.getBranchId(),
+                    403,
+                    ex.getMessage(),
+                    "BRANCH",
+                    branchId == null ? null : branchId.toString(),
+                    null
+            );
+            throw ex;
+        }
         if (tenant.getBranchId() != null && !tenant.getBranchId().equals(branchId)) {
+            securityAuditService.record(
+                    SecurityAuditEventType.BRANCH_DENIED,
+                    tenant.getUserId(),
+                    null,
+                    tenant.getCompanyId(),
+                    tenant.getBranchId(),
+                    403,
+                    message,
+                    "BRANCH",
+                    branchId == null ? null : branchId.toString(),
+                    null
+            );
             throw new AccessDeniedException(message);
         }
         return tenant;

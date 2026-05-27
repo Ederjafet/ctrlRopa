@@ -1,5 +1,7 @@
 package com.hpsqsoft.ctrlropa.security.access;
 
+import com.hpsqsoft.ctrlropa.security.audit.SecurityAuditEventType;
+import com.hpsqsoft.ctrlropa.security.audit.SecurityAuditService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -10,9 +12,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class AccessService {
 
     private final JdbcTemplate jdbcTemplate;
+    private final SecurityAuditService securityAuditService;
 
-    public AccessService(JdbcTemplate jdbcTemplate) {
+    public AccessService(JdbcTemplate jdbcTemplate, SecurityAuditService securityAuditService) {
         this.jdbcTemplate = jdbcTemplate;
+        this.securityAuditService = securityAuditService;
     }
 
     public void assertCan(Long userId, String permissionCode) {
@@ -44,12 +48,36 @@ public class AccessService {
         );
 
         if (count == null || count == 0) {
+            securityAuditService.record(
+                    SecurityAuditEventType.PERMISSION_DENIED,
+                    userId,
+                    null,
+                    null,
+                    null,
+                    403,
+                    "Usuario inactivo o inexistente",
+                    "USER",
+                    userId == null ? null : userId.toString(),
+                    null
+            );
             throw new AccessDeniedException("Usuario inactivo o inexistente");
         }
     }
 
     private void assertHasPermission(Long userId, String permissionCode) {
         if (!hasPermission(userId, permissionCode)) {
+            securityAuditService.record(
+                    SecurityAuditEventType.PERMISSION_DENIED,
+                    userId,
+                    null,
+                    null,
+                    null,
+                    403,
+                    "Permiso requerido: " + permissionCode,
+                    "PERMISSION",
+                    permissionCode,
+                    null
+            );
             throw new AccessDeniedException("Permiso requerido: " + permissionCode);
         }
     }
@@ -103,6 +131,18 @@ public class AccessService {
         );
 
         if (count == null || count == 0) {
+            securityAuditService.record(
+                    SecurityAuditEventType.PERMISSION_DENIED,
+                    null,
+                    null,
+                    null,
+                    branchId,
+                    403,
+                    "Canal deshabilitado para la sucursal: " + channelCode,
+                    "SALES_CHANNEL",
+                    channelCode,
+                    null
+            );
             throw new AccessDeniedException("Canal deshabilitado para la sucursal: " + channelCode);
         }
     }

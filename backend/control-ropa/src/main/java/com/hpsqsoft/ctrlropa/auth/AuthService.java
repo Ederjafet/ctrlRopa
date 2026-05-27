@@ -3,6 +3,8 @@ package com.hpsqsoft.ctrlropa.auth;
 import com.hpsqsoft.ctrlropa.security.settings.SecuritySettingsResponse;
 import com.hpsqsoft.ctrlropa.security.settings.SecuritySettingsService;
 import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
+import com.hpsqsoft.ctrlropa.security.audit.SecurityAuditEventType;
+import com.hpsqsoft.ctrlropa.security.audit.SecurityAuditService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
@@ -28,16 +30,19 @@ public class AuthService {
     private final SecuritySettingsService securitySettingsService;
     private final CurrentUser currentUser;
     private final HttpServletRequest httpRequest;
+    private final SecurityAuditService securityAuditService;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public AuthService(JdbcTemplate jdbcTemplate,
                        SecuritySettingsService securitySettingsService,
                        CurrentUser currentUser,
-                       HttpServletRequest httpRequest) {
+                       HttpServletRequest httpRequest,
+                       SecurityAuditService securityAuditService) {
         this.jdbcTemplate = jdbcTemplate;
         this.securitySettingsService = securitySettingsService;
         this.currentUser = currentUser;
         this.httpRequest = httpRequest;
+        this.securityAuditService = securityAuditService;
         this.passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
     }
 
@@ -168,7 +173,21 @@ public class AuthService {
         secureRandom.nextBytes(randomBytes);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
         Integer absoluteHours = settings.getAbsoluteSessionTimeoutHours();
-        revokeActiveSessionsForUser(userId);
+        int revokedSessions = revokeActiveSessionsForUser(userId);
+        if (revokedSessions > 0) {
+            securityAuditService.record(
+                    SecurityAuditEventType.SESSION_REVOKED,
+                    userId,
+                    null,
+                    tenant.companyId(),
+                    tenant.branchId(),
+                    200,
+                    "Sesiones activas anteriores revocadas por nuevo login",
+                    "USER_API_SESSION",
+                    userId.toString(),
+                    "{\"revokedSessions\":" + revokedSessions + "}"
+            );
+        }
 
         jdbcTemplate.update(
                 """
@@ -208,8 +227,8 @@ public class AuthService {
         return token;
     }
 
-    private void revokeActiveSessionsForUser(Long userId) {
-        jdbcTemplate.update(
+    private int revokeActiveSessionsForUser(Long userId) {
+        return jdbcTemplate.update(
                 """
                 UPDATE user_api_sessions
                 SET revoked_at = CURRENT_TIMESTAMP
@@ -226,11 +245,29 @@ public class AuthService {
         boolean hasNoAccessRole = roles.stream().anyMatch(role -> "NO_ACCESS".equals(role.getCode()));
 
         if (hasNoAccessRole) {
+            securityAuditService.record(
+                    SecurityAuditEventType.LOGIN_BLOCKED_NO_ACCESS,
+                    user.id(),
+                    user.email(),
+                    null,
+                    user.branchId(),
+                    403,
+                    "Usuario con rol NO_ACCESS"
+            );
             auditSecurityEvent("AUTH_LOGIN_DENIED", "/api/auth/login", 403, user.id(), user.branchId(), user.name(), "Usuario con rol NO_ACCESS");
             throw new AccessDeniedException("No tienes permisos asignados para acceder al sistema");
         }
 
         if (effectivePermissions.isEmpty()) {
+            securityAuditService.record(
+                    SecurityAuditEventType.LOGIN_BLOCKED_NO_EFFECTIVE_PERMISSIONS,
+                    user.id(),
+                    user.email(),
+                    null,
+                    user.branchId(),
+                    403,
+                    "Usuario sin permisos efectivos"
+            );
             auditSecurityEvent("AUTH_LOGIN_DENIED", "/api/auth/login", 403, user.id(), user.branchId(), user.name(), "Usuario sin permisos efectivos");
             throw new AccessDeniedException("No tienes permisos asignados para acceder al sistema");
         }
@@ -257,6 +294,15 @@ public class AuthService {
                 """,
                 rs -> {
                     if (!rs.next()) {
+                        securityAuditService.record(
+                                SecurityAuditEventType.COMPANY_DENIED,
+                                userId,
+                                null,
+                                null,
+                                null,
+                                403,
+                                "No se pudo resolver company activa para la sesion"
+                        );
                         throw new AccessDeniedException("No se pudo resolver company activa para la sesion");
                     }
                     return new DefaultTenantRow(

@@ -1,5 +1,7 @@
 package com.hpsqsoft.ctrlropa.config;
 
+import com.hpsqsoft.ctrlropa.security.audit.SecurityAuditEventType;
+import com.hpsqsoft.ctrlropa.security.audit.SecurityAuditService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,9 +24,11 @@ public class ApiTokenFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JdbcTemplate jdbcTemplate;
+    private final SecurityAuditService securityAuditService;
 
-    public ApiTokenFilter(JdbcTemplate jdbcTemplate) {
+    public ApiTokenFilter(JdbcTemplate jdbcTemplate, SecurityAuditService securityAuditService) {
         this.jdbcTemplate = jdbcTemplate;
+        this.securityAuditService = securityAuditService;
     }
 
     @Override
@@ -40,9 +44,11 @@ public class ApiTokenFilter extends OncePerRequestFilter {
         if (token == null || !isTokenValid(token)) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
-            String message = token != null && isRevokedToken(token)
+            boolean revokedToken = token != null && isRevokedToken(token);
+            String message = revokedToken
                     ? "Tu sesion se cerro porque iniciaste sesion en otro dispositivo."
                     : "Sesion invalida o vencida";
+            auditInvalidToken(token, revokedToken, message);
             response.getWriter().write("{\"message\":\"" + message + "\"}");
             return;
         }
@@ -135,6 +141,7 @@ public class ApiTokenFilter extends OncePerRequestFilter {
                 SELECT
                   s.id,
                   s.user_id,
+                  u.email,
                   s.active_company_id,
                   s.active_branch_id,
                   s.revoked_at,
@@ -164,6 +171,7 @@ public class ApiTokenFilter extends OncePerRequestFilter {
                         ? new SessionValidationRow(
                                 rs.getLong("id"),
                                 rs.getLong("user_id"),
+                                rs.getString("email"),
                                 rs.getObject("active_company_id", Long.class),
                                 rs.getObject("active_branch_id", Long.class),
                                 rs.getTimestamp("revoked_at"),
@@ -179,6 +187,45 @@ public class ApiTokenFilter extends OncePerRequestFilter {
                         )
                         : null,
                 tokenHash
+        );
+    }
+
+    private void auditInvalidToken(String token, boolean revokedToken, String message) {
+        if (token == null) {
+            securityAuditService.record(
+                    SecurityAuditEventType.TOKEN_INVALID,
+                    null,
+                    null,
+                    null,
+                    null,
+                    HttpServletResponse.SC_UNAUTHORIZED,
+                    "Token ausente"
+            );
+            return;
+        }
+
+        String tokenHash = sha256(token);
+        SessionValidationRow session = findSessionForValidation(tokenHash);
+        SecurityAuditEventType eventType = revokedToken
+                ? SecurityAuditEventType.TOKEN_REVOKED
+                : SecurityAuditEventType.TOKEN_INVALID;
+        if (session != null && session.revokedAt() != null) {
+            eventType = SecurityAuditEventType.TOKEN_REVOKED;
+        } else if (session != null && !Boolean.TRUE.equals(session.isLatestActiveSession())) {
+            eventType = SecurityAuditEventType.SESSION_REVOKED;
+        }
+
+        securityAuditService.record(
+                eventType,
+                session == null ? null : session.userId(),
+                session == null ? null : session.email(),
+                session == null ? null : session.sessionCompanyId(),
+                session == null ? null : session.sessionBranchId(),
+                HttpServletResponse.SC_UNAUTHORIZED,
+                message,
+                "TOKEN",
+                preview(tokenHash),
+                "{\"tokenHashPreview\":\"" + preview(tokenHash) + "\"}"
         );
     }
 
@@ -295,6 +342,7 @@ public class ApiTokenFilter extends OncePerRequestFilter {
     private record SessionValidationRow(
             Long id,
             Long userId,
+            String email,
             Long sessionCompanyId,
             Long sessionBranchId,
             java.sql.Timestamp revokedAt,

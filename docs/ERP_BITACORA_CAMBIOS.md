@@ -1,5 +1,35 @@
 # ERP - Bitacora de cambios
 
+## 2026-05-26 - AUTH-G auditoria de eventos de seguridad
+
+Tipo: seguridad backend, auditoria, trazabilidad de accesos bloqueados.
+
+Objetivo:
+
+- Registrar eventos relevantes cuando el backend bloquea accesos por token invalido/revocado, falta de permisos, login bloqueado o intento cross-tenant/cross-branch.
+
+Cambios realizados:
+
+- Se creo la migracion `V45__auth_g_security_audit_events.sql`.
+- Se creo la tabla `security_audit_events` con indices por fecha, usuario, company y tipo de evento.
+- Se agregaron `SecurityAuditEvent`, `SecurityAuditEventRepository`, `SecurityAuditService` y `SecurityAuditEventType`.
+- `ApiTokenFilter` registra `TOKEN_INVALID`, `TOKEN_REVOKED` o `SESSION_REVOKED` sin almacenar tokens completos.
+- `AuthService` registra login bloqueado por `NO_ACCESS`, login sin permisos efectivos, company activa no resoluble y sesiones previas revocadas por nuevo login.
+- `AccessService` registra `PERMISSION_DENIED`.
+- `TenantAccessGuard` registra `BRANCH_DENIED` y `COMPANY_DENIED`.
+- Se creo `docs/AUTH_G_SECURITY_AUDIT_EVENTS.md`.
+- Se agregaron pruebas para token revocado, permiso faltante y branch/company denegada.
+
+Pruebas ejecutadas:
+
+- OK: `.\mvnw.cmd test` desde `backend/control-ropa`.
+- Resultado: `BUILD SUCCESS`, 49 tests, 0 failures, 0 errors.
+
+Pendientes:
+
+- Crear consulta administrativa protegida para revisar eventos.
+- Definir retencion/archivado y alertas de eventos repetidos.
+
 ## 2026-05-26 - AUTH-F6 suite de regresion negativa SaaS
 
 Tipo: QA seguridad, smoke reproducible, regresion cross-tenant.
