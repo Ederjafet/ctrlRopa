@@ -6,8 +6,11 @@ import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { hasPermission } from '@/services/accessControl';
 import {
+  getSecurityAuditAlerts,
   getSecurityAuditEvents,
   getSecurityAuditSummary,
+  SecurityAuditAlertLine,
+  SecurityAuditAlertsResponse,
   SecurityAuditCountLine,
   SecurityAuditCriticalEventLine,
   SecurityAuditEventFilters,
@@ -40,8 +43,11 @@ export default function SystemSecurityAuditScreen() {
   const { theme } = useAppTheme();
   const [authorized, setAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [alertsLoading, setAlertsLoading] = useState(true);
+  const [alertsError, setAlertsError] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [alerts, setAlerts] = useState<SecurityAuditAlertsResponse | null>(null);
   const [filters, setFilters] = useState<SecurityAuditEventFilters>(DEFAULT_FILTERS);
   const [events, setEvents] = useState<SecurityAuditEventLine[]>([]);
   const [summary, setSummary] = useState<SecurityAuditSummaryResponse | null>(null);
@@ -92,6 +98,24 @@ export default function SystemSecurityAuditScreen() {
     }
   }, []);
 
+  const loadAlerts = useCallback(async (nextFilters: SecurityAuditEventFilters) => {
+    setAlertsLoading(true);
+    setAlertsError(null);
+    try {
+      const data = await getSecurityAuditAlerts({
+        email: nextFilters.email,
+        windowMinutes: 60,
+        threshold: 5,
+      });
+      setAlerts(data);
+    } catch (err: any) {
+      setAlerts(null);
+      setAlertsError(err?.message || 'No se pudieron cargar las alertas.');
+    } finally {
+      setAlertsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     getSession().then((session) => {
       if (!hasPermission(session, 'VIEW_SECURITY_AUDIT')) {
@@ -99,10 +123,11 @@ export default function SystemSecurityAuditScreen() {
         return;
       }
       setAuthorized(true);
+      void loadAlerts(DEFAULT_FILTERS);
       void loadSummary(DEFAULT_FILTERS);
       void loadEvents(DEFAULT_FILTERS);
     });
-  }, [loadEvents, loadSummary, router]);
+  }, [loadAlerts, loadEvents, loadSummary, router]);
 
   const updateFilter = (key: keyof SecurityAuditEventFilters, value: string) => {
     setFilters((current) => ({ ...current, [key]: value, page: 0 }));
@@ -110,11 +135,13 @@ export default function SystemSecurityAuditScreen() {
 
   const search = () => {
     const nextFilters = { ...filters, page: 0 };
+    void loadAlerts(nextFilters);
     void loadSummary(nextFilters);
     void loadEvents(nextFilters);
   };
 
   const clear = () => {
+    void loadAlerts(DEFAULT_FILTERS);
     void loadSummary(DEFAULT_FILTERS);
     void loadEvents(DEFAULT_FILTERS);
   };
@@ -153,6 +180,12 @@ export default function SystemSecurityAuditScreen() {
         summary={summary}
         loading={summaryLoading}
         error={summaryError}
+      />
+
+      <SecurityAuditAlertsPanel
+        alerts={alerts}
+        loading={alertsLoading}
+        error={alertsError}
       />
 
       <AppCard>
@@ -256,6 +289,80 @@ export default function SystemSecurityAuditScreen() {
         </View>
       </AppCard>
     </AppScreen>
+  );
+}
+
+function SecurityAuditAlertsPanel({
+  alerts,
+  loading,
+  error,
+}: {
+  alerts: SecurityAuditAlertsResponse | null;
+  loading: boolean;
+  error: string | null;
+}) {
+  const { theme } = useAppTheme();
+  const lines = alerts?.alerts ?? [];
+
+  return (
+    <AppCard>
+      <View style={styles.listHeader}>
+        <View>
+          <AppText variant="subtitle" bold>
+            Alertas recientes
+          </AppText>
+          <AppText color={theme.colors.mutedText}>
+            Patrones criticos detectados en los ultimos 60 minutos.
+          </AppText>
+        </View>
+        {loading ? <ActivityIndicator /> : null}
+      </View>
+
+      {error ? (
+        <View style={[styles.summaryWarning, { borderColor: theme.colors.warning }]}>
+          <AppText color={theme.colors.warning}>{error}</AppText>
+        </View>
+      ) : null}
+
+      {!loading && !error && lines.length === 0 ? (
+        <AppText color={theme.colors.mutedText}>Sin alertas criticas.</AppText>
+      ) : (
+        <View style={styles.alertGrid}>
+          {lines.map((alert, index) => (
+            <SecurityAuditAlertCard key={`${alert.alertType}-${index}`} alert={alert} />
+          ))}
+        </View>
+      )}
+    </AppCard>
+  );
+}
+
+function SecurityAuditAlertCard({ alert }: { alert: SecurityAuditAlertLine }) {
+  const { theme } = useAppTheme();
+  const color = alert.severity === 'CRITICAL' || alert.severity === 'HIGH'
+    ? theme.colors.danger
+    : alert.severity === 'MEDIUM'
+      ? theme.colors.warning
+      : theme.colors.accent;
+
+  return (
+    <View style={[styles.alertCard, { borderColor: color }]}>
+      <View style={styles.alertHeader}>
+        <AppText bold color={color}>{alert.severity}</AppText>
+        <AppText bold>{alert.count}</AppText>
+      </View>
+      <AppText bold>{alert.alertType}</AppText>
+      <AppText color={theme.colors.mutedText}>{alert.description}</AppText>
+      {alert.email ? <AuditDetail label="Email" value={alert.email} /> : null}
+      {alert.path ? <AuditDetail label="Ruta" value={alert.path} /> : null}
+      <View style={styles.detailGrid}>
+        <AuditDetail label="Company" value={alert.companyId} />
+        <AuditDetail label="Branch" value={alert.branchId} />
+      </View>
+      <AppText variant="caption" color={theme.colors.mutedText}>
+        {formatDate(alert.firstSeen)} - {formatDate(alert.lastSeen)}
+      </AppText>
+    </View>
   );
 }
 
@@ -491,6 +598,24 @@ function AuditDetail({
 const styles = StyleSheet.create({
   actionButton: {
     minWidth: 140,
+  },
+  alertCard: {
+    borderWidth: 1,
+    flex: 1,
+    gap: 8,
+    minWidth: 240,
+    padding: 12,
+  },
+  alertGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 12,
+  },
+  alertHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   actions: {
     flexDirection: 'row',

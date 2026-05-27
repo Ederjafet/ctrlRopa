@@ -8,6 +8,9 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
 
+import java.util.Arrays;
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -172,5 +175,99 @@ class SecurityAuditEventQueryServiceTests {
         );
 
         assertEquals("/api/me", response.getTopPaths().get(0).getKey());
+    }
+
+    @Test
+    void alertsRequireViewSecurityAuditPermission() {
+        when(currentUser.getUserId()).thenReturn(10L);
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), any(Object[].class)))
+                .thenReturn(List.of());
+
+        SecurityAuditAlertsResponse response = service.alerts(60, 5, null, null, null);
+
+        verify(accessService).assertCan(10L, PermissionCode.VIEW_SECURITY_AUDIT);
+        assertEquals(0L, response.getTotalAlerts());
+    }
+
+    @Test
+    void alertsDenyUserWithoutViewSecurityAuditPermission() {
+        when(currentUser.getUserId()).thenReturn(10L);
+        doThrow(new AccessDeniedException("permiso faltante"))
+                .when(accessService).assertCan(10L, PermissionCode.VIEW_SECURITY_AUDIT);
+
+        assertThrows(AccessDeniedException.class, () -> service.alerts(60, 5, null, null, null));
+    }
+
+    @Test
+    void repeatedEventsGenerateAlert() {
+        when(currentUser.getUserId()).thenReturn(10L);
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), any(Object[].class)))
+                .thenAnswer(invocation -> {
+                    String sql = invocation.getArgument(0);
+                    List<Object> args = Arrays.asList(invocation.getArguments());
+                    if (sql.contains("status_code = ?") && args.contains(401)) {
+                        return List.of(new SecurityAuditAlertsResponse.SecurityAuditAlertLine(
+                                "MEDIUM",
+                                "MANY_401",
+                                "Muchos eventos 401 en ventana reciente",
+                                5L,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null
+                        ));
+                    }
+                    return List.of();
+                });
+
+        SecurityAuditAlertsResponse response = service.alerts(60, 5, null, null, null);
+
+        assertEquals(1L, response.getTotalAlerts());
+        assertEquals("MANY_401", response.getAlerts().get(0).getAlertType());
+    }
+
+    @Test
+    void noRepeatedEventsReturnsZeroAlerts() {
+        when(currentUser.getUserId()).thenReturn(10L);
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), any(Object[].class)))
+                .thenReturn(List.of());
+
+        SecurityAuditAlertsResponse response = service.alerts(60, 5, null, null, null);
+
+        assertEquals(0L, response.getTotalAlerts());
+    }
+
+    @Test
+    void thresholdChangesAlertResult() {
+        when(currentUser.getUserId()).thenReturn(10L);
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), any(Object[].class)))
+                .thenAnswer(invocation -> {
+                    String sql = invocation.getArgument(0);
+                    List<Object> args = Arrays.asList(invocation.getArguments());
+                    boolean thresholdIsHigh = args.contains(10);
+                    if (sql.contains("status_code = ?") && args.contains(401) && !thresholdIsHigh) {
+                        return List.of(new SecurityAuditAlertsResponse.SecurityAuditAlertLine(
+                                "MEDIUM",
+                                "MANY_401",
+                                "Muchos eventos 401 en ventana reciente",
+                                5L,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null
+                        ));
+                    }
+                    return List.of();
+                });
+
+        SecurityAuditAlertsResponse lowThreshold = service.alerts(60, 5, null, null, null);
+        SecurityAuditAlertsResponse highThreshold = service.alerts(60, 10, null, null, null);
+
+        assertEquals(1L, lowThreshold.getTotalAlerts());
+        assertEquals(0L, highThreshold.getTotalAlerts());
     }
 }

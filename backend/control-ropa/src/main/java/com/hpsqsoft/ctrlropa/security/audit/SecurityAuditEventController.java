@@ -42,4 +42,15 @@ public class SecurityAuditEventController {
     ) {
         return service.summary(eventType, email, companyId, branchId, dateFrom, dateTo);
     }
+
+    @GetMapping("/alerts")
+    public SecurityAuditAlertsResponse alerts(
+            @RequestParam(required = false) Integer windowMinutes,
+            @RequestParam(required = false) Integer threshold,
+            @RequestParam(required = false) Long companyId,
+            @RequestParam(required = false) Long branchId,
+            @RequestParam(required = false) String email
+    ) {
+        return service.alerts(windowMinutes, threshold, companyId, branchId, email);
+    }
 }

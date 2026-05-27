@@ -1,5 +1,9 @@
 # AUTH-J2 - Resumen estadistico de auditoria de seguridad
 
+## Referencia AUTH-J4
+
+AUTH-J4 agrega `GET /api/security/audit-events/alerts` para detectar patrones criticos recientes sobre los mismos eventos auditados. El summary de AUTH-J2 se mantiene como vista agregada historica/operativa; las alertas de AUTH-J4 son una lectura tactica por ventana y umbral.
+
 Fecha: 2026-05-27  
 Rama: `feature/auth-j2-security-audit-summary`  
 Tipo: backend, seguridad, analitica operativa

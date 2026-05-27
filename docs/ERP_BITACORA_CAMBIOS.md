@@ -1,5 +1,40 @@
 # ERP - Bitacora de cambios
 
+## 2026-05-27 - AUTH-J4 alertas por patrones criticos de auditoria
+
+Tipo: backend protegido, frontend minimo, seguridad operativa.
+
+Objetivo:
+
+- Detectar patrones criticos recientes sobre `security_audit_events`.
+
+Cambios realizados:
+
+- Se creo `GET /api/security/audit-events/alerts`.
+- El endpoint exige `VIEW_SECURITY_AUDIT`.
+- Se agrego `SecurityAuditAlertsResponse`.
+- Se agregaron alertas por muchos 401, muchos 403, permiso denegado por email, token revocado por email, bloqueos tenant/branch/company, bloqueos por path y bloqueos `NO_ACCESS`.
+- Se agrego la seccion compacta `Alertas recientes` en `/system-security-audit`.
+- Se creo `docs/qa/14-auth-j4-security-alerts-smoke.sh`.
+- Se creo `docs/AUTH_J4_SECURITY_AUDIT_ALERTS.md`.
+- Se ampliaron pruebas backend de `SecurityAuditEventQueryServiceTests`.
+
+Restricciones respetadas:
+
+- No se creo migracion.
+- No se enviaron correos ni notificaciones.
+- No se expusieron tokens, passwords, cuerpos de request ni metadata sensible.
+- No se tocaron pagos, ventas ni reportes funcionales.
+
+Validaciones ejecutadas:
+
+- OK: `.\mvnw.cmd test`, 65 tests, 0 failures, 0 errors.
+- OK: `npm.cmd run lint`, 0 errors, warnings historicos preexistentes.
+- OK: `npx.cmd tsc --noEmit`.
+- OK: `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`.
+- OK: `docs/qa/14-auth-j4-security-alerts-smoke.sh` con Git Bash, `PASS=13`, `FAIL=0`, `SKIP=0`.
+- OK: `git diff --check`, solo warnings CRLF.
+
 ## 2026-05-27 - AUTH-J3 dashboard visual de auditoria
 
 Tipo: frontend protegido, seguridad, soporte operativo.

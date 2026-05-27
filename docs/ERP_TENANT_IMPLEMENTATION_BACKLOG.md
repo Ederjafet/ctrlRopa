@@ -244,7 +244,35 @@ Criterios cubiertos:
 Pendiente:
 
 - Smoke visual en navegador con `qa.soporte@local.test` y `qa.a.admin@local.test`.
-- Evaluar alertas visuales por patrones repetidos.
+
+## Actualizacion AUTH-J4 - Alertas por patrones criticos de auditoria
+
+Fecha: 2026-05-27
+Estado: implementado tecnico condicionado.
+
+Alcance ejecutado:
+
+- Endpoint `GET /api/security/audit-events/alerts`.
+- Permiso requerido `VIEW_SECURITY_AUDIT`.
+- Alertas calculadas bajo demanda desde `security_audit_events`.
+- Deteccion de muchos 401, muchos 403, permiso denegado por email, token revocado por email, bloqueos branch/company/tenant, bloqueos por path y bloqueos `NO_ACCESS`.
+- Seccion compacta `Alertas recientes` en `/system-security-audit`.
+- Smoke `docs/qa/14-auth-j4-security-alerts-smoke.sh` con reporte Markdown/CSV.
+
+Criterios cubiertos:
+
+- Soporte con `VIEW_SECURITY_AUDIT` puede consultar alertas.
+- Admin tenant sin permiso recibe `403`.
+- No se exponen tokens, passwords, cuerpos de request ni `metadataJson`.
+- No se crea tabla nueva ni se envian notificaciones.
+
+Pendiente:
+
+- Definir si se requiere persistencia historica de alertas o workflow de atencion en fase futura.
+
+Validacion:
+
+- Smoke Git Bash `docs/qa/14-auth-j4-security-alerts-smoke.sh`: `PASS=13`, `FAIL=0`, `SKIP=0`.
 
 ## Principios de ejecucion futura
 

@@ -19,6 +19,7 @@ public class SecurityAuditEventQueryService {
 
     private static final int MAX_PAGE_SIZE = 200;
     private static final int SUMMARY_GROUP_LIMIT = 10;
+    private static final int ALERT_LIMIT = 20;
     private static final List<String> CRITICAL_EVENTS = List.of(
             SecurityAuditEventType.TOKEN_INVALID.name(),
             SecurityAuditEventType.TOKEN_REVOKED.name(),
@@ -150,6 +151,60 @@ public class SecurityAuditEventQueryService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public SecurityAuditAlertsResponse alerts(Integer windowMinutes,
+                                              Integer threshold,
+                                              Long companyId,
+                                              Long branchId,
+                                              String email) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_SECURITY_AUDIT);
+
+        int safeWindowMinutes = windowMinutes == null || windowMinutes <= 0 ? 60 : windowMinutes;
+        int safeThreshold = threshold == null || threshold <= 0 ? 5 : threshold;
+        QueryParts base = buildAlertWhere(safeWindowMinutes, companyId, branchId, email);
+
+        List<SecurityAuditAlertsResponse.SecurityAuditAlertLine> alerts = new ArrayList<>();
+        alerts.addAll(statusAlerts(base, safeThreshold, 401, "MANY_401", "Muchos eventos 401 en ventana reciente"));
+        alerts.addAll(statusAlerts(base, safeThreshold, 403, "MANY_403", "Muchos eventos 403 en ventana reciente"));
+        alerts.addAll(groupedEventAlerts(base, safeThreshold, SecurityAuditEventType.PERMISSION_DENIED.name(),
+                "MANY_PERMISSION_DENIED_BY_EMAIL", "Muchos permisos denegados del mismo email", "email"));
+        alerts.addAll(groupedEventAlerts(base, safeThreshold, SecurityAuditEventType.TOKEN_REVOKED.name(),
+                "MANY_TOKEN_REVOKED_BY_EMAIL", "Muchos tokens revocados del mismo email", "email"));
+        alerts.addAll(tenantDeniedAlerts(base, safeThreshold));
+        alerts.addAll(pathAlerts(base, safeThreshold));
+        alerts.addAll(groupedEventAlerts(base, safeThreshold, SecurityAuditEventType.LOGIN_BLOCKED_NO_ACCESS.name(),
+                "MANY_LOGIN_BLOCKED_NO_ACCESS", "Multiples bloqueos NO_ACCESS", "email"));
+
+        alerts.sort((left, right) -> {
+            int severityCompare = Integer.compare(severityRank(right.getSeverity()), severityRank(left.getSeverity()));
+            if (severityCompare != 0) {
+                return severityCompare;
+            }
+            int countCompare = Long.compare(right.getCount(), left.getCount());
+            if (countCompare != 0) {
+                return countCompare;
+            }
+            LocalDateTime rightLastSeen = right.getLastSeen();
+            LocalDateTime leftLastSeen = left.getLastSeen();
+            if (rightLastSeen == null && leftLastSeen == null) {
+                return 0;
+            }
+            if (rightLastSeen == null) {
+                return -1;
+            }
+            if (leftLastSeen == null) {
+                return 1;
+            }
+            return rightLastSeen.compareTo(leftLastSeen);
+        });
+
+        if (alerts.size() > ALERT_LIMIT) {
+            alerts = alerts.subList(0, ALERT_LIMIT);
+        }
+
+        return new SecurityAuditAlertsResponse(alerts.size(), alerts);
+    }
+
     private long count(QueryParts queryParts, String extraClause) {
         QueryParts scoped = appendClause(queryParts, extraClause);
         Long total = jdbcTemplate.queryForObject(
@@ -231,6 +286,228 @@ public class SecurityAuditEventQueryService {
         List<Object> params = new ArrayList<>(queryParts.params());
         params.addAll(Arrays.asList(extraParams));
         return new QueryParts(queryParts.where() + " AND " + extraClause, params);
+    }
+
+    private List<SecurityAuditAlertsResponse.SecurityAuditAlertLine> statusAlerts(QueryParts base,
+                                                                                  int threshold,
+                                                                                  int statusCode,
+                                                                                  String alertType,
+                                                                                  String description) {
+        QueryParts scoped = appendClause(base, "status_code = ?", statusCode);
+        return jdbcTemplate.query(
+                """
+                SELECT COUNT(*) AS total, MIN(occurred_at) AS first_seen, MAX(occurred_at) AS last_seen
+                FROM security_audit_events
+                WHERE %s
+                HAVING COUNT(*) >= ?
+                """.formatted(scoped.where()),
+                (rs, rowNum) -> toAlertLine(
+                        alertType,
+                        description,
+                        rs.getLong("total"),
+                        null,
+                        null,
+                        null,
+                        null,
+                        toLocalDateTime(rs.getTimestamp("first_seen")),
+                        toLocalDateTime(rs.getTimestamp("last_seen")),
+                        threshold
+                ),
+                withThreshold(scoped.params(), threshold)
+        );
+    }
+
+    private List<SecurityAuditAlertsResponse.SecurityAuditAlertLine> groupedEventAlerts(QueryParts base,
+                                                                                        int threshold,
+                                                                                        String eventType,
+                                                                                        String alertType,
+                                                                                        String description,
+                                                                                        String groupColumn) {
+        QueryParts scoped = appendClause(base, "event_type = ? AND " + groupColumn + " IS NOT NULL AND " + groupColumn + " <> ''", eventType);
+        return jdbcTemplate.query(
+                """
+                SELECT
+                  %s AS group_value,
+                  COUNT(*) AS total,
+                  MIN(occurred_at) AS first_seen,
+                  MAX(occurred_at) AS last_seen
+                FROM security_audit_events
+                WHERE %s
+                GROUP BY %s
+                HAVING COUNT(*) >= ?
+                ORDER BY total DESC, group_value ASC
+                LIMIT ?
+                """.formatted(groupColumn, scoped.where(), groupColumn),
+                (rs, rowNum) -> toAlertLine(
+                        alertType,
+                        description,
+                        rs.getLong("total"),
+                        "email".equals(groupColumn) ? rs.getString("group_value") : null,
+                        "path".equals(groupColumn) ? rs.getString("group_value") : null,
+                        null,
+                        null,
+                        toLocalDateTime(rs.getTimestamp("first_seen")),
+                        toLocalDateTime(rs.getTimestamp("last_seen")),
+                        threshold
+                ),
+                withThresholdAndLimit(scoped.params(), threshold)
+        );
+    }
+
+    private List<SecurityAuditAlertsResponse.SecurityAuditAlertLine> tenantDeniedAlerts(QueryParts base, int threshold) {
+        String placeholders = "?,?,?";
+        QueryParts scoped = appendClause(
+                base,
+                "event_type IN (" + placeholders + ")",
+                SecurityAuditEventType.BRANCH_DENIED.name(),
+                SecurityAuditEventType.COMPANY_DENIED.name(),
+                SecurityAuditEventType.CROSS_TENANT_DENIED.name()
+        );
+        return jdbcTemplate.query(
+                """
+                SELECT
+                  event_type,
+                  company_id,
+                  branch_id,
+                  COUNT(*) AS total,
+                  MIN(occurred_at) AS first_seen,
+                  MAX(occurred_at) AS last_seen
+                FROM security_audit_events
+                WHERE %s
+                GROUP BY event_type, company_id, branch_id
+                HAVING COUNT(*) >= ?
+                ORDER BY total DESC, event_type ASC
+                LIMIT ?
+                """.formatted(scoped.where()),
+                (rs, rowNum) -> toAlertLine(
+                        "MANY_TENANT_DENIED",
+                        "Muchos bloqueos de branch/company/tenant",
+                        rs.getLong("total"),
+                        null,
+                        null,
+                        rs.getObject("company_id", Long.class),
+                        rs.getObject("branch_id", Long.class),
+                        toLocalDateTime(rs.getTimestamp("first_seen")),
+                        toLocalDateTime(rs.getTimestamp("last_seen")),
+                        threshold
+                ),
+                withThresholdAndLimit(scoped.params(), threshold)
+        );
+    }
+
+    private List<SecurityAuditAlertsResponse.SecurityAuditAlertLine> pathAlerts(QueryParts base, int threshold) {
+        QueryParts scoped = appendClause(base, "path IS NOT NULL AND path <> ''");
+        return jdbcTemplate.query(
+                """
+                SELECT
+                  path,
+                  COUNT(*) AS total,
+                  MIN(occurred_at) AS first_seen,
+                  MAX(occurred_at) AS last_seen
+                FROM security_audit_events
+                WHERE %s
+                GROUP BY path
+                HAVING COUNT(*) >= ?
+                ORDER BY total DESC, path ASC
+                LIMIT ?
+                """.formatted(scoped.where()),
+                (rs, rowNum) -> toAlertLine(
+                        "MANY_EVENTS_SAME_PATH",
+                        "Muchos bloqueos hacia el mismo path",
+                        rs.getLong("total"),
+                        null,
+                        rs.getString("path"),
+                        null,
+                        null,
+                        toLocalDateTime(rs.getTimestamp("first_seen")),
+                        toLocalDateTime(rs.getTimestamp("last_seen")),
+                        threshold
+                ),
+                withThresholdAndLimit(scoped.params(), threshold)
+        );
+    }
+
+    private SecurityAuditAlertsResponse.SecurityAuditAlertLine toAlertLine(String alertType,
+                                                                           String description,
+                                                                           long count,
+                                                                           String email,
+                                                                           String path,
+                                                                           Long companyId,
+                                                                           Long branchId,
+                                                                           LocalDateTime firstSeen,
+                                                                           LocalDateTime lastSeen,
+                                                                           int threshold) {
+        return new SecurityAuditAlertsResponse.SecurityAuditAlertLine(
+                severityFor(count, threshold),
+                alertType,
+                description,
+                count,
+                email,
+                path,
+                companyId,
+                branchId,
+                firstSeen,
+                lastSeen
+        );
+    }
+
+    private Object[] withThreshold(List<Object> params, int threshold) {
+        List<Object> scopedParams = new ArrayList<>(params);
+        scopedParams.add(threshold);
+        return scopedParams.toArray();
+    }
+
+    private Object[] withThresholdAndLimit(List<Object> params, int threshold) {
+        List<Object> scopedParams = new ArrayList<>(params);
+        scopedParams.add(threshold);
+        scopedParams.add(ALERT_LIMIT);
+        return scopedParams.toArray();
+    }
+
+    private QueryParts buildAlertWhere(int windowMinutes, Long companyId, Long branchId, String email) {
+        List<String> clauses = new ArrayList<>();
+        List<Object> params = new ArrayList<>();
+        clauses.add("occurred_at >= ?");
+        params.add(Timestamp.valueOf(LocalDateTime.now().minusMinutes(windowMinutes)));
+
+        if (companyId != null) {
+            clauses.add("company_id = ?");
+            params.add(companyId);
+        }
+
+        if (branchId != null) {
+            clauses.add("branch_id = ?");
+            params.add(branchId);
+        }
+
+        if (hasText(email)) {
+            clauses.add("LOWER(email) LIKE ?");
+            params.add("%" + email.trim().toLowerCase() + "%");
+        }
+
+        return new QueryParts(String.join(" AND ", clauses), params);
+    }
+
+    private String severityFor(long count, int threshold) {
+        if (count >= (long) threshold * 4) {
+            return "CRITICAL";
+        }
+        if (count >= (long) threshold * 2) {
+            return "HIGH";
+        }
+        if (count >= threshold) {
+            return "MEDIUM";
+        }
+        return "LOW";
+    }
+
+    private int severityRank(String severity) {
+        return switch (severity) {
+            case "CRITICAL" -> 4;
+            case "HIGH" -> 3;
+            case "MEDIUM" -> 2;
+            default -> 1;
+        };
     }
 
     private QueryParts buildWhere(String eventType,

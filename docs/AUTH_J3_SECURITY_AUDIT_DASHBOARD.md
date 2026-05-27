@@ -8,6 +8,14 @@ Tipo: frontend protegido, seguridad, soporte operativo
 
 Mostrar en `/system-security-audit` un dashboard compacto con el resumen de `GET /api/security/audit-events/summary`, sin rediseñar la pantalla ni exponer datos sensibles.
 
+## Extension AUTH-J4
+
+AUTH-J4 agrego en la misma ruta una seccion compacta de `Alertas recientes` basada en:
+
+`GET /api/security/audit-events/alerts`
+
+La seccion conserva el permiso `VIEW_SECURITY_AUDIT`, no muestra metadata sensible y no rompe el listado si falla la consulta de alertas.
+
 ## Ruta afectada
 
 `/system-security-audit`
@@ -110,5 +118,4 @@ Usuario sin permiso:
 
 ## Siguiente fase recomendada
 
-- AUTH-J4: alertas visuales por patrones repetidos.
 - AUTH-J5: export/archivado si soporte necesita evidencia fuera del ERP.

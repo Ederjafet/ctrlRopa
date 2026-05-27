@@ -68,6 +68,24 @@ export type SecurityAuditSummaryResponse = {
   recentCriticalEvents: SecurityAuditCriticalEventLine[];
 };
 
+export type SecurityAuditAlertLine = {
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  alertType: string;
+  description: string;
+  count: number;
+  email?: string | null;
+  path?: string | null;
+  companyId?: number | null;
+  branchId?: number | null;
+  firstSeen?: string | null;
+  lastSeen?: string | null;
+};
+
+export type SecurityAuditAlertsResponse = {
+  totalAlerts: number;
+  alerts: SecurityAuditAlertLine[];
+};
+
 export async function getSecurityAuditEvents(
   filters: SecurityAuditEventFilters
 ): Promise<SecurityAuditEventResponse> {
@@ -100,6 +118,23 @@ export async function getSecurityAuditSummary(
   const suffix = query.toString();
   return apiRequest<SecurityAuditSummaryResponse>(
     `/api/security/audit-events/summary${suffix ? `?${suffix}` : ''}`
+  );
+}
+
+export async function getSecurityAuditAlerts(
+  filters: Pick<SecurityAuditEventFilters, 'email'> & {
+    windowMinutes?: number;
+    threshold?: number;
+  }
+): Promise<SecurityAuditAlertsResponse> {
+  const query = new URLSearchParams();
+
+  addParam(query, 'email', filters.email);
+  query.set('windowMinutes', String(filters.windowMinutes ?? 60));
+  query.set('threshold', String(filters.threshold ?? 5));
+
+  return apiRequest<SecurityAuditAlertsResponse>(
+    `/api/security/audit-events/alerts?${query.toString()}`
   );
 }
 
