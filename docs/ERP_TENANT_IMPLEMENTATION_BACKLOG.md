@@ -170,6 +170,32 @@ Pendiente:
 - Ejecutar smoke runtime en ambiente QA con backend actualizado y script QA aplicado.
 - Definir asignacion productiva del permiso en matriz RBAC avanzada.
 
+## Actualizacion AUTH-J1 - Retencion y limpieza de auditoria
+
+Fecha: 2026-05-27
+Estado: implementado tecnico condicionado.
+
+Alcance ejecutado:
+
+- Propiedades `security.audit.retention-days`, `security.audit.cleanup.enabled` y `security.audit.cleanup-cron`.
+- Servicio transaccional de limpieza de `security_audit_events`.
+- Job programado diario por cron configurable.
+- Proteccion contra configuracion insegura: retencion `0` o negativa no elimina eventos.
+- Pruebas unitarias de cleanup habilitado, deshabilitado y sin eventos antiguos.
+
+Criterios cubiertos:
+
+- Eventos recientes se conservan.
+- Eventos anteriores al cutoff se eliminan.
+- El job no expone endpoint manual de borrado.
+- La limpieza registra cuantos eventos elimino.
+
+Pendiente:
+
+- Definir retencion por ambiente productivo.
+- Evaluar archivado historico antes de reducir retencion por debajo de 180 dias.
+- Definir alertas por patrones repetidos de bloqueo.
+
 ## Principios de ejecucion futura
 
 - No big bang.

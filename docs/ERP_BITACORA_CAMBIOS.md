@@ -1,5 +1,34 @@
 # ERP - Bitacora de cambios
 
+## 2026-05-27 - AUTH-J1 retencion y limpieza segura de auditoria
+
+Tipo: backend, seguridad, retencion operativa.
+
+Objetivo:
+
+- Controlar el crecimiento de `security_audit_events` con una politica configurable y segura.
+
+Cambios realizados:
+
+- Se agregaron propiedades:
+  - `security.audit.retention-days=180`
+  - `security.audit.cleanup.enabled=true`
+  - `security.audit.cleanup-cron=0 0 3 * * *`
+- Se creo `SecurityAuditRetentionProperties`.
+- Se creo `SecurityAuditCleanupService` transaccional.
+- Se creo `SecurityAuditCleanupJob` programado.
+- Se habilito scheduling de forma acotada para limpieza de auditoria.
+- Se agrego `deleteByOccurredAtBefore` en `SecurityAuditEventRepository`.
+- Se agregaron pruebas unitarias para limpieza habilitada, deshabilitada y configuracion insegura.
+- Se creo `docs/AUTH_J1_SECURITY_AUDIT_RETENTION.md`.
+
+Restricciones respetadas:
+
+- No se creo endpoint manual de purge.
+- No se agrego migracion.
+- No se cambio la forma de registrar ni consultar eventos.
+- No se tocaron pagos, ventas ni reportes funcionales.
+
 ## 2026-05-27 - AUTH-I2 permiso dedicado para auditoria de seguridad
 
 Tipo: RBAC, backend protegido, frontend protegido, QA automatizado.

@@ -105,10 +105,12 @@ Responsabilidades:
 
 - No hay UI avanzada con descarga/exportacion.
 - No se expande `metadataJson`.
+- La retencion se configura en backend desde AUTH-J1; la UI solo consulta eventos disponibles.
 - La revision visual real con `qa.soporte@local.test` debe hacerse en navegador QA si se requiere evidencia de pantalla.
 
 ## Siguiente fase recomendada
 
 - AUTH-I2: permiso dedicado `VIEW_SECURITY_AUDIT`, backend/frontend alineados y smoke automatizado.
 - AUTH-I3: descarga CSV desde UI si soporte lo necesita.
-- AUTH-J: retencion/archivado y alertas si se aprueban para operacion.
+- AUTH-J1: retencion automatica segura de eventos.
+- AUTH-J2/J3: archivado y alertas si se aprueban para operacion.

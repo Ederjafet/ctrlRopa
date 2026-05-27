@@ -131,10 +131,11 @@ Resultado validado:
 - AUTH-H no agrega una pantalla frontend completa; deja backend protegido y smoke automatico listo.
 - `qa.a.admin@local.test` no debe tener `VIEW_SECURITY_AUDIT`; es admin tenant operativo, no admin de seguridad. Para consulta de auditoria se usa `qa.soporte@local.test`.
 - El smoke AUTH-H queda como evidencia historica. Para validar el permiso dedicado se debe usar `docs/qa/12-auth-i2-view-security-audit-smoke.sh`.
-- No hay retencion/archivado automatico de eventos todavia.
+- AUTH-J1 agrega retencion automatica configurable; no agrega archivado historico ni endpoint manual de purge.
 
 ## Proximos pasos
 
 - AUTH-I: UI minima en Sistema/Seguridad para filtros frecuentes. Implementada en `docs/AUTH_I_SECURITY_AUDIT_UI.md`.
 - AUTH-I2: permiso dedicado `VIEW_SECURITY_AUDIT`.
-- AUTH-G/H futuro: retencion, archivado y alertas por patrones repetidos.
+- AUTH-J1: retencion automatica segura de eventos. Implementada en `docs/AUTH_J1_SECURITY_AUDIT_RETENTION.md`.
+- AUTH-G/H futuro: archivado y alertas por patrones repetidos.

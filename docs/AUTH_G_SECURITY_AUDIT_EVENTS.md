@@ -100,9 +100,19 @@ Validacion tecnica:
 - Algunos bloqueos que lancen `AccessDeniedException` fuera de `AccessService` o `TenantAccessGuard` pueden requerir integracion especifica futura.
 - `CROSS_TENANT_DENIED` queda reservado para una fase donde los servicios reporten tipo de recurso y tenant destino con mayor precision.
 
+## Retencion
+
+AUTH-J1 agrega limpieza automatica segura de eventos antiguos:
+
+- `security.audit.retention-days=180`
+- `security.audit.cleanup.enabled=true`
+- `security.audit.cleanup-cron=0 0 3 * * *`
+
+La limpieza elimina solo eventos con `occurred_at` anterior a `now - retention-days`. Si la retencion es `0` o negativa, no elimina nada.
+
 ## Proximos pasos recomendados
 
 - AUTH-H: endpoint protegido solo admin/soporte para consultar eventos de auditoria. Implementado en `docs/AUTH_H_SECURITY_AUDIT_CONSOLE.md`.
 - AUTH-G3: filtros por usuario, company, evento, rango de fechas y recurso.
-- AUTH-G4: retencion/archivado de eventos y politicas de privacidad.
+- AUTH-J1: retencion automatica de eventos. Implementada en `docs/AUTH_J1_SECURITY_AUDIT_RETENTION.md`.
 - AUTH-G5: alertas para patrones repetidos de `TOKEN_REVOKED`, `PERMISSION_DENIED` o `BRANCH_DENIED`.
