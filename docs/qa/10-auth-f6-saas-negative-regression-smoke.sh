@@ -35,8 +35,108 @@ SKIP_COUNT=0
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
+REPORT_DIR="${REPORT_DIR:-qa-reports}"
+REPORT_TS="$(date '+%Y%m%d-%H%M%S')"
+REPORT_MD="$REPORT_DIR/AUTH-F6-smoke-report-$REPORT_TS.md"
+REPORT_CSV="$REPORT_DIR/AUTH-F6-smoke-report-$REPORT_TS.csv"
+RUN_TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S %z')"
+LAST_ENDPOINT="-"
+LAST_USER="-"
+
+mkdir -p "$REPORT_DIR"
+
 log() {
   printf '%s\n' "$*"
+}
+
+csv_escape() {
+  local value="${1//\"/\"\"}"
+  printf '"%s"' "$value"
+}
+
+md_escape() {
+  local value="$1"
+  value="${value//|/\\|}"
+  printf '%s' "$value"
+}
+
+write_report_headers() {
+  {
+    printf '# AUTH-F6 SaaS negative regression smoke report\n\n'
+    printf '%s\n' "- Timestamp: \`$RUN_TIMESTAMP\`"
+    printf '%s\n' "- API: \`$API_BASE_URL\`"
+    printf '%s\n' "- QA_A: \`$QA_A_EMAIL\`, branch \`$QA_A_BRANCH_ID\`"
+    printf '%s\n' "- QA_B: \`$QA_B_EMAIL\`, branch \`$QA_B_BRANCH_ID\`"
+    printf '%s\n\n' "- DEFAULT branch: \`$DEFAULT_BRANCH_ID\`"
+    printf '| Test | Endpoint | Usuario/token | Esperado | Recibido | Resultado | Observacion |\n'
+    printf '|---|---|---|---|---:|---|---|\n'
+  } > "$REPORT_MD"
+
+  printf 'test_name,endpoint,user_token,expected,received_status,result,notes,timestamp,api_base_url\n' > "$REPORT_CSV"
+}
+
+record_result() {
+  local test_name="$1"
+  local endpoint="$2"
+  local user_token="$3"
+  local expected="$4"
+  local received_status="$5"
+  local result="$6"
+  local notes="$7"
+
+  {
+    csv_escape "$test_name"; printf ','
+    csv_escape "$endpoint"; printf ','
+    csv_escape "$user_token"; printf ','
+    csv_escape "$expected"; printf ','
+    csv_escape "$received_status"; printf ','
+    csv_escape "$result"; printf ','
+    csv_escape "$notes"; printf ','
+    csv_escape "$RUN_TIMESTAMP"; printf ','
+    csv_escape "$API_BASE_URL"; printf '\n'
+  } >> "$REPORT_CSV"
+
+  printf '| %s | `%s` | `%s` | %s | %s | %s | %s |\n' \
+    "$(md_escape "$test_name")" \
+    "$(md_escape "$endpoint")" \
+    "$(md_escape "$user_token")" \
+    "$(md_escape "$expected")" \
+    "$(md_escape "$received_status")" \
+    "$(md_escape "$result")" \
+    "$(md_escape "$notes")" >> "$REPORT_MD"
+}
+
+token_label() {
+  local token="$1"
+  if [ "${TOKEN_A:-}" = "$token" ]; then
+    printf 'QA_A'
+    return
+  fi
+  if [ "${TOKEN_B:-}" = "$token" ]; then
+    printf 'QA_B'
+    return
+  fi
+  if [ "${TOKEN_A_OLD:-}" = "$token" ]; then
+    printf 'QA_A_REVOKED'
+    return
+  fi
+  printf 'UNKNOWN'
+}
+
+last_endpoint() {
+  if [ -f "$TMP_DIR/last_endpoint" ]; then
+    cat "$TMP_DIR/last_endpoint"
+  else
+    printf '%s' "$LAST_ENDPOINT"
+  fi
+}
+
+last_user() {
+  if [ -f "$TMP_DIR/last_user" ]; then
+    cat "$TMP_DIR/last_user"
+  else
+    printf '%s' "$LAST_USER"
+  fi
 }
 
 extract_json_string() {
@@ -72,6 +172,10 @@ request_status() {
   local path="$2"
   local token="$3"
   local output="$4"
+  LAST_ENDPOINT="$method $path"
+  LAST_USER="$(token_label "$token")"
+  printf '%s' "$LAST_ENDPOINT" > "$TMP_DIR/last_endpoint"
+  printf '%s' "$LAST_USER" > "$TMP_DIR/last_user"
   curl -sS -o "$output" -w "%{http_code}" \
     -X "$method" "$API_BASE_URL$path" \
     -H "Authorization: Bearer $token" \
@@ -91,6 +195,7 @@ fail() {
 skip() {
   SKIP_COUNT=$((SKIP_COUNT + 1))
   log "SKIP $*"
+  record_result "$*" "-" "-" "dato QA disponible" "SKIP" "SKIP" "Dato opcional no configurado o no disponible"
 }
 
 expect_status() {
@@ -98,8 +203,10 @@ expect_status() {
   local status="$2"
   local expected="$3"
   if [ "$status" = "$expected" ]; then
+    record_result "$label" "$(last_endpoint)" "$(last_user)" "$expected" "$status" "PASS" "Respuesta esperada"
     pass "$label -> $status"
   else
+    record_result "$label" "$(last_endpoint)" "$(last_user)" "$expected" "$status" "FAIL" "Respuesta inesperada"
     fail "$label expected $expected got $status"
   fi
 }
@@ -108,9 +215,18 @@ expect_cross_blocked() {
   local label="$1"
   local status="$2"
   case "$status" in
-    403|404) pass "$label blocked -> $status" ;;
-    200) fail "$label leaked data -> 200" ;;
-    *) fail "$label expected 403/404 got $status" ;;
+    403|404)
+      record_result "$label" "$(last_endpoint)" "$(last_user)" "403 o 404" "$status" "PASS" "Dato cross-tenant bloqueado"
+      pass "$label blocked -> $status"
+      ;;
+    200)
+      record_result "$label" "$(last_endpoint)" "$(last_user)" "403 o 404" "$status" "FAIL" "Fuga: dato ajeno respondio 200"
+      fail "$label leaked data -> 200"
+      ;;
+    *)
+      record_result "$label" "$(last_endpoint)" "$(last_user)" "403 o 404" "$status" "FAIL" "Respuesta inesperada para caso cross-tenant"
+      fail "$label expected 403/404 got $status"
+      ;;
   esac
 }
 
@@ -118,8 +234,10 @@ expect_not_200() {
   local label="$1"
   local status="$2"
   if [ "$status" = "200" ]; then
+    record_result "$label" "$(last_endpoint)" "$(last_user)" "no 200" "$status" "FAIL" "Respuesta 200 no esperada"
     fail "$label unexpected 200"
   else
+    record_result "$label" "$(last_endpoint)" "$(last_user)" "no 200" "$status" "PASS" "Respuesta no exitosa como se esperaba"
     pass "$label not 200 -> $status"
   fi
 }
@@ -137,9 +255,13 @@ discover_id_from_list() {
   fi
 }
 
+write_report_headers
+
 log "AUTH-F6 SaaS negative regression smoke"
 log "API_BASE_URL=$API_BASE_URL"
 log "QA_A_BRANCH_ID=$QA_A_BRANCH_ID QA_B_BRANCH_ID=$QA_B_BRANCH_ID DEFAULT_BRANCH_ID=$DEFAULT_BRANCH_ID"
+log "REPORT_MD=$REPORT_MD"
+log "REPORT_CSV=$REPORT_CSV"
 
 login "$QA_A_EMAIL" "$TMP_DIR/login_a_old.json"
 TOKEN_A_OLD="$(extract_json_string "$TMP_DIR/login_a_old.json" sessionToken)"
@@ -268,6 +390,16 @@ else
 fi
 
 log "Summary: PASS=$PASS_COUNT FAIL=$FAIL_COUNT SKIP=$SKIP_COUNT"
+
+{
+  printf '\n## Resumen\n\n'
+  printf '%s\n' "- PASS: \`$PASS_COUNT\`"
+  printf '%s\n' "- FAIL: \`$FAIL_COUNT\`"
+  printf '%s\n' "- SKIP: \`$SKIP_COUNT\`"
+} >> "$REPORT_MD"
+
+log "Report markdown: $REPORT_MD"
+log "Report csv: $REPORT_CSV"
 
 if [ "$FAIL_COUNT" -gt 0 ]; then
   exit 1

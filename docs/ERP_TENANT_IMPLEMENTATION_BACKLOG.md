@@ -65,6 +65,7 @@ Alcance ejecutado:
 - Script Git Bash `docs/qa/10-auth-f6-saas-negative-regression-smoke.sh`.
 - Login QA_A/QA_B, validacion de token revocado y checks negativos por branch/id/codigo/QR/folio.
 - Salida `PASS/FAIL/SKIP` y `exit 1` si un endpoint cross-tenant devuelve `200`.
+- AUTH-F6B genera evidencia automatica en Markdown y CSV bajo `qa-reports/`.
 
 Pendiente:
 

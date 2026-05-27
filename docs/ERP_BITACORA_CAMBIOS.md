@@ -13,9 +13,10 @@ Cambios realizados:
 - Se creo `docs/AUTH_F6_SAAS_NEGATIVE_REGRESSION_SUITE.md`.
 - Se creo `docs/qa/10-auth-f6-saas-negative-regression-smoke.sh`.
 - El smoke usa `API_BASE_URL` configurable, login QA_A/QA_B, extraccion de `sessionToken` con `sed`, validaciones `PASS/FAIL/SKIP` y `exit 1` si un dato ajeno responde `200`.
+- AUTH-F6B agrega generacion automatica de reportes Markdown y CSV en `qa-reports/` con test, endpoint, usuario/token, esperado, recibido, resultado, observacion, timestamp y API.
 - Se cubren clientes, items, batches, pagos, ventas, reportes, reservaciones, direcciones, saldos y casos opcionales de paquetes/envios/refunds.
 - Se valida token revocado con segundo login del mismo usuario.
-- Smoke runtime local ejecutado con Git Bash explicito: `PASS=20`, `FAIL=0`, `SKIP=5`.
+- Smoke runtime local ejecutado con Git Bash explicito: `PASS=20`, `FAIL=0`, `SKIP=5`; reportes generados en `qa-reports/AUTH-F6-smoke-report-20260526-090627.md` y `.csv`.
 
 Pendientes:
 

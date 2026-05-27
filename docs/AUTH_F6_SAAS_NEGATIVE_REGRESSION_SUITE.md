@@ -24,6 +24,23 @@ Archivo:
 
 - `docs/qa/10-auth-f6-saas-negative-regression-smoke.sh`
 
+Salidas automaticas:
+
+- Markdown: `qa-reports/AUTH-F6-smoke-report-YYYYMMDD-HHMMSS.md`.
+- CSV: `qa-reports/AUTH-F6-smoke-report-YYYYMMDD-HHMMSS.csv`.
+
+Cada fila registra:
+
+- `test_name`.
+- `endpoint`.
+- `user_token`.
+- `expected`.
+- `received_status`.
+- `result`.
+- `notes`.
+- `timestamp`.
+- `api_base_url`.
+
 Requisitos:
 
 - Git Bash en Windows.
@@ -147,6 +164,8 @@ Resultado:
 - `PASS=20`.
 - `FAIL=0`.
 - `SKIP=5`.
+- Reporte Markdown: `qa-reports/AUTH-F6-smoke-report-20260526-090627.md`.
+- Reporte CSV: `qa-reports/AUTH-F6-smoke-report-20260526-090627.csv`.
 
 Casos PASS relevantes:
 
