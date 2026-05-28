@@ -333,6 +333,22 @@ Validacion:
 - Smoke maestro `docs/qa/99-auth-z-final-security-smoke.sh`: `PASS=6`, `FAIL=0`, `SKIP=0`.
 - Reportes: `qa-reports/AUTH-Z-final-security-report-20260528-093110.md` y `.csv`.
 
+## Actualizacion cierre documental AUTH / entrega QA
+
+Fecha: 2026-05-28
+Estado: documentacion creada.
+
+Referencias:
+
+- `docs/AUTH_RESUMEN_FINAL.md`
+- `docs/RELEASE_AUTH_QA_HANDOFF.md`
+
+Uso esperado:
+
+- Continuidad tecnica en otro chat.
+- Handoff QA/release del bloque AUTH.
+- Checklist ejecutivo antes de liberar AUTH a QA formal.
+
 ## Principios de ejecucion futura
 
 - No big bang.

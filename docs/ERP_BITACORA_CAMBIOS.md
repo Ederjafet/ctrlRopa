@@ -1,5 +1,15 @@
 # ERP - Bitacora de cambios
 
+## 2026-05-28 - Documentacion integral de cierre AUTH y entrega QA
+
+Tipo: documentacion de cierre, release handoff, continuidad operativa.
+
+Cambios realizados:
+
+- Se creo `docs/AUTH_RESUMEN_FINAL.md`.
+- Se creo `docs/RELEASE_AUTH_QA_HANDOFF.md`.
+- Se consolido el cierre documental del bloque AUTH desde AUTH-A hasta AUTH-Z.
+
 ## 2026-05-28 - AUTH-Z cierre integral de seguridad AUTH
 
 Tipo: QA automatizado, cierre documental, evidencia operativa.
