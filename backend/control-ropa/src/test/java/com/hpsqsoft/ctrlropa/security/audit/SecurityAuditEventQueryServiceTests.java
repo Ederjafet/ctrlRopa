@@ -270,4 +270,66 @@ class SecurityAuditEventQueryServiceTests {
         assertEquals(1L, lowThreshold.getTotalAlerts());
         assertEquals(0L, highThreshold.getTotalAlerts());
     }
+
+    @Test
+    void exportEventsCsvRequiresViewSecurityAuditPermissionAndOmitsMetadata() {
+        when(currentUser.getUserId()).thenReturn(10L);
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), any(Object[].class)))
+                .thenReturn(List.of(new SecurityAuditEventResponse.SecurityAuditEventLine(
+                        99L,
+                        null,
+                        10L,
+                        "qa.soporte@local.test",
+                        2L,
+                        6L,
+                        "TOKEN_REVOKED",
+                        "GET",
+                        "/api/me",
+                        401,
+                        "Sesion revocada",
+                        "127.0.0.1",
+                        "Test Agent",
+                        "session",
+                        "abc",
+                        "sessionToken=secret"
+                )));
+
+        String csv = service.exportEventsCsv(null, null, null, null, null, null, null, null);
+
+        verify(accessService).assertCan(10L, PermissionCode.VIEW_SECURITY_AUDIT);
+        assertEquals(true, csv.startsWith("\"id\",\"occurred_at\""));
+        assertEquals(true, csv.contains("\"TOKEN_REVOKED\""));
+        assertEquals(false, csv.contains("sessionToken"));
+    }
+
+    @Test
+    void exportAlertsCsvRequiresViewSecurityAuditPermission() {
+        when(currentUser.getUserId()).thenReturn(10L);
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), any(Object[].class)))
+                .thenAnswer(invocation -> {
+                    String sql = invocation.getArgument(0);
+                    List<Object> args = Arrays.asList(invocation.getArguments());
+                    if (sql.contains("status_code = ?") && args.contains(401)) {
+                        return List.of(new SecurityAuditAlertsResponse.SecurityAuditAlertLine(
+                                "MEDIUM",
+                                "MANY_401",
+                                "Muchos eventos 401 en ventana reciente",
+                                5L,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null
+                        ));
+                    }
+                    return List.of();
+                });
+
+        String csv = service.exportAlertsCsv(60, 5, null, null, null);
+
+        verify(accessService).assertCan(10L, PermissionCode.VIEW_SECURITY_AUDIT);
+        assertEquals(true, csv.startsWith("\"severity\",\"alert_type\""));
+        assertEquals(true, csv.contains("\"MANY_401\""));
+    }
 }

@@ -138,6 +138,41 @@ export async function getSecurityAuditAlerts(
   );
 }
 
+export async function exportSecurityAuditEventsCsv(
+  filters: Omit<SecurityAuditEventFilters, 'page' | 'size'>
+): Promise<string> {
+  const query = new URLSearchParams();
+
+  addParam(query, 'eventType', filters.eventType);
+  addParam(query, 'email', filters.email);
+  addParam(query, 'statusCode', filters.statusCode);
+  addParam(query, 'path', filters.path);
+  addParam(query, 'dateFrom', filters.dateFrom);
+  addParam(query, 'dateTo', filters.dateTo);
+
+  const suffix = query.toString();
+  return apiRequest<string>(
+    `/api/security/audit-events/export.csv${suffix ? `?${suffix}` : ''}`
+  );
+}
+
+export async function exportSecurityAuditAlertsCsv(
+  filters: Pick<SecurityAuditEventFilters, 'email'> & {
+    windowMinutes?: number;
+    threshold?: number;
+  }
+): Promise<string> {
+  const query = new URLSearchParams();
+
+  addParam(query, 'email', filters.email);
+  query.set('windowMinutes', String(filters.windowMinutes ?? 60));
+  query.set('threshold', String(filters.threshold ?? 5));
+
+  return apiRequest<string>(
+    `/api/security/audit-events/alerts/export.csv?${query.toString()}`
+  );
+}
+
 function addParam(query: URLSearchParams, name: string, value?: string) {
   if (value && value.trim()) {
     query.set(name, value.trim());

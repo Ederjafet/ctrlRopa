@@ -32,6 +32,17 @@ Endpoint backend adicional disponible desde AUTH-J2:
 
 AUTH-J3 consume este endpoint para mostrar un dashboard compacto arriba del listado.
 
+Endpoint adicional desde AUTH-J4:
+
+`GET /api/security/audit-events/alerts`
+
+AUTH-J4 consume este endpoint para mostrar `Alertas recientes`.
+
+Endpoints de export desde AUTH-J5:
+
+- `GET /api/security/audit-events/export.csv`
+- `GET /api/security/audit-events/alerts/export.csv`
+
 Permiso backend requerido:
 
 `VIEW_SECURITY_AUDIT`
@@ -87,6 +98,17 @@ Desde AUTH-J3 la pantalla muestra:
 
 El resumen reutiliza filtros compatibles: fecha desde/hasta, email y tipo de evento. `statusCode` y `path` siguen aplicando al listado.
 
+## Alertas y export
+
+Desde AUTH-J4 la pantalla muestra una seccion compacta de alertas recientes.
+
+Desde AUTH-J5 la pantalla agrega:
+
+- `Exportar eventos CSV`
+- `Exportar alertas CSV`
+
+Los exports respetan `VIEW_SECURITY_AUDIT`, usan filtros compatibles y no descargan `metadataJson`, tokens, passwords ni cuerpos de request.
+
 ## Paginacion
 
 - Tamano default: 20
@@ -124,16 +146,15 @@ Responsabilidades:
 
 ## Limitaciones
 
-- No hay UI avanzada con descarga/exportacion.
 - No se expande `metadataJson`.
+- No hay export Markdown desde la UI.
 - La retencion se configura en backend desde AUTH-J1; la UI solo consulta eventos disponibles.
 - La revision visual real con `qa.soporte@local.test` debe hacerse en navegador QA si se requiere evidencia de pantalla.
 
 ## Siguiente fase recomendada
 
-- AUTH-I2: permiso dedicado `VIEW_SECURITY_AUDIT`, backend/frontend alineados y smoke automatizado.
-- AUTH-I3: descarga CSV desde UI si soporte lo necesita.
 - AUTH-J1: retencion automatica segura de eventos.
 - AUTH-J2: resumen estadistico backend.
 - AUTH-J3: dashboard compacto de resumen en esta pantalla.
-- AUTH-J4/J5: archivado y alertas si se aprueban para operacion.
+- AUTH-J4: alertas por patrones criticos.
+- AUTH-J5: export CSV operativo protegido.

@@ -6,6 +6,8 @@ import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { hasPermission } from '@/services/accessControl';
 import {
+  exportSecurityAuditAlertsCsv,
+  exportSecurityAuditEventsCsv,
   getSecurityAuditAlerts,
   getSecurityAuditEvents,
   getSecurityAuditSummary,
@@ -52,6 +54,7 @@ export default function SystemSecurityAuditScreen() {
   const [events, setEvents] = useState<SecurityAuditEventLine[]>([]);
   const [summary, setSummary] = useState<SecurityAuditSummaryResponse | null>(null);
   const [total, setTotal] = useState(0);
+  const [exporting, setExporting] = useState(false);
 
   const page = filters.page ?? 0;
   const size = filters.size ?? 20;
@@ -150,6 +153,49 @@ export default function SystemSecurityAuditScreen() {
     void loadEvents({ ...filters, page: nextPage });
   };
 
+  const downloadCsv = (filename: string, csv: string) => {
+    if (typeof document === 'undefined') {
+      Alert.alert('Auditoria de seguridad', 'Exportacion disponible desde navegador web.');
+      return;
+    }
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportEvents = async () => {
+    setExporting(true);
+    try {
+      const csv = await exportSecurityAuditEventsCsv(filters);
+      downloadCsv('security-audit-events.csv', csv);
+    } catch (err: any) {
+      Alert.alert('Auditoria de seguridad', err?.message || 'No se pudo exportar eventos.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const exportAlerts = async () => {
+    setExporting(true);
+    try {
+      const csv = await exportSecurityAuditAlertsCsv({
+        email: filters.email,
+        windowMinutes: 60,
+        threshold: 5,
+      });
+      downloadCsv('security-audit-alerts.csv', csv);
+    } catch (err: any) {
+      Alert.alert('Auditoria de seguridad', err?.message || 'No se pudo exportar alertas.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (!authorized) {
     return (
       <AppScreen>
@@ -246,6 +292,22 @@ export default function SystemSecurityAuditScreen() {
             onPress={clear}
             disabled={loading}
             style={styles.actionButton}
+          />
+          <AppButton
+            title="Exportar eventos CSV"
+            variant="secondary"
+            onPress={exportEvents}
+            loading={exporting}
+            disabled={exporting}
+            style={styles.exportButton}
+          />
+          <AppButton
+            title="Exportar alertas CSV"
+            variant="secondary"
+            onPress={exportAlerts}
+            loading={exporting}
+            disabled={exporting}
+            style={styles.exportButton}
           />
         </View>
       </AppCard>
@@ -497,7 +559,7 @@ function CriticalEventRow({ event }: { event: SecurityAuditCriticalEventLine }) 
         </AppText>
       </View>
       <AppText color={theme.colors.mutedText}>
-        {event.email || 'Sin email'} · {event.httpMethod || '-'} {event.path || '-'}
+        {event.email || 'Sin email'} - {event.httpMethod || '-'} {event.path || '-'}
       </AppText>
       {event.reason ? <AppText>{event.reason}</AppText> : null}
     </View>
@@ -658,6 +720,9 @@ const styles = StyleSheet.create({
   eventTitle: {
     flex: 1,
     minWidth: 0,
+  },
+  exportButton: {
+    minWidth: 190,
   },
   filterGrid: {
     flexDirection: 'row',

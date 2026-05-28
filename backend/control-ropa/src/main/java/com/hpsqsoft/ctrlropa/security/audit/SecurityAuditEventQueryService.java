@@ -123,6 +123,103 @@ public class SecurityAuditEventQueryService {
     }
 
     @Transactional(readOnly = true)
+    public String exportEventsCsv(String eventType,
+                                  String email,
+                                  Long companyId,
+                                  Long branchId,
+                                  Integer statusCode,
+                                  String dateFrom,
+                                  String dateTo,
+                                  String path) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_SECURITY_AUDIT);
+
+        QueryParts queryParts = buildWhere(eventType, email, companyId, branchId, statusCode, dateFrom, dateTo, path);
+
+        List<SecurityAuditEventResponse.SecurityAuditEventLine> events = jdbcTemplate.query(
+                """
+                SELECT
+                  id,
+                  occurred_at,
+                  user_id,
+                  email,
+                  company_id,
+                  branch_id,
+                  event_type,
+                  http_method,
+                  path,
+                  status_code,
+                  reason,
+                  remote_ip,
+                  user_agent,
+                  target_resource_type,
+                  target_resource_id
+                FROM security_audit_events
+                WHERE %s
+                ORDER BY occurred_at DESC, id DESC
+                LIMIT ?
+                """.formatted(queryParts.where()),
+                (rs, rowNum) -> new SecurityAuditEventResponse.SecurityAuditEventLine(
+                        rs.getLong("id"),
+                        toLocalDateTime(rs.getTimestamp("occurred_at")),
+                        rs.getObject("user_id", Long.class),
+                        rs.getString("email"),
+                        rs.getObject("company_id", Long.class),
+                        rs.getObject("branch_id", Long.class),
+                        rs.getString("event_type"),
+                        rs.getString("http_method"),
+                        rs.getString("path"),
+                        rs.getObject("status_code", Integer.class),
+                        rs.getString("reason"),
+                        rs.getString("remote_ip"),
+                        rs.getString("user_agent"),
+                        rs.getString("target_resource_type"),
+                        rs.getString("target_resource_id"),
+                        null
+                ),
+                withLimit(queryParts.params(), 5000)
+        );
+
+        StringBuilder csv = new StringBuilder();
+        appendCsvLine(csv, List.of(
+                "id",
+                "occurred_at",
+                "user_id",
+                "email",
+                "company_id",
+                "branch_id",
+                "event_type",
+                "http_method",
+                "path",
+                "status_code",
+                "reason",
+                "remote_ip",
+                "user_agent",
+                "target_resource_type",
+                "target_resource_id"
+        ));
+        for (SecurityAuditEventResponse.SecurityAuditEventLine event : events) {
+            appendCsvLine(csv, Arrays.asList(
+                    event.getId(),
+                    event.getOccurredAt(),
+                    event.getUserId(),
+                    event.getEmail(),
+                    event.getCompanyId(),
+                    event.getBranchId(),
+                    event.getEventType(),
+                    event.getHttpMethod(),
+                    event.getPath(),
+                    event.getStatusCode(),
+                    event.getReason(),
+                    event.getRemoteIp(),
+                    event.getUserAgent(),
+                    event.getTargetResourceType(),
+                    event.getTargetResourceId()
+            ));
+        }
+        return csv.toString();
+    }
+
+    @Transactional(readOnly = true)
     public SecurityAuditSummaryResponse summary(String eventType,
                                                 String email,
                                                 Long companyId,
@@ -203,6 +300,44 @@ public class SecurityAuditEventQueryService {
         }
 
         return new SecurityAuditAlertsResponse(alerts.size(), alerts);
+    }
+
+    @Transactional(readOnly = true)
+    public String exportAlertsCsv(Integer windowMinutes,
+                                  Integer threshold,
+                                  Long companyId,
+                                  Long branchId,
+                                  String email) {
+        SecurityAuditAlertsResponse response = alerts(windowMinutes, threshold, companyId, branchId, email);
+
+        StringBuilder csv = new StringBuilder();
+        appendCsvLine(csv, List.of(
+                "severity",
+                "alert_type",
+                "description",
+                "count",
+                "email",
+                "path",
+                "company_id",
+                "branch_id",
+                "first_seen",
+                "last_seen"
+        ));
+        for (SecurityAuditAlertsResponse.SecurityAuditAlertLine alert : response.getAlerts()) {
+            appendCsvLine(csv, Arrays.asList(
+                    alert.getSeverity(),
+                    alert.getAlertType(),
+                    alert.getDescription(),
+                    alert.getCount(),
+                    alert.getEmail(),
+                    alert.getPath(),
+                    alert.getCompanyId(),
+                    alert.getBranchId(),
+                    alert.getFirstSeen(),
+                    alert.getLastSeen()
+            ));
+        }
+        return csv.toString();
     }
 
     private long count(QueryParts queryParts, String extraClause) {
@@ -462,6 +597,31 @@ public class SecurityAuditEventQueryService {
         scopedParams.add(threshold);
         scopedParams.add(ALERT_LIMIT);
         return scopedParams.toArray();
+    }
+
+    private Object[] withLimit(List<Object> params, int limit) {
+        List<Object> scopedParams = new ArrayList<>(params);
+        scopedParams.add(limit);
+        return scopedParams.toArray();
+    }
+
+    private void appendCsvLine(StringBuilder csv, List<?> values) {
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0) {
+                csv.append(',');
+            }
+            csv.append(csvValue(values.get(i)));
+        }
+        csv.append('\n');
+    }
+
+    private String csvValue(Object value) {
+        if (value == null) {
+            return "";
+        }
+        String text = String.valueOf(value);
+        String escaped = text.replace("\"", "\"\"");
+        return "\"" + escaped + "\"";
     }
 
     private QueryParts buildAlertWhere(int windowMinutes, Long companyId, Long branchId, String email) {

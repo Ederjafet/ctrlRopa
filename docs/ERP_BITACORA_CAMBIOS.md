@@ -1,5 +1,39 @@
 # ERP - Bitacora de cambios
 
+## 2026-05-27 - AUTH-J5 export operativo de auditoria y alertas
+
+Tipo: backend protegido, frontend minimo, evidencia operativa.
+
+Objetivo:
+
+- Permitir a soporte descargar evidencia CSV de eventos de auditoria y alertas.
+
+Cambios realizados:
+
+- Se creo `GET /api/security/audit-events/export.csv`.
+- Se creo `GET /api/security/audit-events/alerts/export.csv`.
+- Ambos endpoints exigen `VIEW_SECURITY_AUDIT`.
+- El export de eventos respeta filtros de auditoria y omite `metadata_json` por default.
+- El export de alertas respeta ventana, umbral, email, company y branch.
+- Se agregaron botones `Exportar eventos CSV` y `Exportar alertas CSV` en `/system-security-audit`.
+- Se creo `docs/qa/15-auth-j5-security-audit-export-smoke.sh`.
+- Se creo `docs/AUTH_J5_SECURITY_AUDIT_EXPORTS.md`.
+- Se ampliaron pruebas backend de `SecurityAuditEventQueryServiceTests`.
+
+Restricciones respetadas:
+
+- No se creo migracion.
+- No se expusieron tokens, passwords, cuerpos de request ni metadata sensible.
+- No se tocaron pagos, ventas ni reportes funcionales.
+
+Validaciones ejecutadas:
+
+- OK: `.\mvnw.cmd test`, 67 tests, 0 failures, 0 errors.
+- OK: `npm.cmd run lint`, 0 errores, warnings historicos preexistentes.
+- OK: `npx.cmd tsc --noEmit`.
+- OK: `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`.
+- OK: `docs/qa/15-auth-j5-security-audit-export-smoke.sh` con Git Bash, `PASS=13`, `FAIL=0`, `SKIP=0`.
+
 ## 2026-05-27 - AUTH-J4 alertas por patrones criticos de auditoria
 
 Tipo: backend protegido, frontend minimo, seguridad operativa.

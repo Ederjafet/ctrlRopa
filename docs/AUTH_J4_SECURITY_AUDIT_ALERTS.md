@@ -160,5 +160,5 @@ Validacion ejecutada:
 
 ## Siguiente fase recomendada
 
-- AUTH-J5: export operativo de auditoria y alertas, si soporte necesita evidencia externa.
+- AUTH-J5: export operativo de auditoria y alertas, implementado con CSV protegido por `VIEW_SECURITY_AUDIT`.
 - AUTH-J6: persistencia de alertas y workflow de atencion, solo si la operacion lo requiere.

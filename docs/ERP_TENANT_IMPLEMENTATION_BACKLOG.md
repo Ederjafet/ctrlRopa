@@ -274,6 +274,35 @@ Validacion:
 
 - Smoke Git Bash `docs/qa/14-auth-j4-security-alerts-smoke.sh`: `PASS=13`, `FAIL=0`, `SKIP=0`.
 
+## Actualizacion AUTH-J5 - Export operativo de auditoria y alertas
+
+Fecha: 2026-05-27
+Estado: implementado tecnico condicionado.
+
+Alcance ejecutado:
+
+- Endpoint `GET /api/security/audit-events/export.csv`.
+- Endpoint `GET /api/security/audit-events/alerts/export.csv`.
+- Permiso requerido `VIEW_SECURITY_AUDIT`.
+- Botones `Exportar eventos CSV` y `Exportar alertas CSV` en `/system-security-audit`.
+- Smoke `docs/qa/15-auth-j5-security-audit-export-smoke.sh` con reporte Markdown/CSV.
+
+Criterios cubiertos:
+
+- Soporte con `VIEW_SECURITY_AUDIT` puede descargar CSV.
+- Admin tenant sin permiso recibe `403`.
+- CSV incluye encabezados operativos.
+- CSV no debe contener `sessionToken` ni `password`.
+- No se exporta `metadata_json` por default.
+
+Pendiente:
+
+- Definir si soporte requiere export Markdown o evidencia firmada en fase posterior.
+
+Validacion:
+
+- Smoke Git Bash `docs/qa/15-auth-j5-security-audit-export-smoke.sh`: `PASS=13`, `FAIL=0`, `SKIP=0`.
+
 ## Principios de ejecucion futura
 
 - No big bang.
