@@ -1,5 +1,35 @@
 # ERP - Bitacora de cambios
 
+## 2026-05-28 - AUTH-Z cierre integral de seguridad AUTH
+
+Tipo: QA automatizado, cierre documental, evidencia operativa.
+
+Objetivo:
+
+- Consolidar la validacion final de seguridad AUTH con un smoke maestro.
+
+Cambios realizados:
+
+- Se creo `docs/AUTH_Z_SECURITY_FINAL_VALIDATION.md`.
+- Se creo `docs/qa/99-auth-z-final-security-smoke.sh`.
+- El smoke maestro encadena AUTH-F6, AUTH-H, AUTH-I2, AUTH-J2, AUTH-J4 y AUTH-J5.
+- El smoke maestro genera reporte Markdown y CSV bajo `qa-reports/`.
+- El checklist cubre bloqueo `NO_ACCESS`, sesion unica, aislamiento QA_A/QA_B/DEFAULT, auditoria, summary, alertas y exports.
+
+Restricciones respetadas:
+
+- No se tocaron pagos, ventas ni reportes funcionales.
+- No se crearon migraciones.
+- No se modificaron roles productivos.
+- No se cambio la seguridad existente.
+
+Validacion ejecutada:
+
+- OK: `docs/qa/99-auth-z-final-security-smoke.sh` con Git Bash.
+- Resultado consolidado: `PASS=6`, `FAIL=0`, `SKIP=0`.
+- Reporte Markdown: `qa-reports/AUTH-Z-final-security-report-20260528-093110.md`.
+- Reporte CSV: `qa-reports/AUTH-Z-final-security-report-20260528-093110.csv`.
+
 ## 2026-05-27 - AUTH-J5 export operativo de auditoria y alertas
 
 Tipo: backend protegido, frontend minimo, evidencia operativa.

@@ -303,6 +303,36 @@ Validacion:
 
 - Smoke Git Bash `docs/qa/15-auth-j5-security-audit-export-smoke.sh`: `PASS=13`, `FAIL=0`, `SKIP=0`.
 
+## Actualizacion AUTH-Z - Cierre integral de seguridad AUTH
+
+Fecha: 2026-05-28
+Estado: cierre documental y orquestacion QA.
+
+Alcance ejecutado:
+
+- Documento `docs/AUTH_Z_SECURITY_FINAL_VALIDATION.md`.
+- Script maestro `docs/qa/99-auth-z-final-security-smoke.sh`.
+- Orquestacion de smokes AUTH-F6, AUTH-H, AUTH-I2, AUTH-J2, AUTH-J4 y AUTH-J5.
+- Reporte consolidado Markdown/CSV en `qa-reports/`.
+
+Criterios cubiertos:
+
+- Bloqueo `NO_ACCESS`.
+- Sesion unica y token revocado.
+- Aislamiento QA_A/QA_B/DEFAULT.
+- Auditoria protegida por `VIEW_SECURITY_AUDIT`.
+- Summary, alertas y exports protegidos.
+- Exports sin `password` ni `sessionToken`.
+
+Pendiente:
+
+- Ejecutar AUTH-Z como checklist obligatorio antes de merge/release de seguridad.
+
+Validacion:
+
+- Smoke maestro `docs/qa/99-auth-z-final-security-smoke.sh`: `PASS=6`, `FAIL=0`, `SKIP=0`.
+- Reportes: `qa-reports/AUTH-Z-final-security-report-20260528-093110.md` y `.csv`.
+
 ## Principios de ejecucion futura
 
 - No big bang.

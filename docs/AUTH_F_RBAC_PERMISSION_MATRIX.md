@@ -17,6 +17,8 @@ Nota AUTH-G: la auditoria de eventos de seguridad queda documentada en `docs/AUT
 
 Nota AUTH-I2: el permiso dedicado `VIEW_SECURITY_AUDIT` queda documentado en `docs/AUTH_I2_VIEW_SECURITY_AUDIT_PERMISSION.md`. Se usa para consultar `GET /api/security/audit-events`; `MANAGE_SECURITY_SETTINGS` queda para configuracion de seguridad.
 
+Nota AUTH-Z: el cierre integral de seguridad queda documentado en `docs/AUTH_Z_SECURITY_FINAL_VALIDATION.md` y se ejecuta con `docs/qa/99-auth-z-final-security-smoke.sh`. Orquesta los smokes AUTH-F6, AUTH-H, AUTH-I2, AUTH-J2, AUTH-J4 y AUTH-J5.
+
 ## Objetivo
 
 Iniciar AUTH-F como fase de diagnostico y matriz RBAC. Esta fase no cambia permisos productivos, no agrega migraciones, no toca SQL y no modifica enforcement funcional. El resultado es una base formal para decidir subfases posteriores de RBAC avanzado.
