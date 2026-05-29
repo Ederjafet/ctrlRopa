@@ -1,0 +1,407 @@
+diff --git a/app/live.tsx b/app/live.tsx
+index f07230c..fe6b359 100644
+--- a/app/live.tsx
++++ b/app/live.tsx
+@@ -39,8 +39,10 @@ import {
+ } from '@/services/liveService';
+ import {
+   clearSelectedLiveId,
++  getOperationalSoldReservationIds,
+   getSelectedLiveId,
+   saveSelectedLiveId,
++  saveOperationalSoldReservationIds,
+ } from '@/services/liveWorkflowStorage';
+ import {
+   DEFAULT_LIVE_LAYOUT_PREFERENCES,
+@@ -94,6 +96,8 @@ type LiveNoticeModalProps = {
+   onClose: () => void;
+ };
+
++const LIVE_MINIMAL_OPERATIONAL_MODE = true;
++
+ function isForbiddenError(error: unknown) {
+   return error instanceof ApiError && error.status === 403;
+ }
+@@ -254,6 +258,8 @@ export default function LiveScreen() {
+
+   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
++  const [activeItem, setActiveItem] = useState<Item | null>(null);
++  const [operationalSoldReservationIds, setOperationalSoldReservationIds] = useState<number[]>([]);
+   const [priceText, setPriceText] = useState('');
+   const [scanInput, setScanInput] = useState('');
+
+@@ -416,6 +422,7 @@ export default function LiveScreen() {
+
+       setSelectedLive(nextSelectedLive);
+       await updateRecentReservations(reservationData, nextSelectedLive?.id);
++      await refreshOperationalSoldReservations(currentSession, nextSelectedLive?.id);
+
+       const pendingItemIds = await consumePendingQuickItems('live');
+       const createdItems = pendingItemIds
+@@ -425,6 +432,7 @@ export default function LiveScreen() {
+       if (createdItems.length > 0) {
+         const createdItem = createdItems[0];
+         setSelectedItem(createdItem);
++        setActiveItem(createdItem);
+         setPriceText(
+           createdItem.price !== null && createdItem.price !== undefined
+             ? String(createdItem.price)
+@@ -513,13 +521,18 @@ export default function LiveScreen() {
+   const mayViewAnalytics = canViewLiveAnalytics(session);
+   const isMobileLayout = isPhone;
+   const showRolesWidget =
+-    liveLayoutPreferences.showRoles && (isTablet || isDesktop);
++    !LIVE_MINIMAL_OPERATIONAL_MODE &&
++    liveLayoutPreferences.showRoles &&
++    (isTablet || isDesktop);
+   const showProductSpotlightWidget = liveLayoutPreferences.showProductSpotlight;
+-  const showPresenterViewWidget = liveLayoutPreferences.showPresenterView;
++  const showPresenterViewWidget =
++    !LIVE_MINIMAL_OPERATIONAL_MODE && liveLayoutPreferences.showPresenterView;
+   const showOperationalStateWidget = liveLayoutPreferences.showOperationalState;
+   const showAnalyticsWidget =
++    !LIVE_MINIMAL_OPERATIONAL_MODE &&
+     liveLayoutPreferences.showAnalytics && mayViewAnalytics && !isMobileLayout;
+   const showActivityFeedWidget =
++    !LIVE_MINIMAL_OPERATIONAL_MODE &&
+     liveLayoutPreferences.showActivityFeed && mayViewAnalytics && !isMobileLayout;
+   const showStreamingPanel = showAnalyticsWidget || showActivityFeedWidget;
+   const hasLeftColumnWidgets =
+@@ -655,34 +668,28 @@ export default function LiveScreen() {
+   const visibleRecentReservations = isTablet
+     ? recentReservations.slice(0, 3)
+     : recentReservations;
+-  const latestReservationProductCode = recentReservations[0]?.itemCode;
+-  const hasActiveProduct = !!selectedItem || !!latestReservationProductCode;
++  const hasActiveProduct = !!activeItem;
+   const featuredProductName =
+-    selectedItem?.productTypeName ||
+-    selectedItem?.code ||
+-    latestReservationProductCode ||
++    activeItem?.productTypeName ||
++    activeItem?.code ||
+     t('live.noProductOnScreen');
+-  const featuredProductMeta = selectedItem
++  const featuredProductMeta = activeItem
+     ? [
+-        selectedItem.brandName || t('live.noBrand'),
+-        selectedItem.sizeName || t('live.noSize'),
++        activeItem.brandName || t('live.noBrand'),
++        activeItem.sizeName || t('live.noSize'),
+         session?.branchName || selectedLive?.branchName || t('live.noBranch'),
+       ].join(' / ')
+-    : latestReservationProductCode
+-      ? t('live.productFromRecentReservation')
+-      : t('live.noProductOnScreenHelp');
++    : t('live.noProductOnScreenHelp');
+   const featuredProductPrice =
+-    selectedItem?.price !== null && selectedItem?.price !== undefined
+-      ? formatMoney(Number(selectedItem.price))
++    activeItem?.price !== null && activeItem?.price !== undefined
++      ? formatMoney(Number(activeItem.price))
+       : t('live.noPriceDefined');
+   const featuredProductCode =
+-    selectedItem?.code || latestReservationProductCode || t('live.noActiveProductCode');
+-  const featuredProductSize = selectedItem?.sizeName || t('live.noSize');
+-  const featuredProductStatus = selectedItem
+-    ? getItemStatusLabel(selectedItem.status, t)
+-    : latestReservationProductCode
+-      ? t('live.productFromReservationStatus')
+-      : t('live.noProductStatus');
++    activeItem?.code || t('live.noActiveProductCode');
++  const featuredProductSize = activeItem?.sizeName || t('live.noSize');
++  const featuredProductStatus = activeItem
++    ? getItemStatusLabel(activeItem.status, t)
++    : t('live.noProductStatus');
+   const featuredProductBranch =
+     session?.branchName || selectedLive?.branchName || t('live.noBranch');
+   const spotlightBadges = hasActiveProduct
+@@ -755,6 +762,7 @@ export default function LiveScreen() {
+   const handleSelectLive = (live: Live) => {
+     setSelectedLive(live);
+     updateRecentReservations(branchReservations, live.id);
++    void refreshOperationalSoldReservations(session, live.id);
+     if (session && live.status !== 'CLOSED') {
+       void saveSelectedLiveId(session.branchId, session.userId, live.id);
+     }
+@@ -785,6 +793,50 @@ export default function LiveScreen() {
+     setPaidByReservationId(Object.fromEntries(entries));
+   };
+
++  const refreshOperationalSoldReservations = async (
++    currentSession: UserSession | null,
++    liveId?: number | null
++  ) => {
++    if (!currentSession || !liveId) {
++      setOperationalSoldReservationIds([]);
++      return;
++    }
++
++    const ids = await getOperationalSoldReservationIds(
++      currentSession.branchId,
++      currentSession.userId,
++      liveId
++    );
++    setOperationalSoldReservationIds(ids);
++  };
++
++  const handleMarkReservationSold = async (reservationId: number) => {
++    if (!session || !selectedLive || !canOperateLive(session)) {
++      setLiveNotice({
++        title: t('live.permissionDeniedTitle'),
++        message: t('live.liveOperatePermissionError'),
++        tone: 'warning',
++      });
++      return;
++    }
++
++    const nextIds = Array.from(
++      new Set([...operationalSoldReservationIds, reservationId])
++    );
++    setOperationalSoldReservationIds(nextIds);
++    await saveOperationalSoldReservationIds(
++      session.branchId,
++      session.userId,
++      selectedLive.id,
++      nextIds
++    );
++    setLiveNotice({
++      title: t('live.operationalSoldTitle'),
++      message: t('live.operationalSoldMessage'),
++      tone: 'success',
++    });
++  };
++
+   const handleCreateLive = async () => {
+     if (!session) {
+       Alert.alert(t('live.sessionTitle'), t('live.noActiveSession'));
+@@ -907,6 +959,8 @@ export default function LiveScreen() {
+         )
+       );
+       setSelectedLive(null);
++      setActiveItem(null);
++      setOperationalSoldReservationIds([]);
+       setCloseLiveToConfirm(null);
+       if (session) {
+         await clearSelectedLiveId(session.branchId, session.userId);
+@@ -954,6 +1008,7 @@ export default function LiveScreen() {
+     }
+
+     setSelectedItem(item);
++    setActiveItem(item);
+     setPriceText(
+       item.price !== null && item.price !== undefined ? String(item.price) : ''
+     );
+@@ -1168,6 +1223,38 @@ export default function LiveScreen() {
+           </AppInfoCard>
+         ) : null}
+
++        <LiveInfoCard
++          title={t('live.minimalModeTitle')}
++          subtitle={t('live.minimalModeHelp')}
++          style={styles.minimalModeCard}
++        >
++          <View style={styles.minimalStepRow}>
++            {[
++              t('live.minimalStepLive'),
++              t('live.minimalStepProduct'),
++              t('live.minimalStepCustomer'),
++              t('live.minimalStepReservation'),
++              t('live.minimalStepClose'),
++            ].map((step) => (
++              <View
++                key={step}
++                style={[
++                  styles.minimalStepPill,
++                  {
++                    backgroundColor: theme.colors.infoCardBackground,
++                    borderColor: theme.colors.border,
++                    borderRadius: theme.radius.md,
++                  },
++                ]}
++              >
++                <AppText variant="caption" bold>
++                  {step}
++                </AppText>
++              </View>
++            ))}
++          </View>
++        </LiveInfoCard>
++
+         {showRolesWidget ? (
+           <View style={styles.roleSection}>
+             <AppText variant="caption" color={theme.colors.mutedText} bold>
+@@ -2046,6 +2133,7 @@ export default function LiveScreen() {
+             {visibleRecentReservations.map(({ reservation, customerName, itemCode }) => {
+               const paid = paidByReservationId[reservation.id] ?? 0;
+               const settled = isReservationSettled(reservation, paid);
++              const operationalSold = operationalSoldReservationIds.includes(reservation.id);
+
+               return (
+                 <Pressable
+@@ -2072,8 +2160,17 @@ export default function LiveScreen() {
+                       </AppText>
+                     </View>
+                     <AppText variant="caption" color={theme.colors.mutedText}>
+-                      {settled ? t('live.settled') : getReservationSellerLabel(reservation)}
++                      {settled
++                        ? t('live.settled')
++                        : operationalSold
++                          ? t('live.operationalSoldStatus')
++                          : getReservationSellerLabel(reservation)}
+                     </AppText>
++                    {operationalSold && !settled ? (
++                      <AppText variant="caption" color={theme.colors.warning}>
++                        {t('live.operationalSoldNoPaymentHelp')}
++                      </AppText>
++                    ) : null}
+                   </LiveCompactCard>
+                   <View style={styles.buttonRow}>
+                     <View style={styles.buttonFill}>
+@@ -2083,6 +2180,15 @@ export default function LiveScreen() {
+                         onPress={() => goToReservationDetail(reservation.id)}
+                       />
+                     </View>
++                    {!settled && !operationalSold && mayOperateLive ? (
++                      <View style={styles.buttonFill}>
++                        <AppButton
++                          title={t('live.markOperationalSold')}
++                          variant="operation"
++                          onPress={() => handleMarkReservationSold(reservation.id)}
++                        />
++                      </View>
++                    ) : null}
+                     {!settled ? (
+                       <View style={styles.buttonFill}>
+                         <AppButton
+@@ -2561,6 +2667,19 @@ const styles = StyleSheet.create({
+   modalList: {
+     maxHeight: 420,
+   },
++  minimalModeCard: {
++    marginBottom: 10,
++  },
++  minimalStepPill: {
++    borderWidth: 1,
++    paddingHorizontal: 10,
++    paddingVertical: 7,
++  },
++  minimalStepRow: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 8,
++  },
+   productVisual: {
+     borderWidth: 1,
+     minHeight: 240,
+diff --git a/locales/en/common.json b/locales/en/common.json
+index f02a884..921a995 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -38,6 +38,13 @@
+   },
+   "live": {
+     "title": "Live",
++    "minimalModeTitle": "Minimal operational mode",
++    "minimalModeHelp": "Focused single-operator flow: stream, product, customer, reservation, and closing. Demo widgets stay isolated.",
++    "minimalStepLive": "1. Stream",
++    "minimalStepProduct": "2. Product",
++    "minimalStepCustomer": "3. Customer",
++    "minimalStepReservation": "4. Reservation",
++    "minimalStepClose": "5. Close",
+     "loadingError": "Live could not be loaded.",
+     "resourceLoadError": "A resource could not be loaded.",
+     "accessDenied": "You do not have permission to access Live.",
+@@ -269,6 +276,11 @@
+     "date": "Date: {{date}}",
+     "viewDetail": "View detail",
+     "charge": "Charge",
++    "markOperationalSold": "Mark sold",
++    "operationalSoldTitle": "Operational sold",
++    "operationalSoldMessage": "The reservation was marked as sold for Live operations. No payment was processed.",
++    "operationalSoldStatus": "Operational sold",
++    "operationalSoldNoPaymentHelp": "Local operational mark; it does not register payment or cash movement.",
+     "closeLiveTitle": "Live closing",
+     "closeLiveHelp": "Close the session when you finish capturing reservations.",
+     "liveClosedButton": "Live closed",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index 0e989e3..9d3a35f 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -38,6 +38,13 @@
+   },
+   "live": {
+     "title": "En vivo",
++    "minimalModeTitle": "Modo operativo mínimo",
++    "minimalModeHelp": "Flujo enfocado en una sola operación: transmisión, producto, cliente, reserva y cierre. Los widgets demostrativos quedan aislados.",
++    "minimalStepLive": "1. Transmisión",
++    "minimalStepProduct": "2. Producto",
++    "minimalStepCustomer": "3. Cliente",
++    "minimalStepReservation": "4. Apartado",
++    "minimalStepClose": "5. Cierre",
+     "loadingError": "No se pudo cargar En vivo.",
+     "resourceLoadError": "No se pudo cargar un recurso.",
+     "accessDenied": "No tienes permisos para acceder a En vivo.",
+@@ -269,6 +276,11 @@
+     "date": "Fecha: {{date}}",
+     "viewDetail": "Ver detalle",
+     "charge": "Cobrar",
++    "markOperationalSold": "Marcar vendido",
++    "operationalSoldTitle": "Vendido operativo",
++    "operationalSoldMessage": "La reserva quedó marcada como vendida para la operación de En vivo. No se procesó ningún pago.",
++    "operationalSoldStatus": "Vendido operativo",
++    "operationalSoldNoPaymentHelp": "Marca operativa local; no registra cobro ni caja.",
+     "closeLiveTitle": "Cierre de transmisión",
+     "closeLiveHelp": "Cierra la transmisión cuando termines de registrar reservas.",
+     "liveClosedButton": "Transmisión cerrada",
+diff --git a/services/liveWorkflowStorage.ts b/services/liveWorkflowStorage.ts
+index 986d6c9..7c142ff 100644
+--- a/services/liveWorkflowStorage.ts
++++ b/services/liveWorkflowStorage.ts
+@@ -3,6 +3,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
+ const selectedLiveKey = (branchId: number, userId: number) =>
+   `selected_live_${branchId}_${userId}`;
+
++const operationalSoldKey = (branchId: number, userId: number, liveId: number) =>
++  `live_operational_sold_${branchId}_${userId}_${liveId}`;
++
+ export async function saveSelectedLiveId(
+   branchId: number,
+   userId: number,
+@@ -24,3 +27,35 @@ export async function getSelectedLiveId(
+ export async function clearSelectedLiveId(branchId: number, userId: number) {
+   await AsyncStorage.removeItem(selectedLiveKey(branchId, userId));
+ }
++
++export async function getOperationalSoldReservationIds(
++  branchId: number,
++  userId: number,
++  liveId: number
++): Promise<number[]> {
++  const raw = await AsyncStorage.getItem(operationalSoldKey(branchId, userId, liveId));
++
++  if (!raw) return [];
++
++  try {
++    const parsed = JSON.parse(raw);
++    return Array.isArray(parsed)
++      ? parsed.filter((value) => Number.isFinite(Number(value))).map(Number)
++      : [];
++  } catch {
++    return [];
++  }
++}
++
++export async function saveOperationalSoldReservationIds(
++  branchId: number,
++  userId: number,
++  liveId: number,
++  reservationIds: number[]
++) {
++  const uniqueIds = Array.from(new Set(reservationIds));
++  await AsyncStorage.setItem(
++    operationalSoldKey(branchId, userId, liveId),
++    JSON.stringify(uniqueIds)
++  );
++}
