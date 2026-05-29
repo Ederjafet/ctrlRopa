@@ -56,6 +56,14 @@ public class ReservationController {
         return service.cancel(reservationId, request.getReason());
     }
 
+    @PatchMapping("/{reservationId}/live-operational-status")
+    public ReservationResponse updateLiveOperationalStatus(
+            @PathVariable Long reservationId,
+            @RequestBody ReservationService.UpdateLiveOperationalStatusRequest request
+    ) {
+        return service.updateLiveOperationalStatus(reservationId, request);
+    }
+
     public static class CancelReservationRequest {
         private String reason;
 

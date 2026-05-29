@@ -56,6 +56,19 @@ public class Reservation {
     @Column(nullable = false, length = 30)
     private ReservationStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "live_operational_status", length = 30)
+    private LiveReservationOperationalStatus liveOperationalStatus;
+
+    @Column(name = "live_operational_status_updated_at")
+    private LocalDateTime liveOperationalStatusUpdatedAt;
+
+    @Column(name = "live_operational_status_updated_by_user_id")
+    private Long liveOperationalStatusUpdatedByUserId;
+
+    @Column(name = "live_operational_status_reason", length = 255)
+    private String liveOperationalStatusReason;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -158,6 +171,38 @@ public class Reservation {
 
     public void setStatus(ReservationStatus status) {
         this.status = status;
+    }
+
+    public LiveReservationOperationalStatus getLiveOperationalStatus() {
+        return liveOperationalStatus;
+    }
+
+    public void setLiveOperationalStatus(LiveReservationOperationalStatus liveOperationalStatus) {
+        this.liveOperationalStatus = liveOperationalStatus;
+    }
+
+    public LocalDateTime getLiveOperationalStatusUpdatedAt() {
+        return liveOperationalStatusUpdatedAt;
+    }
+
+    public void setLiveOperationalStatusUpdatedAt(LocalDateTime liveOperationalStatusUpdatedAt) {
+        this.liveOperationalStatusUpdatedAt = liveOperationalStatusUpdatedAt;
+    }
+
+    public Long getLiveOperationalStatusUpdatedByUserId() {
+        return liveOperationalStatusUpdatedByUserId;
+    }
+
+    public void setLiveOperationalStatusUpdatedByUserId(Long liveOperationalStatusUpdatedByUserId) {
+        this.liveOperationalStatusUpdatedByUserId = liveOperationalStatusUpdatedByUserId;
+    }
+
+    public String getLiveOperationalStatusReason() {
+        return liveOperationalStatusReason;
+    }
+
+    public void setLiveOperationalStatusReason(String liveOperationalStatusReason) {
+        this.liveOperationalStatusReason = liveOperationalStatusReason;
     }
 
     public LocalDateTime getCreatedAt() {

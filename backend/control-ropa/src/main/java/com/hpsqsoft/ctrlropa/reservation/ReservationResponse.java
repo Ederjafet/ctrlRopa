@@ -25,6 +25,10 @@ public class ReservationResponse {
     private BigDecimal price;
     private String notes;
     private String status;
+    private String liveOperationalStatus;
+    private LocalDateTime liveOperationalStatusUpdatedAt;
+    private Long liveOperationalStatusUpdatedByUserId;
+    private String liveOperationalStatusReason;
     private LocalDateTime createdAt;
     private LocalDateTime cancelledAt;
     private String cancelReason;
@@ -53,6 +57,10 @@ public class ReservationResponse {
                                BigDecimal price,
                                String notes,
                                String status,
+                               String liveOperationalStatus,
+                               LocalDateTime liveOperationalStatusUpdatedAt,
+                               Long liveOperationalStatusUpdatedByUserId,
+                               String liveOperationalStatusReason,
                                LocalDateTime createdAt,
                                LocalDateTime cancelledAt,
                                String cancelReason,
@@ -77,6 +85,10 @@ public class ReservationResponse {
         this.price = price;
         this.notes = notes;
         this.status = status;
+        this.liveOperationalStatus = liveOperationalStatus;
+        this.liveOperationalStatusUpdatedAt = liveOperationalStatusUpdatedAt;
+        this.liveOperationalStatusUpdatedByUserId = liveOperationalStatusUpdatedByUserId;
+        this.liveOperationalStatusReason = liveOperationalStatusReason;
         this.createdAt = createdAt;
         this.cancelledAt = cancelledAt;
         this.cancelReason = cancelReason;
@@ -103,6 +115,10 @@ public class ReservationResponse {
     public BigDecimal getPrice() { return price; }
     public String getNotes() { return notes; }
     public String getStatus() { return status; }
+    public String getLiveOperationalStatus() { return liveOperationalStatus; }
+    public LocalDateTime getLiveOperationalStatusUpdatedAt() { return liveOperationalStatusUpdatedAt; }
+    public Long getLiveOperationalStatusUpdatedByUserId() { return liveOperationalStatusUpdatedByUserId; }
+    public String getLiveOperationalStatusReason() { return liveOperationalStatusReason; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getCancelledAt() { return cancelledAt; }
     public String getCancelReason() { return cancelReason; }

@@ -1,0 +1,15 @@
+test_name,module,expected,received,result,notes
+TypeScript,Frontend,tsc OK,OK,PASS,npx.cmd tsc --noEmit
+Backend tests,Backend,mvn test OK,OK,PASS,73 tests OK
+Lint,Frontend,0 errors,0 errors 60 warnings,PASS,Warnings preexistentes del repo
+AUTH-Z regression,Security,PASS=6 FAIL=0 SKIP=0,PASS=6 FAIL=0 SKIP=0,PASS,Ejecutado con Git Bash en C:\Program Files\Git\bin\bash.exe
+Manual AUTH login,Security,login OK,login OK,PASS,qa.admin@local.test obtuvo sessionToken
+Manual AUTH summary,Security,200 autorizado o 403 esperado,403,PASS,qa.admin no tiene VIEW_SECURITY_AUDIT
+Expo export,Frontend,Export web OK,OK,PASS,C:/tmp/control-ropa-web-export
+Backend package,Backend,package -DskipTests OK,OK,PASS,Sin errores
+Git diff check,Git,Sin whitespace errors,OK,PASS,Solo warnings CRLF del entorno
+Visual qa.admin,LIVE,Validar flujo operativo Z3,No ejecutado,SKIP,Requiere navegador/tablet manual
+Visual qa.vendedor,LIVE,Validar permisos operativos reales,No ejecutado,SKIP,Requiere navegador/tablet manual
+Visual qa.supervisor,LIVE,Validar revision/modificacion segun permisos,No ejecutado,SKIP,Requiere navegador/tablet manual
+Visual qa.sinpermisos,LIVE,Bloqueado,Validado indirectamente por AUTH-Z,PASS,NO_ACCESS cubierto por smoke AUTH
+Tenant QA_A/QA_B,Security,Aislamiento tenant,Validado indirectamente por AUTH-Z/F6,PASS,No asumir permiso LIVE

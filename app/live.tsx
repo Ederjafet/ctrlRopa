@@ -40,10 +40,8 @@ import {
 } from '@/services/liveService';
 import {
   clearSelectedLiveId,
-  getOperationalSoldReservationIds,
   getSelectedLiveId,
   saveSelectedLiveId,
-  saveOperationalSoldReservationIds,
 } from '@/services/liveWorkflowStorage';
 import {
   DEFAULT_LIVE_LAYOUT_PREFERENCES,
@@ -62,7 +60,9 @@ import {
 import {
   createReservation,
   getReservationsByBranch,
+  LiveReservationOperationalStatus,
   Reservation,
+  updateLiveReservationOperationalStatus,
 } from '@/services/reservationService';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -197,6 +197,45 @@ function isReservationSettled(reservation: Reservation, paid: number) {
   return paid >= Number(reservation.price || 0) && Number(reservation.price || 0) > 0;
 }
 
+function getLiveReservationOperationalStatus(
+  reservation: Reservation
+): LiveReservationOperationalStatus {
+  const status = normalizeStatus(reservation.liveOperationalStatus);
+
+  if (
+    status === 'PENDING' ||
+    status === 'RESERVED' ||
+    status === 'OPERATIONAL_SOLD' ||
+    status === 'CANCELLED'
+  ) {
+    return status;
+  }
+
+  if (normalizeStatus(reservation.status) === 'CANCELLED') {
+    return 'CANCELLED';
+  }
+
+  return 'RESERVED';
+}
+
+function getLiveReservationOperationalStatusLabel(
+  status: LiveReservationOperationalStatus,
+  t: (key: string) => string
+) {
+  switch (status) {
+    case 'PENDING':
+      return t('live.operationalStatusPending');
+    case 'RESERVED':
+      return t('live.operationalStatusReserved');
+    case 'OPERATIONAL_SOLD':
+      return t('live.operationalSoldStatus');
+    case 'CANCELLED':
+      return t('live.operationalStatusCancelled');
+    default:
+      return t('live.operationalStatusReserved');
+  }
+}
+
 function LiveNoticeModal({ notice, onClose }: LiveNoticeModalProps) {
   const { theme } = useAppTheme();
   const { t } = useTranslation('common');
@@ -274,11 +313,12 @@ export default function LiveScreen() {
   >([]);
   const [branchReservations, setBranchReservations] = useState<Reservation[]>([]);
   const [paidByReservationId, setPaidByReservationId] = useState<Record<number, number>>({});
+  const [updatingOperationalReservationId, setUpdatingOperationalReservationId] =
+    useState<number | null>(null);
 
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [activeItem, setActiveItem] = useState<Item | null>(null);
-  const [operationalSoldReservationIds, setOperationalSoldReservationIds] = useState<number[]>([]);
   const [priceText, setPriceText] = useState('');
   const [scanInput, setScanInput] = useState('');
 
@@ -442,7 +482,6 @@ export default function LiveScreen() {
       setSelectedLive(nextSelectedLive);
       setActiveItem(activeItemFromLive(nextSelectedLive));
       await updateRecentReservations(reservationData, nextSelectedLive?.id);
-      await refreshOperationalSoldReservations(currentSession, nextSelectedLive?.id);
 
       const pendingItemIds = await consumePendingQuickItems('live');
       const createdItems = pendingItemIds
@@ -782,7 +821,6 @@ export default function LiveScreen() {
     setSelectedLive(live);
     setActiveItem(activeItemFromLive(live));
     updateRecentReservations(branchReservations, live.id);
-    void refreshOperationalSoldReservations(session, live.id);
     if (session && live.status !== 'CLOSED') {
       void saveSelectedLiveId(session.branchId, session.userId, live.id);
     }
@@ -813,24 +851,10 @@ export default function LiveScreen() {
     setPaidByReservationId(Object.fromEntries(entries));
   };
 
-  const refreshOperationalSoldReservations = async (
-    currentSession: UserSession | null,
-    liveId?: number | null
+  const handleUpdateReservationOperationalStatus = async (
+    reservationId: number,
+    status: LiveReservationOperationalStatus
   ) => {
-    if (!currentSession || !liveId) {
-      setOperationalSoldReservationIds([]);
-      return;
-    }
-
-    const ids = await getOperationalSoldReservationIds(
-      currentSession.branchId,
-      currentSession.userId,
-      liveId
-    );
-    setOperationalSoldReservationIds(ids);
-  };
-
-  const handleMarkReservationSold = async (reservationId: number) => {
     if (!session || !selectedLive || !canOperateLive(session)) {
       setLiveNotice({
         title: t('live.permissionDeniedTitle'),
@@ -840,21 +864,46 @@ export default function LiveScreen() {
       return;
     }
 
-    const nextIds = Array.from(
-      new Set([...operationalSoldReservationIds, reservationId])
-    );
-    setOperationalSoldReservationIds(nextIds);
-    await saveOperationalSoldReservationIds(
-      session.branchId,
-      session.userId,
-      selectedLive.id,
-      nextIds
-    );
-    setLiveNotice({
-      title: t('live.operationalSoldTitle'),
-      message: t('live.operationalSoldMessage'),
-      tone: 'success',
-    });
+    setUpdatingOperationalReservationId(reservationId);
+
+    try {
+      const updatedReservation = await updateLiveReservationOperationalStatus(
+        reservationId,
+        status
+      );
+
+      const applyReservation = (reservation: Reservation) =>
+        reservation.id === updatedReservation.id ? updatedReservation : reservation;
+
+      setBranchReservations((current) => current.map(applyReservation));
+      setRecentReservations((current) =>
+        current.map((entry) =>
+          entry.reservation.id === updatedReservation.id
+            ? { ...entry, reservation: updatedReservation }
+            : entry
+        )
+      );
+
+      setLiveNotice({
+        title:
+          status === 'OPERATIONAL_SOLD'
+            ? t('live.operationalSoldTitle')
+            : t('live.operationalStatusUpdatedTitle'),
+        message:
+          status === 'OPERATIONAL_SOLD'
+            ? t('live.operationalSoldMessage')
+            : t('live.operationalStatusUpdatedMessage'),
+        tone: status === 'CANCELLED' ? 'warning' : 'success',
+      });
+    } catch (err: any) {
+      setLiveNotice({
+        title: t('live.operationalStatusUpdateErrorTitle'),
+        message: err?.message || t('live.operationalStatusUpdateError'),
+        tone: 'danger',
+      });
+    } finally {
+      setUpdatingOperationalReservationId(null);
+    }
   };
 
   const handleCreateLive = async () => {
@@ -980,7 +1029,6 @@ export default function LiveScreen() {
       );
       setSelectedLive(null);
       setActiveItem(null);
-      setOperationalSoldReservationIds([]);
       setCloseLiveToConfirm(null);
       if (session) {
         await clearSelectedLiveId(session.branchId, session.userId);
@@ -2237,7 +2285,11 @@ export default function LiveScreen() {
             {visibleRecentReservations.map(({ reservation, customerName, itemCode }) => {
               const paid = paidByReservationId[reservation.id] ?? 0;
               const settled = isReservationSettled(reservation, paid);
-              const operationalSold = operationalSoldReservationIds.includes(reservation.id);
+              const operationalStatus = getLiveReservationOperationalStatus(reservation);
+              const operationalSold = operationalStatus === 'OPERATIONAL_SOLD';
+              const operationalCancelled = operationalStatus === 'CANCELLED';
+              const isUpdatingOperationalStatus =
+                updatingOperationalReservationId === reservation.id;
 
               return (
                 <Pressable
@@ -2268,11 +2320,16 @@ export default function LiveScreen() {
                         ? t('live.settled')
                         : operationalSold
                           ? t('live.operationalSoldStatus')
-                          : getReservationSellerLabel(reservation)}
+                          : getLiveReservationOperationalStatusLabel(operationalStatus, t)}
                     </AppText>
                     {operationalSold && !settled ? (
                       <AppText variant="caption" color={theme.colors.warning}>
-                        {t('live.operationalSoldNoPaymentHelp')}
+                        {t('live.operationalSoldPersistedNoPaymentHelp')}
+                      </AppText>
+                    ) : null}
+                    {!operationalSold && !operationalCancelled ? (
+                      <AppText variant="caption" color={theme.colors.mutedText}>
+                        {getReservationSellerLabel(reservation)}
                       </AppText>
                     ) : null}
                   </LiveCompactCard>
@@ -2284,16 +2341,97 @@ export default function LiveScreen() {
                         onPress={() => goToReservationDetail(reservation.id)}
                       />
                     </View>
-                    {!settled && !operationalSold && mayOperateLive ? (
+                    {!settled && !operationalSold && !operationalCancelled && mayOperateLive ? (
                       <View style={styles.buttonFill}>
                         <AppButton
                           title={t('live.markOperationalSold')}
                           variant="operation"
-                          onPress={() => handleMarkReservationSold(reservation.id)}
+                          loading={isUpdatingOperationalStatus}
+                          onPress={() =>
+                            handleUpdateReservationOperationalStatus(
+                              reservation.id,
+                              'OPERATIONAL_SOLD'
+                            )
+                          }
                         />
                       </View>
                     ) : null}
-                    {!settled ? (
+                    {operationalStatus === 'RESERVED' && mayOperateLive ? (
+                      <View style={styles.buttonFill}>
+                        <AppButton
+                          title={t('live.markPending')}
+                          variant="secondary"
+                          loading={isUpdatingOperationalStatus}
+                          onPress={() =>
+                            handleUpdateReservationOperationalStatus(
+                              reservation.id,
+                              'PENDING'
+                            )
+                          }
+                        />
+                      </View>
+                    ) : null}
+                    {operationalStatus === 'PENDING' && mayOperateLive ? (
+                      <View style={styles.buttonFill}>
+                        <AppButton
+                          title={t('live.returnToReserved')}
+                          variant="secondary"
+                          loading={isUpdatingOperationalStatus}
+                          onPress={() =>
+                            handleUpdateReservationOperationalStatus(
+                              reservation.id,
+                              'RESERVED'
+                            )
+                          }
+                        />
+                      </View>
+                    ) : null}
+                    {operationalSold && mayOperateLive ? (
+                      <View style={styles.buttonFill}>
+                        <AppButton
+                          title={t('live.returnToReserved')}
+                          variant="secondary"
+                          loading={isUpdatingOperationalStatus}
+                          onPress={() =>
+                            handleUpdateReservationOperationalStatus(
+                              reservation.id,
+                              'RESERVED'
+                            )
+                          }
+                        />
+                      </View>
+                    ) : null}
+                    {!operationalCancelled && mayOperateLive ? (
+                      <View style={styles.buttonFill}>
+                        <AppButton
+                          title={t('live.cancelOperational')}
+                          variant="cancel"
+                          loading={isUpdatingOperationalStatus}
+                          onPress={() =>
+                            handleUpdateReservationOperationalStatus(
+                              reservation.id,
+                              'CANCELLED'
+                            )
+                          }
+                        />
+                      </View>
+                    ) : null}
+                    {operationalCancelled && mayOperateLive ? (
+                      <View style={styles.buttonFill}>
+                        <AppButton
+                          title={t('live.reactivateReserved')}
+                          variant="secondary"
+                          loading={isUpdatingOperationalStatus}
+                          onPress={() =>
+                            handleUpdateReservationOperationalStatus(
+                              reservation.id,
+                              'RESERVED'
+                            )
+                          }
+                        />
+                      </View>
+                    ) : null}
+                    {!settled && !operationalCancelled ? (
                       <View style={styles.buttonFill}>
                         <AppButton
                           title={t('live.charge')}
