@@ -1,0 +1,15 @@
+test_name,module,expected,received_status,result,notes,timestamp
+Initial git status,Git,Working tree clean at start,Clean,PASS,Started on feature/live-z1-minimal-operational-flow,2026-05-28T15:15:31-06:00
+Branch check,Git,feature/live-z1-minimal-operational-flow,feature/live-z1-minimal-operational-flow,PASS,Branch matched expected phase branch,2026-05-28T15:15:31-06:00
+Frontend lint,Frontend,0 errors,0 errors 60 warnings,PASS,Warnings are preexisting repository warnings,2026-05-28T15:16:00-06:00
+TypeScript,Frontend,tsc success,0 errors,PASS,npx.cmd tsc --noEmit completed,2026-05-28T15:16:00-06:00
+Expo web export,Frontend,Export success,Exported C:/tmp/control-ropa-web-export,PASS,/live route exported,2026-05-28T15:16:00-06:00
+Backend tests,Backend,Tests pass,67 tests 0 failures 0 errors 0 skipped,PASS,No backend code changed,2026-05-28T15:16:59-06:00
+Backend package,Backend,Package success,Success with -DskipTests,PASS,No backend code changed,2026-05-28T15:17:00-06:00
+Restricted modules,Scope,No payments reports billing IA AUTH SQL migrations touched,Not touched,PASS,Only LIVE frontend/i18n/storage/docs/reports evidence changed,2026-05-28T15:17:00-06:00
+Smoke visual,Runtime,Manual browser smoke,Not executed,SKIP,Requires user runtime QA after review,2026-05-28T15:17:00-06:00
+AUTH-Z regression,Security,FAIL=0,PASS=6 FAIL=0 SKIP=0,PASS,Master AUTH smoke completed against API_BASE_URL http://192.168.0.128:8090,2026-05-28T17:09:38-06:00
+AUTH manual qa.admin login,Security,Login OK and token obtained,Login OK token obtained,PASS,Backend available and qa.admin@local.test authenticated,2026-05-28T17:12:24-06:00
+AUTH manual qa.admin audit summary,Security,HTTP 200,HTTP 403,FAIL,Expected by requested manual check but current AUTH-I2 requires VIEW_SECURITY_AUDIT; no AUTH change made in LIVE-Z1,2026-05-28T17:12:24-06:00
+AUTH sanity qa.soporte audit summary,Security,HTTP 200,HTTP 200,PASS,qa.soporte@local.test has VIEW_SECURITY_AUDIT and can query summary,2026-05-28T17:13:00-06:00
+Visual role matrix,Documentation,Matrix added,Added,PASS,Matrix added to LIVE-Z1 doc and QA report; visual runtime remains pending,2026-05-28T17:13:00-06:00
