@@ -1,0 +1,11 @@
+package com.hpsqsoft.ctrlropa.live;
+
+public enum LiveEventType {
+    LIVE_STARTED,
+    LIVE_CLOSED,
+    ACTIVE_ITEM_CHANGED,
+    LIVE_RESERVATION_CREATED,
+    LIVE_RESERVATION_STATUS_CHANGED,
+    LIVE_OPERATIONAL_SOLD,
+    LIVE_RESERVATION_CANCELLED
+}

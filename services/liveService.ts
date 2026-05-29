@@ -29,6 +29,19 @@ export type CreateLiveRequest = {
   status?: LiveStatus;
 };
 
+export type LiveEvent = {
+  id: number;
+  companyId: number;
+  branchId: number;
+  liveId: number;
+  actorUserId?: number | null;
+  eventType: string;
+  entityType?: string | null;
+  entityId?: number | null;
+  payloadJson?: string | null;
+  createdAt?: string;
+};
+
 export async function getLivesByBranch(branchId: number): Promise<Live[]> {
   return apiRequest<Live[]>(`/api/lives/branch/${branchId}`);
 }
@@ -67,6 +80,10 @@ export async function setLiveActiveItem(
     method: 'PATCH',
     body: { itemId },
   });
+}
+
+export async function getLiveEvents(liveId: number): Promise<LiveEvent[]> {
+  return apiRequest<LiveEvent[]>(`/api/lives/${liveId}/events`);
 }
 
 export function isLiveOperable(live: Live | null): boolean {

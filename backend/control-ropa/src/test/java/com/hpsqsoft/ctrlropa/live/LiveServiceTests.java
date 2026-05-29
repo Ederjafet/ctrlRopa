@@ -33,6 +33,7 @@ class LiveServiceTests {
     private final AccessService accessService = mock(AccessService.class);
     private final CurrentUser currentUser = mock(CurrentUser.class);
     private final TenantResolver tenantResolver = mock(TenantResolver.class);
+    private final LiveEventService liveEventService = mock(LiveEventService.class);
 
     private final LiveService service = new LiveService(
             liveRepository,
@@ -40,7 +41,8 @@ class LiveServiceTests {
             itemRepository,
             accessService,
             currentUser,
-            tenantResolver
+            tenantResolver,
+            liveEventService
     );
 
     @Test
@@ -71,6 +73,14 @@ class LiveServiceTests {
         assertEquals("QA-CTR-005", response.getActiveItemCode());
         assertEquals("Blusa Verde", response.getActiveItemProductTypeName());
         verify(tenantResolver).assertBranchBelongsToCompany(6L, 2L);
+        verify(liveEventService).record(
+                live,
+                LiveEventType.ACTIVE_ITEM_CHANGED,
+                10L,
+                "ITEM",
+                8L,
+                "{\"previousItemId\":null,\"activeItemId\":8}"
+        );
     }
 
     @Test
@@ -102,6 +112,14 @@ class LiveServiceTests {
 
         assertEquals("CLOSED", response.getStatus());
         assertEquals(null, response.getActiveItemId());
+        verify(liveEventService).record(
+                live,
+                LiveEventType.LIVE_CLOSED,
+                10L,
+                "LIVE",
+                4L,
+                "{\"status\":\"CLOSED\"}"
+        );
     }
 
     private CurrentTenantContext tenant() {

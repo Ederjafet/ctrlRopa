@@ -28,19 +28,22 @@ public class LiveService {
     private final AccessService accessService;
     private final CurrentUser currentUser;
     private final TenantResolver tenantResolver;
+    private final LiveEventService liveEventService;
 
     public LiveService(LiveRepository repository,
                        BranchRepository branchRepository,
                        ItemRepository itemRepository,
                        AccessService accessService,
                        CurrentUser currentUser,
-                       TenantResolver tenantResolver) {
+                       TenantResolver tenantResolver,
+                       LiveEventService liveEventService) {
         this.repository = repository;
         this.branchRepository = branchRepository;
         this.itemRepository = itemRepository;
         this.accessService = accessService;
         this.currentUser = currentUser;
         this.tenantResolver = tenantResolver;
+        this.liveEventService = liveEventService;
     }
 
     @Transactional(readOnly = true)
@@ -91,7 +94,16 @@ public class LiveService {
             existing.setStartedAt(LocalDateTime.now());
         }
 
-        return toResponse(repository.save(existing));
+        Live saved = repository.save(existing);
+        liveEventService.record(
+                saved,
+                LiveEventType.LIVE_STARTED,
+                currentUser.getUserId(),
+                "LIVE",
+                saved.getId(),
+                "{\"status\":\"" + saved.getStatus().name() + "\"}"
+        );
+        return toResponse(saved);
     }
 
     public LiveResponse close(Long id) {
@@ -104,7 +116,16 @@ public class LiveService {
         existing.setEndedAt(LocalDateTime.now());
         existing.setActiveItem(null);
 
-        return toResponse(repository.save(existing));
+        Live saved = repository.save(existing);
+        liveEventService.record(
+                saved,
+                LiveEventType.LIVE_CLOSED,
+                currentUser.getUserId(),
+                "LIVE",
+                saved.getId(),
+                "{\"status\":\"" + saved.getStatus().name() + "\"}"
+        );
+        return toResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -123,9 +144,13 @@ public class LiveService {
             throw new IllegalArgumentException("No se puede cambiar producto activo de un En vivo cerrado");
         }
 
+        Long previousItemId = live.getActiveItem() != null ? live.getActiveItem().getId() : null;
+
         if (request == null || request.getItemId() == null) {
             live.setActiveItem(null);
-            return toResponse(repository.save(live));
+            Live saved = repository.save(live);
+            recordActiveItemChanged(saved, previousItemId, null);
+            return toResponse(saved);
         }
 
         CurrentTenantContext tenant = tenantResolver.resolveCurrent();
@@ -137,7 +162,30 @@ public class LiveService {
         }
 
         live.setActiveItem(item);
-        return toResponse(repository.save(live));
+        Live saved = repository.save(live);
+        recordActiveItemChanged(saved, previousItemId, item.getId());
+        return toResponse(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public List<LiveEventResponse> findEvents(Long id) {
+        return liveEventService.findByLive(id);
+    }
+
+    private void recordActiveItemChanged(Live live, Long previousItemId, Long nextItemId) {
+        liveEventService.record(
+                live,
+                LiveEventType.ACTIVE_ITEM_CHANGED,
+                currentUser.getUserId(),
+                "ITEM",
+                nextItemId,
+                "{\"previousItemId\":" + nullableNumber(previousItemId)
+                        + ",\"activeItemId\":" + nullableNumber(nextItemId) + "}"
+        );
+    }
+
+    private String nullableNumber(Long value) {
+        return value == null ? "null" : value.toString();
     }
 
     private Live findEntityById(Long id) {

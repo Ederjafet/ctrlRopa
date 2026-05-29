@@ -51,4 +51,9 @@ public class LiveController {
     public LiveResponse setActiveItem(@PathVariable Long id, @RequestBody LiveActiveItemRequest request) {
         return service.setActiveItem(id, request);
     }
+
+    @GetMapping("/{id}/events")
+    public List<LiveEventResponse> findEvents(@PathVariable Long id) {
+        return service.findEvents(id);
+    }
 }
