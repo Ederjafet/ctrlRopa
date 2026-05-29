@@ -1,0 +1,29 @@
+ app/live.tsx                                       | 226 +++++++++++++++++----
+ .../hpsqsoft/ctrlropa/reservation/Reservation.java |  47 ++++-
+ .../reservation/ReservationController.java         |  10 +-
+ .../ctrlropa/reservation/ReservationResponse.java  |  16 ++
+ .../ctrlropa/reservation/ReservationService.java   |  62 ++++++
+ locales/en/common.json                             |  12 ++
+ locales/es/common.json                             |  12 ++
+ services/reservationService.ts                     |  24 +++
+ 8 files changed, 363 insertions(+), 46 deletions(-)
+app/live.tsx
+backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/Reservation.java
+backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationController.java
+backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationResponse.java
+backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
+locales/en/common.json
+locales/es/common.json
+services/reservationService.ts
+
+Untracked files not included by plain git diff:
+backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/LiveReservationOperationalStatus.java
+backend/control-ropa/src/main/resources/db/migration/V48__live_reservation_operational_status.sql
+backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java
+docs/ERP_LIVE_Z3_OPERATIONAL_RESERVATION_STATUS.md
+
+Ignored generated evidence files:
+qa-reports/LIVE-Z3-operational-reservation-status-report-20260528-201556.md
+qa-reports/LIVE-Z3-operational-reservation-status-smoke-20260528-201556.csv
+git-diffs/20260528-LIVE-Z3-operational-reservation-status.diff
+git-diffs/20260528-LIVE-Z3-operational-reservation-status-stat.txt

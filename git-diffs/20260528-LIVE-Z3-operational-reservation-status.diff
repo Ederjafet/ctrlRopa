@@ -1,0 +1,667 @@
+diff --git a/app/live.tsx b/app/live.tsx
+index 5ef4e18..f6f7c03 100644
+--- a/app/live.tsx
++++ b/app/live.tsx
+@@ -40,10 +40,8 @@ import {
+ } from '@/services/liveService';
+ import {
+   clearSelectedLiveId,
+-  getOperationalSoldReservationIds,
+   getSelectedLiveId,
+   saveSelectedLiveId,
+-  saveOperationalSoldReservationIds,
+ } from '@/services/liveWorkflowStorage';
+ import {
+   DEFAULT_LIVE_LAYOUT_PREFERENCES,
+@@ -62,7 +60,9 @@ import {
+ import {
+   createReservation,
+   getReservationsByBranch,
++  LiveReservationOperationalStatus,
+   Reservation,
++  updateLiveReservationOperationalStatus,
+ } from '@/services/reservationService';
+ import { getSession, UserSession } from '@/services/sessionStorage';
+ import { useFocusEffect, useRouter } from 'expo-router';
+@@ -197,6 +197,45 @@ function isReservationSettled(reservation: Reservation, paid: number) {
+   return paid >= Number(reservation.price || 0) && Number(reservation.price || 0) > 0;
+ }
+
++function getLiveReservationOperationalStatus(
++  reservation: Reservation
++): LiveReservationOperationalStatus {
++  const status = normalizeStatus(reservation.liveOperationalStatus);
++
++  if (
++    status === 'PENDING' ||
++    status === 'RESERVED' ||
++    status === 'OPERATIONAL_SOLD' ||
++    status === 'CANCELLED'
++  ) {
++    return status;
++  }
++
++  if (normalizeStatus(reservation.status) === 'CANCELLED') {
++    return 'CANCELLED';
++  }
++
++  return 'RESERVED';
++}
++
++function getLiveReservationOperationalStatusLabel(
++  status: LiveReservationOperationalStatus,
++  t: (key: string) => string
++) {
++  switch (status) {
++    case 'PENDING':
++      return t('live.operationalStatusPending');
++    case 'RESERVED':
++      return t('live.operationalStatusReserved');
++    case 'OPERATIONAL_SOLD':
++      return t('live.operationalSoldStatus');
++    case 'CANCELLED':
++      return t('live.operationalStatusCancelled');
++    default:
++      return t('live.operationalStatusReserved');
++  }
++}
++
+ function LiveNoticeModal({ notice, onClose }: LiveNoticeModalProps) {
+   const { theme } = useAppTheme();
+   const { t } = useTranslation('common');
+@@ -274,11 +313,12 @@ export default function LiveScreen() {
+   >([]);
+   const [branchReservations, setBranchReservations] = useState<Reservation[]>([]);
+   const [paidByReservationId, setPaidByReservationId] = useState<Record<number, number>>({});
++  const [updatingOperationalReservationId, setUpdatingOperationalReservationId] =
++    useState<number | null>(null);
+
+   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+   const [activeItem, setActiveItem] = useState<Item | null>(null);
+-  const [operationalSoldReservationIds, setOperationalSoldReservationIds] = useState<number[]>([]);
+   const [priceText, setPriceText] = useState('');
+   const [scanInput, setScanInput] = useState('');
+
+@@ -442,7 +482,6 @@ export default function LiveScreen() {
+       setSelectedLive(nextSelectedLive);
+       setActiveItem(activeItemFromLive(nextSelectedLive));
+       await updateRecentReservations(reservationData, nextSelectedLive?.id);
+-      await refreshOperationalSoldReservations(currentSession, nextSelectedLive?.id);
+
+       const pendingItemIds = await consumePendingQuickItems('live');
+       const createdItems = pendingItemIds
+@@ -782,7 +821,6 @@ export default function LiveScreen() {
+     setSelectedLive(live);
+     setActiveItem(activeItemFromLive(live));
+     updateRecentReservations(branchReservations, live.id);
+-    void refreshOperationalSoldReservations(session, live.id);
+     if (session && live.status !== 'CLOSED') {
+       void saveSelectedLiveId(session.branchId, session.userId, live.id);
+     }
+@@ -813,24 +851,10 @@ export default function LiveScreen() {
+     setPaidByReservationId(Object.fromEntries(entries));
+   };
+
+-  const refreshOperationalSoldReservations = async (
+-    currentSession: UserSession | null,
+-    liveId?: number | null
++  const handleUpdateReservationOperationalStatus = async (
++    reservationId: number,
++    status: LiveReservationOperationalStatus
+   ) => {
+-    if (!currentSession || !liveId) {
+-      setOperationalSoldReservationIds([]);
+-      return;
+-    }
+-
+-    const ids = await getOperationalSoldReservationIds(
+-      currentSession.branchId,
+-      currentSession.userId,
+-      liveId
+-    );
+-    setOperationalSoldReservationIds(ids);
+-  };
+-
+-  const handleMarkReservationSold = async (reservationId: number) => {
+     if (!session || !selectedLive || !canOperateLive(session)) {
+       setLiveNotice({
+         title: t('live.permissionDeniedTitle'),
+@@ -840,21 +864,46 @@ export default function LiveScreen() {
+       return;
+     }
+
+-    const nextIds = Array.from(
+-      new Set([...operationalSoldReservationIds, reservationId])
+-    );
+-    setOperationalSoldReservationIds(nextIds);
+-    await saveOperationalSoldReservationIds(
+-      session.branchId,
+-      session.userId,
+-      selectedLive.id,
+-      nextIds
+-    );
+-    setLiveNotice({
+-      title: t('live.operationalSoldTitle'),
+-      message: t('live.operationalSoldMessage'),
+-      tone: 'success',
+-    });
++    setUpdatingOperationalReservationId(reservationId);
++
++    try {
++      const updatedReservation = await updateLiveReservationOperationalStatus(
++        reservationId,
++        status
++      );
++
++      const applyReservation = (reservation: Reservation) =>
++        reservation.id === updatedReservation.id ? updatedReservation : reservation;
++
++      setBranchReservations((current) => current.map(applyReservation));
++      setRecentReservations((current) =>
++        current.map((entry) =>
++          entry.reservation.id === updatedReservation.id
++            ? { ...entry, reservation: updatedReservation }
++            : entry
++        )
++      );
++
++      setLiveNotice({
++        title:
++          status === 'OPERATIONAL_SOLD'
++            ? t('live.operationalSoldTitle')
++            : t('live.operationalStatusUpdatedTitle'),
++        message:
++          status === 'OPERATIONAL_SOLD'
++            ? t('live.operationalSoldMessage')
++            : t('live.operationalStatusUpdatedMessage'),
++        tone: status === 'CANCELLED' ? 'warning' : 'success',
++      });
++    } catch (err: any) {
++      setLiveNotice({
++        title: t('live.operationalStatusUpdateErrorTitle'),
++        message: err?.message || t('live.operationalStatusUpdateError'),
++        tone: 'danger',
++      });
++    } finally {
++      setUpdatingOperationalReservationId(null);
++    }
+   };
+
+   const handleCreateLive = async () => {
+@@ -980,7 +1029,6 @@ export default function LiveScreen() {
+       );
+       setSelectedLive(null);
+       setActiveItem(null);
+-      setOperationalSoldReservationIds([]);
+       setCloseLiveToConfirm(null);
+       if (session) {
+         await clearSelectedLiveId(session.branchId, session.userId);
+@@ -2237,7 +2285,11 @@ export default function LiveScreen() {
+             {visibleRecentReservations.map(({ reservation, customerName, itemCode }) => {
+               const paid = paidByReservationId[reservation.id] ?? 0;
+               const settled = isReservationSettled(reservation, paid);
+-              const operationalSold = operationalSoldReservationIds.includes(reservation.id);
++              const operationalStatus = getLiveReservationOperationalStatus(reservation);
++              const operationalSold = operationalStatus === 'OPERATIONAL_SOLD';
++              const operationalCancelled = operationalStatus === 'CANCELLED';
++              const isUpdatingOperationalStatus =
++                updatingOperationalReservationId === reservation.id;
+
+               return (
+                 <Pressable
+@@ -2268,11 +2320,16 @@ export default function LiveScreen() {
+                         ? t('live.settled')
+                         : operationalSold
+                           ? t('live.operationalSoldStatus')
+-                          : getReservationSellerLabel(reservation)}
++                          : getLiveReservationOperationalStatusLabel(operationalStatus, t)}
+                     </AppText>
+                     {operationalSold && !settled ? (
+                       <AppText variant="caption" color={theme.colors.warning}>
+-                        {t('live.operationalSoldNoPaymentHelp')}
++                        {t('live.operationalSoldPersistedNoPaymentHelp')}
++                      </AppText>
++                    ) : null}
++                    {!operationalSold && !operationalCancelled ? (
++                      <AppText variant="caption" color={theme.colors.mutedText}>
++                        {getReservationSellerLabel(reservation)}
+                       </AppText>
+                     ) : null}
+                   </LiveCompactCard>
+@@ -2284,16 +2341,97 @@ export default function LiveScreen() {
+                         onPress={() => goToReservationDetail(reservation.id)}
+                       />
+                     </View>
+-                    {!settled && !operationalSold && mayOperateLive ? (
++                    {!settled && !operationalSold && !operationalCancelled && mayOperateLive ? (
+                       <View style={styles.buttonFill}>
+                         <AppButton
+                           title={t('live.markOperationalSold')}
+                           variant="operation"
+-                          onPress={() => handleMarkReservationSold(reservation.id)}
++                          loading={isUpdatingOperationalStatus}
++                          onPress={() =>
++                            handleUpdateReservationOperationalStatus(
++                              reservation.id,
++                              'OPERATIONAL_SOLD'
++                            )
++                          }
++                        />
++                      </View>
++                    ) : null}
++                    {operationalStatus === 'RESERVED' && mayOperateLive ? (
++                      <View style={styles.buttonFill}>
++                        <AppButton
++                          title={t('live.markPending')}
++                          variant="secondary"
++                          loading={isUpdatingOperationalStatus}
++                          onPress={() =>
++                            handleUpdateReservationOperationalStatus(
++                              reservation.id,
++                              'PENDING'
++                            )
++                          }
++                        />
++                      </View>
++                    ) : null}
++                    {operationalStatus === 'PENDING' && mayOperateLive ? (
++                      <View style={styles.buttonFill}>
++                        <AppButton
++                          title={t('live.returnToReserved')}
++                          variant="secondary"
++                          loading={isUpdatingOperationalStatus}
++                          onPress={() =>
++                            handleUpdateReservationOperationalStatus(
++                              reservation.id,
++                              'RESERVED'
++                            )
++                          }
++                        />
++                      </View>
++                    ) : null}
++                    {operationalSold && mayOperateLive ? (
++                      <View style={styles.buttonFill}>
++                        <AppButton
++                          title={t('live.returnToReserved')}
++                          variant="secondary"
++                          loading={isUpdatingOperationalStatus}
++                          onPress={() =>
++                            handleUpdateReservationOperationalStatus(
++                              reservation.id,
++                              'RESERVED'
++                            )
++                          }
++                        />
++                      </View>
++                    ) : null}
++                    {!operationalCancelled && mayOperateLive ? (
++                      <View style={styles.buttonFill}>
++                        <AppButton
++                          title={t('live.cancelOperational')}
++                          variant="cancel"
++                          loading={isUpdatingOperationalStatus}
++                          onPress={() =>
++                            handleUpdateReservationOperationalStatus(
++                              reservation.id,
++                              'CANCELLED'
++                            )
++                          }
++                        />
++                      </View>
++                    ) : null}
++                    {operationalCancelled && mayOperateLive ? (
++                      <View style={styles.buttonFill}>
++                        <AppButton
++                          title={t('live.reactivateReserved')}
++                          variant="secondary"
++                          loading={isUpdatingOperationalStatus}
++                          onPress={() =>
++                            handleUpdateReservationOperationalStatus(
++                              reservation.id,
++                              'RESERVED'
++                            )
++                          }
+                         />
+                       </View>
+                     ) : null}
+-                    {!settled ? (
++                    {!settled && !operationalCancelled ? (
+                       <View style={styles.buttonFill}>
+                         <AppButton
+                           title={t('live.charge')}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/Reservation.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/Reservation.java
+index 079b4f0..dff6cbb 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/Reservation.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/Reservation.java
+@@ -56,6 +56,19 @@ public class Reservation {
+     @Column(nullable = false, length = 30)
+     private ReservationStatus status;
+
++    @Enumerated(EnumType.STRING)
++    @Column(name = "live_operational_status", length = 30)
++    private LiveReservationOperationalStatus liveOperationalStatus;
++
++    @Column(name = "live_operational_status_updated_at")
++    private LocalDateTime liveOperationalStatusUpdatedAt;
++
++    @Column(name = "live_operational_status_updated_by_user_id")
++    private Long liveOperationalStatusUpdatedByUserId;
++
++    @Column(name = "live_operational_status_reason", length = 255)
++    private String liveOperationalStatusReason;
++
+     @Column(name = "created_at", nullable = false)
+     private LocalDateTime createdAt;
+
+@@ -160,6 +173,38 @@ public class Reservation {
+         this.status = status;
+     }
+
++    public LiveReservationOperationalStatus getLiveOperationalStatus() {
++        return liveOperationalStatus;
++    }
++
++    public void setLiveOperationalStatus(LiveReservationOperationalStatus liveOperationalStatus) {
++        this.liveOperationalStatus = liveOperationalStatus;
++    }
++
++    public LocalDateTime getLiveOperationalStatusUpdatedAt() {
++        return liveOperationalStatusUpdatedAt;
++    }
++
++    public void setLiveOperationalStatusUpdatedAt(LocalDateTime liveOperationalStatusUpdatedAt) {
++        this.liveOperationalStatusUpdatedAt = liveOperationalStatusUpdatedAt;
++    }
++
++    public Long getLiveOperationalStatusUpdatedByUserId() {
++        return liveOperationalStatusUpdatedByUserId;
++    }
++
++    public void setLiveOperationalStatusUpdatedByUserId(Long liveOperationalStatusUpdatedByUserId) {
++        this.liveOperationalStatusUpdatedByUserId = liveOperationalStatusUpdatedByUserId;
++    }
++
++    public String getLiveOperationalStatusReason() {
++        return liveOperationalStatusReason;
++    }
++
++    public void setLiveOperationalStatusReason(String liveOperationalStatusReason) {
++        this.liveOperationalStatusReason = liveOperationalStatusReason;
++    }
++
+     public LocalDateTime getCreatedAt() {
+         return createdAt;
+     }
+@@ -187,4 +232,4 @@ public class Reservation {
+     public void setCancelledByUserId(Long cancelledByUserId) {
+         this.cancelledByUserId = cancelledByUserId;
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationController.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationController.java
+index c184b07..63fe3a0 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationController.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationController.java
+@@ -56,6 +56,14 @@ public class ReservationController {
+         return service.cancel(reservationId, request.getReason());
+     }
+
++    @PatchMapping("/{reservationId}/live-operational-status")
++    public ReservationResponse updateLiveOperationalStatus(
++            @PathVariable Long reservationId,
++            @RequestBody ReservationService.UpdateLiveOperationalStatusRequest request
++    ) {
++        return service.updateLiveOperationalStatus(reservationId, request);
++    }
++
+     public static class CancelReservationRequest {
+         private String reason;
+
+@@ -67,4 +75,4 @@ public class ReservationController {
+             this.reason = reason;
+         }
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationResponse.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationResponse.java
+index f8c0655..ffa7965 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationResponse.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationResponse.java
+@@ -25,6 +25,10 @@ public class ReservationResponse {
+     private BigDecimal price;
+     private String notes;
+     private String status;
++    private String liveOperationalStatus;
++    private LocalDateTime liveOperationalStatusUpdatedAt;
++    private Long liveOperationalStatusUpdatedByUserId;
++    private String liveOperationalStatusReason;
+     private LocalDateTime createdAt;
+     private LocalDateTime cancelledAt;
+     private String cancelReason;
+@@ -53,6 +57,10 @@ public class ReservationResponse {
+                                BigDecimal price,
+                                String notes,
+                                String status,
++                               String liveOperationalStatus,
++                               LocalDateTime liveOperationalStatusUpdatedAt,
++                               Long liveOperationalStatusUpdatedByUserId,
++                               String liveOperationalStatusReason,
+                                LocalDateTime createdAt,
+                                LocalDateTime cancelledAt,
+                                String cancelReason,
+@@ -77,6 +85,10 @@ public class ReservationResponse {
+         this.price = price;
+         this.notes = notes;
+         this.status = status;
++        this.liveOperationalStatus = liveOperationalStatus;
++        this.liveOperationalStatusUpdatedAt = liveOperationalStatusUpdatedAt;
++        this.liveOperationalStatusUpdatedByUserId = liveOperationalStatusUpdatedByUserId;
++        this.liveOperationalStatusReason = liveOperationalStatusReason;
+         this.createdAt = createdAt;
+         this.cancelledAt = cancelledAt;
+         this.cancelReason = cancelReason;
+@@ -103,6 +115,10 @@ public class ReservationResponse {
+     public BigDecimal getPrice() { return price; }
+     public String getNotes() { return notes; }
+     public String getStatus() { return status; }
++    public String getLiveOperationalStatus() { return liveOperationalStatus; }
++    public LocalDateTime getLiveOperationalStatusUpdatedAt() { return liveOperationalStatusUpdatedAt; }
++    public Long getLiveOperationalStatusUpdatedByUserId() { return liveOperationalStatusUpdatedByUserId; }
++    public String getLiveOperationalStatusReason() { return liveOperationalStatusReason; }
+     public LocalDateTime getCreatedAt() { return createdAt; }
+     public LocalDateTime getCancelledAt() { return cancelledAt; }
+     public String getCancelReason() { return cancelReason; }
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
+index 9265af3..1e373f7 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
+@@ -192,6 +192,11 @@ public class ReservationService {
+         entity.setPrice(effectivePrice);
+         entity.setNotes(request.getNotes());
+         entity.setStatus(ReservationStatus.ACTIVE);
++        if (live != null) {
++            entity.setLiveOperationalStatus(LiveReservationOperationalStatus.RESERVED);
++            entity.setLiveOperationalStatusUpdatedAt(LocalDateTime.now());
++            entity.setLiveOperationalStatusUpdatedByUserId(userId);
++        }
+
+         item.setStatus(ItemStatus.RESERVED);
+         itemRepository.save(item);
+@@ -249,6 +254,12 @@ public class ReservationService {
+         existing.setCancelledAt(LocalDateTime.now());
+         existing.setCancelReason(reason);
+         existing.setCancelledByUserId(userId);
++        if (existing.getLive() != null) {
++            existing.setLiveOperationalStatus(LiveReservationOperationalStatus.CANCELLED);
++            existing.setLiveOperationalStatusUpdatedAt(LocalDateTime.now());
++            existing.setLiveOperationalStatusUpdatedByUserId(userId);
++            existing.setLiveOperationalStatusReason(reason);
++        }
+
+         Item item = existing.getItem();
+         item.setStatus(ItemStatus.AVAILABLE);
+@@ -257,6 +268,32 @@ public class ReservationService {
+         return toResponse(repository.save(existing));
+     }
+
++    public ReservationResponse updateLiveOperationalStatus(
++            Long reservationId,
++            UpdateLiveOperationalStatusRequest request
++    ) {
++        Long userId = currentUser.getUserId();
++        Reservation existing = findEntityById(reservationId);
++
++        if (existing.getLive() == null || !ChannelCode.LIVE.equals(existing.getSalesChannel().getCode())) {
++            throw new IllegalArgumentException("La reserva no pertenece a una transmision En vivo");
++        }
++
++        validateReservationManagementAccess(userId, existing);
++
++        LiveReservationOperationalStatus nextStatus = request.getStatus();
++        if (nextStatus == null) {
++            throw new IllegalArgumentException("Estado operativo requerido");
++        }
++
++        existing.setLiveOperationalStatus(nextStatus);
++        existing.setLiveOperationalStatusUpdatedAt(LocalDateTime.now());
++        existing.setLiveOperationalStatusUpdatedByUserId(userId);
++        existing.setLiveOperationalStatusReason(request.getReason());
++
++        return toResponse(repository.save(existing));
++    }
++
+     private void validateReservationCreateAccess(Long userId, String salesChannelCode, Long branchId) {
+         if (ChannelCode.LIVE.equals(salesChannelCode)) {
+             accessService.assertCan(
+@@ -345,6 +382,10 @@ public class ReservationService {
+                 entity.getPrice(),
+                 entity.getNotes(),
+                 entity.getStatus().name(),
++                entity.getLiveOperationalStatus() != null ? entity.getLiveOperationalStatus().name() : null,
++                entity.getLiveOperationalStatusUpdatedAt(),
++                entity.getLiveOperationalStatusUpdatedByUserId(),
++                entity.getLiveOperationalStatusReason(),
+                 entity.getCreatedAt(),
+                 entity.getCancelledAt(),
+                 entity.getCancelReason(),
+@@ -440,4 +481,25 @@ public class ReservationService {
+             this.notes = notes;
+         }
+     }
++
++    public static class UpdateLiveOperationalStatusRequest {
++        private LiveReservationOperationalStatus status;
++        private String reason;
++
++        public LiveReservationOperationalStatus getStatus() {
++            return status;
++        }
++
++        public void setStatus(LiveReservationOperationalStatus status) {
++            this.status = status;
++        }
++
++        public String getReason() {
++            return reason;
++        }
++
++        public void setReason(String reason) {
++            this.reason = reason;
++        }
++    }
+ }
+diff --git a/locales/en/common.json b/locales/en/common.json
+index 4d8a525..211e77c 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -292,6 +292,18 @@
+     "operationalSoldMessage": "The reservation was marked as sold for Live operations. No payment was processed.",
+     "operationalSoldStatus": "Operational sold",
+     "operationalSoldNoPaymentHelp": "Local operational mark; it does not register payment or cash movement.",
++    "operationalSoldPersistedNoPaymentHelp": "Saved operational state; it does not register payment or cash movement.",
++    "operationalStatusPending": "Pending",
++    "operationalStatusReserved": "Reserved",
++    "operationalStatusCancelled": "Operational cancelled",
++    "operationalStatusUpdatedTitle": "Status updated",
++    "operationalStatusUpdatedMessage": "The reservation operational status was saved.",
++    "operationalStatusUpdateErrorTitle": "Could not update",
++    "operationalStatusUpdateError": "Could not save the reservation operational status.",
++    "returnToReserved": "Back to reserved",
++    "markPending": "Mark pending",
++    "cancelOperational": "Cancel operational",
++    "reactivateReserved": "Reactivate reserved",
+     "closeLiveTitle": "Live closing",
+     "closeLiveHelp": "Close the session when you finish capturing reservations.",
+     "liveClosedButton": "Live closed",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index f8c69c8..cab32b4 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -292,6 +292,18 @@
+     "operationalSoldMessage": "La reserva quedó marcada como vendida para la operación de En vivo. No se procesó ningún pago.",
+     "operationalSoldStatus": "Vendido operativo",
+     "operationalSoldNoPaymentHelp": "Marca operativa local; no registra cobro ni caja.",
++    "operationalSoldPersistedNoPaymentHelp": "Estado operativo guardado; no registra cobro ni caja.",
++    "operationalStatusPending": "Pendiente",
++    "operationalStatusReserved": "Apartado",
++    "operationalStatusCancelled": "Cancelado operativo",
++    "operationalStatusUpdatedTitle": "Estado actualizado",
++    "operationalStatusUpdatedMessage": "El estado operativo de la reserva quedó guardado.",
++    "operationalStatusUpdateErrorTitle": "No se pudo actualizar",
++    "operationalStatusUpdateError": "No se pudo guardar el estado operativo de la reserva.",
++    "returnToReserved": "Volver a apartado",
++    "markPending": "Marcar pendiente",
++    "cancelOperational": "Cancelar operativo",
++    "reactivateReserved": "Reactivar apartado",
+     "closeLiveTitle": "Cierre de transmisión",
+     "closeLiveHelp": "Cierra la transmisión cuando termines de registrar reservas.",
+     "liveClosedButton": "Transmisión cerrada",
+diff --git a/services/reservationService.ts b/services/reservationService.ts
+index b0fcaaa..00a1fb6 100644
+--- a/services/reservationService.ts
++++ b/services/reservationService.ts
+@@ -6,6 +6,12 @@ export type ReservationStatus =
+   | 'CONVERTED_TO_SALE'
+   | 'COMPLETED';
+
++export type LiveReservationOperationalStatus =
++  | 'PENDING'
++  | 'RESERVED'
++  | 'OPERATIONAL_SOLD'
++  | 'CANCELLED';
++
+ export type CreateReservationRequest = {
+   itemId: number;
+   customerId: number;
+@@ -33,6 +39,10 @@ export type Reservation = {
+   sellerUserName?: string | null;
+   price: number;
+   status?: ReservationStatus;
++  liveOperationalStatus?: LiveReservationOperationalStatus | null;
++  liveOperationalStatusUpdatedAt?: string | null;
++  liveOperationalStatusUpdatedByUserId?: number | null;
++  liveOperationalStatusReason?: string | null;
+   boxId?: number | null;
+   boxCode?: string | null;
+   createdAt?: string;
+@@ -101,3 +111,17 @@ export async function cancelReservation(
+         },
+   });
+ }
++
++export async function updateLiveReservationOperationalStatus(
++  reservationId: number,
++  status: LiveReservationOperationalStatus,
++  reason?: string
++): Promise<Reservation> {
++  return apiRequest<Reservation>(
++    `/api/reservations/${reservationId}/live-operational-status`,
++    {
++      method: 'PATCH',
++      body: reason ? { status, reason } : { status },
++    }
++  );
++}

@@ -192,6 +192,11 @@ public class ReservationService {
         entity.setPrice(effectivePrice);
         entity.setNotes(request.getNotes());
         entity.setStatus(ReservationStatus.ACTIVE);
+        if (live != null) {
+            entity.setLiveOperationalStatus(LiveReservationOperationalStatus.RESERVED);
+            entity.setLiveOperationalStatusUpdatedAt(LocalDateTime.now());
+            entity.setLiveOperationalStatusUpdatedByUserId(userId);
+        }
 
         item.setStatus(ItemStatus.RESERVED);
         itemRepository.save(item);
@@ -249,10 +254,42 @@ public class ReservationService {
         existing.setCancelledAt(LocalDateTime.now());
         existing.setCancelReason(reason);
         existing.setCancelledByUserId(userId);
+        if (existing.getLive() != null) {
+            existing.setLiveOperationalStatus(LiveReservationOperationalStatus.CANCELLED);
+            existing.setLiveOperationalStatusUpdatedAt(LocalDateTime.now());
+            existing.setLiveOperationalStatusUpdatedByUserId(userId);
+            existing.setLiveOperationalStatusReason(reason);
+        }
 
         Item item = existing.getItem();
         item.setStatus(ItemStatus.AVAILABLE);
         itemRepository.save(item);
+
+        return toResponse(repository.save(existing));
+    }
+
+    public ReservationResponse updateLiveOperationalStatus(
+            Long reservationId,
+            UpdateLiveOperationalStatusRequest request
+    ) {
+        Long userId = currentUser.getUserId();
+        Reservation existing = findEntityById(reservationId);
+
+        if (existing.getLive() == null || !ChannelCode.LIVE.equals(existing.getSalesChannel().getCode())) {
+            throw new IllegalArgumentException("La reserva no pertenece a una transmision En vivo");
+        }
+
+        validateReservationManagementAccess(userId, existing);
+
+        LiveReservationOperationalStatus nextStatus = request.getStatus();
+        if (nextStatus == null) {
+            throw new IllegalArgumentException("Estado operativo requerido");
+        }
+
+        existing.setLiveOperationalStatus(nextStatus);
+        existing.setLiveOperationalStatusUpdatedAt(LocalDateTime.now());
+        existing.setLiveOperationalStatusUpdatedByUserId(userId);
+        existing.setLiveOperationalStatusReason(request.getReason());
 
         return toResponse(repository.save(existing));
     }
@@ -345,6 +382,10 @@ public class ReservationService {
                 entity.getPrice(),
                 entity.getNotes(),
                 entity.getStatus().name(),
+                entity.getLiveOperationalStatus() != null ? entity.getLiveOperationalStatus().name() : null,
+                entity.getLiveOperationalStatusUpdatedAt(),
+                entity.getLiveOperationalStatusUpdatedByUserId(),
+                entity.getLiveOperationalStatusReason(),
                 entity.getCreatedAt(),
                 entity.getCancelledAt(),
                 entity.getCancelReason(),
@@ -438,6 +479,27 @@ public class ReservationService {
 
         public void setNotes(String notes) {
             this.notes = notes;
+        }
+    }
+
+    public static class UpdateLiveOperationalStatusRequest {
+        private LiveReservationOperationalStatus status;
+        private String reason;
+
+        public LiveReservationOperationalStatus getStatus() {
+            return status;
+        }
+
+        public void setStatus(LiveReservationOperationalStatus status) {
+            this.status = status;
+        }
+
+        public String getReason() {
+            return reason;
+        }
+
+        public void setReason(String reason) {
+            this.reason = reason;
         }
     }
 }

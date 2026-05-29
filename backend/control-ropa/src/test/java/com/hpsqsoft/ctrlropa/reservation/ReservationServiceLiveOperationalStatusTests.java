@@ -1,0 +1,154 @@
+package com.hpsqsoft.ctrlropa.reservation;
+
+import com.hpsqsoft.ctrlropa.branch.Branch;
+import com.hpsqsoft.ctrlropa.branch.BranchRepository;
+import com.hpsqsoft.ctrlropa.catalog.SalesChannel;
+import com.hpsqsoft.ctrlropa.catalog.SalesChannelRepository;
+import com.hpsqsoft.ctrlropa.customer.CustomerRepository;
+import com.hpsqsoft.ctrlropa.inventory.BoxRepository;
+import com.hpsqsoft.ctrlropa.item.Item;
+import com.hpsqsoft.ctrlropa.item.ItemRepository;
+import com.hpsqsoft.ctrlropa.item.ItemStatus;
+import com.hpsqsoft.ctrlropa.live.Live;
+import com.hpsqsoft.ctrlropa.live.LiveRepository;
+import com.hpsqsoft.ctrlropa.live.LiveStatus;
+import com.hpsqsoft.ctrlropa.order.CustomerOrderService;
+import com.hpsqsoft.ctrlropa.security.access.AccessService;
+import com.hpsqsoft.ctrlropa.security.access.ChannelCode;
+import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
+import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
+import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
+import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+class ReservationServiceLiveOperationalStatusTests {
+
+    private final ReservationRepository repository = mock(ReservationRepository.class);
+    private final ItemRepository itemRepository = mock(ItemRepository.class);
+    private final CustomerRepository customerRepository = mock(CustomerRepository.class);
+    private final BranchRepository branchRepository = mock(BranchRepository.class);
+    private final LiveRepository liveRepository = mock(LiveRepository.class);
+    private final SalesChannelRepository salesChannelRepository = mock(SalesChannelRepository.class);
+    private final BoxRepository boxRepository = mock(BoxRepository.class);
+    private final AccessService accessService = mock(AccessService.class);
+    private final CurrentUser currentUser = mock(CurrentUser.class);
+    private final CustomerOrderService customerOrderService = mock(CustomerOrderService.class);
+    private final JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+    private final TenantAccessGuard tenantAccessGuard = mock(TenantAccessGuard.class);
+
+    private final ReservationService service = new ReservationService(
+            repository,
+            itemRepository,
+            customerRepository,
+            branchRepository,
+            liveRepository,
+            salesChannelRepository,
+            boxRepository,
+            accessService,
+            currentUser,
+            customerOrderService,
+            jdbcTemplate,
+            tenantAccessGuard
+    );
+
+    @Test
+    void updateLiveOperationalStatusPersistsWithoutChangingCoreStatus() {
+        Reservation reservation = liveReservation(10L, 6L);
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(10L)).thenReturn(Optional.of(reservation));
+        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(customerOrderService.findOrderIdByReservationId(10L)).thenReturn(55L);
+
+        ReservationService.UpdateLiveOperationalStatusRequest request =
+                new ReservationService.UpdateLiveOperationalStatusRequest();
+        request.setStatus(LiveReservationOperationalStatus.OPERATIONAL_SOLD);
+
+        ReservationResponse response = service.updateLiveOperationalStatus(10L, request);
+
+        assertEquals("ACTIVE", response.getStatus());
+        assertEquals("OPERATIONAL_SOLD", response.getLiveOperationalStatus());
+        assertEquals(99L, response.getLiveOperationalStatusUpdatedByUserId());
+        verify(tenantAccessGuard).requireBranch(6L, "La reserva no pertenece a la sucursal activa");
+        verify(accessService).assertCan(
+                99L,
+                PermissionCode.DO_LIVE_RESERVATION,
+                ChannelCode.LIVE,
+                6L
+        );
+    }
+
+    @Test
+    void updateLiveOperationalStatusRejectsNonLiveReservation() {
+        Reservation reservation = liveReservation(10L, 6L);
+        reservation.setLive(null);
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(10L)).thenReturn(Optional.of(reservation));
+
+        ReservationService.UpdateLiveOperationalStatusRequest request =
+                new ReservationService.UpdateLiveOperationalStatusRequest();
+        request.setStatus(LiveReservationOperationalStatus.OPERATIONAL_SOLD);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.updateLiveOperationalStatus(10L, request)
+        );
+    }
+
+    private static Reservation liveReservation(Long id, Long branchId) {
+        Branch branch = new Branch();
+        branch.setId(branchId);
+        branch.setCode("QA_CTR");
+
+        Item item = new Item();
+        ReflectionTestUtils.setField(item, "id", 8L);
+        item.setCode("QA-CTR-005");
+        item.setPrice(BigDecimal.valueOf(300));
+        item.setBranch(branch);
+        item.setStatus(ItemStatus.RESERVED);
+
+        Live live = new Live();
+        ReflectionTestUtils.setField(live, "id", 4L);
+        live.setBranch(branch);
+        live.setStatus(LiveStatus.ACTIVE);
+
+        SalesChannel liveChannel = new SalesChannel();
+        liveChannel.setId(3L);
+        liveChannel.setCode(ChannelCode.LIVE);
+
+        Reservation reservation = new Reservation();
+        ReflectionTestUtils.setField(reservation, "id", id);
+        reservation.setBranch(branch);
+        reservation.setItem(item);
+        reservation.setCustomer(customer());
+        reservation.setLive(live);
+        reservation.setSalesChannel(liveChannel);
+        reservation.setPrice(BigDecimal.valueOf(300));
+        reservation.setStatus(ReservationStatus.ACTIVE);
+        reservation.setLiveOperationalStatus(LiveReservationOperationalStatus.RESERVED);
+        reservation.setLiveOperationalStatusUpdatedAt(LocalDateTime.now());
+        reservation.setLiveOperationalStatusUpdatedByUserId(99L);
+        ReflectionTestUtils.setField(reservation, "createdAt", LocalDateTime.now());
+        return reservation;
+    }
+
+    private static com.hpsqsoft.ctrlropa.customer.Customer customer() {
+        com.hpsqsoft.ctrlropa.customer.Customer customer =
+                new com.hpsqsoft.ctrlropa.customer.Customer();
+        ReflectionTestUtils.setField(customer, "id", 27L);
+        customer.setName("Damaris");
+        return customer;
+    }
+}
