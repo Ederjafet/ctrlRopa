@@ -1,8 +1,10 @@
 package com.hpsqsoft.ctrlropa.live;
 
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
 
 import java.util.List;
+import com.hpsqsoft.ctrlropa.item.ItemResponse;
 
 @RestController
 @RequestMapping("/api/lives")
@@ -37,5 +39,16 @@ public class LiveController {
     @PatchMapping("/{id}/close")
     public LiveResponse close(@PathVariable Long id) {
         return service.close(id);
+    }
+
+    @GetMapping("/{id}/active-item")
+    public ResponseEntity<ItemResponse> getActiveItem(@PathVariable Long id) {
+        ItemResponse activeItem = service.getActiveItem(id);
+        return activeItem == null ? ResponseEntity.noContent().build() : ResponseEntity.ok(activeItem);
+    }
+
+    @PatchMapping("/{id}/active-item")
+    public LiveResponse setActiveItem(@PathVariable Long id, @RequestBody LiveActiveItemRequest request) {
+        return service.setActiveItem(id, request);
     }
 }

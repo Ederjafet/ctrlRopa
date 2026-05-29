@@ -36,6 +36,7 @@ import {
   getLiveStatusLabel,
   isLiveOperable,
   Live,
+  setLiveActiveItem,
 } from '@/services/liveService';
 import {
   clearSelectedLiveId,
@@ -155,6 +156,23 @@ function getItemStatusLabel(status: string | null | undefined, t: (key: string) 
   }
 }
 
+function activeItemFromLive(live: Live | null): Item | null {
+  if (!live?.activeItemId) return null;
+
+  return {
+    id: live.activeItemId,
+    code: live.activeItemCode || `#${live.activeItemId}`,
+    qrCode: live.activeItemQrCode ?? null,
+    branchId: live.activeItemBranchId ?? live.branchId,
+    productTypeId: 0,
+    productTypeName: live.activeItemProductTypeName ?? undefined,
+    brandName: live.activeItemBrandName ?? undefined,
+    sizeName: live.activeItemSizeName ?? undefined,
+    price: live.activeItemPrice ?? null,
+    status: (live.activeItemStatus || 'AVAILABLE') as Item['status'],
+  };
+}
+
 function mapLiveReservations(
   reservations: Reservation[],
   liveId?: number | null
@@ -231,6 +249,7 @@ export default function LiveScreen() {
   const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingLive, setIsSavingLive] = useState(false);
+  const [isSavingActiveItem, setIsSavingActiveItem] = useState(false);
   const [isSavingReservation, setIsSavingReservation] = useState(false);
   const [liveNotice, setLiveNotice] = useState<LiveNotice | null>(null);
   const [closeLiveToConfirm, setCloseLiveToConfirm] = useState<Live | null>(null);
@@ -421,6 +440,7 @@ export default function LiveScreen() {
         );
 
       setSelectedLive(nextSelectedLive);
+      setActiveItem(activeItemFromLive(nextSelectedLive));
       await updateRecentReservations(reservationData, nextSelectedLive?.id);
       await refreshOperationalSoldReservations(currentSession, nextSelectedLive?.id);
 
@@ -432,7 +452,6 @@ export default function LiveScreen() {
       if (createdItems.length > 0) {
         const createdItem = createdItems[0];
         setSelectedItem(createdItem);
-        setActiveItem(createdItem);
         setPriceText(
           createdItem.price !== null && createdItem.price !== undefined
             ? String(createdItem.price)
@@ -761,6 +780,7 @@ export default function LiveScreen() {
 
   const handleSelectLive = (live: Live) => {
     setSelectedLive(live);
+    setActiveItem(activeItemFromLive(live));
     updateRecentReservations(branchReservations, live.id);
     void refreshOperationalSoldReservations(session, live.id);
     if (session && live.status !== 'CLOSED') {
@@ -1008,12 +1028,66 @@ export default function LiveScreen() {
     }
 
     setSelectedItem(item);
-    setActiveItem(item);
     setPriceText(
       item.price !== null && item.price !== undefined ? String(item.price) : ''
     );
     setItemSearch('');
     setIsItemModalVisible(false);
+  };
+
+  const handleSetSelectedItemActive = async () => {
+    if (!session || !selectedLive || !selectedItem) {
+      setLiveNotice({
+        title: t('live.activeProductMissingTitle'),
+        message: t('live.activeProductMissingMessage'),
+        tone: 'warning',
+      });
+      return;
+    }
+
+    if (!canOperateLive(session)) {
+      setLiveNotice({
+        title: t('live.permissionDeniedTitle'),
+        message: t('live.liveOperatePermissionError'),
+        tone: 'warning',
+      });
+      return;
+    }
+
+    if (!isLiveOperable(selectedLive)) {
+      setLiveNotice({
+        title: t('live.activeProductMissingTitle'),
+        message: t('live.activeProductLiveClosedMessage'),
+        tone: 'warning',
+      });
+      return;
+    }
+
+    setIsSavingActiveItem(true);
+
+    try {
+      const updated = await setLiveActiveItem(selectedLive.id, selectedItem.id);
+      setSelectedLive(updated);
+      setLives((current) =>
+        current.map((live) => (live.id === updated.id ? updated : live))
+      );
+      setActiveItem(activeItemFromLive(updated));
+      setLiveNotice({
+        title: t('live.activeProductUpdatedTitle'),
+        message: t('live.activeProductUpdatedMessage', {
+          item: selectedItem.code,
+        }),
+        tone: 'success',
+      });
+    } catch (err: any) {
+      setLiveNotice({
+        title: t('live.activeProductUpdateErrorTitle'),
+        message: err?.message || t('live.activeProductUpdateError'),
+        tone: 'danger',
+      });
+    } finally {
+      setIsSavingActiveItem(false);
+    }
   };
 
   const addItemByCode = (value: string) => {
@@ -2008,6 +2082,11 @@ export default function LiveScreen() {
                 ? `${selectedItem.code} - ${selectedItem.productTypeName || t('live.noType')}`
                 : t('live.itemHelp')}
             </AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {activeItem
+                ? t('live.activeProductCurrent', { item: activeItem.code })
+                : t('live.noOfficialActiveProduct')}
+            </AppText>
 
             <View style={styles.capturePrimaryGroup}>
             <AppInput
@@ -2034,6 +2113,31 @@ export default function LiveScreen() {
               <AppText variant="caption" color={theme.colors.mutedText}>
                 {t('live.productCodeQrHelp')}
               </AppText>
+              {selectedItem ? (
+                <AppButton
+                  title={
+                    activeItem?.id === selectedItem.id
+                      ? t('live.productAlreadyOnAir')
+                      : t('live.markProductOnAir')
+                  }
+                  variant="secondary"
+                  onPress={handleSetSelectedItemActive}
+                  loading={isSavingActiveItem}
+                  disabled={
+                    isSavingActiveItem ||
+                    !selectedLiveIsOperable ||
+                    !mayOperateLive ||
+                    activeItem?.id === selectedItem.id
+                  }
+                  disabledReason={
+                    !mayOperateLive
+                      ? t('live.liveOperatePermissionError')
+                      : !selectedLiveIsOperable
+                        ? t('live.selectOpenLiveReason')
+                        : undefined
+                  }
+                />
+              ) : null}
             </View>
 
             {maySelectItem ? (

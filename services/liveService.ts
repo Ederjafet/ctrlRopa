@@ -13,6 +13,15 @@ export type Live = {
   createdAt?: string;
   startedAt?: string | null;
   endedAt?: string | null;
+  activeItemId?: number | null;
+  activeItemCode?: string | null;
+  activeItemQrCode?: string | null;
+  activeItemBranchId?: number | null;
+  activeItemProductTypeName?: string | null;
+  activeItemBrandName?: string | null;
+  activeItemSizeName?: string | null;
+  activeItemPrice?: number | null;
+  activeItemStatus?: string | null;
 };
 
 export type CreateLiveRequest = {
@@ -47,6 +56,16 @@ export async function activateLive(id: number): Promise<Live> {
 export async function closeLive(id: number): Promise<Live> {
   return apiRequest<Live>(`/api/lives/${id}/close`, {
     method: 'PATCH',
+  });
+}
+
+export async function setLiveActiveItem(
+  liveId: number,
+  itemId: number | null
+): Promise<Live> {
+  return apiRequest<Live>(`/api/lives/${liveId}/active-item`, {
+    method: 'PATCH',
+    body: { itemId },
   });
 }
 

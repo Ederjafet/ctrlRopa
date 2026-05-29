@@ -1,6 +1,7 @@
 package com.hpsqsoft.ctrlropa.live;
 
 import com.hpsqsoft.ctrlropa.branch.Branch;
+import com.hpsqsoft.ctrlropa.item.Item;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
@@ -36,6 +37,10 @@ public class Live {
     @Column(name = "ended_at")
     private LocalDateTime endedAt;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "active_item_id")
+    private Item activeItem;
+
     public Live() {
     }
 
@@ -58,4 +63,6 @@ public class Live {
     public void setStartedAt(LocalDateTime startedAt) { this.startedAt = startedAt; }
     public LocalDateTime getEndedAt() { return endedAt; }
     public void setEndedAt(LocalDateTime endedAt) { this.endedAt = endedAt; }
+    public Item getActiveItem() { return activeItem; }
+    public void setActiveItem(Item activeItem) { this.activeItem = activeItem; }
 }
