@@ -32,10 +32,12 @@ import {
   activateLive,
   closeLive,
   createLive,
+  getLiveEvents,
   getLivesByBranch,
   getLiveStatusLabel,
   isLiveOperable,
   Live,
+  LiveEvent,
   setLiveActiveItem,
 } from '@/services/liveService';
 import {
@@ -92,6 +94,13 @@ type LiveNotice = {
   tone: 'success' | 'warning' | 'danger';
 };
 
+type ActivityFeedEvent = {
+  badge: string;
+  label: string;
+  time: string;
+  tone: 'success' | 'neutral' | 'info' | 'accent';
+};
+
 type LiveNoticeModalProps = {
   notice: LiveNotice | null;
   onClose: () => void;
@@ -119,6 +128,18 @@ function resolveLoadIssue(
 
 function formatMoney(value: number) {
   return `$${value.toFixed(2)}`;
+}
+
+function formatLiveEventTime(value?: string | null) {
+  if (!value) return '';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  return date.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function normalize(value?: string | null) {
@@ -236,6 +257,44 @@ function getLiveReservationOperationalStatusLabel(
   }
 }
 
+function getLiveEventLabel(
+  event: LiveEvent,
+  t: (key: string, options?: Record<string, unknown>) => string
+) {
+  switch (event.eventType) {
+    case 'LIVE_STARTED':
+      return t('live.eventLiveStarted');
+    case 'LIVE_CLOSED':
+      return t('live.eventLiveClosed');
+    case 'ACTIVE_ITEM_CHANGED':
+      return t('live.eventActiveItemChanged', { id: event.entityId || '-' });
+    case 'LIVE_RESERVATION_CREATED':
+      return t('live.eventReservationCreated', { id: event.entityId || '-' });
+    case 'LIVE_RESERVATION_STATUS_CHANGED':
+      return t('live.eventReservationStatusChanged', { id: event.entityId || '-' });
+    case 'LIVE_OPERATIONAL_SOLD':
+      return t('live.eventOperationalSold', { id: event.entityId || '-' });
+    case 'LIVE_RESERVATION_CANCELLED':
+      return t('live.eventReservationCancelled', { id: event.entityId || '-' });
+    default:
+      return event.eventType;
+  }
+}
+
+function getLiveEventBadge(eventType: string, t: (key: string) => string) {
+  if (eventType.includes('RESERVATION')) return t('live.activityBadgeReservation');
+  if (eventType.includes('ITEM')) return t('live.activityBadgeProduct');
+  if (eventType.includes('SOLD')) return t('live.activityBadgeSold');
+  return t('live.activityBadgeLive');
+}
+
+function getLiveEventTone(eventType: string): ActivityFeedEvent['tone'] {
+  if (eventType.includes('SOLD')) return 'success';
+  if (eventType.includes('ITEM')) return 'accent';
+  if (eventType.includes('CANCELLED') || eventType.includes('CLOSED')) return 'neutral';
+  return 'info';
+}
+
 function LiveNoticeModal({ notice, onClose }: LiveNoticeModalProps) {
   const { theme } = useAppTheme();
   const { t } = useTranslation('common');
@@ -311,6 +370,7 @@ export default function LiveScreen() {
   const [recentReservations, setRecentReservations] = useState<
     RecentLiveReservation[]
   >([]);
+  const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
   const [branchReservations, setBranchReservations] = useState<Reservation[]>([]);
   const [paidByReservationId, setPaidByReservationId] = useState<Record<number, number>>({});
   const [updatingOperationalReservationId, setUpdatingOperationalReservationId] =
@@ -482,6 +542,7 @@ export default function LiveScreen() {
       setSelectedLive(nextSelectedLive);
       setActiveItem(activeItemFromLive(nextSelectedLive));
       await updateRecentReservations(reservationData, nextSelectedLive?.id);
+      await updateLiveEvents(nextSelectedLive?.id);
 
       const pendingItemIds = await consumePendingQuickItems('live');
       const createdItems = pendingItemIds
@@ -765,39 +826,14 @@ export default function LiveScreen() {
         ? t('live.presenterReadyActive')
         : t('live.presenterReadyOpen');
   const shouldShowDemoMetrics = showAnalyticsWidget && showDemoMetrics;
-  const activityFeed = [
-    ...recentReservations.slice(0, 3).map(({ customerName, itemCode }, index) => ({
-      badge: t('live.activityBadgeReservation'),
-      label: t('live.activityReservation', {
-        customer: customerName,
-        item: itemCode,
-      }),
-      time: t('live.activityMinutesAgo', { count: index + 1 }),
-      tone: 'success' as const,
-    })),
-    {
-      badge: t('live.activityBadgeComment'),
-      label: t('live.activityComment', { customer: 'Carla', text: 'Tienes M?' }),
-      time: t('live.activityNow'),
-      tone: 'neutral' as const,
-    },
-    {
-      badge: t('live.activityBadgeViewer'),
-      label: t('live.activityViewersOnProduct', { count: 14 }),
-      time: t('live.activityNow'),
-      tone: 'info' as const,
-    },
-    ...(hasActiveProduct
-      ? [
-          {
-            badge: t('live.activityBadgeProduct'),
-            label: t('live.activityProductPinned', { item: featuredProductName }),
-            time: t('live.activityMinutesAgo', { count: 4 }),
-            tone: 'accent' as const,
-          },
-        ]
-      : []),
-  ].slice(0, isTablet ? 4 : isDesktop ? 6 : 3);
+  const activityFeed: ActivityFeedEvent[] = liveEvents
+    .map((event) => ({
+      badge: getLiveEventBadge(event.eventType, t),
+      label: getLiveEventLabel(event, t),
+      time: formatLiveEventTime(event.createdAt) || t('live.activityNow'),
+      tone: getLiveEventTone(event.eventType),
+    }))
+    .slice(0, isTablet ? 4 : isDesktop ? 6 : 3);
   const createLiveBlockedReason = !newLiveNotes.trim()
     ? t('live.createLiveMissingNotes')
     : isSavingLive
@@ -821,6 +857,7 @@ export default function LiveScreen() {
     setSelectedLive(live);
     setActiveItem(activeItemFromLive(live));
     updateRecentReservations(branchReservations, live.id);
+    void updateLiveEvents(live.id);
     if (session && live.status !== 'CLOSED') {
       void saveSelectedLiveId(session.branchId, session.userId, live.id);
     }
@@ -849,6 +886,19 @@ export default function LiveScreen() {
     );
 
     setPaidByReservationId(Object.fromEntries(entries));
+  };
+
+  const updateLiveEvents = async (liveId?: number | null) => {
+    if (!liveId) {
+      setLiveEvents([]);
+      return;
+    }
+
+    try {
+      setLiveEvents(await getLiveEvents(liveId));
+    } catch {
+      setLiveEvents([]);
+    }
   };
 
   const handleUpdateReservationOperationalStatus = async (
@@ -883,6 +933,7 @@ export default function LiveScreen() {
             : entry
         )
       );
+      await updateLiveEvents(selectedLive.id);
 
       setLiveNotice({
         title:
@@ -1120,6 +1171,7 @@ export default function LiveScreen() {
         current.map((live) => (live.id === updated.id ? updated : live))
       );
       setActiveItem(activeItemFromLive(updated));
+      await updateLiveEvents(updated.id);
       setLiveNotice({
         title: t('live.activeProductUpdatedTitle'),
         message: t('live.activeProductUpdatedMessage', {
@@ -1751,7 +1803,11 @@ export default function LiveScreen() {
                 ]}
               >
                 <AppText bold>{t('live.activityFeedTitle')}</AppText>
-                {activityFeed.map((event, index) => (
+                {activityFeed.length === 0 ? (
+                  <AppText color={theme.colors.mutedText}>
+                    {t('live.noLiveEvents')}
+                  </AppText>
+                ) : activityFeed.map((event, index) => (
                   <View
                     key={`${event.label}-${index}`}
                     style={[
@@ -1814,7 +1870,11 @@ export default function LiveScreen() {
                   ]}
                 >
                   <AppText bold>{t('live.activityFeedTitle')}</AppText>
-                  {activityFeed.map((event, index) => (
+                  {activityFeed.length === 0 ? (
+                    <AppText color={theme.colors.mutedText}>
+                      {t('live.noLiveEvents')}
+                    </AppText>
+                  ) : activityFeed.map((event, index) => (
                     <View
                       key={`${event.label}-${index}`}
                       style={[

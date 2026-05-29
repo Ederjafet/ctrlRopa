@@ -12,6 +12,8 @@ import com.hpsqsoft.ctrlropa.item.Item;
 import com.hpsqsoft.ctrlropa.item.ItemRepository;
 import com.hpsqsoft.ctrlropa.item.ItemStatus;
 import com.hpsqsoft.ctrlropa.live.Live;
+import com.hpsqsoft.ctrlropa.live.LiveEventService;
+import com.hpsqsoft.ctrlropa.live.LiveEventType;
 import com.hpsqsoft.ctrlropa.live.LiveRepository;
 import com.hpsqsoft.ctrlropa.live.LiveStatus;
 import com.hpsqsoft.ctrlropa.order.CustomerOrder;
@@ -45,6 +47,7 @@ public class ReservationService {
     private final CustomerOrderService customerOrderService;
     private final JdbcTemplate jdbcTemplate;
     private final TenantAccessGuard tenantAccessGuard;
+    private final LiveEventService liveEventService;
 
     public ReservationService(ReservationRepository repository,
                               ItemRepository itemRepository,
@@ -57,7 +60,8 @@ public class ReservationService {
                               CurrentUser currentUser,
                               CustomerOrderService customerOrderService,
                               JdbcTemplate jdbcTemplate,
-                              TenantAccessGuard tenantAccessGuard) {
+                              TenantAccessGuard tenantAccessGuard,
+                              LiveEventService liveEventService) {
         this.repository = repository;
         this.itemRepository = itemRepository;
         this.customerRepository = customerRepository;
@@ -70,6 +74,7 @@ public class ReservationService {
         this.customerOrderService = customerOrderService;
         this.jdbcTemplate = jdbcTemplate;
         this.tenantAccessGuard = tenantAccessGuard;
+        this.liveEventService = liveEventService;
     }
 
     @Transactional(readOnly = true)
@@ -206,6 +211,20 @@ public class ReservationService {
         CustomerOrder order = customerOrderService.addReservationToOpenOrder(saved);
         customerOrderService.refreshStatus(order.getId());
 
+        if (saved.getLive() != null) {
+            liveEventService.record(
+                    saved.getLive(),
+                    LiveEventType.LIVE_RESERVATION_CREATED,
+                    userId,
+                    "RESERVATION",
+                    saved.getId(),
+                    "{\"reservationId\":" + saved.getId()
+                            + ",\"itemId\":" + saved.getItem().getId()
+                            + ",\"customerId\":" + saved.getCustomer().getId()
+                            + ",\"operationalStatus\":\"" + saved.getLiveOperationalStatus().name() + "\"}"
+            );
+        }
+
         return toResponse(saved);
     }
 
@@ -255,17 +274,25 @@ public class ReservationService {
         existing.setCancelReason(reason);
         existing.setCancelledByUserId(userId);
         if (existing.getLive() != null) {
+            LiveReservationOperationalStatus previousOperationalStatus = existing.getLiveOperationalStatus();
             existing.setLiveOperationalStatus(LiveReservationOperationalStatus.CANCELLED);
             existing.setLiveOperationalStatusUpdatedAt(LocalDateTime.now());
             existing.setLiveOperationalStatusUpdatedByUserId(userId);
             existing.setLiveOperationalStatusReason(reason);
+            recordLiveReservationStatusChange(
+                    existing,
+                    userId,
+                    previousOperationalStatus,
+                    LiveReservationOperationalStatus.CANCELLED
+            );
         }
 
         Item item = existing.getItem();
         item.setStatus(ItemStatus.AVAILABLE);
         itemRepository.save(item);
 
-        return toResponse(repository.save(existing));
+        Reservation saved = repository.save(existing);
+        return toResponse(saved);
     }
 
     public ReservationResponse updateLiveOperationalStatus(
@@ -286,12 +313,63 @@ public class ReservationService {
             throw new IllegalArgumentException("Estado operativo requerido");
         }
 
+        LiveReservationOperationalStatus previousStatus = existing.getLiveOperationalStatus();
         existing.setLiveOperationalStatus(nextStatus);
         existing.setLiveOperationalStatusUpdatedAt(LocalDateTime.now());
         existing.setLiveOperationalStatusUpdatedByUserId(userId);
         existing.setLiveOperationalStatusReason(request.getReason());
 
-        return toResponse(repository.save(existing));
+        Reservation saved = repository.save(existing);
+        recordLiveReservationStatusChange(saved, userId, previousStatus, nextStatus);
+        return toResponse(saved);
+    }
+
+    private void recordLiveReservationStatusChange(Reservation reservation,
+                                                   Long actorUserId,
+                                                   LiveReservationOperationalStatus previousStatus,
+                                                   LiveReservationOperationalStatus nextStatus) {
+        if (reservation.getLive() == null || nextStatus == null) {
+            return;
+        }
+
+        String payload = "{\"reservationId\":" + reservation.getId()
+                + ",\"previousStatus\":\"" + statusName(previousStatus)
+                + "\",\"newStatus\":\"" + nextStatus.name() + "\"}";
+
+        liveEventService.record(
+                reservation.getLive(),
+                LiveEventType.LIVE_RESERVATION_STATUS_CHANGED,
+                actorUserId,
+                "RESERVATION",
+                reservation.getId(),
+                payload
+        );
+
+        if (nextStatus == LiveReservationOperationalStatus.OPERATIONAL_SOLD) {
+            liveEventService.record(
+                    reservation.getLive(),
+                    LiveEventType.LIVE_OPERATIONAL_SOLD,
+                    actorUserId,
+                    "RESERVATION",
+                    reservation.getId(),
+                    payload
+            );
+        }
+
+        if (nextStatus == LiveReservationOperationalStatus.CANCELLED) {
+            liveEventService.record(
+                    reservation.getLive(),
+                    LiveEventType.LIVE_RESERVATION_CANCELLED,
+                    actorUserId,
+                    "RESERVATION",
+                    reservation.getId(),
+                    payload
+            );
+        }
+    }
+
+    private String statusName(LiveReservationOperationalStatus status) {
+        return status == null ? "null" : status.name();
     }
 
     private void validateReservationCreateAccess(Long userId, String salesChannelCode, Long branchId) {

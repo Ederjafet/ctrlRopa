@@ -10,6 +10,8 @@ import com.hpsqsoft.ctrlropa.item.Item;
 import com.hpsqsoft.ctrlropa.item.ItemRepository;
 import com.hpsqsoft.ctrlropa.item.ItemStatus;
 import com.hpsqsoft.ctrlropa.live.Live;
+import com.hpsqsoft.ctrlropa.live.LiveEventService;
+import com.hpsqsoft.ctrlropa.live.LiveEventType;
 import com.hpsqsoft.ctrlropa.live.LiveRepository;
 import com.hpsqsoft.ctrlropa.live.LiveStatus;
 import com.hpsqsoft.ctrlropa.order.CustomerOrderService;
@@ -48,6 +50,7 @@ class ReservationServiceLiveOperationalStatusTests {
     private final CustomerOrderService customerOrderService = mock(CustomerOrderService.class);
     private final JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
     private final TenantAccessGuard tenantAccessGuard = mock(TenantAccessGuard.class);
+    private final LiveEventService liveEventService = mock(LiveEventService.class);
 
     private final ReservationService service = new ReservationService(
             repository,
@@ -61,7 +64,8 @@ class ReservationServiceLiveOperationalStatusTests {
             currentUser,
             customerOrderService,
             jdbcTemplate,
-            tenantAccessGuard
+            tenantAccessGuard,
+            liveEventService
     );
 
     @Test
@@ -87,6 +91,22 @@ class ReservationServiceLiveOperationalStatusTests {
                 PermissionCode.DO_LIVE_RESERVATION,
                 ChannelCode.LIVE,
                 6L
+        );
+        verify(liveEventService).record(
+                reservation.getLive(),
+                LiveEventType.LIVE_RESERVATION_STATUS_CHANGED,
+                99L,
+                "RESERVATION",
+                10L,
+                "{\"reservationId\":10,\"previousStatus\":\"RESERVED\",\"newStatus\":\"OPERATIONAL_SOLD\"}"
+        );
+        verify(liveEventService).record(
+                reservation.getLive(),
+                LiveEventType.LIVE_OPERATIONAL_SOLD,
+                99L,
+                "RESERVATION",
+                10L,
+                "{\"reservationId\":10,\"previousStatus\":\"RESERVED\",\"newStatus\":\"OPERATIONAL_SOLD\"}"
         );
     }
 
