@@ -1,0 +1,304 @@
+import AppShell from '@/components/layout/AppShell';
+import { SidebarSection } from '@/components/layout/Sidebar';
+import DashboardTemplate from '@/components/templates/DashboardTemplate';
+import DetailTemplate from '@/components/templates/DetailTemplate';
+import ListTemplate from '@/components/templates/ListTemplate';
+import MonitoringTemplate from '@/components/templates/MonitoringTemplate';
+import OperationalTemplate from '@/components/templates/OperationalTemplate';
+import ActionTile from '@/components/ui/ActionTile';
+import AppCard from '@/components/ui/AppCard';
+import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
+import AppText from '@/components/ui/AppText';
+import EmptyState from '@/components/ui/EmptyState';
+import EntitySummaryCard from '@/components/ui/EntitySummaryCard';
+import MetricCard from '@/components/ui/MetricCard';
+import SectionHeader from '@/components/ui/SectionHeader';
+import StatusBadge from '@/components/ui/StatusBadge';
+import { useAppTheme } from '@/context/AppThemeContext';
+import { canAccess, canAccessByPermission, isAdmin, isNoAccess } from '@/services/accessControl';
+import { canViewLive } from '@/services/livePermissionGuards';
+import { ensureSessionActive, getSession, UserSession } from '@/services/sessionStorage';
+import { designTokens, viewVariants } from '@/theme/designTokens';
+import { Redirect } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+
+function buildNavSections(session: UserSession | null): SidebarSection[] {
+  const liveAllowed = canViewLive(session);
+  const customersAllowed = canAccessByPermission(session, 'VIEW_CUSTOMERS');
+  const reservationsAllowed =
+    canAccess(session, 'DOOR_RESERVATION', 'DO_DOOR_RESERVATION') || liveAllowed;
+  const usersAllowed = canAccessByPermission(session, 'MANAGE_USERS') || isAdmin(session);
+  const systemAllowed =
+    canAccessByPermission(session, 'MANAGE_ROLES') ||
+    canAccessByPermission(session, 'MANAGE_BRANCH_CHANNELS') ||
+    isAdmin(session);
+  const reportsAllowed = canAccessByPermission(session, 'VIEW_REPORTS') || isAdmin(session);
+  const adminAllowed = isAdmin(session);
+
+  const primaryItems = [
+    { key: 'home', label: 'Inicio', route: '/', icon: 'space-dashboard' as const },
+    liveAllowed ? { key: 'live', label: 'LIVE', route: '/live', icon: 'live-tv' as const } : null,
+    customersAllowed
+      ? { key: 'customers', label: 'Clientes', route: '/customers', icon: 'groups' as const }
+      : null,
+    reservationsAllowed
+      ? { key: 'reservations', label: 'Reservas', route: '/reservations', icon: 'bookmark' as const }
+      : null,
+  ].filter(Boolean);
+
+  const controlItems = [
+    usersAllowed
+      ? { key: 'users', label: 'Usuarios', route: '/users', icon: 'manage-accounts' as const }
+      : null,
+    systemAllowed
+      ? { key: 'system', label: 'Sistema', route: '/system', icon: 'settings' as const }
+      : null,
+    reportsAllowed
+      ? { key: 'reports', label: 'Reportes', route: '/reports', icon: 'analytics' as const }
+      : null,
+  ].filter(Boolean);
+  const developmentItems = [
+    adminAllowed
+      ? { key: 'ui-kit', label: 'UI Kit', route: '/ui-kit', icon: 'dashboard-customize' as const }
+      : null,
+  ].filter(Boolean);
+
+  return [
+    { title: 'Operacion', items: primaryItems },
+    { title: 'Control', items: controlItems },
+    { title: 'Desarrollo', items: developmentItems },
+  ].filter((section) => section.items.length > 0) as SidebarSection[];
+}
+
+export default function UiKitPreview() {
+  const { theme } = useAppTheme();
+  const [loading, setLoading] = useState(true);
+  const [isLogged, setIsLogged] = useState(false);
+  const [session, setSession] = useState<UserSession | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      const active = await ensureSessionActive();
+      const currentSession = await getSession();
+
+      if (cancelled) return;
+
+      setIsLogged(Boolean(active && currentSession));
+      setSession(currentSession);
+      setLoading(false);
+    };
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const navSections = useMemo(() => buildNavSections(session), [session]);
+
+  if (loading) {
+    return (
+      <View style={[styles.loadingScreen, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator />
+        <AppText color={theme.colors.mutedText}>Cargando UI Kit...</AppText>
+      </View>
+    );
+  }
+
+  if (!isLogged) {
+    return <Redirect href="/login" />;
+  }
+
+  if (!isAdmin(session) || isNoAccess(session)) {
+    return (
+      <AppShell
+        title="UI Kit"
+        subtitle="Catalogo interno de componentes y templates"
+        activeRoute="ui-kit"
+        session={session}
+        navSections={navSections}
+      >
+        <EmptyState
+          title="Acceso restringido"
+          message="El catalogo UI Kit es una vista interna para administracion y desarrollo."
+          icon="lock"
+        />
+      </AppShell>
+    );
+  }
+
+  return (
+    <AppShell
+      title="UI Kit"
+      subtitle="Catalogo interno de componentes y templates"
+      activeRoute="ui-kit"
+      session={session}
+      navSections={navSections}
+    >
+      <SectionHeader
+        title="Datos de ejemplo para preview visual"
+        subtitle="Estos datos solo viven en /ui-kit; no se usan en pantallas reales."
+      />
+
+      <SectionHeader title="Design tokens" subtitle="Colores, radios, sombras y spacing base" />
+      <AppResponsiveGrid tabletColumns={2} desktopColumns={4}>
+        {Object.entries(designTokens.colors).slice(0, 12).map(([name, color]) => (
+          <AppCard key={name} style={styles.tokenCard}>
+            <View style={[styles.swatch, { backgroundColor: color }]} />
+            <AppText bold>{name}</AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {color}
+            </AppText>
+          </AppCard>
+        ))}
+      </AppResponsiveGrid>
+
+      <AppResponsiveGrid tabletColumns={3} desktopColumns={3}>
+        <EntitySummaryCard
+          title="Radius"
+          subtitle="Escala visual"
+          meta={Object.entries(designTokens.radius).map(([label, value]) => ({
+            label,
+            value: String(value),
+          }))}
+        />
+        <EntitySummaryCard
+          title="Spacing"
+          subtitle="Ritmo de layout"
+          meta={Object.entries(designTokens.spacing).map(([label, value]) => ({
+            label,
+            value: String(value),
+          }))}
+        />
+        <EntitySummaryCard
+          title="Layout"
+          subtitle="Admin shell"
+          meta={[
+            { label: 'Sidebar', value: String(designTokens.layout.sidebarWidth) },
+            { label: 'Max width', value: String(designTokens.layout.contentMaxWidth) },
+            { label: 'Gap', value: String(designTokens.layout.cardGap) },
+          ]}
+        />
+      </AppResponsiveGrid>
+
+      <SectionHeader title="Componentes UI" subtitle="Piezas base del UI Kit interno" />
+      <AppResponsiveGrid tabletColumns={2} desktopColumns={3}>
+        <AppCard>
+          <SectionHeader title="StatusBadge" />
+          <View style={styles.inlineList}>
+            <StatusBadge label="Neutral" />
+            <StatusBadge label="Success" tone="success" />
+            <StatusBadge label="Warning" tone="warning" />
+            <StatusBadge label="Danger" tone="danger" />
+            <StatusBadge label="Info" tone="info" />
+          </View>
+        </AppCard>
+        <MetricCard label="MetricCard" value="$12,450" helper="Dato de ejemplo para preview" />
+        <ActionTile
+          title="ActionTile"
+          subtitle="Accion compacta reutilizable"
+          icon="open-in-new"
+          onPress={() => undefined}
+        />
+        <EntitySummaryCard
+          title="EntitySummaryCard"
+          subtitle="Resumen de entidad"
+          badge="Preview"
+          meta={[
+            { label: 'Estado', value: 'Activo' },
+            { label: 'Modulo', value: 'UI Kit' },
+          ]}
+        />
+        <EmptyState title="EmptyState" message="Estado vacio profesional y reutilizable." />
+      </AppResponsiveGrid>
+
+      <SectionHeader title="Templates" subtitle="Previews estructurales para fases futuras" />
+      <DashboardTemplate
+        header={<EntitySummaryCard title="DashboardTemplate" subtitle="Inicio o resumen operativo" badge="Preview" />}
+        metrics={
+          <AppResponsiveGrid tabletColumns={2} desktopColumns={3}>
+            <MetricCard label="Reservas" value="8" helper="Preview" />
+            <MetricCard label="Pendientes" value="3" helper="Preview" />
+            <MetricCard label="Eventos" value="21" helper="Preview" />
+          </AppResponsiveGrid>
+        }
+        pendingSections={<EmptyState title="Pendientes" message="Lista de acciones reales en pantallas productivas." />}
+        followUpSection={<EmptyState title="Seguimiento" message="Clientes o entidades por revisar." />}
+        quickActions={<ActionTile title="Acceso rapido" subtitle="Preview" icon="bolt" onPress={() => undefined} />}
+      />
+
+      <OperationalTemplate
+        title="OperationalTemplate"
+        status={<StatusBadge label="Operacion activa" tone="success" />}
+        steps={<EmptyState title="Pasos tactiles" message="Preparado para LIVE u operaciones guiadas." icon="touch-app" />}
+        primaryAction={<ActionTile title="Accion principal" subtitle="Touch-first" icon="play-arrow" onPress={() => undefined} />}
+      />
+
+      <MonitoringTemplate
+        title="MonitoringTemplate"
+        status={<StatusBadge label="Supervisor" tone="warning" />}
+        metrics={[
+          <MetricCard key="m1" label="Eventos" value="12" helper="Preview" />,
+          <MetricCard key="m2" label="Reservas" value="4" helper="Preview" />,
+        ]}
+        recentItems={<EmptyState title="Recientes" message="Lista compacta de entidades." />}
+        activity={<EmptyState title="Actividad" message="Timeline operacional." icon="timeline" />}
+      />
+
+      <DetailTemplate
+        header={<SectionHeader title="DetailTemplate" subtitle="Detalle de reserva, cliente, prenda o usuario" />}
+        primaryInfo={<EntitySummaryCard title="Informacion principal" subtitle="Preview" badge="Activo" />}
+        secondaryInfo={<EntitySummaryCard title="Informacion secundaria" subtitle="Preview" />}
+        restrictedSections={<EmptyState title="Seccion restringida" message="Aqui puede ir RestrictedSection." icon="lock" />}
+      />
+
+      <ListTemplate
+        header={<SectionHeader title="ListTemplate" subtitle="Listados con filtros y acciones" />}
+        filters={<EmptyState title="Filtros" message="Controles de busqueda o estado." icon="filter-list" />}
+        actions={<ActionTile title="Nueva entidad" subtitle="Accion contextual" icon="add" onPress={() => undefined} />}
+        list={<EntitySummaryCard title="Fila / card de lista" subtitle="Preview de registro" badge="Disponible" />}
+      />
+
+      <SectionHeader title="Variantes visuales" subtitle="Presentacion por contexto; no reemplaza AUTH/RBAC" />
+      <AppResponsiveGrid tabletColumns={2} desktopColumns={3}>
+        {Object.entries(viewVariants).map(([name, variant]) => (
+          <EntitySummaryCard
+            key={name}
+            title={name}
+            subtitle="Variante visual"
+            badge={variant.tone}
+            meta={[
+              { label: 'Densidad', value: variant.density },
+              { label: 'Enfasis', value: variant.emphasis },
+            ]}
+          />
+        ))}
+      </AppResponsiveGrid>
+    </AppShell>
+  );
+}
+
+const styles = StyleSheet.create({
+  inlineList: {
+    alignItems: 'flex-start',
+    gap: designTokens.spacing.sm,
+  },
+  loadingScreen: {
+    alignItems: 'center',
+    flex: 1,
+    gap: designTokens.spacing.md,
+    justifyContent: 'center',
+  },
+  swatch: {
+    borderRadius: designTokens.radius.md,
+    height: 42,
+    width: '100%',
+  },
+  tokenCard: {
+    gap: designTokens.spacing.sm,
+  },
+});
