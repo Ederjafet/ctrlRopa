@@ -42,6 +42,19 @@ export function hasPermission(
   );
 }
 
+export function hasEffectivePermission(
+  user: UserSession | null,
+  code: string | null
+): boolean {
+  if (!code) return true;
+
+  return (
+    user?.effectivePermissions?.some(
+      (permission) => permission.code === code
+    ) === true
+  );
+}
+
 export function can(user: UserSession | null, permissionCode: string): boolean {
   return hasPermission(user, permissionCode);
 }

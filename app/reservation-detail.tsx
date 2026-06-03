@@ -3,12 +3,22 @@ import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppOptionRow from '@/components/ui/AppOptionRow';
+import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
+import RestrictedSection from '@/components/ui/RestrictedSection';
 import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
+import { hasEffectivePermission } from '@/services/accessControl';
 import { apiRequest } from '@/services/apiClient';
+import {
+  isNotFoundError,
+  normalizeApiError,
+  NormalizedApiError,
+} from '@/services/apiError';
 import { Box, getActiveBoxesByBranch } from '@/services/boxService';
 import { getPaymentMethods, PaymentMethod } from '@/services/catalogService';
+import { Customer, getCustomerById } from '@/services/customerService';
+import { getItemById, Item } from '@/services/itemService';
 import {
   assignReservationToBox,
   cancelReservation,
@@ -36,6 +46,11 @@ type Reservation = {
   boxId?: number | null;
   boxCode?: string | null;
   createdAt?: string;
+  branchName?: string | null;
+  sellerUserName?: string | null;
+  sellerUserId?: number | null;
+  liveOperationalStatus?: string | null;
+  liveOperationalStatusUpdatedAt?: string | null;
 };
 
 type Payment = {
@@ -89,11 +104,59 @@ function getSalesChannelLabel(code?: string | null, name?: string | null) {
 }
 
 function getLiveLabel(reservation: Reservation) {
-  if (!reservation.liveId) return 'No aplica';
+  if (!reservation.liveId) return 'Sin live asociado';
 
   const notes = reservation.liveNotes?.trim();
   const status = reservation.liveStatus ? ` (${reservation.liveStatus})` : '';
   return notes ? `Live #${reservation.liveId} - ${notes}${status}` : `Live #${reservation.liveId}${status}`;
+}
+
+function formatMoney(value?: number | null) {
+  return `$${Number(value || 0).toFixed(2)}`;
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return 'Sin fecha';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Sin fecha';
+
+  return new Intl.DateTimeFormat('es-MX', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(date);
+}
+
+function getLiveOperationalStatusLabel(status?: string | null) {
+  switch ((status || '').toUpperCase()) {
+    case 'PENDING':
+      return 'Pendiente';
+    case 'RESERVED':
+      return 'Apartado';
+    case 'OPERATIONAL_SOLD':
+      return 'Vendido operativo';
+    case 'CANCELLED':
+      return 'Cancelado operativo';
+    default:
+      return status || 'No disponible';
+  }
+}
+
+function getItemStatusLabel(status?: string | null) {
+  switch ((status || '').toUpperCase()) {
+    case 'AVAILABLE':
+      return 'Disponible';
+    case 'RESERVED':
+      return 'Reservada';
+    case 'SOLD':
+      return 'Vendida';
+    case 'DISABLED':
+      return 'Deshabilitada';
+    case 'ON_CONSIGNMENT':
+      return 'Consignacion';
+    default:
+      return status || 'No disponible';
+  }
 }
 
 function isVoidedPayment(payment: Payment) {
@@ -156,9 +219,14 @@ export default function ReservationDetailScreen() {
   const returnRoute = Array.isArray(returnTo) ? returnTo[0] : returnTo;
 
   const [reservation, setReservation] = useState<Reservation | null>(null);
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [item, setItem] = useState<Item | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [boxes, setBoxes] = useState<Box[]>([]);
+  const [paymentSectionError, setPaymentSectionError] =
+    useState<NormalizedApiError | null>(null);
+  const [loadError, setLoadError] = useState<NormalizedApiError | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isBoxModalVisible, setIsBoxModalVisible] = useState(false);
@@ -172,22 +240,76 @@ export default function ReservationDetailScreen() {
 
     try {
       setIsLoading(true);
+      setLoadError(null);
+      setPaymentSectionError(null);
 
       const session = await getSession();
-      const [reservationData, paymentsData, paymentMethodsData, boxesData] =
-        await Promise.all([
-          apiRequest<Reservation>(`/api/reservations/${reservationId}`),
-          apiRequest<Payment[]>(`/api/payments/reservation/${reservationId}`),
-          session ? getPaymentMethods(session.branchId) : Promise.resolve([]),
+      const reservationData = await apiRequest<Reservation>(
+        `/api/reservations/${reservationId}`
+      );
+      const canViewPayments = hasEffectivePermission(session, 'VIEW_PAYMENTS');
+
+      const restrictedPaymentError = normalizeApiError({
+        status: 403,
+        requiredPermission: 'VIEW_PAYMENTS',
+        message: 'Acceso restringido',
+      });
+
+      const [paymentsResult, paymentMethodsResult, boxesResult, customerResult, itemResult] =
+        await Promise.allSettled([
+          canViewPayments
+            ? apiRequest<Payment[]>(`/api/payments/reservation/${reservationId}`)
+            : Promise.reject(restrictedPaymentError),
+          canViewPayments && session
+            ? getPaymentMethods(session.branchId)
+            : Promise.resolve([]),
           session ? getActiveBoxesByBranch(session.branchId) : Promise.resolve([]),
+          reservationData.customerId
+            ? getCustomerById(reservationData.customerId)
+            : Promise.resolve(null),
+          reservationData.itemId
+            ? getItemById(reservationData.itemId)
+            : Promise.resolve(null),
         ]);
 
       setReservation(reservationData);
-      setPayments(Array.isArray(paymentsData) ? paymentsData : []);
-      setPaymentMethods(Array.isArray(paymentMethodsData) ? paymentMethodsData : []);
-      setBoxes(Array.isArray(boxesData) ? boxesData : []);
+      setCustomer(
+        customerResult.status === 'fulfilled' && customerResult.value
+          ? customerResult.value
+          : null
+      );
+      setItem(
+        itemResult.status === 'fulfilled' && itemResult.value ? itemResult.value : null
+      );
+      setPayments(
+        paymentsResult.status === 'fulfilled' && Array.isArray(paymentsResult.value)
+          ? paymentsResult.value
+          : []
+      );
+      setPaymentMethods(
+        paymentMethodsResult.status === 'fulfilled' &&
+          Array.isArray(paymentMethodsResult.value)
+          ? paymentMethodsResult.value
+          : []
+      );
+      setBoxes(
+        boxesResult.status === 'fulfilled' && Array.isArray(boxesResult.value)
+          ? boxesResult.value
+          : []
+      );
+
+      if (paymentsResult.status === 'rejected') {
+        setPaymentSectionError(normalizeApiError(paymentsResult.reason));
+      }
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'No se pudo cargar el apartado.');
+      const normalized = normalizeApiError(e);
+      setLoadError(normalized);
+      if (!isNotFoundError(e)) {
+        Alert.alert('Error', normalized.message || 'No se pudo cargar el apartado.');
+      }
+      setReservation(null);
+      setCustomer(null);
+      setItem(null);
     } finally {
       setIsLoading(false);
     }
@@ -199,7 +321,10 @@ export default function ReservationDetailScreen() {
     }, [load])
   );
 
-  const totalPaid = payments.reduce(
+  const paymentAccessRestricted = paymentSectionError?.category === 'forbidden';
+  const totalPaid = paymentAccessRestricted
+    ? 0
+    : payments.reduce(
     (sum, payment) => sum + getPaymentAmount(payment),
     0
   );
@@ -208,12 +333,28 @@ export default function ReservationDetailScreen() {
   const remaining = Math.max(total - totalPaid, 0);
   const overpaid = Math.max(totalPaid - total, 0);
   const isActive = reservation?.status === 'ACTIVE';
-  const canCancel = isActive && totalPaid <= 0;
+  const canCancel = isActive && !paymentAccessRestricted && totalPaid <= 0;
   const isLiveContext =
     returnRoute === '/live' ||
     !!reservation?.liveId ||
     reservation?.salesChannelCode === 'LIVE' ||
     reservation?.salesChannelName?.toUpperCase() === 'LIVE';
+  const reservationBadge = isLiveContext ? 'Reserva LIVE' : 'Apartado';
+  const customerName = reservation?.customerName || customer?.name || 'Sin cliente';
+  const customerPhone = customer?.phone || 'Sin telefono';
+  const branchName =
+    reservation?.branchName || customer?.branchName || 'No capturado';
+  const itemName =
+    item?.productTypeName || item?.brandName || reservation?.itemCode || 'No disponible';
+  const itemCode = item?.code || reservation?.itemCode || 'Sin codigo';
+  const itemPrice = item?.price ?? reservation?.price ?? 0;
+  const sellerLabel = reservation?.sellerUserName
+    || (reservation?.sellerUserId ? `Usuario #${reservation.sellerUserId}` : 'No capturado');
+  const liveOperationalStatus = getLiveOperationalStatusLabel(
+    reservation?.liveOperationalStatus
+  );
+  const liveStatus = reservation?.liveStatus || 'No disponible';
+  const createdAtLabel = formatDateTime(reservation?.createdAt);
 
 
   const handleCancel = async () => {
@@ -313,7 +454,9 @@ export default function ReservationDetailScreen() {
       <AppScreen>
         <AppBackButton fallbackRoute={returnRoute || (isLiveContext ? '/live' : '/reservations')} />
         <AppText variant="title" bold>
-          Apartado no encontrado
+          {loadError?.category === 'not-found'
+            ? 'Apartado no encontrado'
+            : loadError?.message || 'No se encontro la informacion solicitada.'}
         </AppText>
       </AppScreen>
     );
@@ -321,11 +464,33 @@ export default function ReservationDetailScreen() {
 
   return (
     <AppScreen>
-      <AppBackButton fallbackRoute={returnRoute || (isLiveContext ? '/live' : '/reservations')} />
+      <View style={styles.headerActions}>
+        <AppBackButton fallbackRoute={returnRoute || (isLiveContext ? '/live' : '/reservations')} />
+        <AppButton
+          title="Menu principal"
+          variant="secondary"
+          onPress={() => router.replace('/system' as any)}
+        />
+      </View>
 
-      <AppText variant="title" bold>
-        Detalle apartado
-      </AppText>
+      <View style={styles.titleBlock}>
+        <AppText variant="title" bold>
+          Detalle del apartado
+        </AppText>
+        <View
+          style={[
+            styles.liveBadge,
+            {
+              backgroundColor: theme.isDark ? '#064e3b' : '#dcfce7',
+              borderColor: theme.isDark ? '#059669' : '#86efac',
+            },
+          ]}
+        >
+          <AppText variant="caption" bold color={theme.isDark ? '#bbf7d0' : '#166534'}>
+            {reservationBadge}
+          </AppText>
+        </View>
+      </View>
 
       {isLiveContext ? (
         <AppButton
@@ -336,121 +501,196 @@ export default function ReservationDetailScreen() {
         />
       ) : null}
 
-      <AppCard>
-        <InfoRow label="Cliente" value={reservation.customerName || 'Sin cliente'} />
-        <InfoRow label="Producto" value={reservation.itemCode || 'Sin código'} />
-        <InfoRow
-          label="Canal"
-          value={getSalesChannelLabel(
-            reservation.salesChannelCode,
-            reservation.salesChannelName
-          )}
-        />
-        {reservation.liveId ? (
-          <InfoRow label="Live" value={getLiveLabel(reservation)} />
-        ) : null}
-        <InfoRow label="Estado" value={getReservationStatusLabel(reservation.status)} />
-        <InfoRow label="Caja" value={reservation.boxCode || 'Sin caja'} />
-      </AppCard>
+      <AppResponsiveGrid tabletColumns={2} desktopColumns={2} gap={12}>
+        <AppCard style={styles.detailCard}>
+          <AppText variant="subtitle" bold>
+            Resumen del apartado
+          </AppText>
+          <InfoRow label="Estado" value={getReservationStatusLabel(reservation.status)} />
+          <InfoRow label="Precio" value={formatMoney(reservation.price)} />
+          <InfoRow
+            label="Canal"
+            value={getSalesChannelLabel(
+              reservation.salesChannelCode,
+              reservation.salesChannelName
+            )}
+          />
+          <InfoRow label="Live relacionado" value={getLiveLabel(reservation)} />
+          <InfoRow label="Fecha/hora" value={createdAtLabel} />
+          <InfoRow label="Sucursal" value={branchName} />
+          <InfoRow label="Registrado por" value={sellerLabel} />
+          <InfoRow label="Caja" value={reservation.boxCode || 'Sin caja'} />
+        </AppCard>
 
-      {isActive ? (
-        <AppCard>
+        <AppCard style={styles.detailCard}>
+          <AppText variant="subtitle" bold>
+            Cliente
+          </AppText>
+          <InfoRow label="Nombre" value={customerName} />
+          <InfoRow label="Telefono" value={customerPhone} />
+          <InfoRow label="Compras pasadas" value="No disponible" />
+          <InfoRow label="Compras activas" value="No disponible" />
+          <InfoRow label="Saldo pendiente" value="No disponible" />
+        </AppCard>
+
+        <AppCard style={styles.detailCard}>
+          <AppText variant="subtitle" bold>
+            Prenda
+          </AppText>
+          <View
+            style={[
+              styles.itemPlaceholder,
+              { borderColor: theme.colors.border, backgroundColor: theme.colors.background },
+            ]}
+          >
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              Sin foto
+            </AppText>
+          </View>
+          <InfoRow label="Producto" value={itemName} />
+          <InfoRow label="Codigo" value={itemCode} />
+          <InfoRow label="Talla" value={item?.sizeName || 'Sin talla'} />
+          <InfoRow label="Color" value="Sin color" />
+          <InfoRow label="Precio" value={formatMoney(itemPrice)} />
+          <InfoRow label="Estado de disponibilidad" value={getItemStatusLabel(item?.status)} />
+        </AppCard>
+
+        <AppCard style={styles.detailCard}>
+          <AppText variant="subtitle" bold>
+            LIVE
+          </AppText>
+          <InfoRow label="Live" value={reservation.liveId ? `Live #${reservation.liveId}` : 'Sin live asociado'} />
+          <InfoRow label="Estado del live" value={liveStatus} />
+          <InfoRow label="Sucursal" value={branchName} />
+          <InfoRow label="Inicio" value="No capturado" />
+          <InfoRow label="Cierre" value="No capturado" />
+          <InfoRow label="Canal/URL" value="No capturado" />
+        </AppCard>
+
+        <AppCard style={styles.detailCard}>
+          <AppText variant="subtitle" bold>
+            Seguimiento operativo
+          </AppText>
+          <InfoRow label="Estado operativo LIVE" value={liveOperationalStatus} />
+          <InfoRow
+            label="Ultima actualizacion"
+            value={formatDateTime(reservation.liveOperationalStatusUpdatedAt || reservation.createdAt)}
+          />
+          <InfoRow
+            label="Acciones"
+            value={canCancel ? 'Cancelar apartado disponible' : 'Sin acciones operativas disponibles'}
+          />
+        </AppCard>
+
+        <AppCard style={styles.detailCard}>
           <AppText variant="subtitle" bold>
             Caja
           </AppText>
 
-          {reservation.boxId ? (
-            <>
-              <AppText>Asignado a: {reservation.boxCode || `Caja ${reservation.boxId}`}</AppText>
-              <AppButton
-                title="Quitar de caja"
-                variant="secondary"
-                onPress={handleRemoveBox}
-                loading={isSaving}
-                disabled={isSaving}
-                style={styles.buttonSpacing}
-              />
-            </>
+          {isActive ? (
+            reservation.boxId ? (
+              <>
+                <AppText>Asignado a: {reservation.boxCode || `Caja ${reservation.boxId}`}</AppText>
+                <AppButton
+                  title="Quitar de caja"
+                  variant="secondary"
+                  onPress={handleRemoveBox}
+                  loading={isSaving}
+                  disabled={isSaving}
+                  style={styles.buttonSpacing}
+                />
+              </>
+            ) : (
+              <>
+                <AppText color={theme.colors.mutedText}>
+                  Este apartado todavia no esta asignado a una caja.
+                </AppText>
+                <AppButton
+                  title="Asignar caja"
+                  variant="secondary"
+                  onPress={() => setIsBoxModalVisible(true)}
+                  disabled={isSaving}
+                  style={styles.buttonSpacing}
+                />
+              </>
+            )
           ) : (
-            <>
-              <AppText color={theme.colors.mutedText}>
-                Este apartado todavia no esta asignado a una caja.
-              </AppText>
-              <AppButton
-                title="Asignar caja"
-                variant="secondary"
-                onPress={() => setIsBoxModalVisible(true)}
-                disabled={isSaving}
-                style={styles.buttonSpacing}
-              />
-            </>
+            <AppText color={theme.colors.mutedText}>
+              Este apartado ya no esta activo para asignacion de caja.
+            </AppText>
           )}
         </AppCard>
-      ) : null}
+      </AppResponsiveGrid>
 
-      <AppCard>
-        <AppText variant="subtitle" bold>
-          Resumen de pago
-        </AppText>
-
-        <InfoRow label="Total" value={`$${total.toFixed(2)}`} />
-        <InfoRow label="Pagado" value={`$${totalPaid.toFixed(2)}`} />
-
-        <View
-          style={[
-            styles.remainingBox,
-            {
-              backgroundColor: theme.isDark ? '#451a03' : '#fff7ed',
-              borderColor: theme.isDark ? '#92400e' : '#fed7aa',
-            },
-          ]}
-        >
-          <AppText color={theme.isDark ? '#fdba74' : '#9a3412'} bold>
-            Restante: ${remaining.toFixed(2)}
-          </AppText>
-          {overpaid > 0 ? (
-            <AppText color={theme.isDark ? '#fdba74' : '#9a3412'}>
-              Excedente / saldo a favor: ${overpaid.toFixed(2)}
-            </AppText>
-          ) : null}
-        </View>
-      </AppCard>
-
-      {isActive && remaining > 0 ? (
-        <AppCard>
-          <AppText variant="subtitle" bold>
-            Registrar abono
-          </AppText>
-
-          <AppText color={theme.colors.mutedText}>
-            Restante por cobrar: ${remaining.toFixed(2)}
-          </AppText>
-
-          <AppButton
-            title="Cobrar apartado"
-            onPress={() =>
-              router.push({
-                pathname: '/payments',
-                params: {
-                  reservationId: String(reservationId),
-                  returnTo: isLiveContext ? '/live' : `/reservation-detail?id=${reservationId}`,
-                },
-              } as any)
-            }
-            style={styles.buttonSpacing}
-          />
-        </AppCard>
+      {paymentAccessRestricted && paymentSectionError ? (
+        <RestrictedSection error={paymentSectionError} />
       ) : (
         <AppCard>
-          <AppText color={theme.colors.mutedText}>
-            {remaining <= 0
-              ? 'Apartado completamente liquidado.'
-              : 'Este apartado no esta activo.'}
+          <AppText variant="subtitle" bold>
+            Resumen de pago
           </AppText>
+
+          <InfoRow label="Total" value={`$${total.toFixed(2)}`} />
+          <InfoRow label="Pagado" value={`$${totalPaid.toFixed(2)}`} />
+
+          <View
+            style={[
+              styles.remainingBox,
+              {
+                backgroundColor: theme.isDark ? '#451a03' : '#fff7ed',
+                borderColor: theme.isDark ? '#92400e' : '#fed7aa',
+              },
+            ]}
+          >
+            <AppText color={theme.isDark ? '#fdba74' : '#9a3412'} bold>
+              Restante: ${remaining.toFixed(2)}
+            </AppText>
+            {overpaid > 0 ? (
+              <AppText color={theme.isDark ? '#fdba74' : '#9a3412'}>
+                Excedente / saldo a favor: ${overpaid.toFixed(2)}
+              </AppText>
+            ) : null}
+          </View>
         </AppCard>
       )}
 
-      {payments.length > 0 ? (
+      {!paymentAccessRestricted ? (
+        isActive && remaining > 0 ? (
+          <AppCard>
+            <AppText variant="subtitle" bold>
+              Registrar abono
+            </AppText>
+
+            <AppText color={theme.colors.mutedText}>
+              Restante por cobrar: ${remaining.toFixed(2)}
+            </AppText>
+
+            <AppButton
+              title="Cobrar apartado"
+              onPress={() =>
+                router.push({
+                  pathname: '/payments',
+                  params: {
+                    reservationId: String(reservationId),
+                    returnTo: isLiveContext ? '/live' : `/reservation-detail?id=${reservationId}`,
+                  },
+                } as any)
+              }
+              style={styles.buttonSpacing}
+            />
+          </AppCard>
+        ) : (
+          <AppCard>
+            <AppText color={theme.colors.mutedText}>
+              {remaining <= 0
+                ? 'Apartado completamente liquidado.'
+                : 'Este apartado no esta activo.'}
+            </AppText>
+          </AppCard>
+        )
+      ) : null}
+
+      {!paymentAccessRestricted && payments.length > 0 ? (
         <AppCard>
           <AppText variant="subtitle" bold>
             Pagos registrados
@@ -535,6 +775,38 @@ function InfoRow({ label, value }: InfoRowProps) {
 }
 
 const styles = StyleSheet.create({
+  headerActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  titleBlock: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 8,
+  },
+  liveBadge: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  detailCard: {
+    minHeight: 0,
+  },
+  itemPlaceholder: {
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    height: 80,
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
   infoRow: {
     marginBottom: 10,
   },
