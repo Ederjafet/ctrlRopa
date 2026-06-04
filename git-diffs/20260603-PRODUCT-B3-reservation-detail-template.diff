@@ -1,0 +1,1275 @@
+﻿diff --git a/app/live.tsx b/app/live.tsx
+index cdef07c..aeeb7a6 100644
+--- a/app/live.tsx
++++ b/app/live.tsx
+@@ -274,6 +274,16 @@ function isReservationSettled(reservation: Reservation, paid: number) {
+   return paid >= Number(reservation.price || 0) && Number(reservation.price || 0) > 0;
+ }
+
++function isBlockingLiveReservation(reservation: Reservation) {
++  const reservationStatus = normalizeStatus(reservation.status);
++  const operationalStatus = getLiveReservationOperationalStatus(reservation);
++
++  return (
++    !['CANCELLED', 'COMPLETED', 'CONVERTED_TO_SALE'].includes(reservationStatus) &&
++    operationalStatus !== 'CANCELLED'
++  );
++}
++
+ function getLiveReservationOperationalStatus(
+   reservation: Reservation
+ ): LiveReservationOperationalStatus {
+@@ -843,10 +853,26 @@ export default function LiveScreen() {
+
+   const hasValidReservationPrice =
+     !!priceText.trim() && !Number.isNaN(Number(priceText)) && Number(priceText) > 0;
++  const reservationSourcesForActiveItem = [
++    ...recentReservations.map((entry) => entry.reservation),
++    ...branchReservations,
++  ];
++  const findBlockingReservationForItem = (itemId?: number | null) =>
++    itemId
++      ? reservationSourcesForActiveItem.find(
++        (reservation, index, reservations) =>
++          reservations.findIndex((candidate) => candidate.id === reservation.id) === index &&
++          reservation.itemId === itemId &&
++          isBlockingLiveReservation(reservation)
++      )
++      : undefined;
++  const activeItemBlockingReservationForValidation = findBlockingReservationForItem(activeItem?.id);
+   const reservationPendingReason = !selectedLive || !operatorFlowEnabled
+     ? t('live.reserveMissingLive')
+     : !activeItem
+       ? t('live.reserveMissingActiveItem')
++    : activeItemBlockingReservationForValidation
++      ? t('live.activeItemAlreadyReservedReason')
+     : !hasValidReservationPrice
+       ? t('live.reserveMissingPrice')
+     : !selectedCustomer
+@@ -1107,6 +1133,8 @@ export default function LiveScreen() {
+       ? t('live.operatorNextProduct')
+     : !activeItem
+       ? t('live.operatorNextActiveItem')
++    : activeItemBlockingReservationForValidation
++      ? t('live.operatorNextChangeReservedItem')
+     : !hasValidReservationPrice
+       ? t('live.operatorNextPrice')
+     : !selectedCustomer
+@@ -1966,6 +1994,11 @@ export default function LiveScreen() {
+       return false;
+     }
+
++    if (activeItemBlockingReservationForValidation) {
++      setReservationIssue(t('live.activeItemAlreadyReservedReason'));
++      return false;
++    }
++
+     const availability = getItemLiveAvailability(activeItem);
+     if (!availability.canGoOnAir) {
+       setReservationIssue(t('live.itemNotAvailableForReservation'));
+@@ -2027,6 +2060,14 @@ export default function LiveScreen() {
+         },
+         ...current,
+       ].slice(0, 10));
++      setBranchReservations((current) => {
++        const withoutDuplicate = current.filter((entry) => entry.id !== reservation.id);
++        return [reservation, ...withoutDuplicate];
++      });
++      setActiveItemForReservation({
++        ...activeItem,
++        status: 'RESERVED',
++      });
+
+       setSelectedItem(null);
+       setSelectedCustomer(null);
+@@ -2134,30 +2175,52 @@ export default function LiveScreen() {
+     const isOnAir = activeItem?.id === item.id;
+     const isPreparedForChange = options.showOnAirAction && !options.highlighted;
+     const availability = getItemLiveAvailability(item);
+-    const cardBorderColor = options.highlighted
++    const blockingReservation = findBlockingReservationForItem(item.id);
++    const isHighlightedReserved = !!options.highlighted && !!blockingReservation;
++    const cardBorderColor = isHighlightedReserved
++      ? '#f59e0b'
++      : options.highlighted
+       ? theme.colors.success
+       : isPreparedForChange
+         ? '#f59e0b'
+         : theme.colors.border;
+-    const cardBackgroundColor = options.highlighted
++    const cardBackgroundColor = isHighlightedReserved
++      ? theme.isDark
++        ? '#451a03'
++        : '#fff7e6'
++      : options.highlighted
+       ? theme.colors.successBackground
+       : isPreparedForChange
+         ? theme.isDark
+           ? '#451a03'
+           : '#fff7e6'
+         : theme.colors.surface;
+-    const placeholderBackgroundColor = options.highlighted
++    const placeholderBackgroundColor = isHighlightedReserved
++      ? theme.isDark
++        ? '#78350f'
++        : '#fffbeb'
++      : options.highlighted
+       ? theme.colors.surface
+       : isPreparedForChange
+         ? theme.isDark
+           ? '#78350f'
+           : '#fffbeb'
+         : theme.colors.infoCardBackground;
+-    const stateColor = options.highlighted
++    const stateColor = isHighlightedReserved
++      ? theme.colors.warning
++      : options.highlighted
+       ? theme.colors.success
+       : isPreparedForChange
+         ? theme.colors.warning
+         : theme.colors.accent;
++    const availabilityLabel = isHighlightedReserved
++      ? t('live.activeItemReservedStatus')
++      : availability.label;
++    const availabilityTone = isHighlightedReserved
++      ? theme.colors.warning
++      : availability.canGoOnAir
++        ? theme.colors.success
++        : theme.colors.warning;
+
+     return (
+       <View
+@@ -2197,28 +2260,48 @@ export default function LiveScreen() {
+                 {itemName}
+               </AppText>
+               <AppText variant="caption" color={theme.colors.mutedText}>
+-                {options.highlighted
+-                  ? t('live.activeItemReservationHelp')
++                {isHighlightedReserved
++                  ? t('live.activeItemReservedHelp')
++                  : options.highlighted
++                    ? t('live.activeItemReservationHelp')
+                   : options.showOnAirAction && activeItem
+                     ? t('live.preparedItemReservationHelp')
+                     : t('live.productOnAirHelp')}
+               </AppText>
+             </View>
+             {isOnAir ? (
+-              <View
+-                style={[
+-                  styles.operatorItemBadge,
+-                  {
+-                    backgroundColor: theme.colors.successBackground,
+-                    borderColor: theme.colors.success,
+-                    borderRadius: theme.radius.sm,
+-                  },
+-                ]}
+-              >
+-                <AppText variant="caption" color={theme.colors.success} bold>
+-                  {t('live.productOnAirChip')}
+-                </AppText>
+-              </View>
++              <>
++                <View
++                  style={[
++                    styles.operatorItemBadge,
++                    {
++                      backgroundColor: theme.colors.successBackground,
++                      borderColor: theme.colors.success,
++                      borderRadius: theme.radius.sm,
++                    },
++                  ]}
++                >
++                  <AppText variant="caption" color={theme.colors.success} bold>
++                    {t('live.productOnAirChip')}
++                  </AppText>
++                </View>
++                {isHighlightedReserved ? (
++                  <View
++                    style={[
++                      styles.operatorItemBadge,
++                      {
++                        backgroundColor: theme.isDark ? '#78350f' : '#fffbeb',
++                        borderColor: '#f59e0b',
++                        borderRadius: theme.radius.sm,
++                      },
++                    ]}
++                  >
++                    <AppText variant="caption" color={theme.colors.warning} bold>
++                      {t('live.activeItemReservedChip')}
++                    </AppText>
++                  </View>
++                ) : null}
++              </>
+             ) : isPreparedForChange ? (
+               <View
+                 style={[
+@@ -2238,17 +2321,21 @@ export default function LiveScreen() {
+           </View>
+           <AppText
+             variant="caption"
+-            color={availability.canGoOnAir ? theme.colors.success : theme.colors.warning}
++            color={availabilityTone}
+             bold
+           >
+-            {availability.label}
++            {availabilityLabel}
+           </AppText>
+           {availability.warning ? (
+             <AppText variant="caption" color={theme.colors.warning}>
+               {availability.warning}
+             </AppText>
+           ) : null}
+-          {!availability.canGoOnAir && availability.reason ? (
++          {isHighlightedReserved ? (
++            <AppText variant="caption" color={theme.colors.warning}>
++              {t('live.activeItemReservedNextStepHelp')}
++            </AppText>
++          ) : !availability.canGoOnAir && availability.reason ? (
+             <AppText variant="caption" color={theme.colors.warning}>
+               {availability.reason}
+             </AppText>
+@@ -3646,13 +3733,32 @@ export default function LiveScreen() {
+                   </LiveCompactCard>
+                 </View>
+
++                {activeItemBlockingReservationForValidation ? (
++                  <LiveWarningCard style={styles.reservationRiskCard}>
++                    <AppText variant="caption" color={theme.colors.warning} bold>
++                      {t('live.activeItemAlreadyReservedTitle')}
++                    </AppText>
++                    <AppText variant="caption" color={theme.colors.mutedText}>
++                      {t('live.activeItemAlreadyReservedReason')}
++                    </AppText>
++                  </LiveWarningCard>
++                ) : null}
++
+                 <AppButton
+                   title={t('live.operatorReserveNow')}
+                   variant="operation"
+                   onPress={handleCreateReservation}
+                   loading={isSavingReservation}
+-                  disabled={isSavingReservation || !mayOperateLive}
+-                  disabledReason={reservationPendingReason || t('live.liveOperatePermissionError')}
++                  disabled={
++                    isSavingReservation ||
++                    !mayOperateLive ||
++                    !!activeItemBlockingReservationForValidation
++                  }
++                  disabledReason={
++                    activeItemBlockingReservationForValidation
++                      ? t('live.activeItemAlreadyReservedReason')
++                      : reservationPendingReason || t('live.liveOperatePermissionError')
++                  }
+                   style={styles.operatorPrimaryButton}
+                 />
+
+diff --git a/app/reservation-detail.tsx b/app/reservation-detail.tsx
+index 912e0f0..e1a803f 100644
+--- a/app/reservation-detail.tsx
++++ b/app/reservation-detail.tsx
+@@ -2,13 +2,23 @@
+ import AppBottomModal from '@/components/ui/AppBottomModal';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
++import AppShell from '@/components/layout/AppShell';
+ import AppOptionRow from '@/components/ui/AppOptionRow';
+-import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
+ import RestrictedSection from '@/components/ui/RestrictedSection';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
++import DetailTemplate from '@/components/templates/DetailTemplate';
++import EmptyState from '@/components/ui/EmptyState';
++import EntitySummaryCard from '@/components/ui/EntitySummaryCard';
++import SectionHeader from '@/components/ui/SectionHeader';
++import StatusBadge from '@/components/ui/StatusBadge';
++import { SidebarSection } from '@/components/layout/Sidebar';
+ import { useAppTheme } from '@/context/AppThemeContext';
+-import { hasEffectivePermission } from '@/services/accessControl';
++import {
++  canAccess,
++  canAccessByPermission,
++  hasEffectivePermission,
++  isAdmin,
++} from '@/services/accessControl';
+ import { apiRequest } from '@/services/apiClient';
+ import {
+   isNotFoundError,
+@@ -24,7 +34,8 @@ import {
+   cancelReservation,
+   removeReservationFromBox,
+ } from '@/services/reservationService';
+-import { getSession } from '@/services/sessionStorage';
++import { canViewLive } from '@/services/livePermissionGuards';
++import { getSession, UserSession } from '@/services/sessionStorage';
+ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+ import { useCallback, useMemo, useState } from 'react';
+ import { Alert, StyleSheet, View } from 'react-native';
+@@ -204,6 +215,55 @@ function getPaymentMethodLabel(
+   return 'Metodo no especificado';
+ }
+
++function buildNavSections(session: UserSession | null): SidebarSection[] {
++  const liveAllowed = canViewLive(session);
++  const customersAllowed = canAccessByPermission(session, 'VIEW_CUSTOMERS');
++  const reservationsAllowed =
++    canAccess(session, 'DOOR_RESERVATION', 'DO_DOOR_RESERVATION') || liveAllowed;
++  const usersAllowed = canAccessByPermission(session, 'MANAGE_USERS') || isAdmin(session);
++  const systemAllowed =
++    canAccessByPermission(session, 'MANAGE_ROLES') ||
++    canAccessByPermission(session, 'MANAGE_BRANCH_CHANNELS') ||
++    isAdmin(session);
++  const reportsAllowed = canAccessByPermission(session, 'VIEW_REPORTS') || isAdmin(session);
++  const adminAllowed = isAdmin(session);
++
++  const primaryItems = [
++    { key: 'home', label: 'Inicio', route: '/', icon: 'space-dashboard' as const },
++    liveAllowed ? { key: 'live', label: 'LIVE', route: '/live', icon: 'live-tv' as const } : null,
++    customersAllowed
++      ? { key: 'customers', label: 'Clientes', route: '/customers', icon: 'groups' as const }
++      : null,
++    reservationsAllowed
++      ? { key: 'reservations', label: 'Reservas', route: '/reservations', icon: 'bookmark' as const }
++      : null,
++  ].filter(Boolean);
++
++  const controlItems = [
++    usersAllowed
++      ? { key: 'users', label: 'Usuarios', route: '/users', icon: 'manage-accounts' as const }
++      : null,
++    systemAllowed
++      ? { key: 'system', label: 'Sistema', route: '/system', icon: 'settings' as const }
++      : null,
++    reportsAllowed
++      ? { key: 'reports', label: 'Reportes', route: '/reports', icon: 'analytics' as const }
++      : null,
++  ].filter(Boolean);
++
++  const developmentItems = [
++    adminAllowed
++      ? { key: 'ui-kit', label: 'UI Kit', route: '/ui-kit', icon: 'dashboard-customize' as const }
++      : null,
++  ].filter(Boolean);
++
++  return [
++    { title: 'Operacion', items: primaryItems },
++    { title: 'Control', items: controlItems },
++    { title: 'Desarrollo', items: developmentItems },
++  ].filter((section) => section.items.length > 0) as SidebarSection[];
++}
++
+ export default function ReservationDetailScreen() {
+   const { id, returnTo } = useLocalSearchParams<{
+     id?: string | string[];
+@@ -224,6 +284,7 @@ export default function ReservationDetailScreen() {
+   const [payments, setPayments] = useState<Payment[]>([]);
+   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+   const [boxes, setBoxes] = useState<Box[]>([]);
++  const [session, setSession] = useState<UserSession | null>(null);
+   const [paymentSectionError, setPaymentSectionError] =
+     useState<NormalizedApiError | null>(null);
+   const [loadError, setLoadError] = useState<NormalizedApiError | null>(null);
+@@ -244,6 +305,7 @@ export default function ReservationDetailScreen() {
+       setPaymentSectionError(null);
+
+       const session = await getSession();
++      setSession(session);
+       const reservationData = await apiRequest<Reservation>(
+         `/api/reservations/${reservationId}`
+       );
+@@ -334,6 +396,7 @@ export default function ReservationDetailScreen() {
+   const overpaid = Math.max(totalPaid - total, 0);
+   const isActive = reservation?.status === 'ACTIVE';
+   const canCancel = isActive && !paymentAccessRestricted && totalPaid <= 0;
++  const navSections = useMemo(() => buildNavSections(session), [session]);
+   const isLiveContext =
+     returnRoute === '/live' ||
+     !!reservation?.liveId ||
+@@ -442,295 +505,303 @@ export default function ReservationDetailScreen() {
+
+   if (isLoading) {
+     return (
+-      <AppScreen>
++      <AppShell
++        title="Detalle del apartado"
++        subtitle="Cargando informacion"
++        activeRoute="reservations"
++        session={session}
++        navSections={navSections}
++      >
+         <AppBackButton fallbackRoute={returnRoute || (isLiveContext ? '/live' : '/reservations')} />
+-        <AppText>Cargando apartado...</AppText>
+-      </AppScreen>
++        <EmptyState title="Cargando apartado..." message="Estamos preparando el detalle." />
++      </AppShell>
+     );
+   }
+
+   if (!reservation) {
+     return (
+-      <AppScreen>
++      <AppShell
++        title="Detalle del apartado"
++        subtitle="No se pudo cargar la informacion"
++        activeRoute="reservations"
++        session={session}
++        navSections={navSections}
++      >
+         <AppBackButton fallbackRoute={returnRoute || (isLiveContext ? '/live' : '/reservations')} />
+-        <AppText variant="title" bold>
+-          {loadError?.category === 'not-found'
+-            ? 'Apartado no encontrado'
+-            : loadError?.message || 'No se encontro la informacion solicitada.'}
+-        </AppText>
+-      </AppScreen>
++        <EmptyState
++          title={loadError?.category === 'not-found' ? 'Apartado no encontrado' : 'No se pudo cargar el apartado'}
++          message={loadError?.message || 'No se encontro la informacion solicitada.'}
++          icon={loadError?.category === 'not-found' ? 'search-off' : 'error-outline'}
++        />
++      </AppShell>
+     );
+   }
+
+   return (
+-    <AppScreen>
+-      <View style={styles.headerActions}>
+-        <AppBackButton fallbackRoute={returnRoute || (isLiveContext ? '/live' : '/reservations')} />
+-        <AppButton
+-          title="Menu principal"
+-          variant="secondary"
+-          onPress={() => router.replace('/system' as any)}
+-        />
+-      </View>
+-
+-      <View style={styles.titleBlock}>
+-        <AppText variant="title" bold>
+-          Detalle del apartado
+-        </AppText>
+-        <View
+-          style={[
+-            styles.liveBadge,
+-            {
+-              backgroundColor: theme.isDark ? '#064e3b' : '#dcfce7',
+-              borderColor: theme.isDark ? '#059669' : '#86efac',
+-            },
+-          ]}
+-        >
+-          <AppText variant="caption" bold color={theme.isDark ? '#bbf7d0' : '#166534'}>
+-            {reservationBadge}
+-          </AppText>
+-        </View>
+-      </View>
+-
+-      {isLiveContext ? (
+-        <AppButton
+-          title="Volver al live activo"
+-          variant="secondary"
+-          onPress={() => router.replace('/live' as any)}
+-          style={styles.buttonSpacing}
+-        />
+-      ) : null}
+-
+-      <AppResponsiveGrid tabletColumns={2} desktopColumns={2} gap={12}>
+-        <AppCard style={styles.detailCard}>
+-          <AppText variant="subtitle" bold>
+-            Resumen del apartado
+-          </AppText>
+-          <InfoRow label="Estado" value={getReservationStatusLabel(reservation.status)} />
+-          <InfoRow label="Precio" value={formatMoney(reservation.price)} />
+-          <InfoRow
+-            label="Canal"
+-            value={getSalesChannelLabel(
+-              reservation.salesChannelCode,
+-              reservation.salesChannelName
+-            )}
+-          />
+-          <InfoRow label="Live relacionado" value={getLiveLabel(reservation)} />
+-          <InfoRow label="Fecha/hora" value={createdAtLabel} />
+-          <InfoRow label="Sucursal" value={branchName} />
+-          <InfoRow label="Registrado por" value={sellerLabel} />
+-          <InfoRow label="Caja" value={reservation.boxCode || 'Sin caja'} />
+-        </AppCard>
+-
+-        <AppCard style={styles.detailCard}>
+-          <AppText variant="subtitle" bold>
+-            Cliente
+-          </AppText>
+-          <InfoRow label="Nombre" value={customerName} />
+-          <InfoRow label="Telefono" value={customerPhone} />
+-          <InfoRow label="Compras pasadas" value="No disponible" />
+-          <InfoRow label="Compras activas" value="No disponible" />
+-          <InfoRow label="Saldo pendiente" value="No disponible" />
+-        </AppCard>
+-
+-        <AppCard style={styles.detailCard}>
+-          <AppText variant="subtitle" bold>
+-            Prenda
+-          </AppText>
+-          <View
+-            style={[
+-              styles.itemPlaceholder,
+-              { borderColor: theme.colors.border, backgroundColor: theme.colors.background },
+-            ]}
+-          >
+-            <AppText variant="caption" color={theme.colors.mutedText}>
+-              Sin foto
+-            </AppText>
+-          </View>
+-          <InfoRow label="Producto" value={itemName} />
+-          <InfoRow label="Codigo" value={itemCode} />
+-          <InfoRow label="Talla" value={item?.sizeName || 'Sin talla'} />
+-          <InfoRow label="Color" value="Sin color" />
+-          <InfoRow label="Precio" value={formatMoney(itemPrice)} />
+-          <InfoRow label="Estado de disponibilidad" value={getItemStatusLabel(item?.status)} />
+-        </AppCard>
+-
+-        <AppCard style={styles.detailCard}>
+-          <AppText variant="subtitle" bold>
+-            LIVE
+-          </AppText>
+-          <InfoRow label="Live" value={reservation.liveId ? `Live #${reservation.liveId}` : 'Sin live asociado'} />
+-          <InfoRow label="Estado del live" value={liveStatus} />
+-          <InfoRow label="Sucursal" value={branchName} />
+-          <InfoRow label="Inicio" value="No capturado" />
+-          <InfoRow label="Cierre" value="No capturado" />
+-          <InfoRow label="Canal/URL" value="No capturado" />
+-        </AppCard>
+-
+-        <AppCard style={styles.detailCard}>
+-          <AppText variant="subtitle" bold>
+-            Seguimiento operativo
+-          </AppText>
+-          <InfoRow label="Estado operativo LIVE" value={liveOperationalStatus} />
+-          <InfoRow
+-            label="Ultima actualizacion"
+-            value={formatDateTime(reservation.liveOperationalStatusUpdatedAt || reservation.createdAt)}
+-          />
+-          <InfoRow
+-            label="Acciones"
+-            value={canCancel ? 'Cancelar apartado disponible' : 'Sin acciones operativas disponibles'}
+-          />
+-        </AppCard>
+-
+-        <AppCard style={styles.detailCard}>
+-          <AppText variant="subtitle" bold>
+-            Caja
+-          </AppText>
+-
+-          {isActive ? (
+-            reservation.boxId ? (
+-              <>
+-                <AppText>Asignado a: {reservation.boxCode || `Caja ${reservation.boxId}`}</AppText>
++    <AppShell
++      title="Detalle del apartado"
++      subtitle={isLiveContext ? 'Apartado generado en vivo' : 'Resumen y seguimiento'}
++      activeRoute="reservations"
++      session={session}
++      navSections={navSections}
++    >
++      <DetailTemplate
++        header={
++          <View style={styles.headerStack}>
++            <View style={styles.headerActions}>
++              <AppBackButton fallbackRoute={returnRoute || (isLiveContext ? '/live' : '/reservations')} />
++              <View style={styles.headerButtons}>
++                {isLiveContext ? (
++                  <AppButton
++                    title="Volver al live activo"
++                    variant="secondary"
++                    onPress={() => router.replace('/live' as any)}
++                  />
++                ) : null}
+                 <AppButton
+-                  title="Quitar de caja"
++                  title="Menu principal"
+                   variant="secondary"
+-                  onPress={handleRemoveBox}
+-                  loading={isSaving}
+-                  disabled={isSaving}
+-                  style={styles.buttonSpacing}
++                  onPress={() => router.replace('/' as any)}
+                 />
+-              </>
++              </View>
++            </View>
++            <SectionHeader
++              title="Detalle del apartado"
++              subtitle="Informacion operativa agrupada por cliente, prenda, live, seguimiento y pagos."
++              rightContent={<StatusBadge label={reservationBadge} tone={isLiveContext ? 'success' : 'info'} />}
++            />
++          </View>
++        }
++        primaryInfo={
++          <>
++            <EntitySummaryCard
++              title="Resumen del apartado"
++              subtitle={`Apartado #${reservation.id}`}
++              badge={getReservationStatusLabel(reservation.status)}
++              meta={[
++                { label: 'Precio', value: formatMoney(reservation.price) },
++                {
++                  label: 'Canal',
++                  value: getSalesChannelLabel(
++                    reservation.salesChannelCode,
++                    reservation.salesChannelName
++                  ),
++                },
++                { label: 'Fecha/hora', value: createdAtLabel },
++                { label: 'Sucursal', value: branchName },
++                { label: 'Registrado por', value: sellerLabel },
++                { label: 'Caja', value: reservation.boxCode || 'Sin caja' },
++              ]}
++            />
++
++            <AppCard style={styles.detailCard}>
++              <SectionHeader title="Prenda" subtitle="Producto asociado al apartado" />
++              <View
++                style={[
++                  styles.itemPlaceholder,
++                  { borderColor: theme.colors.border, backgroundColor: theme.colors.background },
++                ]}
++              >
++                <AppText variant="caption" color={theme.colors.mutedText}>
++                  Sin foto
++                </AppText>
++              </View>
++              <InfoRow label="Producto" value={itemName} />
++              <InfoRow label="Codigo" value={itemCode} />
++              <InfoRow label="Talla" value={item?.sizeName || 'Sin talla'} />
++              <InfoRow label="Color" value="Sin color" />
++              <InfoRow label="Precio" value={formatMoney(itemPrice)} />
++              <InfoRow label="Estado de disponibilidad" value={getItemStatusLabel(item?.status)} />
++            </AppCard>
++
++            {paymentAccessRestricted && paymentSectionError ? (
++              <RestrictedSection error={paymentSectionError} />
+             ) : (
+-              <>
++              <AppCard>
++                <SectionHeader title="Pagos" subtitle="Resumen de pago del apartado" />
++                <InfoRow label="Total" value={`$${total.toFixed(2)}`} />
++                <InfoRow label="Pagado" value={`$${totalPaid.toFixed(2)}`} />
++                <View
++                  style={[
++                    styles.remainingBox,
++                    {
++                      backgroundColor: theme.isDark ? '#451a03' : '#fff7ed',
++                      borderColor: theme.isDark ? '#92400e' : '#fed7aa',
++                    },
++                  ]}
++                >
++                  <AppText color={theme.isDark ? '#fdba74' : '#9a3412'} bold>
++                    Restante: ${remaining.toFixed(2)}
++                  </AppText>
++                  {overpaid > 0 ? (
++                    <AppText color={theme.isDark ? '#fdba74' : '#9a3412'}>
++                      Excedente / saldo a favor: ${overpaid.toFixed(2)}
++                    </AppText>
++                  ) : null}
++                </View>
++              </AppCard>
++            )}
++
++            {!paymentAccessRestricted && payments.length > 0 ? (
++              <AppCard>
++                <SectionHeader title="Pagos registrados" />
++                {payments.map((payment) => (
++                  <View
++                    key={payment.id}
++                    style={[styles.paymentRow, { borderBottomColor: theme.colors.border }]}
++                  >
++                    <AppText bold>${getPaymentAmount(payment).toFixed(2)}</AppText>
++                    <AppText variant="caption" color={theme.colors.mutedText}>
++                      Metodo: {getPaymentMethodLabel(payment, paymentMethods)}
++                    </AppText>
++                    {isVoidedPayment(payment) ? (
++                      <AppText variant="caption" color={theme.colors.danger}>
++                        Pago anulado / cancelado
++                      </AppText>
++                    ) : null}
++                  </View>
++                ))}
++              </AppCard>
++            ) : null}
++          </>
++        }
++        secondaryInfo={
++          <>
++            <EntitySummaryCard
++              title="Cliente"
++              subtitle={customerPhone}
++              badge={customer?.status || 'No disponible'}
++              meta={[
++                { label: 'Nombre', value: customerName },
++                { label: 'Telefono', value: customerPhone },
++                { label: 'Email', value: customer?.email || 'No capturado' },
++                { label: 'Compras pasadas', value: 'No disponible' },
++                { label: 'Compras activas', value: 'No disponible' },
++                { label: 'Saldo pendiente', value: 'No disponible' },
++              ]}
++            />
++
++            <EntitySummaryCard
++              title="LIVE / canal"
++              subtitle={getLiveLabel(reservation)}
++              badge={isLiveContext ? 'LIVE' : 'Canal'}
++              meta={[
++                { label: 'Live', value: reservation.liveId ? `Live #${reservation.liveId}` : 'Sin live asociado' },
++                { label: 'Estado del live', value: liveStatus },
++                { label: 'Canal', value: getSalesChannelLabel(reservation.salesChannelCode, reservation.salesChannelName) },
++                { label: 'Sucursal', value: branchName },
++                { label: 'URL', value: 'No capturada' },
++              ]}
++            />
++
++            <EntitySummaryCard
++              title="Seguimiento operativo"
++              subtitle="Estado y acciones seguras"
++              badge={liveOperationalStatus}
++              meta={[
++                { label: 'Estado LIVE', value: liveOperationalStatus },
++                {
++                  label: 'Ultima actualizacion',
++                  value: formatDateTime(reservation.liveOperationalStatusUpdatedAt || reservation.createdAt),
++                },
++                {
++                  label: 'Acciones',
++                  value: canCancel ? 'Cancelar apartado disponible' : 'Sin acciones operativas disponibles',
++                },
++              ]}
++            />
++
++            <AppCard style={styles.detailCard}>
++              <SectionHeader title="Caja" subtitle="Asignacion operativa" />
++              {isActive ? (
++                reservation.boxId ? (
++                  <>
++                    <AppText>Asignado a: {reservation.boxCode || `Caja ${reservation.boxId}`}</AppText>
++                    <AppButton
++                      title="Quitar de caja"
++                      variant="secondary"
++                      onPress={handleRemoveBox}
++                      loading={isSaving}
++                      disabled={isSaving}
++                      style={styles.buttonSpacing}
++                    />
++                  </>
++                ) : (
++                  <>
++                    <AppText color={theme.colors.mutedText}>
++                      Este apartado todavia no esta asignado a una caja.
++                    </AppText>
++                    <AppButton
++                      title="Asignar caja"
++                      variant="secondary"
++                      onPress={() => setIsBoxModalVisible(true)}
++                      disabled={isSaving}
++                      style={styles.buttonSpacing}
++                    />
++                  </>
++                )
++              ) : (
+                 <AppText color={theme.colors.mutedText}>
+-                  Este apartado todavia no esta asignado a una caja.
++                  Este apartado ya no esta activo para asignacion de caja.
+                 </AppText>
+-                <AppButton
+-                  title="Asignar caja"
+-                  variant="secondary"
+-                  onPress={() => setIsBoxModalVisible(true)}
+-                  disabled={isSaving}
+-                  style={styles.buttonSpacing}
++              )}
++            </AppCard>
++          </>
++        }
++        actions={
++          <>
++            {!paymentAccessRestricted ? (
++              isActive && remaining > 0 ? (
++                <AppCard>
++                  <SectionHeader title="Registrar abono" />
++                  <AppText color={theme.colors.mutedText}>
++                    Restante por cobrar: ${remaining.toFixed(2)}
++                  </AppText>
++                  <AppButton
++                    title="Cobrar apartado"
++                    onPress={() =>
++                      router.push({
++                        pathname: '/payments',
++                        params: {
++                          reservationId: String(reservationId),
++                          returnTo: isLiveContext ? '/live' : `/reservation-detail?id=${reservationId}`,
++                        },
++                      } as any)
++                    }
++                    style={styles.buttonSpacing}
++                  />
++                </AppCard>
++              ) : (
++                <EmptyState
++                  title={remaining <= 0 ? 'Apartado liquidado' : 'Apartado no activo'}
++                  message={
++                    remaining <= 0
++                      ? 'Apartado completamente liquidado.'
++                      : 'Este apartado no esta activo.'
++                  }
+                 />
+-              </>
+-            )
+-          ) : (
+-            <AppText color={theme.colors.mutedText}>
+-              Este apartado ya no esta activo para asignacion de caja.
+-            </AppText>
+-          )}
+-        </AppCard>
+-      </AppResponsiveGrid>
+-
+-      {paymentAccessRestricted && paymentSectionError ? (
+-        <RestrictedSection error={paymentSectionError} />
+-      ) : (
+-        <AppCard>
+-          <AppText variant="subtitle" bold>
+-            Resumen de pago
+-          </AppText>
++              )
++            ) : null}
+
+-          <InfoRow label="Total" value={`$${total.toFixed(2)}`} />
+-          <InfoRow label="Pagado" value={`$${totalPaid.toFixed(2)}`} />
+-
+-          <View
+-            style={[
+-              styles.remainingBox,
+-              {
+-                backgroundColor: theme.isDark ? '#451a03' : '#fff7ed',
+-                borderColor: theme.isDark ? '#92400e' : '#fed7aa',
+-              },
+-            ]}
+-          >
+-            <AppText color={theme.isDark ? '#fdba74' : '#9a3412'} bold>
+-              Restante: ${remaining.toFixed(2)}
+-            </AppText>
+-            {overpaid > 0 ? (
+-              <AppText color={theme.isDark ? '#fdba74' : '#9a3412'}>
+-                Excedente / saldo a favor: ${overpaid.toFixed(2)}
++            {!isActive ? (
++              <AppText color={theme.colors.danger} style={styles.statusMessage} bold>
++                Este apartado ya no esta activo.
+               </AppText>
+             ) : null}
+-          </View>
+-        </AppCard>
+-      )}
+-
+-      {!paymentAccessRestricted ? (
+-        isActive && remaining > 0 ? (
+-          <AppCard>
+-            <AppText variant="subtitle" bold>
+-              Registrar abono
+-            </AppText>
+-
+-            <AppText color={theme.colors.mutedText}>
+-              Restante por cobrar: ${remaining.toFixed(2)}
+-            </AppText>
+-
+-            <AppButton
+-              title="Cobrar apartado"
+-              onPress={() =>
+-                router.push({
+-                  pathname: '/payments',
+-                  params: {
+-                    reservationId: String(reservationId),
+-                    returnTo: isLiveContext ? '/live' : `/reservation-detail?id=${reservationId}`,
+-                  },
+-                } as any)
+-              }
+-              style={styles.buttonSpacing}
+-            />
+-          </AppCard>
+-        ) : (
+-          <AppCard>
+-            <AppText color={theme.colors.mutedText}>
+-              {remaining <= 0
+-                ? 'Apartado completamente liquidado.'
+-                : 'Este apartado no esta activo.'}
+-            </AppText>
+-          </AppCard>
+-        )
+-      ) : null}
+-
+-      {!paymentAccessRestricted && payments.length > 0 ? (
+-        <AppCard>
+-          <AppText variant="subtitle" bold>
+-            Pagos registrados
+-          </AppText>
+
+-          {payments.map((payment) => (
+-            <View
+-              key={payment.id}
+-              style={[styles.paymentRow, { borderBottomColor: theme.colors.border }]}
+-            >
+-              <AppText bold>${getPaymentAmount(payment).toFixed(2)}</AppText>
+-              <AppText variant="caption" color={theme.colors.mutedText}>
+-                Metodo: {getPaymentMethodLabel(payment, paymentMethods)}
+-              </AppText>
+-              {isVoidedPayment(payment) ? (
+-                <AppText variant="caption" color={theme.colors.danger}>
+-                  Pago anulado / cancelado
+-                </AppText>
+-              ) : null}
+-            </View>
+-          ))}
+-        </AppCard>
+-      ) : null}
+-
+-      {!isActive ? (
+-        <AppText color={theme.colors.danger} style={styles.statusMessage} bold>
+-          Este apartado ya no esta activo.
+-        </AppText>
+-      ) : null}
+-
+-      {canCancel ? (
+-        <AppButton
+-          title="Cancelar apartado"
+-          variant="danger"
+-          onPress={handleCancel}
+-          loading={isSaving}
+-          disabled={isSaving}
+-          style={styles.cancelButton}
+-        />
+-      ) : null}
++            {canCancel ? (
++              <AppButton
++                title="Cancelar apartado"
++                variant="danger"
++                onPress={handleCancel}
++                loading={isSaving}
++                disabled={isSaving}
++                style={styles.cancelButton}
++              />
++            ) : null}
++          </>
++        }
++      />
+
+       <AppBottomModal
+         visible={isBoxModalVisible}
+@@ -752,7 +823,7 @@ export default function ReservationDetailScreen() {
+           </AppText>
+         )}
+       </AppBottomModal>
+-    </AppScreen>
++    </AppShell>
+   );
+ }
+
+@@ -775,6 +846,9 @@ function InfoRow({ label, value }: InfoRowProps) {
+ }
+
+ const styles = StyleSheet.create({
++  headerStack: {
++    gap: 12,
++  },
+   headerActions: {
+     alignItems: 'center',
+     flexDirection: 'row',
+@@ -783,6 +857,11 @@ const styles = StyleSheet.create({
+     justifyContent: 'space-between',
+     marginBottom: 8,
+   },
++  headerButtons: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 10,
++  },
+   titleBlock: {
+     alignItems: 'center',
+     flexDirection: 'row',
+diff --git a/locales/en/common.json b/locales/en/common.json
+index c94e024..cae0bfc 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -140,6 +140,7 @@
+     "operatorNextProduct": "prepare item.",
+     "operatorNextPrice": "confirm price.",
+     "operatorNextReserve": "reserve now.",
++    "operatorNextChangeReservedItem": "Change or take the item off air to continue.",
+     "operatorReadyToReserve": "Ready to reserve.",
+     "operatorLatestReservation": "Latest reservation: #{{id}}",
+     "liveReservationBadge": "LIVE reservation",
+@@ -162,6 +163,12 @@
+     "activeItemSectionHelp": "This is the item being shown and reserved.",
+     "productOnAirHelp": "Product on air is the item currently shown in the live stream.",
+     "activeItemReservationHelp": "This is the item being shown and reserved.",
++    "activeItemReservedHelp": "This item has already been reserved. Change it or take it off air to continue.",
++    "activeItemReservedNextStepHelp": "This item has already been reserved. Change it or take it off air to continue.",
++    "activeItemAlreadyReservedTitle": "Item already reserved",
++    "activeItemAlreadyReservedReason": "This item already has an active reservation. Change or take the item off air to register another reservation.",
++    "activeItemReservedStatus": "Reserved / Held",
++    "activeItemReservedChip": "Reserved",
+     "activeItemPresenterHelp": "This is the item currently being shown in the stream.",
+     "preparedItemReservationHelp": "Ready to go on air. It is not used for reservations yet.",
+     "preparedItemChip": "Prepared",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index 689a5ba..224b677 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -140,6 +140,7 @@
+     "operatorNextProduct": "preparar prenda.",
+     "operatorNextPrice": "confirmar precio.",
+     "operatorNextReserve": "reservar ahora.",
++    "operatorNextChangeReservedItem": "Cambia o saca la prenda del aire para continuar.",
+     "operatorReadyToReserve": "Listo para reservar.",
+     "operatorLatestReservation": "Ultima reserva: #{{id}}",
+     "liveReservationBadge": "Reserva LIVE",
+@@ -162,6 +163,12 @@
+     "activeItemSectionHelp": "Esta es la prenda que se esta mostrando y que se reservara.",
+     "productOnAirHelp": "Producto al aire es la prenda que se esta mostrando en la transmision.",
+     "activeItemReservationHelp": "Esta es la prenda que se esta mostrando y que se reservara.",
++    "activeItemReservedHelp": "Esta prenda ya fue reservada. Cambia o saca la prenda del aire para continuar.",
++    "activeItemReservedNextStepHelp": "Esta prenda ya fue reservada. Cambia o saca la prenda del aire para continuar.",
++    "activeItemAlreadyReservedTitle": "Prenda ya reservada",
++    "activeItemAlreadyReservedReason": "Esta prenda ya tiene una reserva activa. Cambia o saca la prenda del aire para registrar otra reserva.",
++    "activeItemReservedStatus": "Reservada / Apartada",
++    "activeItemReservedChip": "Reservada",
+     "activeItemPresenterHelp": "Esta es la prenda que se esta mostrando en la transmision.",
+     "preparedItemReservationHelp": "Lista para pasar al aire. Aun no se usa para reservas.",
+     "preparedItemChip": "Preparada",
+diff --git a/docs/PRODUCT_B3_RESERVATION_DETAIL_TEMPLATE.md b/docs/PRODUCT_B3_RESERVATION_DETAIL_TEMPLATE.md
+new file mode 100644
+index 0000000..898d71a
+--- /dev/null
++++ b/docs/PRODUCT_B3_RESERVATION_DETAIL_TEMPLATE.md
+@@ -0,0 +1,124 @@
++# PRODUCT-B3 - Reservation Detail Template
++
++## Objetivo
++
++Aplicar el UI Kit interno de PRODUCT-B a una pantalla funcional segura: `app/reservation-detail.tsx`.
++
++La meta de esta fase es validar `AppShell` y `DetailTemplate` en una pantalla real de detalle de apartado, sin cambiar backend, contratos de API, AUTH/RBAC, pagos reales, caja, reportes, billing ni IA. El ajuste posterior sobre LIVE-Z5 fue puntual y limitado al estado visual/funcional de la prenda al aire ya reservada.
++
++## Ajuste puntual 2026-06-04
++
++Antes de cerrar PRODUCT-B3 se aplico un ajuste funcional/UX en LIVE para evitar doble reserva visual de la prenda al aire:
++
++- Cuando se crea una reserva sobre la prenda al aire, la prenda cambia localmente a estado `RESERVED`.
++- La tarjeta `PRENDA AL AIRE AHORA` deja de verse como disponible y pasa a estilo ambar/reservado.
++- Se mantiene el chip `Al aire`, pero se agrega estado `Reservada`.
++- Se muestra el mensaje operativo: la prenda ya fue reservada y debe cambiarse o sacarse del aire para continuar.
++- `RESERVAR AHORA` queda bloqueado para esa misma prenda mientras exista una reserva activa.
++- Cuando `RESERVAR AHORA` esta bloqueado por prenda ya reservada, se muestra una advertencia visible junto al boton para que no parezca una accion muerta.
++- El siguiente paso cambia a: `Cambia o saca la prenda del aire para continuar.`
++- Antes de crear reserva, LIVE valida si el `activeItem` ya tiene una reserva activa y evita duplicados.
++- La regla usa reservas reales cargadas en `branchReservations` y `recentReservations`; no se agrego backend ni endpoint nuevo.
++
++## Alcance aplicado
++
++- `reservation-detail` ahora usa `AppShell` como layout principal.
++- La pantalla usa `DetailTemplate` para separar header, informacion primaria, informacion secundaria y acciones.
++- La informacion se agrupo en secciones:
++  - Resumen del apartado.
++  - Cliente.
++  - Prenda.
++  - LIVE / canal.
++  - Seguimiento operativo.
++  - Caja.
++  - Pagos o acceso restringido.
++- Se mantuvieron `RestrictedSection`, `normalizeApiError`, `isNotFoundError` y la regla de no confundir 403 con 404.
++- Se mantuvo la proteccion de pagos: si el usuario no tiene `VIEW_PAYMENTS`, no se consulta `/api/payments/reservation/{id}` y se muestra acceso restringido.
++- Se mantuvieron las acciones existentes de caja, cancelar apartado, volver y navegar al menu principal.
++
++## Componentes PRODUCT-B usados
++
++- `components/layout/AppShell.tsx`
++- `components/templates/DetailTemplate.tsx`
++- `components/ui/EntitySummaryCard.tsx`
++- `components/ui/SectionHeader.tsx`
++- `components/ui/StatusBadge.tsx`
++- `components/ui/EmptyState.tsx`
++- `components/ui/RestrictedSection.tsx`
++
++## Comportamiento visual
++
++Desktop:
++- La pantalla entra dentro del shell administrativo.
++- `DetailTemplate` distribuye la informacion en columnas responsivas.
++- Las cards reducen el espacio en blanco y mejoran jerarquia.
++
++Tablet/mobile:
++- El shell conserva su comportamiento responsive.
++- Las columnas del detalle pueden apilarse por ancho disponible.
++- No se agrego navegacion nueva ni se migro LIVE.
++
++## Permisos y pagos
++
++PRODUCT-B3 no modifica permisos ni backend.
++
++Reglas conservadas:
++- `404` del apartado principal muestra estado de no encontrado.
++- `403` en pagos no tumba toda la pantalla.
++- Sin `VIEW_PAYMENTS`, la seccion de pagos muestra `RestrictedSection`.
++- Sin `VIEW_PAYMENTS`, no hay rafaga de llamadas a pagos.
++- Si el usuario tiene `VIEW_PAYMENTS`, se mantiene la carga de pagos existente.
++
++## Archivos modificados
++
++- `app/reservation-detail.tsx`
++- `app/live.tsx`
++- `locales/es/common.json`
++- `locales/en/common.json`
++
++## Archivos creados
++
++- `docs/PRODUCT_B3_RESERVATION_DETAIL_TEMPLATE.md`
++- `qa-reports/PRODUCT-B3-reservation-detail-template-report-20260603-140748.md`
++- `git-diffs/20260603-PRODUCT-B3-reservation-detail-template.diff`
++- `git-diffs/20260603-PRODUCT-B3-reservation-detail-template-stat.txt`
++
++## Pantallas no tocadas
++
++- Pantallas de pagos.
++- Pantallas de caja.
++- Reportes.
++- AUTH/RBAC.
++- Backend.
++
++## Validaciones
++
++- `npm.cmd run lint`: OK, 0 errores, 60 warnings preexistentes.
++- `npx.cmd tsc --noEmit`: OK.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
++- `backend/control-ropa/./mvnw.cmd test`: OK, 73 tests, 0 failures.
++- `backend/control-ropa/./mvnw.cmd -q -DskipTests package`: OK.
++- `git diff --check`: OK, solo warning CRLF.
++
++## Riesgos
++
++- La pantalla ya usa layout nuevo, por lo que requiere QA visual en desktop/tablet/mobile.
++- Algunos datos de cliente/prenda/live dependen de campos disponibles actualmente; si no existen, se muestran fallbacks seguros.
++- La seccion de pagos mantiene comportamiento existente y no cambia logica financiera.
++- Si una reserva se cancela operativamente, el criterio para volver a permitir reserva de esa misma prenda queda sujeto a validacion de estado real y QA operacional.
++
++## GO/NO-GO
++
++GO tecnico:
++- `reservation-detail` ya valida el uso de `DetailTemplate` en una pantalla real sin tocar backend ni LIVE-Z5.
++- LIVE evita que la prenda al aire reservada siga pareciendo disponible o reservable.
++- LIVE muestra feedback claro cuando el boton de reserva queda bloqueado por prenda ya apartada.
++
++GO visual condicionado:
++- Requiere validacion manual con reserva existente y usuario sin `VIEW_PAYMENTS`.
++
++## Siguiente fase recomendada
++
++PRODUCT-B4:
++- Aplicar `DetailTemplate` a otra pantalla de detalle segura o evolucionar `reservation-detail` con datos reales adicionales de cliente/prenda/live si ya existen servicios disponibles.
++- Mantener LIVE-Z5 fuera de migracion hasta completar al menos dos pantallas funcionales con templates.
+diff --git a/qa-reports/PRODUCT-B3-reservation-detail-template-report-20260603-140748.md b/qa-reports/PRODUCT-B3-reservation-detail-template-report-20260603-140748.md
+new file mode 100644
+index 0000000..0b8342f
+--- /dev/null
++++ b/qa-reports/PRODUCT-B3-reservation-detail-template-report-20260603-140748.md
+@@ -0,0 +1,100 @@
++# PRODUCT-B3 - Reservation Detail Template QA Report
++
++## Contexto
++
++- Rama: `feature/product-b3-reservation-detail-template`
++- Commit base visible: `90f415d Merge branch 'feature/product-b-internal-ui-kit-foundation' into develop`
++- Fecha: 2026-06-03 14:07
++
++## Alcance
++
++Migracion visual controlada de `app/reservation-detail.tsx` al UI Kit interno PRODUCT-B.
++
++Ajuste puntual posterior: LIVE marca la prenda al aire como reservada/apartada despues de crear una reserva y bloquea doble reserva de la misma prenda.
++
++Ajuste final antes de cierre: cuando `RESERVAR AHORA` queda bloqueado por prenda ya reservada, LIVE muestra advertencia visible y actualiza el siguiente paso para evitar sensacion de boton muerto.
++
++## Archivos revisados
++
++- `app/live.tsx`
++- `app/reservation-detail.tsx`
++- `components/templates/DetailTemplate.tsx`
++- `components/ui/EntitySummaryCard.tsx`
++- `components/ui/RestrictedSection.tsx`
++- `services/apiError.ts`
++- `services/accessControl.ts`
++- `services/customerService.ts`
++- `services/itemService.ts`
++
++## Archivos modificados
++
++- `app/reservation-detail.tsx`
++- `app/live.tsx`
++- `locales/es/common.json`
++- `locales/en/common.json`
++
++## Archivos creados
++
++- `docs/PRODUCT_B3_RESERVATION_DETAIL_TEMPLATE.md`
++- `qa-reports/PRODUCT-B3-reservation-detail-template-report-20260603-140748.md`
++- `git-diffs/20260603-PRODUCT-B3-reservation-detail-template.diff`
++- `git-diffs/20260603-PRODUCT-B3-reservation-detail-template-stat.txt`
++
++## Cambios aplicados
++
++- `reservation-detail` ahora usa `AppShell`.
++- Se aplico `DetailTemplate` como estructura principal.
++- Se agrupo la informacion en cards: resumen, cliente, prenda, LIVE/canal, seguimiento operativo, caja y pagos.
++- Se mantuvo `RestrictedSection` para falta de `VIEW_PAYMENTS`.
++- Se mantuvo el manejo correcto de 403 vs 404.
++- Se mantuvo la regla de no llamar pagos si el permiso ya se conoce como ausente.
++- Se mantuvieron acciones existentes: volver, menu principal, volver a LIVE, caja, cobrar si hay permiso, cancelar apartado.
++- LIVE ahora deriva si el `activeItem` tiene una reserva activa usando reservas reales cargadas.
++- Despues de reservar, el `activeItem` se marca localmente como `RESERVED`.
++- La tarjeta `PRENDA AL AIRE AHORA` cambia a estado visual reservado y muestra mensaje operativo para cambiar o sacar del aire.
++- `RESERVAR AHORA` se bloquea para la misma prenda reservada y la validacion evita crear duplicados.
++- Se agregaron textos ES/EN para estado reservado, bloqueo y siguiente paso.
++- Se agrego advertencia visible junto al boton bloqueado: la prenda ya tiene reserva activa y debe cambiarse o sacarse del aire.
++- El siguiente paso ahora indica: `Cambia o saca la prenda del aire para continuar.`
++
++## Validaciones ejecutadas
++
++- `npm.cmd run lint`: OK, 0 errores, 60 warnings preexistentes.
++- `npx.cmd tsc --noEmit`: OK.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
++- `backend/control-ropa/./mvnw.cmd test`: OK, 73 tests, 0 failures.
++- `backend/control-ropa/./mvnw.cmd -q -DskipTests package`: OK.
++- `git diff --check`: OK, solo warning CRLF.
++
++## Validaciones no ejecutadas
++
++- QA visual manual con navegador y usuarios QA: no ejecutada en esta pasada; queda pendiente para validacion humana.
++
++## Warnings
++
++- Lint reporta warnings preexistentes en varias pantallas.
++- `app/reservation-detail.tsx` conserva warning de BOM detectado por lint.
++- Git reporta conversion futura LF/CRLF en `app/reservation-detail.tsx`.
++
++## Validacion funcional esperada
++
++Con `qa.admin@local.test`:
++- Abrir reserva existente.
++- Ver detalle con cards ordenadas.
++- Confirmar cliente, prenda, live, estado y precio.
++- Confirmar que volver y menu principal funcionan.
++- Desde LIVE, reservar la prenda al aire y confirmar que la tarjeta queda como Reservada/Apartada.
++- Intentar reservar la misma prenda sin cambiarla y confirmar que no crea duplicado.
++- Confirmar que al quedar bloqueado `RESERVAR AHORA` se ve el mensaje claro junto al boton.
++- Cambiar prenda al aire y confirmar que el flujo vuelve a permitir reserva si la nueva prenda esta disponible.
++
++Con usuario sin `VIEW_PAYMENTS`:
++- Confirmar seccion de pagos restringida.
++- Confirmar que no aparece `Apartado no encontrado` si la reserva existe.
++- Confirmar que no hay rafaga de llamadas a `/api/payments/reservation/{id}`.
++
++## GO/NO-GO
++
++GO tecnico para PRODUCT-B3.
++
++GO visual condicionado a validar manualmente desktop/tablet/mobile y permisos de pagos con usuarios QA.

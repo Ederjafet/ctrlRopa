@@ -274,6 +274,16 @@ function isReservationSettled(reservation: Reservation, paid: number) {
   return paid >= Number(reservation.price || 0) && Number(reservation.price || 0) > 0;
 }
 
+function isBlockingLiveReservation(reservation: Reservation) {
+  const reservationStatus = normalizeStatus(reservation.status);
+  const operationalStatus = getLiveReservationOperationalStatus(reservation);
+
+  return (
+    !['CANCELLED', 'COMPLETED', 'CONVERTED_TO_SALE'].includes(reservationStatus) &&
+    operationalStatus !== 'CANCELLED'
+  );
+}
+
 function getLiveReservationOperationalStatus(
   reservation: Reservation
 ): LiveReservationOperationalStatus {
@@ -843,10 +853,26 @@ export default function LiveScreen() {
 
   const hasValidReservationPrice =
     !!priceText.trim() && !Number.isNaN(Number(priceText)) && Number(priceText) > 0;
+  const reservationSourcesForActiveItem = [
+    ...recentReservations.map((entry) => entry.reservation),
+    ...branchReservations,
+  ];
+  const findBlockingReservationForItem = (itemId?: number | null) =>
+    itemId
+      ? reservationSourcesForActiveItem.find(
+        (reservation, index, reservations) =>
+          reservations.findIndex((candidate) => candidate.id === reservation.id) === index &&
+          reservation.itemId === itemId &&
+          isBlockingLiveReservation(reservation)
+      )
+      : undefined;
+  const activeItemBlockingReservationForValidation = findBlockingReservationForItem(activeItem?.id);
   const reservationPendingReason = !selectedLive || !operatorFlowEnabled
     ? t('live.reserveMissingLive')
     : !activeItem
       ? t('live.reserveMissingActiveItem')
+    : activeItemBlockingReservationForValidation
+      ? t('live.activeItemAlreadyReservedReason')
     : !hasValidReservationPrice
       ? t('live.reserveMissingPrice')
     : !selectedCustomer
@@ -1107,6 +1133,8 @@ export default function LiveScreen() {
       ? t('live.operatorNextProduct')
     : !activeItem
       ? t('live.operatorNextActiveItem')
+    : activeItemBlockingReservationForValidation
+      ? t('live.operatorNextChangeReservedItem')
     : !hasValidReservationPrice
       ? t('live.operatorNextPrice')
     : !selectedCustomer
@@ -1966,6 +1994,11 @@ export default function LiveScreen() {
       return false;
     }
 
+    if (activeItemBlockingReservationForValidation) {
+      setReservationIssue(t('live.activeItemAlreadyReservedReason'));
+      return false;
+    }
+
     const availability = getItemLiveAvailability(activeItem);
     if (!availability.canGoOnAir) {
       setReservationIssue(t('live.itemNotAvailableForReservation'));
@@ -2027,6 +2060,14 @@ export default function LiveScreen() {
         },
         ...current,
       ].slice(0, 10));
+      setBranchReservations((current) => {
+        const withoutDuplicate = current.filter((entry) => entry.id !== reservation.id);
+        return [reservation, ...withoutDuplicate];
+      });
+      setActiveItemForReservation({
+        ...activeItem,
+        status: 'RESERVED',
+      });
 
       setSelectedItem(null);
       setSelectedCustomer(null);
@@ -2134,30 +2175,52 @@ export default function LiveScreen() {
     const isOnAir = activeItem?.id === item.id;
     const isPreparedForChange = options.showOnAirAction && !options.highlighted;
     const availability = getItemLiveAvailability(item);
-    const cardBorderColor = options.highlighted
+    const blockingReservation = findBlockingReservationForItem(item.id);
+    const isHighlightedReserved = !!options.highlighted && !!blockingReservation;
+    const cardBorderColor = isHighlightedReserved
+      ? '#f59e0b'
+      : options.highlighted
       ? theme.colors.success
       : isPreparedForChange
         ? '#f59e0b'
         : theme.colors.border;
-    const cardBackgroundColor = options.highlighted
+    const cardBackgroundColor = isHighlightedReserved
+      ? theme.isDark
+        ? '#451a03'
+        : '#fff7e6'
+      : options.highlighted
       ? theme.colors.successBackground
       : isPreparedForChange
         ? theme.isDark
           ? '#451a03'
           : '#fff7e6'
         : theme.colors.surface;
-    const placeholderBackgroundColor = options.highlighted
+    const placeholderBackgroundColor = isHighlightedReserved
+      ? theme.isDark
+        ? '#78350f'
+        : '#fffbeb'
+      : options.highlighted
       ? theme.colors.surface
       : isPreparedForChange
         ? theme.isDark
           ? '#78350f'
           : '#fffbeb'
         : theme.colors.infoCardBackground;
-    const stateColor = options.highlighted
+    const stateColor = isHighlightedReserved
+      ? theme.colors.warning
+      : options.highlighted
       ? theme.colors.success
       : isPreparedForChange
         ? theme.colors.warning
         : theme.colors.accent;
+    const availabilityLabel = isHighlightedReserved
+      ? t('live.activeItemReservedStatus')
+      : availability.label;
+    const availabilityTone = isHighlightedReserved
+      ? theme.colors.warning
+      : availability.canGoOnAir
+        ? theme.colors.success
+        : theme.colors.warning;
 
     return (
       <View
@@ -2197,28 +2260,48 @@ export default function LiveScreen() {
                 {itemName}
               </AppText>
               <AppText variant="caption" color={theme.colors.mutedText}>
-                {options.highlighted
-                  ? t('live.activeItemReservationHelp')
+                {isHighlightedReserved
+                  ? t('live.activeItemReservedHelp')
+                  : options.highlighted
+                    ? t('live.activeItemReservationHelp')
                   : options.showOnAirAction && activeItem
                     ? t('live.preparedItemReservationHelp')
                     : t('live.productOnAirHelp')}
               </AppText>
             </View>
             {isOnAir ? (
-              <View
-                style={[
-                  styles.operatorItemBadge,
-                  {
-                    backgroundColor: theme.colors.successBackground,
-                    borderColor: theme.colors.success,
-                    borderRadius: theme.radius.sm,
-                  },
-                ]}
-              >
-                <AppText variant="caption" color={theme.colors.success} bold>
-                  {t('live.productOnAirChip')}
-                </AppText>
-              </View>
+              <>
+                <View
+                  style={[
+                    styles.operatorItemBadge,
+                    {
+                      backgroundColor: theme.colors.successBackground,
+                      borderColor: theme.colors.success,
+                      borderRadius: theme.radius.sm,
+                    },
+                  ]}
+                >
+                  <AppText variant="caption" color={theme.colors.success} bold>
+                    {t('live.productOnAirChip')}
+                  </AppText>
+                </View>
+                {isHighlightedReserved ? (
+                  <View
+                    style={[
+                      styles.operatorItemBadge,
+                      {
+                        backgroundColor: theme.isDark ? '#78350f' : '#fffbeb',
+                        borderColor: '#f59e0b',
+                        borderRadius: theme.radius.sm,
+                      },
+                    ]}
+                  >
+                    <AppText variant="caption" color={theme.colors.warning} bold>
+                      {t('live.activeItemReservedChip')}
+                    </AppText>
+                  </View>
+                ) : null}
+              </>
             ) : isPreparedForChange ? (
               <View
                 style={[
@@ -2238,17 +2321,21 @@ export default function LiveScreen() {
           </View>
           <AppText
             variant="caption"
-            color={availability.canGoOnAir ? theme.colors.success : theme.colors.warning}
+            color={availabilityTone}
             bold
           >
-            {availability.label}
+            {availabilityLabel}
           </AppText>
           {availability.warning ? (
             <AppText variant="caption" color={theme.colors.warning}>
               {availability.warning}
             </AppText>
           ) : null}
-          {!availability.canGoOnAir && availability.reason ? (
+          {isHighlightedReserved ? (
+            <AppText variant="caption" color={theme.colors.warning}>
+              {t('live.activeItemReservedNextStepHelp')}
+            </AppText>
+          ) : !availability.canGoOnAir && availability.reason ? (
             <AppText variant="caption" color={theme.colors.warning}>
               {availability.reason}
             </AppText>
@@ -3646,13 +3733,32 @@ export default function LiveScreen() {
                   </LiveCompactCard>
                 </View>
 
+                {activeItemBlockingReservationForValidation ? (
+                  <LiveWarningCard style={styles.reservationRiskCard}>
+                    <AppText variant="caption" color={theme.colors.warning} bold>
+                      {t('live.activeItemAlreadyReservedTitle')}
+                    </AppText>
+                    <AppText variant="caption" color={theme.colors.mutedText}>
+                      {t('live.activeItemAlreadyReservedReason')}
+                    </AppText>
+                  </LiveWarningCard>
+                ) : null}
+
                 <AppButton
                   title={t('live.operatorReserveNow')}
                   variant="operation"
                   onPress={handleCreateReservation}
                   loading={isSavingReservation}
-                  disabled={isSavingReservation || !mayOperateLive}
-                  disabledReason={reservationPendingReason || t('live.liveOperatePermissionError')}
+                  disabled={
+                    isSavingReservation ||
+                    !mayOperateLive ||
+                    !!activeItemBlockingReservationForValidation
+                  }
+                  disabledReason={
+                    activeItemBlockingReservationForValidation
+                      ? t('live.activeItemAlreadyReservedReason')
+                      : reservationPendingReason || t('live.liveOperatePermissionError')
+                  }
                   style={styles.operatorPrimaryButton}
                 />
 
