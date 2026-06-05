@@ -402,6 +402,15 @@ Hacer que `/live` consuma el sistema visual de PRODUCT-B de forma real, con tema
 - La prenda vendida/no reservable usa acento danger sutil cuando esta en la card activa.
 - Dark mode hereda tokens del tema; no se agregan amarillos fuertes hardcodeados.
 
+### Transicion a LIVE-Z7
+
+- LIVE-Z7 continua con el principio `AUTH real -> permisos reales -> capacidades LIVE -> vista/acciones permitidas`.
+- `canChangeLivePrice` se endurece de forma conservadora y ya no depende solo de operar LIVE.
+- Si el usuario no puede cambiar precio LIVE, la consola muestra precio solo lectura y `Solicitar autorizacion`.
+- La solicitud de autorizacion no simula aprobacion real; queda pendiente mensajeria interna para LIVE-Z8.
+- Si el precio LIVE difiere del precio sugerido/base, se solicita confirmacion antes de crear la reserva.
+- La liberacion segura de prenda queda pendiente porque requiere confirmar pagos y un endpoint especifico.
+
 ## GO/NO-GO
 
 GO tecnico para LIVE-Z6A, Z6B, Z6C y Z6C2.

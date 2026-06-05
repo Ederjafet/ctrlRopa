@@ -89,16 +89,19 @@ export function resolveLiveCapabilities(user: UserSession | null): LiveCapabilit
   const canManageInventory = canAccessByPermission(user, 'MANAGE_INVENTORY');
   const canCancelReservation = operate && canAccessByPermission(user, 'CANCEL_RESERVATION');
   const canViewPayments = hasEffectivePermission(user, 'VIEW_PAYMENTS');
+  const canViewLiveDashboard = canViewLive && (supervisor || viewReports || admin);
+  const canChangeLivePrice =
+    operate &&
+    (admin || (canManageInventory && canCancelReservation && canViewLiveDashboard));
   const canAccessCashbox =
     canAccessByPermission(user, 'MANAGE_CASH_CLOSURES') ||
     canAccessByPermission(user, 'REGISTER_PAYMENTS');
-  const canViewLiveDashboard = canViewLive && (supervisor || viewReports || admin);
   const gaps: string[] = [
     'START_LIVE',
     'CLOSE_LIVE',
     'SET_LIVE_ACTIVE_ITEM',
     'CLEAR_LIVE_ACTIVE_ITEM',
-    'CHANGE_LIVE_PRICE',
+    'UPDATE_LIVE_PRICE',
     'RELEASE_LIVE_RESERVED_ITEM',
   ];
 
@@ -123,7 +126,7 @@ export function resolveLiveCapabilities(user: UserSession | null): LiveCapabilit
     canMarkPending: operate,
     canMarkOperationalSold: operate,
     canReleaseReservedItem: canCancelReservation && canManageInventory && canViewPayments,
-    canChangeLivePrice: operate,
+    canChangeLivePrice,
     canViewLiveDashboard,
     canViewLiveEvents: canViewLive,
     canViewLiveHistory: canViewLive,

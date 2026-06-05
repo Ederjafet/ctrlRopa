@@ -1,0 +1,269 @@
+diff --git a/app/live.tsx b/app/live.tsx
+index 0ef9c46..5e2471b 100644
+--- a/app/live.tsx
++++ b/app/live.tsx
+@@ -489,6 +489,9 @@ export default function LiveScreen() {
+   const [closeLiveToConfirm, setCloseLiveToConfirm] = useState<Live | null>(null);
+   const [activateLiveToConfirm, setActivateLiveToConfirm] = useState<Live | null>(null);
+   const [cancelReservationToConfirm, setCancelReservationToConfirm] = useState<number | null>(null);
++  const [authorizationRequestContext, setAuthorizationRequestContext] = useState<
++    'price' | 'release' | 'close' | 'cancel' | null
++  >(null);
+   const [reservationIssue, setReservationIssue] = useState<string | null>(null);
+   const [showDemoMetrics, setShowDemoMetrics] = useState(true);
+   const [liveLayoutPreferences, setLiveLayoutPreferences] =
+@@ -1666,6 +1669,21 @@ export default function LiveScreen() {
+     await handleUpdateReservationOperationalStatus(reservationId, 'CANCELLED', reason);
+   };
+
++  const handleRequestAuthorization = (
++    context: 'price' | 'release' | 'close' | 'cancel'
++  ) => {
++    setAuthorizationRequestContext(context);
++  };
++
++  const confirmAuthorizationRequest = (reason: string) => {
++    setAuthorizationRequestContext(null);
++    setLiveNotice({
++      title: t('live.authorizationRequestPendingTitle'),
++      message: t('live.authorizationRequestPendingMessage', { reason }),
++      tone: 'warning',
++    });
++  };
++
+   const handleCreateLive = async () => {
+     if (!session) {
+       Alert.alert(t('live.sessionTitle'), t('live.noActiveSession'));
+@@ -2163,11 +2181,48 @@ export default function LiveScreen() {
+       return;
+     }
+
++    const price = Number(priceText);
++    const suggestedPrice =
++      activeItem.price !== null && activeItem.price !== undefined
++        ? Number(activeItem.price)
++        : null;
++    const livePriceDiffersFromBase =
++      mayChangeLivePrice &&
++      suggestedPrice !== null &&
++      Number.isFinite(suggestedPrice) &&
++      Math.abs(price - suggestedPrice) > 0.009;
++
++    if (livePriceDiffersFromBase) {
++      Alert.alert(
++        t('live.livePriceChangeConfirmTitle'),
++        t('live.livePriceChangeConfirmMessage', {
++          basePrice: formatMoney(suggestedPrice),
++          livePrice: formatMoney(price),
++        }),
++        [
++          { text: t('common.cancel'), style: 'cancel' },
++          {
++            text: t('live.confirmLivePriceChange'),
++            onPress: () => {
++              void persistReservation(price);
++            },
++          },
++        ]
++      );
++      return;
++    }
++
++    await persistReservation(price);
++  };
++
++  const persistReservation = async (price: number) => {
++    if (!session || !selectedCustomer || !activeItem || !selectedLive || !liveChannelId) {
++      return;
++    }
++
+     setIsSavingReservation(true);
+
+     try {
+-      const price = Number(priceText);
+-
+       const reservation = await createReservation({
+         itemId: activeItem.id,
+         customerId: selectedCustomer.id,
+@@ -3728,6 +3783,18 @@ export default function LiveScreen() {
+                           })
+                         : t('live.operatorStepPriceEmpty')}
+                     </AppText>
++                    {activeItem && !mayChangeLivePrice ? (
++                      <View style={styles.operatorPriceAuthorizationBox}>
++                        <AppText variant="caption" color={theme.colors.mutedText}>
++                          {t('live.livePriceAuthorizationHelp')}
++                        </AppText>
++                        <AppButton
++                          title={t('live.requestAuthorization')}
++                          variant="secondary"
++                          onPress={() => handleRequestAuthorization('price')}
++                        />
++                      </View>
++                    ) : null}
+                   </LiveCompactCard>
+
+                   <LiveCompactCard style={[styles.operatorFlowStepCard, styles.operatorInlinePanel]}>
+@@ -5344,6 +5411,42 @@ export default function LiveScreen() {
+         />
+       </AppBottomModal>
+
++      <AppBottomModal
++        visible={authorizationRequestContext !== null}
++        title={t('live.authorizationRequestTitle')}
++        onClose={() => setAuthorizationRequestContext(null)}
++        showCancelButton={false}
++      >
++        <AppText color={theme.colors.mutedText}>
++          {authorizationRequestContext === 'price'
++            ? t('live.authorizationPricePrompt')
++            : t('live.authorizationGenericPrompt')}
++        </AppText>
++        {[
++          t('live.authorizationReasonLivePromotion'),
++          t('live.authorizationReasonDefectAdjustment'),
++          t('live.authorizationReasonFrequentCustomer'),
++          t('live.authorizationReasonVerbalApproval'),
++          t('live.authorizationReasonOther'),
++        ].map((reason) => (
++          <AppOptionRow
++            key={reason}
++            title={reason}
++            subtitle={
++              reason === t('live.authorizationReasonOther')
++                ? t('live.authorizationRequestNotPersistedHelp')
++                : undefined
++            }
++            onPress={() => confirmAuthorizationRequest(reason)}
++          />
++        ))}
++        <AppButton
++          title={t('common.cancel')}
++          variant="secondary"
++          onPress={() => setAuthorizationRequestContext(null)}
++        />
++      </AppBottomModal>
++
+
+       <AppBottomModal
+         visible={activateLiveToConfirm !== null}
+@@ -5786,6 +5889,10 @@ const styles = StyleSheet.create({
+   operatorPrimaryButton: {
+     minHeight: 48,
+   },
++  operatorPriceAuthorizationBox: {
++    gap: 8,
++    marginTop: 4,
++  },
+   operatorRecentLiveCard: {
+     borderWidth: 1,
+     flex: 1,
+diff --git a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+index f1e90cb..7c3910b 100644
+--- a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
++++ b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+@@ -402,6 +402,15 @@ Hacer que `/live` consuma el sistema visual de PRODUCT-B de forma real, con tema
+ - La prenda vendida/no reservable usa acento danger sutil cuando esta en la card activa.
+ - Dark mode hereda tokens del tema; no se agregan amarillos fuertes hardcodeados.
+
++### Transicion a LIVE-Z7
++
++- LIVE-Z7 continua con el principio `AUTH real -> permisos reales -> capacidades LIVE -> vista/acciones permitidas`.
++- `canChangeLivePrice` se endurece de forma conservadora y ya no depende solo de operar LIVE.
++- Si el usuario no puede cambiar precio LIVE, la consola muestra precio solo lectura y `Solicitar autorizacion`.
++- La solicitud de autorizacion no simula aprobacion real; queda pendiente mensajeria interna para LIVE-Z8.
++- Si el precio LIVE difiere del precio sugerido/base, se solicita confirmacion antes de crear la reserva.
++- La liberacion segura de prenda queda pendiente porque requiere confirmar pagos y un endpoint especifico.
++
+ ## GO/NO-GO
+
+ GO tecnico para LIVE-Z6A, Z6B, Z6C y Z6C2.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index 0cc3552..fd63083 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -192,6 +192,22 @@
+     "reserveMissingActiveItem": "Put an item on air first.",
+     "priceUsesActiveItemHelp": "This price belongs to the item on air and will be used for the reservation. If adjusted, it applies only to the current live/reservation and does not change the item base price.",
+     "livePriceReadOnlyHelp": "Price of the item on air. You do not have permission to change the LIVE price.",
++    "livePriceAuthorizationHelp": "Request supervisor authorization if you need to change the LIVE price.",
++    "requestAuthorization": "Request authorization",
++    "authorizationRequestTitle": "Request authorization",
++    "authorizationPricePrompt": "Select the reason to request authorization for changing the LIVE price.",
++    "authorizationGenericPrompt": "Select the reason to request authorization.",
++    "authorizationReasonLivePromotion": "Live promotion",
++    "authorizationReasonDefectAdjustment": "Defect adjustment",
++    "authorizationReasonFrequentCustomer": "Frequent customer",
++    "authorizationReasonVerbalApproval": "Verbal authorization",
++    "authorizationReasonOther": "Other",
++    "authorizationRequestPendingTitle": "Request pending",
++    "authorizationRequestPendingMessage": "Authorization request is pending implementation. Reason: {{reason}}.",
++    "authorizationRequestNotPersistedHelp": "Internal messaging pending for LIVE-Z8.",
++    "livePriceChangeConfirmTitle": "Confirm LIVE price",
++    "livePriceChangeConfirmMessage": "The LIVE price {{livePrice}} differs from the suggested price {{basePrice}}. This change applies only to the current live/reservation and does not change the item base price.",
++    "confirmLivePriceChange": "Confirm LIVE price",
+     "activeItemPriceLabel": "Price of the item on air",
+     "suggestedPriceFromItem": "Suggested item price: {{price}}",
+     "priceConfirmedForReservation": "Confirmed reservation price: {{price}}",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index f812cbd..b88e643 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -192,6 +192,22 @@
+     "reserveMissingActiveItem": "Primero pon una prenda al aire.",
+     "priceUsesActiveItemHelp": "Este precio corresponde a la prenda que esta al aire y sera el que se usara para reservar. Si lo ajustas, aplica solo al en vivo/reserva actual y no modifica el precio base de la prenda.",
+     "livePriceReadOnlyHelp": "Precio de la prenda al aire. No tienes permiso para cambiar el precio LIVE.",
++    "livePriceAuthorizationHelp": "Solicita autorizacion a un supervisor si necesitas cambiar el precio LIVE.",
++    "requestAuthorization": "Solicitar autorizacion",
++    "authorizationRequestTitle": "Solicitar autorizacion",
++    "authorizationPricePrompt": "Selecciona el motivo para solicitar autorizacion de cambio de precio LIVE.",
++    "authorizationGenericPrompt": "Selecciona el motivo para solicitar autorizacion.",
++    "authorizationReasonLivePromotion": "Promocion en vivo",
++    "authorizationReasonDefectAdjustment": "Ajuste por defecto",
++    "authorizationReasonFrequentCustomer": "Cliente frecuente",
++    "authorizationReasonVerbalApproval": "Autorizacion verbal",
++    "authorizationReasonOther": "Otro",
++    "authorizationRequestPendingTitle": "Solicitud pendiente",
++    "authorizationRequestPendingMessage": "Solicitud de autorizacion pendiente de implementar. Motivo: {{reason}}.",
++    "authorizationRequestNotPersistedHelp": "Mensajeria interna pendiente para LIVE-Z8.",
++    "livePriceChangeConfirmTitle": "Confirmar precio LIVE",
++    "livePriceChangeConfirmMessage": "El precio LIVE {{livePrice}} es distinto al precio sugerido {{basePrice}}. Este cambio aplica solo al en vivo/reserva actual y no modifica el precio base de la prenda.",
++    "confirmLivePriceChange": "Confirmar precio LIVE",
+     "activeItemPriceLabel": "Precio de la prenda al aire",
+     "suggestedPriceFromItem": "Precio sugerido de la prenda: {{price}}",
+     "priceConfirmedForReservation": "Precio confirmado para reserva: {{price}}",
+diff --git a/services/liveCapabilities.ts b/services/liveCapabilities.ts
+index 0112ddf..1763766 100644
+--- a/services/liveCapabilities.ts
++++ b/services/liveCapabilities.ts
+@@ -89,16 +89,19 @@ export function resolveLiveCapabilities(user: UserSession | null): LiveCapabilit
+   const canManageInventory = canAccessByPermission(user, 'MANAGE_INVENTORY');
+   const canCancelReservation = operate && canAccessByPermission(user, 'CANCEL_RESERVATION');
+   const canViewPayments = hasEffectivePermission(user, 'VIEW_PAYMENTS');
++  const canViewLiveDashboard = canViewLive && (supervisor || viewReports || admin);
++  const canChangeLivePrice =
++    operate &&
++    (admin || (canManageInventory && canCancelReservation && canViewLiveDashboard));
+   const canAccessCashbox =
+     canAccessByPermission(user, 'MANAGE_CASH_CLOSURES') ||
+     canAccessByPermission(user, 'REGISTER_PAYMENTS');
+-  const canViewLiveDashboard = canViewLive && (supervisor || viewReports || admin);
+   const gaps: string[] = [
+     'START_LIVE',
+     'CLOSE_LIVE',
+     'SET_LIVE_ACTIVE_ITEM',
+     'CLEAR_LIVE_ACTIVE_ITEM',
+-    'CHANGE_LIVE_PRICE',
++    'UPDATE_LIVE_PRICE',
+     'RELEASE_LIVE_RESERVED_ITEM',
+   ];
+
+@@ -123,7 +126,7 @@ export function resolveLiveCapabilities(user: UserSession | null): LiveCapabilit
+     canMarkPending: operate,
+     canMarkOperationalSold: operate,
+     canReleaseReservedItem: canCancelReservation && canManageInventory && canViewPayments,
+-    canChangeLivePrice: operate,
++    canChangeLivePrice,
+     canViewLiveDashboard,
+     canViewLiveEvents: canViewLive,
+     canViewLiveHistory: canViewLive,

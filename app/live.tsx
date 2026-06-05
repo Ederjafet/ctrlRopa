@@ -489,6 +489,9 @@ export default function LiveScreen() {
   const [closeLiveToConfirm, setCloseLiveToConfirm] = useState<Live | null>(null);
   const [activateLiveToConfirm, setActivateLiveToConfirm] = useState<Live | null>(null);
   const [cancelReservationToConfirm, setCancelReservationToConfirm] = useState<number | null>(null);
+  const [authorizationRequestContext, setAuthorizationRequestContext] = useState<
+    'price' | 'release' | 'close' | 'cancel' | null
+  >(null);
   const [reservationIssue, setReservationIssue] = useState<string | null>(null);
   const [showDemoMetrics, setShowDemoMetrics] = useState(true);
   const [liveLayoutPreferences, setLiveLayoutPreferences] =
@@ -1666,6 +1669,21 @@ export default function LiveScreen() {
     await handleUpdateReservationOperationalStatus(reservationId, 'CANCELLED', reason);
   };
 
+  const handleRequestAuthorization = (
+    context: 'price' | 'release' | 'close' | 'cancel'
+  ) => {
+    setAuthorizationRequestContext(context);
+  };
+
+  const confirmAuthorizationRequest = (reason: string) => {
+    setAuthorizationRequestContext(null);
+    setLiveNotice({
+      title: t('live.authorizationRequestPendingTitle'),
+      message: t('live.authorizationRequestPendingMessage', { reason }),
+      tone: 'warning',
+    });
+  };
+
   const handleCreateLive = async () => {
     if (!session) {
       Alert.alert(t('live.sessionTitle'), t('live.noActiveSession'));
@@ -2163,11 +2181,48 @@ export default function LiveScreen() {
       return;
     }
 
+    const price = Number(priceText);
+    const suggestedPrice =
+      activeItem.price !== null && activeItem.price !== undefined
+        ? Number(activeItem.price)
+        : null;
+    const livePriceDiffersFromBase =
+      mayChangeLivePrice &&
+      suggestedPrice !== null &&
+      Number.isFinite(suggestedPrice) &&
+      Math.abs(price - suggestedPrice) > 0.009;
+
+    if (livePriceDiffersFromBase) {
+      Alert.alert(
+        t('live.livePriceChangeConfirmTitle'),
+        t('live.livePriceChangeConfirmMessage', {
+          basePrice: formatMoney(suggestedPrice),
+          livePrice: formatMoney(price),
+        }),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('live.confirmLivePriceChange'),
+            onPress: () => {
+              void persistReservation(price);
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    await persistReservation(price);
+  };
+
+  const persistReservation = async (price: number) => {
+    if (!session || !selectedCustomer || !activeItem || !selectedLive || !liveChannelId) {
+      return;
+    }
+
     setIsSavingReservation(true);
 
     try {
-      const price = Number(priceText);
-
       const reservation = await createReservation({
         itemId: activeItem.id,
         customerId: selectedCustomer.id,
@@ -3728,6 +3783,18 @@ export default function LiveScreen() {
                           })
                         : t('live.operatorStepPriceEmpty')}
                     </AppText>
+                    {activeItem && !mayChangeLivePrice ? (
+                      <View style={styles.operatorPriceAuthorizationBox}>
+                        <AppText variant="caption" color={theme.colors.mutedText}>
+                          {t('live.livePriceAuthorizationHelp')}
+                        </AppText>
+                        <AppButton
+                          title={t('live.requestAuthorization')}
+                          variant="secondary"
+                          onPress={() => handleRequestAuthorization('price')}
+                        />
+                      </View>
+                    ) : null}
                   </LiveCompactCard>
 
                   <LiveCompactCard style={[styles.operatorFlowStepCard, styles.operatorInlinePanel]}>
@@ -5344,6 +5411,42 @@ export default function LiveScreen() {
         />
       </AppBottomModal>
 
+      <AppBottomModal
+        visible={authorizationRequestContext !== null}
+        title={t('live.authorizationRequestTitle')}
+        onClose={() => setAuthorizationRequestContext(null)}
+        showCancelButton={false}
+      >
+        <AppText color={theme.colors.mutedText}>
+          {authorizationRequestContext === 'price'
+            ? t('live.authorizationPricePrompt')
+            : t('live.authorizationGenericPrompt')}
+        </AppText>
+        {[
+          t('live.authorizationReasonLivePromotion'),
+          t('live.authorizationReasonDefectAdjustment'),
+          t('live.authorizationReasonFrequentCustomer'),
+          t('live.authorizationReasonVerbalApproval'),
+          t('live.authorizationReasonOther'),
+        ].map((reason) => (
+          <AppOptionRow
+            key={reason}
+            title={reason}
+            subtitle={
+              reason === t('live.authorizationReasonOther')
+                ? t('live.authorizationRequestNotPersistedHelp')
+                : undefined
+            }
+            onPress={() => confirmAuthorizationRequest(reason)}
+          />
+        ))}
+        <AppButton
+          title={t('common.cancel')}
+          variant="secondary"
+          onPress={() => setAuthorizationRequestContext(null)}
+        />
+      </AppBottomModal>
+
 
       <AppBottomModal
         visible={activateLiveToConfirm !== null}
@@ -5785,6 +5888,10 @@ const styles = StyleSheet.create({
   },
   operatorPrimaryButton: {
     minHeight: 48,
+  },
+  operatorPriceAuthorizationBox: {
+    gap: 8,
+    marginTop: 4,
   },
   operatorRecentLiveCard: {
     borderWidth: 1,
