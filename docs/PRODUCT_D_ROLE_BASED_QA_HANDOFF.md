@@ -84,6 +84,8 @@ Para una corrida visual/manual real:
 - CSV smoke actualizado con resultado PASS/FAIL;
 - hallazgos priorizados.
 
+PRODUCT-D2 deja el handoff operativo en `docs/PRODUCT_D2_VISUAL_QA_EXECUTION_HANDOFF.md` y el CSV ejecutable en `qa-reports/PRODUCT-D2-visual-qa-execution-smoke-*.csv`. Los casos arrancan como `PENDIENTE_MANUAL`; no deben marcarse como PASS sin evidencia.
+
 ## Entregables de esta fase
 
 - `docs/PRODUCT_D_ROLE_BASED_QA_MATRIX.md`
