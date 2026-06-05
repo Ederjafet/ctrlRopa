@@ -35,9 +35,7 @@ export default function AppText({
 }
 
 const styles = StyleSheet.create({
-  base: {
-    color: '#111111',
-  },
+  base: {},
 });
 
 const variantStyles = StyleSheet.create({

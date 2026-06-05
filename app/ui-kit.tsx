@@ -8,6 +8,7 @@ import OperationalTemplate from '@/components/templates/OperationalTemplate';
 import ActionTile from '@/components/ui/ActionTile';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
+import AppInput from '@/components/ui/AppInput';
 import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
 import AppText from '@/components/ui/AppText';
 import EmptyState from '@/components/ui/EmptyState';
@@ -162,6 +163,85 @@ export default function UiKitPreview() {
         ))}
       </AppResponsiveGrid>
 
+      <SectionHeader
+        title="Tokens semanticos del tema activo"
+        subtitle="Superficies, texto, inputs y estados usados por AppShell, LIVE y detalle"
+      />
+      <AppResponsiveGrid tabletColumns={2} desktopColumns={4}>
+        {[
+          ['background', theme.colors.background],
+          ['surface', theme.colors.surface],
+          ['surfaceAlt', theme.colors.surfaceAlt],
+          ['surfaceMuted', theme.colors.surfaceMuted],
+          ['textPrimary', theme.colors.textPrimary],
+          ['textSecondary', theme.colors.textSecondary],
+          ['textMuted', theme.colors.textMuted],
+          ['inputBackground', theme.colors.inputBackground],
+          ['inputText', theme.colors.inputText],
+          ['inputPlaceholder', theme.colors.inputPlaceholder],
+          ['disabledBackground', theme.colors.disabledBackground],
+          ['disabledText', theme.colors.disabledText],
+        ].map(([name, color]) => (
+          <AppCard key={name} style={styles.tokenCard}>
+            <View
+              style={[
+                styles.swatch,
+                {
+                  backgroundColor: color,
+                  borderColor: theme.colors.borderStrong,
+                  borderWidth: StyleSheet.hairlineWidth,
+                },
+              ]}
+            />
+            <AppText bold>{name}</AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {color}
+            </AppText>
+          </AppCard>
+        ))}
+      </AppResponsiveGrid>
+
+      <SectionHeader
+        title="Comparativo claro / oscuro"
+        subtitle="Referencia rapida para detectar contraste bajo antes de migrar pantallas"
+      />
+      <AppResponsiveGrid tabletColumns={2} desktopColumns={2}>
+        {[
+          { label: 'Light', palette: designTokens.colors },
+          { label: 'Dark', palette: designTokens.darkColors },
+        ].map(({ label, palette }) => (
+          <AppCard key={label} style={styles.previewCard}>
+            <View style={styles.themePreviewHeader}>
+              <AppText bold>{label}</AppText>
+              <StatusBadge label={label === 'Dark' ? 'dark' : 'light'} tone="info" />
+            </View>
+            <View style={[styles.themePreviewCanvas, { backgroundColor: palette.background }]}>
+              <View
+                style={[
+                  styles.themePreviewPanel,
+                  {
+                    backgroundColor: palette.surface,
+                    borderColor: palette.border,
+                  },
+                ]}
+              >
+                <AppText color={palette.textPrimary} bold>
+                  Card premium
+                </AppText>
+                <AppText variant="caption" color={palette.textSecondary}>
+                  Texto secundario legible y con menor jerarquia.
+                </AppText>
+                <View style={styles.inlineList}>
+                  <StatusBadge label="Disponible" tone="success" />
+                  <StatusBadge label="Reservada" tone="warning" />
+                  <StatusBadge label="Bloqueada" />
+                </View>
+              </View>
+            </View>
+          </AppCard>
+        ))}
+      </AppResponsiveGrid>
+
       <AppResponsiveGrid tabletColumns={3} desktopColumns={3}>
         <EntitySummaryCard
           title="Radius"
@@ -209,6 +289,7 @@ export default function UiKitPreview() {
           <AppButton title="Primary" variant="primary" onPress={() => undefined} />
           <AppButton title="Secondary" variant="secondary" onPress={() => undefined} />
           <AppButton title="Neutral" variant="neutral" onPress={() => undefined} />
+          <AppButton title="Ghost" variant="ghost" onPress={() => undefined} />
           <AppButton title="Danger" variant="danger" onPress={() => undefined} />
           <AppButton
             title="Disabled"
@@ -229,6 +310,11 @@ export default function UiKitPreview() {
           </View>
         </AppCard>
         <MetricCard label="MetricCard" value="$12,450" helper="Dato de ejemplo para preview" />
+        <AppCard style={styles.previewCard}>
+          <SectionHeader title="Inputs" subtitle="Texto, placeholder y readonly en claro/oscuro" />
+          <AppInput label="Precio LIVE" value="1299.00" onChangeText={() => undefined} />
+          <AppInput label="Precio solo lectura" value="1299.00" editable={false} />
+        </AppCard>
         <ActionTile
           title="ActionTile"
           subtitle="Accion compacta reutilizable"
@@ -245,6 +331,51 @@ export default function UiKitPreview() {
           ]}
         />
         <EmptyState title="EmptyState" message="Estado vacio profesional y reutilizable." />
+      </AppResponsiveGrid>
+
+      <SectionHeader title="Panel LIVE premium" subtitle="Referencia visual usada por consola operativa" />
+      <AppResponsiveGrid tabletColumns={2} desktopColumns={3}>
+        <AppCard style={styles.previewCard}>
+          <View style={styles.themePreviewHeader}>
+            <StatusBadge label="Preparada" tone="warning" />
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              Secundaria
+            </AppText>
+          </View>
+          <AppText bold>Prenda lista para pasar al aire</AppText>
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            Aun no se usa para reservas.
+          </AppText>
+          <AppButton title="Poner al aire" variant="primary" onPress={() => undefined} />
+        </AppCard>
+        <AppCard style={[styles.previewCard, { borderColor: theme.colors.success }]}>
+          <View style={styles.themePreviewHeader}>
+            <StatusBadge label="Al aire" tone="success" />
+            <StatusBadge label="Disponible" tone="success" />
+          </View>
+          <AppText bold>Prenda protagonista</AppText>
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            Esta es la prenda que se reservara.
+          </AppText>
+          <AppButton title="Reservar ahora" variant="primary" onPress={() => undefined} />
+        </AppCard>
+        <AppCard style={[styles.previewCard, { borderColor: theme.colors.warning }]}>
+          <View style={styles.themePreviewHeader}>
+            <StatusBadge label="Al aire" tone="success" />
+            <StatusBadge label="Reservada" tone="warning" />
+          </View>
+          <AppText bold>Prenda reservada</AppText>
+          <AppText variant="caption" color={theme.colors.warning}>
+            Cambia o sacala del aire para continuar.
+          </AppText>
+          <AppButton
+            title="Reservar ahora"
+            variant="neutral"
+            disabled
+            disabledReason="La prenda ya tiene una reserva activa."
+            onPress={() => undefined}
+          />
+        </AppCard>
       </AppResponsiveGrid>
 
       <SectionHeader title="Templates" subtitle="Previews estructurales para fases futuras" />
@@ -331,6 +462,23 @@ const styles = StyleSheet.create({
     borderRadius: designTokens.radius.md,
     height: 42,
     width: '100%',
+  },
+  themePreviewCanvas: {
+    borderRadius: designTokens.radius.lg,
+    padding: designTokens.spacing.lg,
+  },
+  themePreviewHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: designTokens.spacing.sm,
+    justifyContent: 'space-between',
+  },
+  themePreviewPanel: {
+    borderRadius: designTokens.radius.md,
+    borderWidth: 1,
+    gap: designTokens.spacing.sm,
+    padding: designTokens.spacing.md,
   },
   tokenCard: {
     gap: designTokens.spacing.sm,

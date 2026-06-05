@@ -709,3 +709,93 @@ No se instalaron librerias externas. No se tocaron backend, AUTH backend, RBAC, 
 - Ver `/live` en claro y oscuro.
 - Confirmar contraste de botones y badges.
 - Confirmar `reservation-detail` heredando tema desde AppShell.
+
+---
+
+## PRODUCT-B4 - Dark theme premium y estandarizacion visual
+
+Fecha: 2026-06-04
+
+### Objetivo
+
+Corregir inconsistencias de dark mode y estandarizar el lenguaje visual en pantallas que ya usan AppShell/UI Kit.
+
+### Cambios
+
+- Se fortalecieron tokens semanticos para superficies, texto, inputs, disabled, overlay y alertas.
+- `mutedText`, `textSecondary` y `textMuted` quedan definidos por el tema claro/oscuro y no por colores configurables de light mode.
+- `AppInput` aplica tokens especificos para readonly/disabled, corrigiendo la legibilidad de precio LIVE en dark mode.
+- `AppButton`, `AppCard`, `StatusBadge`, `AppShell`, `AppNoticeDropdown` y `LiveCommerceCards` consumen mejor los tokens del tema.
+- `/ui-kit` agrega tokens semanticos del tema activo y comparativo claro/oscuro.
+- `reservation-detail` elimina hardcodes warning en la seccion de pagos.
+
+### Restricciones respetadas
+
+No se tocaron backend, AUTH/RBAC, pagos, caja, reportes, billing, IA ni reglas operativas LIVE.
+
+### Evidencia relacionada
+
+Ver `docs/LIVE_Z8B_DARK_THEME_STANDARDIZATION.md`.
+
+---
+
+## PRODUCT-B4.1 - Premium AppShell polish
+
+Fecha: 2026-06-04
+
+### Objetivo
+
+Pulir `AppShell`, `TopBar` y `Sidebar` para evitar duplicidad de usuario/rol en desktop.
+
+### Cambios
+
+- `TopBar` deja de mostrar usuario completo en desktop.
+- `TopBar` mantiene contexto de pantalla y toggle claro/oscuro.
+- En tablet/mobile, `TopBar` puede mostrar rol compacto porque el Sidebar esta oculto como drawer.
+- `Sidebar` footer queda como fuente visual principal para sesion:
+  - rol;
+  - usuario;
+  - correo;
+  - cerrar sesion.
+- El footer usa tokens `surfaceAlt`, `border`, `danger` y respeta claro/oscuro.
+
+### Validacion esperada
+
+- En desktop no debe verse `ADMIN / QA Admin General / DEFAULT / QA Centro` duplicado entre TopBar y Sidebar.
+- En mobile/tablet el drawer mantiene usuario y logout.
+- El toggle claro/oscuro sigue visible.
+
+---
+
+## PRODUCT-B4.2 - Premium visual redesign pass
+
+Fecha: 2026-06-04
+
+### Objetivo
+
+Hacer mas visible la diferencia visual del UI Kit interno y acercar la app a un panel operativo premium.
+
+### Cambios visuales
+
+- Tokens nuevos:
+  - `backgroundElevated`;
+  - `surfaceElevated`;
+  - `borderSubtle`;
+  - `accentSoft`.
+- AppShell agrega profundidad visual con una superficie ambiental.
+- Sidebar mejora active state, brand panel, spacing de secciones y footer de sesion.
+- TopBar gana jerarquia con eyebrow contextual, sombra y borde sutil.
+- Cards, tiles, metricas, empty states, badges, inputs y botones consumen mejor tokens semanticos.
+- `AppButton` agrega variante `ghost`.
+- `/ui-kit` muestra botones, inputs y panel LIVE premium como referencia real.
+
+### Pantallas impactadas
+
+- Inicio.
+- LIVE.
+- UI Kit.
+- Reservation detail.
+
+### Restricciones respetadas
+
+No se tocaron backend, AUTH/RBAC, pagos, caja, reportes, billing, IA ni reglas operativas LIVE.

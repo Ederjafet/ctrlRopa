@@ -22,15 +22,16 @@ export default function ActionTile({ title, subtitle, icon = 'chevron-right', di
       style={({ pressed }) => [
         styles.tile,
         {
-          backgroundColor: theme.colors.surface,
-          borderColor: theme.colors.border,
-          borderRadius: designTokens.radius.lg,
+          backgroundColor: theme.colors.surfaceElevated,
+          borderColor: theme.colors.borderSubtle,
+          borderRadius: designTokens.radius.xl,
           opacity: disabled ? 0.45 : pressed ? 0.78 : 1,
-          ...designTokens.shadows.card,
+          shadowColor: theme.isDark ? theme.colors.overlay : theme.colors.primary,
+          shadowOpacity: theme.isDark ? 0.18 : 0.09,
         },
       ]}
     >
-      <View style={[styles.iconWrap, { backgroundColor: theme.colors.infoCardBackground }]}>
+      <View style={[styles.iconWrap, { backgroundColor: theme.colors.accentSoft }]}>
         <MaterialIcons name={icon} size={20} color={theme.colors.accent} />
       </View>
       <View style={styles.textBlock}>
@@ -68,5 +69,7 @@ const styles = StyleSheet.create({
     marginBottom: designTokens.spacing.sm,
     minHeight: 64,
     padding: designTokens.spacing.md,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 18,
   },
 });

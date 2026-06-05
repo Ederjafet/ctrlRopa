@@ -22,7 +22,7 @@ type Props = {
 export default function SidebarNavItem({ item, active, onPress }: Props) {
   const { theme } = useAppTheme();
   const disabled = item.disabled || !item.route;
-  const iconColor = active ? theme.colors.primaryButtonText : theme.colors.mutedText;
+  const iconColor = active ? theme.colors.accent : theme.colors.mutedText;
 
   return (
     <Pressable
@@ -31,8 +31,8 @@ export default function SidebarNavItem({ item, active, onPress }: Props) {
       style={({ pressed }) => [
         styles.item,
         {
-          backgroundColor: active ? theme.colors.primaryButtonBackground : 'transparent',
-          borderColor: active ? theme.colors.primaryButtonBackground : theme.colors.border,
+          backgroundColor: active ? theme.colors.accentSoft : 'transparent',
+          borderColor: active ? theme.colors.accent : theme.colors.borderSubtle,
           borderRadius: designTokens.radius.md,
           opacity: disabled ? 0.45 : pressed ? 0.78 : 1,
         },
@@ -42,7 +42,7 @@ export default function SidebarNavItem({ item, active, onPress }: Props) {
       <View style={styles.textBlock}>
         <AppText
           bold={active}
-          color={active ? theme.colors.primaryButtonText : theme.colors.text}
+          color={active ? theme.colors.textPrimary : theme.colors.text}
           numberOfLines={1}
         >
           {item.label}
@@ -50,7 +50,7 @@ export default function SidebarNavItem({ item, active, onPress }: Props) {
         {item.helper ? (
           <AppText
             variant="caption"
-            color={active ? theme.colors.primaryButtonText : theme.colors.mutedText}
+            color={active ? theme.colors.textSecondary : theme.colors.mutedText}
             numberOfLines={1}
           >
             {item.helper}

@@ -1,0 +1,26 @@
+ app/live.tsx                                 | 186 ++++++++++++++++++-------
+ app/reservation-detail.tsx                   |   8 +-
+ app/ui-kit.tsx                               | 148 ++++++++++++++++++++
+ components/layout/AppShell.tsx               |  25 +++-
+ components/layout/Sidebar.tsx                |  71 +++++++---
+ components/layout/SidebarNavItem.tsx         |  10 +-
+ components/layout/TopBar.tsx                 |  56 ++++----
+ components/live/LiveCommerceCards.tsx        |  13 +-
+ components/ui/ActionTile.tsx                 |  13 +-
+ components/ui/AppButton.tsx                  |  16 ++-
+ components/ui/AppCard.tsx                    |  16 +--
+ components/ui/AppInput.tsx                   |  11 +-
+ components/ui/AppNoticeDropdown.tsx          |   8 +-
+ components/ui/AppText.tsx                    |   4 +-
+ components/ui/EmptyState.tsx                 |   2 +-
+ components/ui/EntitySummaryCard.tsx          |   5 +-
+ components/ui/MetricCard.tsx                 |  11 +-
+ components/ui/StatusBadge.tsx                |   6 +-
+ context/AppThemeContext.tsx                  | 194 +++++++++++++++++----------
+ docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md  |  25 ++++
+ docs/LIVE_Z7_PERMISSIONS_PRICE_APPROVAL.md   |  12 ++
+ docs/PRODUCT_B_INTERNAL_UI_KIT_FOUNDATION.md |  90 +++++++++++++
+ locales/en/common.json                       |  17 ++-
+ locales/es/common.json                       |  17 ++-
+ theme/designTokens.ts                        |  56 ++++++++
+ 25 files changed, 812 insertions(+), 208 deletions(-)

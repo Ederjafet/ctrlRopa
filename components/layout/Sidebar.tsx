@@ -31,12 +31,21 @@ export default function Sidebar({ sections, activeRoute, onNavigate, session, on
         styles.sidebar,
         {
           backgroundColor: theme.colors.surface,
-          borderColor: theme.colors.border,
+          borderColor: theme.colors.borderSubtle,
         },
       ]}
     >
       <View style={styles.brandRow}>
-        <View style={styles.brand}>
+        <View
+          style={[
+            styles.brand,
+            {
+              backgroundColor: theme.colors.surfaceAlt,
+              borderColor: theme.colors.borderSubtle,
+              borderRadius: designTokens.radius.lg,
+            },
+          ]}
+        >
           <AppText variant="subtitle" bold>
             Ctrl Ropa
           </AppText>
@@ -52,8 +61,8 @@ export default function Sidebar({ sections, activeRoute, onNavigate, session, on
             style={({ pressed }) => [
               styles.closeButton,
               {
-                backgroundColor: theme.colors.infoCardBackground,
-                borderColor: theme.colors.infoCardBorder,
+              backgroundColor: theme.colors.infoCardBackground,
+              borderColor: theme.colors.borderSubtle,
                 borderRadius: designTokens.radius.md,
                 opacity: pressed ? 0.72 : 1,
               },
@@ -92,22 +101,35 @@ export default function Sidebar({ sections, activeRoute, onNavigate, session, on
         ))}
       </ScrollView>
       {session ? (
-        <View style={[styles.sessionPanel, { borderColor: theme.colors.border }]}>
-          <StatusBadge label={roleLabel} tone="info" />
-          <AppText bold numberOfLines={1}>
-            {session.name || session.email}
-          </AppText>
-          <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
-            {session.email}
-          </AppText>
+        <View
+          style={[
+            styles.sessionPanel,
+            {
+              backgroundColor: theme.colors.surfaceAlt,
+              borderColor: theme.colors.borderSubtle,
+              borderRadius: designTokens.radius.lg,
+            },
+          ]}
+        >
+          <View style={styles.sessionHeader}>
+            <StatusBadge label={roleLabel} tone="info" />
+          </View>
+          <View style={styles.sessionIdentity}>
+            <AppText bold numberOfLines={1}>
+              {session.name || session.email}
+            </AppText>
+            <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+              {session.email}
+            </AppText>
+          </View>
           <Pressable
             onPress={onSignOut}
             accessibilityRole="button"
             style={({ pressed }) => [
               styles.signOutButton,
               {
-                backgroundColor: theme.colors.dangerBackground,
-                borderColor: theme.colors.danger,
+                backgroundColor: theme.isDark ? theme.colors.surfaceMuted : theme.colors.surface,
+                borderColor: theme.isDark ? theme.colors.borderStrong : theme.colors.dangerBackground,
                 borderRadius: designTokens.radius.md,
                 opacity: pressed ? 0.72 : 1,
               },
@@ -127,7 +149,10 @@ export default function Sidebar({ sections, activeRoute, onNavigate, session, on
 const styles = StyleSheet.create({
   brand: {
     flex: 1,
+    borderWidth: 1,
     minWidth: 0,
+    paddingHorizontal: designTokens.spacing.md,
+    paddingVertical: designTokens.spacing.sm,
   },
   brandRow: {
     alignItems: 'flex-start',
@@ -150,22 +175,30 @@ const styles = StyleSheet.create({
     paddingBottom: designTokens.spacing.md,
   },
   section: {
-    marginBottom: designTokens.spacing.md,
+    marginBottom: designTokens.spacing.lg,
   },
   sectionLabel: {
-    marginBottom: designTokens.spacing.xs,
+    letterSpacing: 0.8,
+    marginBottom: designTokens.spacing.sm,
     textTransform: 'uppercase',
   },
+  sessionHeader: {
+    alignItems: 'flex-start',
+  },
+  sessionIdentity: {
+    gap: 2,
+    minWidth: 0,
+  },
   sessionPanel: {
-    borderTopWidth: 1,
+    borderWidth: 1,
     gap: designTokens.spacing.xs,
-    paddingTop: designTokens.spacing.sm,
+    padding: designTokens.spacing.sm,
   },
   sidebar: {
     borderRightWidth: 1,
     flex: 1,
     minHeight: '100%',
-    padding: designTokens.spacing.md,
+    padding: designTokens.spacing.lg,
     width: '100%',
   },
   signOutButton: {

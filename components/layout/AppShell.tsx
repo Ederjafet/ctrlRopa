@@ -72,6 +72,16 @@ export default function AppShell({
 
   return (
     <View style={[styles.shell, { backgroundColor: theme.colors.background }]}>
+      <View
+        pointerEvents="none"
+        style={[
+          styles.ambientPanel,
+          {
+            backgroundColor: theme.colors.backgroundElevated,
+            borderColor: theme.colors.borderSubtle,
+          },
+        ]}
+      />
       {showSidebar ? <View style={styles.fixedSidebar}>{renderSidebar(false)}</View> : null}
       <View style={styles.mainPane}>
         <ScrollView
@@ -103,7 +113,10 @@ export default function AppShell({
       </View>
       <Modal visible={!showSidebar && menuOpen} transparent animationType="fade">
         <View style={styles.modalRoot}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setMenuOpen(false)} />
+          <Pressable
+            style={[styles.modalBackdrop, { backgroundColor: theme.colors.overlay }]}
+            onPress={() => setMenuOpen(false)}
+          />
           <View style={[styles.mobileSidebar, { width: drawerWidth }]}>{renderSidebar(true)}</View>
         </View>
       </Modal>
@@ -120,6 +133,15 @@ const styles = StyleSheet.create({
   fixedSidebar: {
     width: designTokens.layout.sidebarWidth,
   },
+  ambientPanel: {
+    borderBottomWidth: 1,
+    height: 188,
+    left: 0,
+    opacity: 0.82,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
   mainPane: {
     flex: 1,
     minWidth: 0,
@@ -133,7 +155,6 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.35)',
   },
   modalRoot: {
     flex: 1,

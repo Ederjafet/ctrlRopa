@@ -21,7 +21,7 @@ export default function EntitySummaryCard({ title, subtitle, badge, meta = [] }:
   const { theme } = useAppTheme();
 
   return (
-    <AppCard>
+    <AppCard style={styles.card}>
       <View style={styles.header}>
         <View style={styles.titleBlock}>
           <AppText bold numberOfLines={2}>
@@ -59,6 +59,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: designTokens.spacing.md,
     justifyContent: 'space-between',
+  },
+  card: {
+    gap: designTokens.spacing.xs,
   },
   metaGrid: {
     flexDirection: 'row',

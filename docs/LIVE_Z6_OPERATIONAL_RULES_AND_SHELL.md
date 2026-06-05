@@ -411,6 +411,13 @@ Hacer que `/live` consuma el sistema visual de PRODUCT-B de forma real, con tema
 - Si el precio LIVE difiere del precio sugerido/base, se solicita confirmacion antes de crear la reserva.
 - La liberacion segura de prenda queda pendiente porque requiere confirmar pagos y un endpoint especifico.
 
+### Continuidad a LIVE-Z8
+
+- LIVE-Z8 agrega `AuthorizationRequestPanel` como UI reutilizable para acciones bloqueadas por capacidades.
+- La vista Supervisor/Admin muestra `Solicitudes pendientes` con EmptyState real mientras no exista backend.
+- No se simulan aprobaciones ni se ejecutan acciones despues de solicitar autorizacion.
+- Persistencia, inbox supervisor y auditoria operacional quedan para LIVE-Z9.
+
 ## GO/NO-GO
 
 GO tecnico para LIVE-Z6A, Z6B, Z6C y Z6C2.
@@ -421,3 +428,21 @@ GO visual condicionado a QA manual con usuarios:
 - `qa.vendedor.centro@local.test`
 - `qa.supervisor.centro@local.test`
 - `qa.sinpermisos@local.test`
+
+## LIVE-Z8B / PRODUCT-B4 - Dark theme premium
+
+Fecha: 2026-06-04
+
+### Ajuste visual
+
+- Se reforzo dark mode para que LIVE herede tokens semanticos reales y no colores hardcodeados.
+- El bloque `3. PRECIO` queda legible en modo oscuro sin seleccionar texto.
+- Inputs, helper texts, captions, disabled states, badges y alertas usan tokens del tema.
+- Las alertas warning en dark mode se suavizan para verse premium y no como bloques ambar dominantes.
+- La prenda reservada conserva acento warning sin saturar toda la card.
+- `AppShell`, `TopBar`, `Sidebar`, Home, UI Kit y `reservation-detail` mantienen el mismo lenguaje visual claro/oscuro.
+
+### No se cambio
+
+- No se tocaron backend, AUTH/RBAC, pagos, caja, reportes, billing ni IA.
+- No se cambiaron capacidades LIVE ni reglas operativas Z6/Z7/Z8.

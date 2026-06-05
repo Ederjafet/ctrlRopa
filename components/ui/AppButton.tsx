@@ -11,7 +11,8 @@ type Props = PressableProps & {
     | 'danger'
     | 'cancel'
     | 'back'
-    | 'menu';
+    | 'menu'
+    | 'ghost';
   loading?: boolean;
   disabledReason?: string;
 };
@@ -32,6 +33,8 @@ export default function AppButton({
   const backgroundColor =
     isBlocked
       ? theme.colors.disabledButtonBackground
+      : variant === 'ghost'
+        ? 'transparent'
       : variant === 'danger'
       ? theme.colors.dangerButtonBackground
       : variant === 'cancel'
@@ -51,6 +54,8 @@ export default function AppButton({
   const textColor =
     isBlocked
       ? theme.colors.disabledButtonText
+      : variant === 'ghost'
+        ? theme.colors.accent
       : variant === 'danger'
       ? theme.colors.dangerButtonText
       : variant === 'cancel'
@@ -66,6 +71,11 @@ export default function AppButton({
       : variant === 'secondary'
         ? theme.colors.secondaryButtonText
         : theme.colors.primaryButtonText;
+  const hasSubtleBorder = variant === 'neutral' || variant === 'secondary' || variant === 'ghost';
+  const borderColor =
+    variant === 'secondary' || variant === 'ghost'
+      ? theme.colors.accent
+      : theme.colors.neutralButtonBorder;
 
   return (
     <Pressable
@@ -73,8 +83,8 @@ export default function AppButton({
         styles.button,
         {
           backgroundColor,
-          borderColor: variant === 'neutral' ? theme.colors.neutralButtonBorder : backgroundColor,
-          borderWidth: variant === 'neutral' ? StyleSheet.hairlineWidth : 0,
+          borderColor: hasSubtleBorder ? borderColor : backgroundColor,
+          borderWidth: hasSubtleBorder ? StyleSheet.hairlineWidth : 0,
           borderRadius: theme.radius.md,
           paddingVertical: theme.density === 'COMPACT' ? 11 : 15,
           paddingHorizontal: theme.spacing.md,
