@@ -249,3 +249,19 @@ Implementacion:
 La seleccion se guarda localmente y afecta la app real mediante tokens semanticos. No se persiste en backend ni tenant todavia.
 
 Ver `docs/PRODUCT_C_CLIENT_VISUAL_IDENTITY_PRESETS.md`.
+
+---
+
+## Continuidad PRODUCT-C2 - Editor controlado
+
+Fecha: 2026-06-05
+
+Se agrego un editor controlado de identidad visual sobre la plantilla activa. La resolucion del tema queda:
+
+```text
+preset base + overrides locales + light/dark mode = tokens finales
+```
+
+El editor vive en `/ui-kit`, valida colores hexadecimales `#RRGGBB`, permite restaurar la plantilla y guarda la personalizacion solo en frontend. No se agregaron endpoints, migraciones ni persistencia por tenant.
+
+Ver `docs/PRODUCT_C2_VISUAL_IDENTITY_EDITOR.md`.
