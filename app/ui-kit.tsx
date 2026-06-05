@@ -22,6 +22,14 @@ import { canAccess, canAccessByPermission, isAdmin, isNoAccess } from '@/service
 import { canViewLive } from '@/services/livePermissionGuards';
 import { ensureSessionActive, getSession, UserSession } from '@/services/sessionStorage';
 import { designTokens, viewVariants } from '@/theme/designTokens';
+import {
+  EditableVisualTokenKey,
+  ThemeScheme,
+  editableVisualTokenKeys,
+  getContrastRatio,
+  isHexColor,
+  visualTokenLabels,
+} from '@/theme/designPresets';
 import { Redirect } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
@@ -80,12 +88,67 @@ export default function UiKitPreview() {
     themeMode,
     toggleThemeMode,
     visualPresetId,
+    customVisualIdentity,
     designPresets,
     setVisualPresetId,
+    setCustomVisualIdentity,
+    resetCustomVisualIdentity,
   } = useAppTheme();
   const [loading, setLoading] = useState(true);
   const [isLogged, setIsLogged] = useState(false);
   const [session, setSession] = useState<UserSession | null>(null);
+  const [editorValues, setEditorValues] = useState<Record<EditableVisualTokenKey, string>>({
+    primary: '',
+    secondary: '',
+    accent: '',
+    success: '',
+    warning: '',
+    danger: '',
+    background: '',
+    surface: '',
+  });
+  const [editorRadius, setEditorRadius] = useState<'standard' | 'soft' | 'compact'>('soft');
+  const [editorDensity, setEditorDensity] = useState<'NORMAL' | 'COMPACT'>('NORMAL');
+  const [identityFeedback, setIdentityFeedback] = useState<string | null>(null);
+
+  const activePreset = useMemo(
+    () => designPresets.find((preset) => preset.id === visualPresetId) ?? designPresets[0],
+    [designPresets, visualPresetId],
+  );
+  const activeScheme: ThemeScheme = theme.isDark ? 'dark' : 'light';
+  const activeOverrides = useMemo(
+    () =>
+      customVisualIdentity?.presetId === visualPresetId
+        ? customVisualIdentity.colors[activeScheme] ?? {}
+        : {},
+    [activeScheme, customVisualIdentity, visualPresetId],
+  );
+  const editorErrors = useMemo(() => {
+    return editableVisualTokenKeys.reduce<Partial<Record<EditableVisualTokenKey, string>>>(
+      (acc, key) => {
+        const value = editorValues[key]?.trim();
+        if (!value || !isHexColor(value)) {
+          acc[key] = 'Usa formato #RRGGBB.';
+        }
+        return acc;
+      },
+      {},
+    );
+  }, [editorValues]);
+  const hasEditorErrors = Object.keys(editorErrors).length > 0;
+  const contrastWarnings = useMemo(() => {
+    const warnings: string[] = [];
+    const backgroundContrast = getContrastRatio(theme.colors.textPrimary, editorValues.background);
+    const surfaceContrast = getContrastRatio(theme.colors.textPrimary, editorValues.surface);
+
+    if (backgroundContrast !== null && backgroundContrast < 3) {
+      warnings.push('El fondo puede tener bajo contraste con el texto principal.');
+    }
+    if (surfaceContrast !== null && surfaceContrast < 3) {
+      warnings.push('La superficie/cards puede tener bajo contraste con el texto principal.');
+    }
+    return warnings;
+  }, [editorValues.background, editorValues.surface, theme.colors.textPrimary]);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,6 +172,59 @@ export default function UiKitPreview() {
   }, []);
 
   const navSections = useMemo(() => buildNavSections(session), [session]);
+
+  useEffect(() => {
+    const baseColors = activePreset.colors[activeScheme];
+    const nextValues = editableVisualTokenKeys.reduce<Record<EditableVisualTokenKey, string>>(
+      (acc, key) => {
+        acc[key] = activeOverrides[key] ?? baseColors[key];
+        return acc;
+      },
+      {
+        primary: '',
+        secondary: '',
+        accent: '',
+        success: '',
+        warning: '',
+        danger: '',
+        background: '',
+        surface: '',
+      },
+    );
+
+    setEditorValues(nextValues);
+    setEditorRadius(customVisualIdentity?.radius ?? activePreset.radius);
+    setEditorDensity(customVisualIdentity?.density ?? activePreset.density);
+    setIdentityFeedback(null);
+  }, [activeOverrides, activePreset, activeScheme, customVisualIdentity, visualPresetId]);
+
+  const updateEditorToken = (key: EditableVisualTokenKey, value: string) => {
+    setEditorValues((current) => ({ ...current, [key]: value.trim() }));
+    setIdentityFeedback(null);
+  };
+
+  const applyVisualIdentityChanges = async () => {
+    if (hasEditorErrors) {
+      setIdentityFeedback('Corrige los colores invalidos antes de aplicar.');
+      return;
+    }
+
+    await setCustomVisualIdentity({
+      presetId: visualPresetId,
+      colors: {
+        ...(customVisualIdentity?.colors ?? {}),
+        [activeScheme]: editorValues,
+      },
+      radius: editorRadius,
+      density: editorDensity,
+    });
+    setIdentityFeedback('Personalizacion aplicada localmente.');
+  };
+
+  const restoreActivePreset = async () => {
+    await resetCustomVisualIdentity();
+    setIdentityFeedback('Plantilla restaurada a sus tokens base.');
+  };
 
   if (loading) {
     return (
@@ -212,6 +328,175 @@ export default function UiKitPreview() {
             ))}
         </AppResponsiveGrid>
       </View>
+
+      <SectionHeader
+        title="Editor controlado"
+        subtitle="Personaliza tokens semanticos principales de la plantilla activa."
+      />
+      <AppCard variant="elevated" style={styles.previewCard}>
+        <View style={styles.themePreviewHeader}>
+          <View style={styles.previewTextBlock}>
+            <AppText bold>Identidad visual local</AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              Editando modo {activeScheme === 'dark' ? 'oscuro' : 'claro'} sobre{' '}
+              {activePreset.label}. No modifica backend ni tenant.
+            </AppText>
+          </View>
+          <StatusBadge
+            label={customVisualIdentity?.presetId === visualPresetId ? 'Personalizada' : 'Base'}
+            tone={customVisualIdentity?.presetId === visualPresetId ? 'warning' : 'info'}
+          />
+        </View>
+
+        <AppResponsiveGrid tabletColumns={2} desktopColumns={4}>
+          {editableVisualTokenKeys.map((key) => (
+            <View key={key} style={styles.editorField}>
+              <View style={styles.editorLabelRow}>
+                <View
+                  style={[
+                    styles.editorSwatch,
+                    {
+                      backgroundColor: isHexColor(editorValues[key])
+                        ? editorValues[key]
+                        : theme.colors.surfaceMuted,
+                      borderColor: theme.colors.borderStrong,
+                    },
+                  ]}
+                />
+                <AppText variant="caption" color={theme.colors.textSecondary} style={styles.editorLabel}>
+                  {visualTokenLabels[key]}
+                </AppText>
+              </View>
+              <AppInput
+                value={editorValues[key]}
+                onChangeText={(value) => updateEditorToken(key, value)}
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholder="#RRGGBB"
+              />
+              {editorErrors[key] ? (
+                <AppText variant="caption" color={theme.colors.danger}>
+                  {editorErrors[key]}
+                </AppText>
+              ) : null}
+            </View>
+          ))}
+        </AppResponsiveGrid>
+
+        <View style={styles.segmentedRow}>
+          <View style={styles.previewTextBlock}>
+            <AppText bold>Radio visual</AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              Ajusta la suavidad global sin editar componentes individuales.
+            </AppText>
+          </View>
+          {(['standard', 'soft', 'compact'] as const).map((radius) => (
+            <AppButton
+              key={radius}
+              title={radius}
+              variant={editorRadius === radius ? 'secondary' : 'neutral'}
+              onPress={() => setEditorRadius(radius)}
+            />
+          ))}
+        </View>
+
+        <View style={styles.segmentedRow}>
+          <View style={styles.previewTextBlock}>
+            <AppText bold>Densidad visual</AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              Controla spacing global soportado por el tema.
+            </AppText>
+          </View>
+          {(['NORMAL', 'COMPACT'] as const).map((density) => (
+            <AppButton
+              key={density}
+              title={density === 'NORMAL' ? 'Normal' : 'Compacta'}
+              variant={editorDensity === density ? 'secondary' : 'neutral'}
+              onPress={() => setEditorDensity(density)}
+            />
+          ))}
+        </View>
+
+        {contrastWarnings.length > 0 ? (
+          <AppCard variant="warning" style={styles.compactNotice}>
+            <AppText bold color={theme.colors.warning}>
+              Revisar contraste
+            </AppText>
+            {contrastWarnings.map((warning) => (
+              <AppText key={warning} variant="caption" color={theme.colors.textSecondary}>
+                {warning}
+              </AppText>
+            ))}
+          </AppCard>
+        ) : null}
+
+        {identityFeedback ? (
+          <AppCard variant={hasEditorErrors ? 'danger' : 'info'} style={styles.compactNotice}>
+            <AppText color={hasEditorErrors ? theme.colors.danger : theme.colors.info}>
+              {identityFeedback}
+            </AppText>
+          </AppCard>
+        ) : null}
+
+        <View style={styles.buttonRow}>
+          <AppButton
+            title="Aplicar cambios localmente"
+            variant="primary"
+            disabled={hasEditorErrors}
+            disabledReason="Corrige los colores invalidos antes de aplicar."
+            onPress={applyVisualIdentityChanges}
+          />
+          <AppButton title="Restaurar plantilla" variant="neutral" onPress={restoreActivePreset} />
+        </View>
+
+        <AppText variant="caption" color={theme.colors.mutedText}>
+          Esta personalizacion se guarda localmente en esta fase. La persistencia por cliente/tenant
+          queda pendiente.
+        </AppText>
+      </AppCard>
+
+      <SectionHeader
+        title="Preview de identidad"
+        subtitle="Referencia en vivo de botones, cards, badges, inputs y estado reservado."
+      />
+      <AppResponsiveGrid tabletColumns={2} desktopColumns={3}>
+        <AppCard variant="selected" style={styles.previewCard}>
+          <StatusBadge label="Activo" tone="live" />
+          <AppText bold>Panel operativo</AppText>
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            Mini preview con el preset y overrides actuales.
+          </AppText>
+          <AppButton title="Boton primario" variant="primary" onPress={() => undefined} />
+          <AppButton title="Boton secundario" variant="secondary" onPress={() => undefined} />
+        </AppCard>
+        <AppCard variant="danger" style={styles.previewCard}>
+          <View style={styles.themePreviewHeader}>
+            <StatusBadge label="Reservada" tone="reserved" />
+            <StatusBadge label="Al aire" tone="live" />
+          </View>
+          <AppText bold color={theme.colors.danger}>
+            Prenda reservada
+          </AppText>
+          <AppText variant="caption" color={theme.colors.textSecondary}>
+            El estado reservado deriva de danger/dangerSoft.
+          </AppText>
+          <AppButton title="Boton danger" variant="danger" onPress={() => undefined} />
+        </AppCard>
+        <AppCard style={styles.previewCard}>
+          <AppInput
+            label="Input premium"
+            value="Preview de identidad"
+            onChangeText={() => undefined}
+          />
+          <AppButton
+            title="Accion bloqueada"
+            variant="primary"
+            disabled
+            disabledReason="Preview de estado disabled."
+            onPress={() => undefined}
+          />
+        </AppCard>
+      </AppResponsiveGrid>
 
       <SectionHeader title="Design tokens" subtitle="Colores, radios, sombras y spacing base" />
       <AppResponsiveGrid tabletColumns={2} desktopColumns={4}>
@@ -561,6 +846,34 @@ export default function UiKitPreview() {
 }
 
 const styles = StyleSheet.create({
+  buttonRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: designTokens.spacing.sm,
+  },
+  compactNotice: {
+    gap: designTokens.spacing.xs,
+    marginBottom: 0,
+  },
+  editorField: {
+    gap: designTokens.spacing.xs,
+  },
+  editorLabel: {
+    flex: 1,
+    minWidth: 0,
+  },
+  editorLabelRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: designTokens.spacing.sm,
+  },
+  editorSwatch: {
+    borderRadius: designTokens.radius.full,
+    borderWidth: 1,
+    height: 18,
+    width: 18,
+  },
   inlineList: {
     alignItems: 'flex-start',
     gap: designTokens.spacing.sm,
@@ -589,6 +902,12 @@ const styles = StyleSheet.create({
     borderRadius: designTokens.radius.full,
     height: 20,
     width: 20,
+  },
+  segmentedRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: designTokens.spacing.sm,
   },
   swatch: {
     borderRadius: designTokens.radius.md,

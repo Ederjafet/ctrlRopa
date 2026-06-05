@@ -187,3 +187,22 @@ En cada ruta:
 GO para uso interno/local y demo controlada.
 
 NO-GO para branding contractual por cliente hasta tener persistencia backend/tenant y auditoria.
+
+## Continuidad PRODUCT-C2 - Editor controlado
+
+PRODUCT-C2 agrega un editor local sobre la plantilla activa. El editor mantiene el modelo seguro: no permite cambiar componentes individuales ni editar colores de texto libremente.
+
+Tokens editables:
+
+- primary;
+- secondary;
+- accent;
+- success;
+- warning;
+- danger/reserved;
+- background;
+- surface;
+- radius;
+- density.
+
+La personalizacion se guarda localmente en `controlRopa.localVisualIdentityOverrides` y se combina con `controlRopa.localVisualPreset`. La persistencia por cliente/tenant sigue pendiente para una fase backend con validacion, auditoria y rollback.

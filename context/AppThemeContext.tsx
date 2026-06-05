@@ -1,7 +1,9 @@
 import { getAppearanceSettings } from '@/services/appearanceService';
 import {
+  CustomVisualIdentity,
   DEFAULT_DESIGN_PRESET_ID,
   DesignPresetId,
+  applyCustomVisualIdentity,
   designPresets,
   getDesignPreset,
 } from '@/theme/designPresets';
@@ -295,33 +297,61 @@ type AppThemeContextValue = {
   theme: AppTheme;
   themeMode: 'LIGHT' | 'DARK';
   visualPresetId: DesignPresetId;
+  customVisualIdentity: CustomVisualIdentity | null;
   designPresets: typeof designPresets;
   isLoadingTheme: boolean;
   reloadTheme: () => Promise<void>;
   toggleThemeMode: () => Promise<void>;
   setThemeMode: (mode: 'LIGHT' | 'DARK') => Promise<void>;
   setVisualPresetId: (presetId: DesignPresetId) => Promise<void>;
+  setCustomVisualIdentity: (identity: CustomVisualIdentity) => Promise<void>;
+  updateCustomVisualIdentity: (
+    updates: Partial<Pick<CustomVisualIdentity, 'colors' | 'radius' | 'density'>>,
+  ) => Promise<void>;
+  resetCustomVisualIdentity: () => Promise<void>;
 };
 
 const AppThemeContext = createContext<AppThemeContextValue>({
   theme: createDefaultTheme('light'),
   themeMode: 'LIGHT',
   visualPresetId: DEFAULT_DESIGN_PRESET_ID,
+  customVisualIdentity: null,
   designPresets,
   isLoadingTheme: false,
   reloadTheme: async () => {},
   toggleThemeMode: async () => {},
   setThemeMode: async () => {},
   setVisualPresetId: async () => {},
+  setCustomVisualIdentity: async () => {},
+  updateCustomVisualIdentity: async () => {},
+  resetCustomVisualIdentity: async () => {},
 });
 
 const LOCAL_THEME_MODE_KEY = 'controlRopa.localThemeMode';
 const LOCAL_VISUAL_PRESET_KEY = 'controlRopa.localVisualPreset';
+const LOCAL_VISUAL_IDENTITY_KEY = 'controlRopa.localVisualIdentityOverrides';
 
 const cleanColor = (value?: string | null) => {
   if (!value) return undefined;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const parseCustomVisualIdentity = (value: string | null) => {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as CustomVisualIdentity;
+    const preset = getDesignPreset(parsed?.presetId);
+    return {
+      presetId: preset.id,
+      colors: parsed.colors ?? {},
+      radius: parsed.radius,
+      density: parsed.density,
+      updatedAt: parsed.updatedAt,
+    };
+  } catch {
+    return null;
+  }
 };
 
 export function AppThemeProvider({ children }: { children: React.ReactNode }) {
@@ -331,6 +361,8 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<AppTheme>(createDefaultTheme(systemScheme));
   const [localThemeMode, setLocalThemeMode] = useState<'LIGHT' | 'DARK' | null>(null);
   const [visualPresetId, setVisualPresetState] = useState<DesignPresetId>(DEFAULT_DESIGN_PRESET_ID);
+  const [customVisualIdentity, setCustomVisualIdentityState] =
+    useState<CustomVisualIdentity | null>(null);
   const [isLoadingTheme, setIsLoadingTheme] = useState(true);
 
   useEffect(() => {
@@ -347,11 +379,15 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
     Promise.all([
       AsyncStorage.getItem(LOCAL_THEME_MODE_KEY),
       AsyncStorage.getItem(LOCAL_VISUAL_PRESET_KEY),
+      AsyncStorage.getItem(LOCAL_VISUAL_IDENTITY_KEY),
     ])
-      .then(([value, presetValue]) => {
+      .then(([value, presetValue, customIdentityValue]) => {
         if (cancelled) return;
+        const customIdentity = parseCustomVisualIdentity(customIdentityValue);
+        const resolvedPresetId = customIdentity?.presetId ?? getDesignPreset(presetValue).id;
         setLocalThemeMode(value === 'DARK' ? 'DARK' : value === 'LIGHT' ? 'LIGHT' : null);
-        setVisualPresetState(getDesignPreset(presetValue).id);
+        setVisualPresetState(resolvedPresetId);
+        setCustomVisualIdentityState(customIdentity);
       })
       .catch(() => {
         if (!cancelled) setLocalThemeMode(null);
@@ -364,7 +400,7 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     reloadTheme();
-  }, [systemScheme, localThemeMode, visualPresetId]);
+  }, [systemScheme, localThemeMode, visualPresetId, customVisualIdentity]);
 
   const setThemeMode = async (mode: 'LIGHT' | 'DARK') => {
     await AsyncStorage.setItem(LOCAL_THEME_MODE_KEY, mode);
@@ -378,7 +414,42 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
   const setVisualPresetId = async (presetId: DesignPresetId) => {
     const nextPreset = getDesignPreset(presetId);
     await AsyncStorage.setItem(LOCAL_VISUAL_PRESET_KEY, nextPreset.id);
+    await AsyncStorage.removeItem(LOCAL_VISUAL_IDENTITY_KEY);
     setVisualPresetState(nextPreset.id);
+    setCustomVisualIdentityState(null);
+  };
+
+  const setCustomVisualIdentity = async (identity: CustomVisualIdentity) => {
+    const nextIdentity = {
+      ...identity,
+      presetId: getDesignPreset(identity.presetId).id,
+      updatedAt: new Date().toISOString(),
+    };
+    await AsyncStorage.setItem(LOCAL_VISUAL_PRESET_KEY, nextIdentity.presetId);
+    await AsyncStorage.setItem(LOCAL_VISUAL_IDENTITY_KEY, JSON.stringify(nextIdentity));
+    setVisualPresetState(nextIdentity.presetId);
+    setCustomVisualIdentityState(nextIdentity);
+  };
+
+  const updateCustomVisualIdentity = async (
+    updates: Partial<Pick<CustomVisualIdentity, 'colors' | 'radius' | 'density'>>,
+  ) => {
+    const nextIdentity: CustomVisualIdentity = {
+      presetId: visualPresetId,
+      colors: {
+        ...(customVisualIdentity?.colors ?? {}),
+        ...(updates.colors ?? {}),
+      },
+      radius: updates.radius ?? customVisualIdentity?.radius,
+      density: updates.density ?? customVisualIdentity?.density,
+      updatedAt: new Date().toISOString(),
+    };
+    await setCustomVisualIdentity(nextIdentity);
+  };
+
+  const resetCustomVisualIdentity = async () => {
+    await AsyncStorage.removeItem(LOCAL_VISUAL_IDENTITY_KEY);
+    setCustomVisualIdentityState(null);
   };
 
   const reloadTheme = async () => {
@@ -395,15 +466,22 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
 
       const baseTheme = createDefaultTheme(resolvedScheme);
       const activePreset = getDesignPreset(visualPresetId);
-      const presetColors = activePreset.colors[baseTheme.isDark ? 'dark' : 'light'];
+      const activeScheme = baseTheme.isDark ? 'dark' : 'light';
+      const presetColors = applyCustomVisualIdentity(
+        activePreset.colors[activeScheme],
+        customVisualIdentity?.presetId === activePreset.id ? customVisualIdentity : null,
+        activeScheme,
+      );
+      const resolvedRadius = customVisualIdentity?.radius ?? activePreset.radius;
+      const resolvedDensity = customVisualIdentity?.density ?? activePreset.density;
       const presetRadius =
-        activePreset.radius === 'compact'
+        resolvedRadius === 'compact'
           ? { sm: 4, md: 6, lg: 10, xl: 14 }
-          : activePreset.radius === 'soft'
+          : resolvedRadius === 'soft'
             ? { sm: 8, md: 12, lg: 18, xl: 24 }
             : baseTheme.radius;
       const baseSpacing =
-        settings.densityMode === 'COMPACT' || activePreset.density === 'COMPACT'
+        settings.densityMode === 'COMPACT' || resolvedDensity === 'COMPACT'
           ? { xs: 3, sm: 6, md: 10, lg: 14, xl: 22 }
           : baseTheme.spacing;
       const baseRadius =
@@ -557,7 +635,7 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
 
       setTheme({
         ...baseTheme,
-        density: settings.densityMode ?? activePreset.density ?? baseTheme.density,
+        density: settings.densityMode ?? resolvedDensity ?? baseTheme.density,
         buttonStyle: settings.buttonStyle ?? baseTheme.buttonStyle,
         spacing: baseSpacing,
         radius: baseRadius,
@@ -573,14 +651,18 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
       theme,
       themeMode: (theme.isDark ? 'DARK' : 'LIGHT') as 'LIGHT' | 'DARK',
       visualPresetId,
+      customVisualIdentity,
       designPresets,
       isLoadingTheme,
       reloadTheme,
       toggleThemeMode,
       setThemeMode,
       setVisualPresetId,
+      setCustomVisualIdentity,
+      updateCustomVisualIdentity,
+      resetCustomVisualIdentity,
     }),
-    [theme, isLoadingTheme, visualPresetId]
+    [theme, isLoadingTheme, visualPresetId, customVisualIdentity]
   );
 
   return <AppThemeContext.Provider value={value}>{children}</AppThemeContext.Provider>;

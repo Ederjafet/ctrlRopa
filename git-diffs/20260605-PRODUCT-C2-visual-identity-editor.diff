@@ -1,0 +1,1047 @@
+﻿diff --git a/app/ui-kit.tsx b/app/ui-kit.tsx
+index 69836ad..67e20e8 100644
+--- a/app/ui-kit.tsx
++++ b/app/ui-kit.tsx
+@@ -22,6 +22,14 @@ import { canAccess, canAccessByPermission, isAdmin, isNoAccess } from '@/service
+ import { canViewLive } from '@/services/livePermissionGuards';
+ import { ensureSessionActive, getSession, UserSession } from '@/services/sessionStorage';
+ import { designTokens, viewVariants } from '@/theme/designTokens';
++import {
++  EditableVisualTokenKey,
++  ThemeScheme,
++  editableVisualTokenKeys,
++  getContrastRatio,
++  isHexColor,
++  visualTokenLabels,
++} from '@/theme/designPresets';
+ import { Redirect } from 'expo-router';
+ import { useEffect, useMemo, useState } from 'react';
+ import { ActivityIndicator, StyleSheet, View } from 'react-native';
+@@ -80,12 +88,67 @@ export default function UiKitPreview() {
+     themeMode,
+     toggleThemeMode,
+     visualPresetId,
++    customVisualIdentity,
+     designPresets,
+     setVisualPresetId,
++    setCustomVisualIdentity,
++    resetCustomVisualIdentity,
+   } = useAppTheme();
+   const [loading, setLoading] = useState(true);
+   const [isLogged, setIsLogged] = useState(false);
+   const [session, setSession] = useState<UserSession | null>(null);
++  const [editorValues, setEditorValues] = useState<Record<EditableVisualTokenKey, string>>({
++    primary: '',
++    secondary: '',
++    accent: '',
++    success: '',
++    warning: '',
++    danger: '',
++    background: '',
++    surface: '',
++  });
++  const [editorRadius, setEditorRadius] = useState<'standard' | 'soft' | 'compact'>('soft');
++  const [editorDensity, setEditorDensity] = useState<'NORMAL' | 'COMPACT'>('NORMAL');
++  const [identityFeedback, setIdentityFeedback] = useState<string | null>(null);
++
++  const activePreset = useMemo(
++    () => designPresets.find((preset) => preset.id === visualPresetId) ?? designPresets[0],
++    [designPresets, visualPresetId],
++  );
++  const activeScheme: ThemeScheme = theme.isDark ? 'dark' : 'light';
++  const activeOverrides = useMemo(
++    () =>
++      customVisualIdentity?.presetId === visualPresetId
++        ? customVisualIdentity.colors[activeScheme] ?? {}
++        : {},
++    [activeScheme, customVisualIdentity, visualPresetId],
++  );
++  const editorErrors = useMemo(() => {
++    return editableVisualTokenKeys.reduce<Partial<Record<EditableVisualTokenKey, string>>>(
++      (acc, key) => {
++        const value = editorValues[key]?.trim();
++        if (!value || !isHexColor(value)) {
++          acc[key] = 'Usa formato #RRGGBB.';
++        }
++        return acc;
++      },
++      {},
++    );
++  }, [editorValues]);
++  const hasEditorErrors = Object.keys(editorErrors).length > 0;
++  const contrastWarnings = useMemo(() => {
++    const warnings: string[] = [];
++    const backgroundContrast = getContrastRatio(theme.colors.textPrimary, editorValues.background);
++    const surfaceContrast = getContrastRatio(theme.colors.textPrimary, editorValues.surface);
++
++    if (backgroundContrast !== null && backgroundContrast < 3) {
++      warnings.push('El fondo puede tener bajo contraste con el texto principal.');
++    }
++    if (surfaceContrast !== null && surfaceContrast < 3) {
++      warnings.push('La superficie/cards puede tener bajo contraste con el texto principal.');
++    }
++    return warnings;
++  }, [editorValues.background, editorValues.surface, theme.colors.textPrimary]);
+
+   useEffect(() => {
+     let cancelled = false;
+@@ -110,6 +173,59 @@ export default function UiKitPreview() {
+
+   const navSections = useMemo(() => buildNavSections(session), [session]);
+
++  useEffect(() => {
++    const baseColors = activePreset.colors[activeScheme];
++    const nextValues = editableVisualTokenKeys.reduce<Record<EditableVisualTokenKey, string>>(
++      (acc, key) => {
++        acc[key] = activeOverrides[key] ?? baseColors[key];
++        return acc;
++      },
++      {
++        primary: '',
++        secondary: '',
++        accent: '',
++        success: '',
++        warning: '',
++        danger: '',
++        background: '',
++        surface: '',
++      },
++    );
++
++    setEditorValues(nextValues);
++    setEditorRadius(customVisualIdentity?.radius ?? activePreset.radius);
++    setEditorDensity(customVisualIdentity?.density ?? activePreset.density);
++    setIdentityFeedback(null);
++  }, [activeOverrides, activePreset, activeScheme, customVisualIdentity, visualPresetId]);
++
++  const updateEditorToken = (key: EditableVisualTokenKey, value: string) => {
++    setEditorValues((current) => ({ ...current, [key]: value.trim() }));
++    setIdentityFeedback(null);
++  };
++
++  const applyVisualIdentityChanges = async () => {
++    if (hasEditorErrors) {
++      setIdentityFeedback('Corrige los colores invalidos antes de aplicar.');
++      return;
++    }
++
++    await setCustomVisualIdentity({
++      presetId: visualPresetId,
++      colors: {
++        ...(customVisualIdentity?.colors ?? {}),
++        [activeScheme]: editorValues,
++      },
++      radius: editorRadius,
++      density: editorDensity,
++    });
++    setIdentityFeedback('Personalizacion aplicada localmente.');
++  };
++
++  const restoreActivePreset = async () => {
++    await resetCustomVisualIdentity();
++    setIdentityFeedback('Plantilla restaurada a sus tokens base.');
++  };
++
+   if (loading) {
+     return (
+       <View style={[styles.loadingScreen, { backgroundColor: theme.colors.background }]}>
+@@ -213,6 +329,175 @@ export default function UiKitPreview() {
+         </AppResponsiveGrid>
+       </View>
+
++      <SectionHeader
++        title="Editor controlado"
++        subtitle="Personaliza tokens semanticos principales de la plantilla activa."
++      />
++      <AppCard variant="elevated" style={styles.previewCard}>
++        <View style={styles.themePreviewHeader}>
++          <View style={styles.previewTextBlock}>
++            <AppText bold>Identidad visual local</AppText>
++            <AppText variant="caption" color={theme.colors.mutedText}>
++              Editando modo {activeScheme === 'dark' ? 'oscuro' : 'claro'} sobre{' '}
++              {activePreset.label}. No modifica backend ni tenant.
++            </AppText>
++          </View>
++          <StatusBadge
++            label={customVisualIdentity?.presetId === visualPresetId ? 'Personalizada' : 'Base'}
++            tone={customVisualIdentity?.presetId === visualPresetId ? 'warning' : 'info'}
++          />
++        </View>
++
++        <AppResponsiveGrid tabletColumns={2} desktopColumns={4}>
++          {editableVisualTokenKeys.map((key) => (
++            <View key={key} style={styles.editorField}>
++              <View style={styles.editorLabelRow}>
++                <View
++                  style={[
++                    styles.editorSwatch,
++                    {
++                      backgroundColor: isHexColor(editorValues[key])
++                        ? editorValues[key]
++                        : theme.colors.surfaceMuted,
++                      borderColor: theme.colors.borderStrong,
++                    },
++                  ]}
++                />
++                <AppText variant="caption" color={theme.colors.textSecondary} style={styles.editorLabel}>
++                  {visualTokenLabels[key]}
++                </AppText>
++              </View>
++              <AppInput
++                value={editorValues[key]}
++                onChangeText={(value) => updateEditorToken(key, value)}
++                autoCapitalize="none"
++                autoCorrect={false}
++                placeholder="#RRGGBB"
++              />
++              {editorErrors[key] ? (
++                <AppText variant="caption" color={theme.colors.danger}>
++                  {editorErrors[key]}
++                </AppText>
++              ) : null}
++            </View>
++          ))}
++        </AppResponsiveGrid>
++
++        <View style={styles.segmentedRow}>
++          <View style={styles.previewTextBlock}>
++            <AppText bold>Radio visual</AppText>
++            <AppText variant="caption" color={theme.colors.mutedText}>
++              Ajusta la suavidad global sin editar componentes individuales.
++            </AppText>
++          </View>
++          {(['standard', 'soft', 'compact'] as const).map((radius) => (
++            <AppButton
++              key={radius}
++              title={radius}
++              variant={editorRadius === radius ? 'secondary' : 'neutral'}
++              onPress={() => setEditorRadius(radius)}
++            />
++          ))}
++        </View>
++
++        <View style={styles.segmentedRow}>
++          <View style={styles.previewTextBlock}>
++            <AppText bold>Densidad visual</AppText>
++            <AppText variant="caption" color={theme.colors.mutedText}>
++              Controla spacing global soportado por el tema.
++            </AppText>
++          </View>
++          {(['NORMAL', 'COMPACT'] as const).map((density) => (
++            <AppButton
++              key={density}
++              title={density === 'NORMAL' ? 'Normal' : 'Compacta'}
++              variant={editorDensity === density ? 'secondary' : 'neutral'}
++              onPress={() => setEditorDensity(density)}
++            />
++          ))}
++        </View>
++
++        {contrastWarnings.length > 0 ? (
++          <AppCard variant="warning" style={styles.compactNotice}>
++            <AppText bold color={theme.colors.warning}>
++              Revisar contraste
++            </AppText>
++            {contrastWarnings.map((warning) => (
++              <AppText key={warning} variant="caption" color={theme.colors.textSecondary}>
++                {warning}
++              </AppText>
++            ))}
++          </AppCard>
++        ) : null}
++
++        {identityFeedback ? (
++          <AppCard variant={hasEditorErrors ? 'danger' : 'info'} style={styles.compactNotice}>
++            <AppText color={hasEditorErrors ? theme.colors.danger : theme.colors.info}>
++              {identityFeedback}
++            </AppText>
++          </AppCard>
++        ) : null}
++
++        <View style={styles.buttonRow}>
++          <AppButton
++            title="Aplicar cambios localmente"
++            variant="primary"
++            disabled={hasEditorErrors}
++            disabledReason="Corrige los colores invalidos antes de aplicar."
++            onPress={applyVisualIdentityChanges}
++          />
++          <AppButton title="Restaurar plantilla" variant="neutral" onPress={restoreActivePreset} />
++        </View>
++
++        <AppText variant="caption" color={theme.colors.mutedText}>
++          Esta personalizacion se guarda localmente en esta fase. La persistencia por cliente/tenant
++          queda pendiente.
++        </AppText>
++      </AppCard>
++
++      <SectionHeader
++        title="Preview de identidad"
++        subtitle="Referencia en vivo de botones, cards, badges, inputs y estado reservado."
++      />
++      <AppResponsiveGrid tabletColumns={2} desktopColumns={3}>
++        <AppCard variant="selected" style={styles.previewCard}>
++          <StatusBadge label="Activo" tone="live" />
++          <AppText bold>Panel operativo</AppText>
++          <AppText variant="caption" color={theme.colors.mutedText}>
++            Mini preview con el preset y overrides actuales.
++          </AppText>
++          <AppButton title="Boton primario" variant="primary" onPress={() => undefined} />
++          <AppButton title="Boton secundario" variant="secondary" onPress={() => undefined} />
++        </AppCard>
++        <AppCard variant="danger" style={styles.previewCard}>
++          <View style={styles.themePreviewHeader}>
++            <StatusBadge label="Reservada" tone="reserved" />
++            <StatusBadge label="Al aire" tone="live" />
++          </View>
++          <AppText bold color={theme.colors.danger}>
++            Prenda reservada
++          </AppText>
++          <AppText variant="caption" color={theme.colors.textSecondary}>
++            El estado reservado deriva de danger/dangerSoft.
++          </AppText>
++          <AppButton title="Boton danger" variant="danger" onPress={() => undefined} />
++        </AppCard>
++        <AppCard style={styles.previewCard}>
++          <AppInput
++            label="Input premium"
++            value="Preview de identidad"
++            onChangeText={() => undefined}
++          />
++          <AppButton
++            title="Accion bloqueada"
++            variant="primary"
++            disabled
++            disabledReason="Preview de estado disabled."
++            onPress={() => undefined}
++          />
++        </AppCard>
++      </AppResponsiveGrid>
++
+       <SectionHeader title="Design tokens" subtitle="Colores, radios, sombras y spacing base" />
+       <AppResponsiveGrid tabletColumns={2} desktopColumns={4}>
+         {Object.entries(designTokens.colors).slice(0, 12).map(([name, color]) => (
+@@ -561,6 +846,34 @@ export default function UiKitPreview() {
+ }
+
+ const styles = StyleSheet.create({
++  buttonRow: {
++    alignItems: 'center',
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: designTokens.spacing.sm,
++  },
++  compactNotice: {
++    gap: designTokens.spacing.xs,
++    marginBottom: 0,
++  },
++  editorField: {
++    gap: designTokens.spacing.xs,
++  },
++  editorLabel: {
++    flex: 1,
++    minWidth: 0,
++  },
++  editorLabelRow: {
++    alignItems: 'center',
++    flexDirection: 'row',
++    gap: designTokens.spacing.sm,
++  },
++  editorSwatch: {
++    borderRadius: designTokens.radius.full,
++    borderWidth: 1,
++    height: 18,
++    width: 18,
++  },
+   inlineList: {
+     alignItems: 'flex-start',
+     gap: designTokens.spacing.sm,
+@@ -590,6 +903,12 @@ const styles = StyleSheet.create({
+     height: 20,
+     width: 20,
+   },
++  segmentedRow: {
++    alignItems: 'center',
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: designTokens.spacing.sm,
++  },
+   swatch: {
+     borderRadius: designTokens.radius.md,
+     height: 42,
+diff --git a/context/AppThemeContext.tsx b/context/AppThemeContext.tsx
+index ff44471..db79524 100644
+--- a/context/AppThemeContext.tsx
++++ b/context/AppThemeContext.tsx
+@@ -1,7 +1,9 @@
+ import { getAppearanceSettings } from '@/services/appearanceService';
+ import {
++  CustomVisualIdentity,
+   DEFAULT_DESIGN_PRESET_ID,
+   DesignPresetId,
++  applyCustomVisualIdentity,
+   designPresets,
+   getDesignPreset,
+ } from '@/theme/designPresets';
+@@ -295,28 +297,39 @@ type AppThemeContextValue = {
+   theme: AppTheme;
+   themeMode: 'LIGHT' | 'DARK';
+   visualPresetId: DesignPresetId;
++  customVisualIdentity: CustomVisualIdentity | null;
+   designPresets: typeof designPresets;
+   isLoadingTheme: boolean;
+   reloadTheme: () => Promise<void>;
+   toggleThemeMode: () => Promise<void>;
+   setThemeMode: (mode: 'LIGHT' | 'DARK') => Promise<void>;
+   setVisualPresetId: (presetId: DesignPresetId) => Promise<void>;
++  setCustomVisualIdentity: (identity: CustomVisualIdentity) => Promise<void>;
++  updateCustomVisualIdentity: (
++    updates: Partial<Pick<CustomVisualIdentity, 'colors' | 'radius' | 'density'>>,
++  ) => Promise<void>;
++  resetCustomVisualIdentity: () => Promise<void>;
+ };
+
+ const AppThemeContext = createContext<AppThemeContextValue>({
+   theme: createDefaultTheme('light'),
+   themeMode: 'LIGHT',
+   visualPresetId: DEFAULT_DESIGN_PRESET_ID,
++  customVisualIdentity: null,
+   designPresets,
+   isLoadingTheme: false,
+   reloadTheme: async () => {},
+   toggleThemeMode: async () => {},
+   setThemeMode: async () => {},
+   setVisualPresetId: async () => {},
++  setCustomVisualIdentity: async () => {},
++  updateCustomVisualIdentity: async () => {},
++  resetCustomVisualIdentity: async () => {},
+ });
+
+ const LOCAL_THEME_MODE_KEY = 'controlRopa.localThemeMode';
+ const LOCAL_VISUAL_PRESET_KEY = 'controlRopa.localVisualPreset';
++const LOCAL_VISUAL_IDENTITY_KEY = 'controlRopa.localVisualIdentityOverrides';
+
+ const cleanColor = (value?: string | null) => {
+   if (!value) return undefined;
+@@ -324,6 +337,23 @@ const cleanColor = (value?: string | null) => {
+   return trimmed.length > 0 ? trimmed : undefined;
+ };
+
++const parseCustomVisualIdentity = (value: string | null) => {
++  if (!value) return null;
++  try {
++    const parsed = JSON.parse(value) as CustomVisualIdentity;
++    const preset = getDesignPreset(parsed?.presetId);
++    return {
++      presetId: preset.id,
++      colors: parsed.colors ?? {},
++      radius: parsed.radius,
++      density: parsed.density,
++      updatedAt: parsed.updatedAt,
++    };
++  } catch {
++    return null;
++  }
++};
++
+ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
+   const [systemScheme, setSystemScheme] = useState<ColorSchemeName>(
+     Appearance.getColorScheme()
+@@ -331,6 +361,8 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
+   const [theme, setTheme] = useState<AppTheme>(createDefaultTheme(systemScheme));
+   const [localThemeMode, setLocalThemeMode] = useState<'LIGHT' | 'DARK' | null>(null);
+   const [visualPresetId, setVisualPresetState] = useState<DesignPresetId>(DEFAULT_DESIGN_PRESET_ID);
++  const [customVisualIdentity, setCustomVisualIdentityState] =
++    useState<CustomVisualIdentity | null>(null);
+   const [isLoadingTheme, setIsLoadingTheme] = useState(true);
+
+   useEffect(() => {
+@@ -347,11 +379,15 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
+     Promise.all([
+       AsyncStorage.getItem(LOCAL_THEME_MODE_KEY),
+       AsyncStorage.getItem(LOCAL_VISUAL_PRESET_KEY),
++      AsyncStorage.getItem(LOCAL_VISUAL_IDENTITY_KEY),
+     ])
+-      .then(([value, presetValue]) => {
++      .then(([value, presetValue, customIdentityValue]) => {
+         if (cancelled) return;
++        const customIdentity = parseCustomVisualIdentity(customIdentityValue);
++        const resolvedPresetId = customIdentity?.presetId ?? getDesignPreset(presetValue).id;
+         setLocalThemeMode(value === 'DARK' ? 'DARK' : value === 'LIGHT' ? 'LIGHT' : null);
+-        setVisualPresetState(getDesignPreset(presetValue).id);
++        setVisualPresetState(resolvedPresetId);
++        setCustomVisualIdentityState(customIdentity);
+       })
+       .catch(() => {
+         if (!cancelled) setLocalThemeMode(null);
+@@ -364,7 +400,7 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
+
+   useEffect(() => {
+     reloadTheme();
+-  }, [systemScheme, localThemeMode, visualPresetId]);
++  }, [systemScheme, localThemeMode, visualPresetId, customVisualIdentity]);
+
+   const setThemeMode = async (mode: 'LIGHT' | 'DARK') => {
+     await AsyncStorage.setItem(LOCAL_THEME_MODE_KEY, mode);
+@@ -378,7 +414,42 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
+   const setVisualPresetId = async (presetId: DesignPresetId) => {
+     const nextPreset = getDesignPreset(presetId);
+     await AsyncStorage.setItem(LOCAL_VISUAL_PRESET_KEY, nextPreset.id);
++    await AsyncStorage.removeItem(LOCAL_VISUAL_IDENTITY_KEY);
+     setVisualPresetState(nextPreset.id);
++    setCustomVisualIdentityState(null);
++  };
++
++  const setCustomVisualIdentity = async (identity: CustomVisualIdentity) => {
++    const nextIdentity = {
++      ...identity,
++      presetId: getDesignPreset(identity.presetId).id,
++      updatedAt: new Date().toISOString(),
++    };
++    await AsyncStorage.setItem(LOCAL_VISUAL_PRESET_KEY, nextIdentity.presetId);
++    await AsyncStorage.setItem(LOCAL_VISUAL_IDENTITY_KEY, JSON.stringify(nextIdentity));
++    setVisualPresetState(nextIdentity.presetId);
++    setCustomVisualIdentityState(nextIdentity);
++  };
++
++  const updateCustomVisualIdentity = async (
++    updates: Partial<Pick<CustomVisualIdentity, 'colors' | 'radius' | 'density'>>,
++  ) => {
++    const nextIdentity: CustomVisualIdentity = {
++      presetId: visualPresetId,
++      colors: {
++        ...(customVisualIdentity?.colors ?? {}),
++        ...(updates.colors ?? {}),
++      },
++      radius: updates.radius ?? customVisualIdentity?.radius,
++      density: updates.density ?? customVisualIdentity?.density,
++      updatedAt: new Date().toISOString(),
++    };
++    await setCustomVisualIdentity(nextIdentity);
++  };
++
++  const resetCustomVisualIdentity = async () => {
++    await AsyncStorage.removeItem(LOCAL_VISUAL_IDENTITY_KEY);
++    setCustomVisualIdentityState(null);
+   };
+
+   const reloadTheme = async () => {
+@@ -395,15 +466,22 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
+
+       const baseTheme = createDefaultTheme(resolvedScheme);
+       const activePreset = getDesignPreset(visualPresetId);
+-      const presetColors = activePreset.colors[baseTheme.isDark ? 'dark' : 'light'];
++      const activeScheme = baseTheme.isDark ? 'dark' : 'light';
++      const presetColors = applyCustomVisualIdentity(
++        activePreset.colors[activeScheme],
++        customVisualIdentity?.presetId === activePreset.id ? customVisualIdentity : null,
++        activeScheme,
++      );
++      const resolvedRadius = customVisualIdentity?.radius ?? activePreset.radius;
++      const resolvedDensity = customVisualIdentity?.density ?? activePreset.density;
+       const presetRadius =
+-        activePreset.radius === 'compact'
++        resolvedRadius === 'compact'
+           ? { sm: 4, md: 6, lg: 10, xl: 14 }
+-          : activePreset.radius === 'soft'
++          : resolvedRadius === 'soft'
+             ? { sm: 8, md: 12, lg: 18, xl: 24 }
+             : baseTheme.radius;
+       const baseSpacing =
+-        settings.densityMode === 'COMPACT' || activePreset.density === 'COMPACT'
++        settings.densityMode === 'COMPACT' || resolvedDensity === 'COMPACT'
+           ? { xs: 3, sm: 6, md: 10, lg: 14, xl: 22 }
+           : baseTheme.spacing;
+       const baseRadius =
+@@ -557,7 +635,7 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
+
+       setTheme({
+         ...baseTheme,
+-        density: settings.densityMode ?? activePreset.density ?? baseTheme.density,
++        density: settings.densityMode ?? resolvedDensity ?? baseTheme.density,
+         buttonStyle: settings.buttonStyle ?? baseTheme.buttonStyle,
+         spacing: baseSpacing,
+         radius: baseRadius,
+@@ -573,14 +651,18 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
+       theme,
+       themeMode: (theme.isDark ? 'DARK' : 'LIGHT') as 'LIGHT' | 'DARK',
+       visualPresetId,
++      customVisualIdentity,
+       designPresets,
+       isLoadingTheme,
+       reloadTheme,
+       toggleThemeMode,
+       setThemeMode,
+       setVisualPresetId,
++      setCustomVisualIdentity,
++      updateCustomVisualIdentity,
++      resetCustomVisualIdentity,
+     }),
+-    [theme, isLoadingTheme, visualPresetId]
++    [theme, isLoadingTheme, visualPresetId, customVisualIdentity]
+   );
+
+   return <AppThemeContext.Provider value={value}>{children}</AppThemeContext.Provider>;
+diff --git a/docs/PRODUCT_C1_GLOBAL_PREMIUM_ROLLOUT.md b/docs/PRODUCT_C1_GLOBAL_PREMIUM_ROLLOUT.md
+index 1706fd8..34da507 100644
+--- a/docs/PRODUCT_C1_GLOBAL_PREMIUM_ROLLOUT.md
++++ b/docs/PRODUCT_C1_GLOBAL_PREMIUM_ROLLOUT.md
+@@ -244,3 +244,11 @@ PRODUCT-C2:
+ - migracion visual de formularios y reportes individuales;
+ - revisar pantallas de pagos/caja solo visualmente y con guardas estrictas;
+ - checklist de contraste automatizable.
++
++---
++
++## Continuidad PRODUCT-C2
++
++PRODUCT-C2 agrega un editor controlado de identidad visual local en `/ui-kit`. El editor mantiene el modelo seguro de PRODUCT-C1: presets como base, overrides semanticos limitados, preview en vivo y restauracion de plantilla.
++
++La persistencia por cliente/tenant, auditoria y politica centralizada de presets siguen fuera de alcance hasta una fase backend dedicada.
+diff --git a/docs/PRODUCT_C_CLIENT_VISUAL_IDENTITY_PRESETS.md b/docs/PRODUCT_C_CLIENT_VISUAL_IDENTITY_PRESETS.md
+index b1ee3a4..942c508 100644
+--- a/docs/PRODUCT_C_CLIENT_VISUAL_IDENTITY_PRESETS.md
++++ b/docs/PRODUCT_C_CLIENT_VISUAL_IDENTITY_PRESETS.md
+@@ -187,3 +187,22 @@ En cada ruta:
+ GO para uso interno/local y demo controlada.
+
+ NO-GO para branding contractual por cliente hasta tener persistencia backend/tenant y auditoria.
++
++## Continuidad PRODUCT-C2 - Editor controlado
++
++PRODUCT-C2 agrega un editor local sobre la plantilla activa. El editor mantiene el modelo seguro: no permite cambiar componentes individuales ni editar colores de texto libremente.
++
++Tokens editables:
++
++- primary;
++- secondary;
++- accent;
++- success;
++- warning;
++- danger/reserved;
++- background;
++- surface;
++- radius;
++- density.
++
++La personalizacion se guarda localmente en `controlRopa.localVisualIdentityOverrides` y se combina con `controlRopa.localVisualPreset`. La persistencia por cliente/tenant sigue pendiente para una fase backend con validacion, auditoria y rollback.
+diff --git a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+index 2f3c69e..386deac 100644
+--- a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
++++ b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+@@ -249,3 +249,19 @@ Implementacion:
+ La seleccion se guarda localmente y afecta la app real mediante tokens semanticos. No se persiste en backend ni tenant todavia.
+
+ Ver `docs/PRODUCT_C_CLIENT_VISUAL_IDENTITY_PRESETS.md`.
++
++---
++
++## Continuidad PRODUCT-C2 - Editor controlado
++
++Fecha: 2026-06-05
++
++Se agrego un editor controlado de identidad visual sobre la plantilla activa. La resolucion del tema queda:
++
++```text
++preset base + overrides locales + light/dark mode = tokens finales
++```
++
++El editor vive en `/ui-kit`, valida colores hexadecimales `#RRGGBB`, permite restaurar la plantilla y guarda la personalizacion solo en frontend. No se agregaron endpoints, migraciones ni persistencia por tenant.
++
++Ver `docs/PRODUCT_C2_VISUAL_IDENTITY_EDITOR.md`.
+diff --git a/theme/designPresets.ts b/theme/designPresets.ts
+index 188464f..4869fd4 100644
+--- a/theme/designPresets.ts
++++ b/theme/designPresets.ts
+@@ -60,6 +60,131 @@ export type DesignPreset = {
+
+ export const DEFAULT_DESIGN_PRESET_ID: DesignPresetId = 'retailPremium';
+
++export const editableVisualTokenKeys = [
++  'primary',
++  'secondary',
++  'accent',
++  'success',
++  'warning',
++  'danger',
++  'background',
++  'surface',
++] as const;
++
++export type EditableVisualTokenKey = (typeof editableVisualTokenKeys)[number];
++export type ThemeScheme = 'light' | 'dark';
++
++export type VisualIdentityRadius = 'standard' | 'soft' | 'compact';
++export type VisualIdentityDensity = 'NORMAL' | 'COMPACT';
++
++export type CustomVisualIdentity = {
++  presetId: DesignPresetId;
++  colors: Partial<Record<ThemeScheme, Partial<Record<EditableVisualTokenKey, string>>>>;
++  radius?: VisualIdentityRadius;
++  density?: VisualIdentityDensity;
++  updatedAt?: string;
++};
++
++export const visualTokenLabels: Record<EditableVisualTokenKey, string> = {
++  primary: 'Color primario',
++  secondary: 'Color secundario',
++  accent: 'Color acento',
++  success: 'Color exito',
++  warning: 'Color advertencia',
++  danger: 'Color peligro / reservado',
++  background: 'Color de fondo',
++  surface: 'Color de superficie/cards',
++};
++
++export function isHexColor(value: string) {
++  return /^#[0-9a-fA-F]{6}$/.test(value.trim());
++}
++
++function hexToRgb(value: string) {
++  if (!isHexColor(value)) return null;
++  const clean = value.replace('#', '');
++  return {
++    r: parseInt(clean.slice(0, 2), 16),
++    g: parseInt(clean.slice(2, 4), 16),
++    b: parseInt(clean.slice(4, 6), 16),
++  };
++}
++
++function rgbaFromHex(value: string, alpha: number) {
++  const rgb = hexToRgb(value);
++  if (!rgb) return value;
++  return `rgba(${rgb.r},${rgb.g},${rgb.b},${alpha})`;
++}
++
++function getRelativeLuminance(value: string) {
++  const rgb = hexToRgb(value);
++  if (!rgb) return null;
++
++  const channels = [rgb.r, rgb.g, rgb.b].map((channel) => {
++    const normalized = channel / 255;
++    return normalized <= 0.03928
++      ? normalized / 12.92
++      : Math.pow((normalized + 0.055) / 1.055, 2.4);
++  });
++
++  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
++}
++
++export function getContrastRatio(foreground: string, background: string) {
++  const foregroundLuminance = getRelativeLuminance(foreground);
++  const backgroundLuminance = getRelativeLuminance(background);
++  if (foregroundLuminance === null || backgroundLuminance === null) return null;
++
++  const lighter = Math.max(foregroundLuminance, backgroundLuminance);
++  const darker = Math.min(foregroundLuminance, backgroundLuminance);
++  return (lighter + 0.05) / (darker + 0.05);
++}
++
++export function applyCustomVisualIdentity(
++  colors: DesignPresetColors,
++  customIdentity: CustomVisualIdentity | null | undefined,
++  scheme: ThemeScheme,
++) {
++  if (!customIdentity) return colors;
++
++  const overrides = customIdentity.colors[scheme] ?? {};
++  const nextColors: DesignPresetColors = { ...colors };
++
++  editableVisualTokenKeys.forEach((key) => {
++    const value = overrides[key];
++    if (value && isHexColor(value)) {
++      nextColors[key] = value;
++    }
++  });
++
++  if (overrides.primary && isHexColor(overrides.primary)) {
++    nextColors.primarySoft = rgbaFromHex(overrides.primary, scheme === 'dark' ? 0.24 : 0.14);
++  }
++  if (overrides.accent && isHexColor(overrides.accent)) {
++    nextColors.accentSoft = rgbaFromHex(overrides.accent, scheme === 'dark' ? 0.24 : 0.14);
++    nextColors.focusRing = overrides.accent;
++  }
++  if (overrides.success && isHexColor(overrides.success)) {
++    nextColors.successSoft = rgbaFromHex(overrides.success, scheme === 'dark' ? 0.24 : 0.14);
++  }
++  if (overrides.warning && isHexColor(overrides.warning)) {
++    nextColors.warningSoft = rgbaFromHex(overrides.warning, scheme === 'dark' ? 0.24 : 0.16);
++  }
++  if (overrides.danger && isHexColor(overrides.danger)) {
++    nextColors.dangerSoft = rgbaFromHex(overrides.danger, scheme === 'dark' ? 0.26 : 0.14);
++  }
++  if (overrides.background && isHexColor(overrides.background)) {
++    nextColors.backgroundElevated = rgbaFromHex(overrides.background, scheme === 'dark' ? 0.7 : 0.72);
++  }
++  if (overrides.surface && isHexColor(overrides.surface)) {
++    nextColors.surfaceAlt = rgbaFromHex(overrides.surface, scheme === 'dark' ? 0.72 : 0.78);
++    nextColors.surfaceElevated = overrides.surface;
++    nextColors.inputBackground = overrides.surface;
++  }
++
++  return nextColors;
++}
++
+ export const designPresets: DesignPreset[] = [
+   {
+     id: 'retailPremium',
+
+diff --git a/docs/PRODUCT_C2_VISUAL_IDENTITY_EDITOR.md b/docs/PRODUCT_C2_VISUAL_IDENTITY_EDITOR.md
+new file mode 100644
+--- /dev/null
++++ b/docs/PRODUCT_C2_VISUAL_IDENTITY_EDITOR.md
+@@ -0,0 +1,131 @@
++# PRODUCT-C2 - Editor controlado de identidad visual
++
++## Objetivo
++
++PRODUCT-C2 agrega una capa controlada para ajustar la identidad visual principal del cliente sin tocar codigo y sin persistencia backend. El editor vive en `/ui-kit` y trabaja sobre tokens semanticos, no sobre componentes individuales.
++
++## Alcance
++
++Incluido:
++
++- seleccion de plantilla visual base;
++- edicion local de tokens principales;
++- preview en vivo de botones, cards, badges, inputs y estado reservado;
++- persistencia local de overrides;
++- restauracion a plantilla base;
++- convivencia con tema claro/oscuro.
++
++No incluido:
++
++- persistencia por cliente/tenant;
++- endpoints;
++- migraciones;
++- editor libre por componente;
++- edicion libre de colores de texto;
++- cambios de AUTH/RBAC, pagos, caja, billing, reportes backend, IA o reglas LIVE.
++
++## Tokens editables
++
++El editor permite ajustar solo tokens semanticos principales:
++
++- color primario;
++- color secundario;
++- color acento;
++- color exito;
++- color advertencia;
++- color peligro / reservado;
++- color de fondo;
++- color de superficie/cards;
++- radio visual;
++- densidad visual.
++
++Los tokens se aplican sobre la plantilla activa y se resuelven asi:
++
++```text
++preset base + overrides locales + light/dark mode = tokens finales
++```
++
++## Donde se cambia
++
++Ruta:
++
++```text
++/ui-kit
++```
++
++Seccion:
++
++```text
++Identidad visual -> Editor controlado
++```
++
++Acciones disponibles:
++
++- Aplicar cambios localmente;
++- Restaurar plantilla.
++
++## Persistencia local
++
++La personalizacion se guarda en almacenamiento local del frontend mediante `AsyncStorage`.
++
++Claves usadas:
++
++- `controlRopa.localVisualPreset`
++- `controlRopa.localVisualIdentityOverrides`
++
++Esta decision evita simular branding real por tenant mientras no exista soporte backend.
++
++## Validacion
++
++Validaciones actuales:
++
++- solo acepta colores hexadecimales `#RRGGBB`;
++- bloquea aplicar si hay colores invalidos;
++- muestra advertencias simples de contraste para fondo/superficie;
++- no permite editar texto libremente para reducir riesgo de ilegibilidad.
++
++Pendiente:
++
++- algoritmo completo de contraste WCAG;
++- validacion centralizada por preset antes de permitir persistencia tenant;
++- vista de auditoria de cambios visuales.
++
++## Relacion con prenda reservada
++
++El estado reservado usa tokens `danger` y `dangerSoft`.
++
++Si el usuario cambia el token "color peligro / reservado":
++
++- cambia la card reservada;
++- cambia el chip Reservada;
++- cambia la semantica visual danger asociada.
++
++No cambia la logica de reserva ni reglas LIVE.
++
++## Light / Dark
++
++El editor trabaja sobre el modo visual activo. Para ajustar ambos modos, el usuario debe alternar claro/oscuro y aplicar los cambios deseados en cada modo.
++
++Esto mantiene el control de contraste por modo y evita forzar un mismo color en contextos visuales incompatibles.
++
++## Recomendaciones para clientes
++
++- Usar presets como base, no partir de colores aleatorios.
++- Editar primero primario/acento.
++- Reservar danger para estados operativos delicados.
++- Validar `/live`, `/customers`, `/reservations`, `/users`, `/system` y `/reports` despues de aplicar.
++- Validar siempre en claro y oscuro.
++
++## Futuro backend / tenant
++
++Fase futura sugerida:
++
++- guardar preset y overrides por tenant;
++- restringir presets permitidos por cliente;
++- agregar auditoria de cambios;
++- validar contraste antes de persistir;
++- permitir rollback a identidad aprobada.
++
++## GO/NO-GO
++
++GO para uso local/desarrollo/admin. NO-GO para prometer branding persistente por cliente hasta implementar backend/tenant.
+
+diff --git a/qa-reports/PRODUCT-C2-visual-identity-editor-report-20260605-095130.md b/qa-reports/PRODUCT-C2-visual-identity-editor-report-20260605-095130.md
+new file mode 100644
+--- /dev/null
++++ b/qa-reports/PRODUCT-C2-visual-identity-editor-report-20260605-095130.md
+@@ -0,0 +1,117 @@
++# PRODUCT-C2 - Editor controlado de identidad visual
++
++Fecha: 2026-06-05 09:51:30
++Rama real: feature/product-c2-visual-identity-editor
++
++## Resumen
++
++PRODUCT-C2 agrega un editor controlado de identidad visual local en `/ui-kit`. La app mantiene presets controlados y suma overrides semanticos limitados, sin tocar backend, AUTH/RBAC, pagos, caja, billing, reportes backend, IA ni reglas LIVE.
++
++## Que se implemento
++
++- Tipos y helpers para identidad visual custom local.
++- Validacion hex `#RRGGBB`.
++- Overrides locales por modo claro/oscuro.
++- Persistencia local con `AsyncStorage`.
++- Restauracion de plantilla base.
++- Preview en vivo de botones, cards, badges, inputs y prenda reservada.
++- Documentacion PRODUCT-C2 y actualizacion de documentos PRODUCT-C/C1/presets.
++
++## Tokens editables
++
++- primary;
++- secondary;
++- accent;
++- success;
++- warning;
++- danger / reserved;
++- background;
++- surface;
++- radius;
++- density.
++
++## Que NO permite
++
++- editar colores por componente;
++- editar texto libremente;
++- persistir por tenant/backend;
++- crear endpoints;
++- crear migraciones;
++- cambiar reglas LIVE;
++- saltarse AUTH/RBAC.
++
++## Como se guarda
++
++Local frontend:
++
++- `controlRopa.localVisualPreset`;
++- `controlRopa.localVisualIdentityOverrides`.
++
++La resolucion del tema queda:
++
++```text
++preset base + overrides locales + light/dark mode = tokens finales
++```
++
++## Validacion de contraste
++
++Se implemento validacion basica:
++
++- bloquea colores no hexadecimales;
++- muestra advertencias simples para contraste de fondo/superficie.
++
++Pendiente:
++
++- validacion WCAG completa;
++- validacion backend antes de persistir por tenant.
++
++## Archivos modificados
++
++- `app/ui-kit.tsx`
++- `context/AppThemeContext.tsx`
++- `theme/designPresets.ts`
++- `docs/PRODUCT_C2_VISUAL_IDENTITY_EDITOR.md`
++- `docs/PRODUCT_C_CLIENT_VISUAL_IDENTITY_PRESETS.md`
++- `docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md`
++- `docs/PRODUCT_C1_GLOBAL_PREMIUM_ROLLOUT.md`
++
++## Validaciones ejecutadas
++
++- `git branch --show-current`: rama real `feature/product-c2-visual-identity-editor`.
++- `git status`: cambios esperados antes del commit.
++- `git log --oneline -12`: OK.
++- `git --no-pager diff --stat`: OK.
++- `git --no-pager diff --name-only`: OK.
++- `git --no-pager diff --check`: OK, solo warnings LF/CRLF.
++- `npm.cmd run lint`: OK, 0 errores, 60 warnings preexistentes.
++- `npx.cmd tsc --noEmit`: OK.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
++- `cd backend/control-ropa; .\\mvnw.cmd test`: OK, 73 tests.
++- `cd backend/control-ropa; .\\mvnw.cmd -q -DskipTests package`: OK.
++
++## Warnings
++
++- ESLint mantiene 60 warnings historicos/preexistentes, sin errores.
++- Maven mantiene warnings preexistentes de Mockito dynamic agent, MySQL 5.7 y password generada en tests.
++- Git muestra conversion LF/CRLF normal en Windows.
++
++## Riesgos
++
++- La personalizacion sigue siendo local por dispositivo.
++- La validacion de contraste no es WCAG completa.
++- Cambios extremos de fondo/superficie pueden requerir QA manual adicional.
++- Persistencia tenant requiere backend y auditoria futura.
++
++## GO / NO-GO
++
++GO tecnico si el staged diff pasa `git diff --cached --check`.
++
++## Siguiente fase recomendada
++
++PRODUCT-C3 / PRODUCT-E:
++
++- persistencia de identidad visual por cliente/tenant;
++- politica de presets permitidos;
++- auditoria y rollback;
++- validador WCAG completo;
++- preview visual por tenant antes de publicar.

@@ -244,3 +244,11 @@ PRODUCT-C2:
 - migracion visual de formularios y reportes individuales;
 - revisar pantallas de pagos/caja solo visualmente y con guardas estrictas;
 - checklist de contraste automatizable.
+
+---
+
+## Continuidad PRODUCT-C2
+
+PRODUCT-C2 agrega un editor controlado de identidad visual local en `/ui-kit`. El editor mantiene el modelo seguro de PRODUCT-C1: presets como base, overrides semanticos limitados, preview en vivo y restauracion de plantilla.
+
+La persistencia por cliente/tenant, auditoria y politica centralizada de presets siguen fuera de alcance hasta una fase backend dedicada.

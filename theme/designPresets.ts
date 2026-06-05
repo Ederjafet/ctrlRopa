@@ -60,6 +60,131 @@ export type DesignPreset = {
 
 export const DEFAULT_DESIGN_PRESET_ID: DesignPresetId = 'retailPremium';
 
+export const editableVisualTokenKeys = [
+  'primary',
+  'secondary',
+  'accent',
+  'success',
+  'warning',
+  'danger',
+  'background',
+  'surface',
+] as const;
+
+export type EditableVisualTokenKey = (typeof editableVisualTokenKeys)[number];
+export type ThemeScheme = 'light' | 'dark';
+
+export type VisualIdentityRadius = 'standard' | 'soft' | 'compact';
+export type VisualIdentityDensity = 'NORMAL' | 'COMPACT';
+
+export type CustomVisualIdentity = {
+  presetId: DesignPresetId;
+  colors: Partial<Record<ThemeScheme, Partial<Record<EditableVisualTokenKey, string>>>>;
+  radius?: VisualIdentityRadius;
+  density?: VisualIdentityDensity;
+  updatedAt?: string;
+};
+
+export const visualTokenLabels: Record<EditableVisualTokenKey, string> = {
+  primary: 'Color primario',
+  secondary: 'Color secundario',
+  accent: 'Color acento',
+  success: 'Color exito',
+  warning: 'Color advertencia',
+  danger: 'Color peligro / reservado',
+  background: 'Color de fondo',
+  surface: 'Color de superficie/cards',
+};
+
+export function isHexColor(value: string) {
+  return /^#[0-9a-fA-F]{6}$/.test(value.trim());
+}
+
+function hexToRgb(value: string) {
+  if (!isHexColor(value)) return null;
+  const clean = value.replace('#', '');
+  return {
+    r: parseInt(clean.slice(0, 2), 16),
+    g: parseInt(clean.slice(2, 4), 16),
+    b: parseInt(clean.slice(4, 6), 16),
+  };
+}
+
+function rgbaFromHex(value: string, alpha: number) {
+  const rgb = hexToRgb(value);
+  if (!rgb) return value;
+  return `rgba(${rgb.r},${rgb.g},${rgb.b},${alpha})`;
+}
+
+function getRelativeLuminance(value: string) {
+  const rgb = hexToRgb(value);
+  if (!rgb) return null;
+
+  const channels = [rgb.r, rgb.g, rgb.b].map((channel) => {
+    const normalized = channel / 255;
+    return normalized <= 0.03928
+      ? normalized / 12.92
+      : Math.pow((normalized + 0.055) / 1.055, 2.4);
+  });
+
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+}
+
+export function getContrastRatio(foreground: string, background: string) {
+  const foregroundLuminance = getRelativeLuminance(foreground);
+  const backgroundLuminance = getRelativeLuminance(background);
+  if (foregroundLuminance === null || backgroundLuminance === null) return null;
+
+  const lighter = Math.max(foregroundLuminance, backgroundLuminance);
+  const darker = Math.min(foregroundLuminance, backgroundLuminance);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+export function applyCustomVisualIdentity(
+  colors: DesignPresetColors,
+  customIdentity: CustomVisualIdentity | null | undefined,
+  scheme: ThemeScheme,
+) {
+  if (!customIdentity) return colors;
+
+  const overrides = customIdentity.colors[scheme] ?? {};
+  const nextColors: DesignPresetColors = { ...colors };
+
+  editableVisualTokenKeys.forEach((key) => {
+    const value = overrides[key];
+    if (value && isHexColor(value)) {
+      nextColors[key] = value;
+    }
+  });
+
+  if (overrides.primary && isHexColor(overrides.primary)) {
+    nextColors.primarySoft = rgbaFromHex(overrides.primary, scheme === 'dark' ? 0.24 : 0.14);
+  }
+  if (overrides.accent && isHexColor(overrides.accent)) {
+    nextColors.accentSoft = rgbaFromHex(overrides.accent, scheme === 'dark' ? 0.24 : 0.14);
+    nextColors.focusRing = overrides.accent;
+  }
+  if (overrides.success && isHexColor(overrides.success)) {
+    nextColors.successSoft = rgbaFromHex(overrides.success, scheme === 'dark' ? 0.24 : 0.14);
+  }
+  if (overrides.warning && isHexColor(overrides.warning)) {
+    nextColors.warningSoft = rgbaFromHex(overrides.warning, scheme === 'dark' ? 0.24 : 0.16);
+  }
+  if (overrides.danger && isHexColor(overrides.danger)) {
+    nextColors.dangerSoft = rgbaFromHex(overrides.danger, scheme === 'dark' ? 0.26 : 0.14);
+  }
+  if (overrides.background && isHexColor(overrides.background)) {
+    nextColors.backgroundElevated = rgbaFromHex(overrides.background, scheme === 'dark' ? 0.7 : 0.72);
+  }
+  if (overrides.surface && isHexColor(overrides.surface)) {
+    nextColors.surfaceAlt = rgbaFromHex(overrides.surface, scheme === 'dark' ? 0.72 : 0.78);
+    nextColors.surfaceElevated = overrides.surface;
+    nextColors.inputBackground = overrides.surface;
+  }
+
+  return nextColors;
+}
+
 export const designPresets: DesignPreset[] = [
   {
     id: 'retailPremium',

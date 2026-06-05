@@ -1,0 +1,11 @@
+﻿ app/ui-kit.tsx                                   | 319 +++++++++++++++++++++++
+ context/AppThemeContext.tsx                      | 100 ++++++-
+ docs/PRODUCT_C1_GLOBAL_PREMIUM_ROLLOUT.md        |   8 +
+ docs/PRODUCT_C_CLIENT_VISUAL_IDENTITY_PRESETS.md |  19 ++
+ docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md          |  16 ++
+ theme/designPresets.ts                           | 125 +++++++++
+ 6 files changed, 578 insertions(+), 9 deletions(-)
+
+Untracked/force-added evidence included:
+docs/PRODUCT_C2_VISUAL_IDENTITY_EDITOR.md | 131 lines
+qa-reports/PRODUCT-C2-visual-identity-editor-report-20260605-095130.md | 117 lines
