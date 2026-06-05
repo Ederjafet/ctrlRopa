@@ -1,0 +1,6 @@
+ app/live.tsx                                | 111 +++++++++++++++++++++++++++-
+ docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md |   9 +++
+ locales/en/common.json                      |  16 ++++
+ locales/es/common.json                      |  16 ++++
+ services/liveCapabilities.ts                |   9 ++-
+ 5 files changed, 156 insertions(+), 5 deletions(-)
