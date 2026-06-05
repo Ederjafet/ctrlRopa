@@ -1,4 +1,5 @@
 import { getAppearanceSettings } from '@/services/appearanceService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Appearance, ColorSchemeName } from 'react-native';
 
@@ -40,6 +41,11 @@ type ThemeColors = {
   backButtonText: string;
   menuButtonBackground: string;
   menuButtonText: string;
+  neutralButtonBackground: string;
+  neutralButtonText: string;
+  neutralButtonBorder: string;
+  disabledButtonBackground: string;
+  disabledButtonText: string;
   infoCardBackground: string;
   infoCardText: string;
   infoCardBorder: string;
@@ -109,6 +115,11 @@ const lightColors: ThemeColors = {
   backButtonText: '#ffffff',
   menuButtonBackground: '#2563eb',
   menuButtonText: '#ffffff',
+  neutralButtonBackground: '#f8fafc',
+  neutralButtonText: '#334155',
+  neutralButtonBorder: '#cbd5e1',
+  disabledButtonBackground: '#e5e7eb',
+  disabledButtonText: '#64748b',
   infoCardBackground: '#eef2ff',
   infoCardText: '#1e293b',
   infoCardBorder: '#93c5fd',
@@ -158,6 +169,11 @@ const darkColors: ThemeColors = {
   backButtonText: '#f9fafb',
   menuButtonBackground: '#2563eb',
   menuButtonText: '#ffffff',
+  neutralButtonBackground: '#1e293b',
+  neutralButtonText: '#e2e8f0',
+  neutralButtonBorder: '#475569',
+  disabledButtonBackground: '#334155',
+  disabledButtonText: '#94a3b8',
   infoCardBackground: '#172554',
   infoCardText: '#dbeafe',
   infoCardBorder: '#2563eb',
@@ -196,15 +212,23 @@ const createDefaultTheme = (scheme: ColorSchemeName = 'light'): AppTheme => {
 
 type AppThemeContextValue = {
   theme: AppTheme;
+  themeMode: 'LIGHT' | 'DARK';
   isLoadingTheme: boolean;
   reloadTheme: () => Promise<void>;
+  toggleThemeMode: () => Promise<void>;
+  setThemeMode: (mode: 'LIGHT' | 'DARK') => Promise<void>;
 };
 
 const AppThemeContext = createContext<AppThemeContextValue>({
   theme: createDefaultTheme('light'),
+  themeMode: 'LIGHT',
   isLoadingTheme: false,
   reloadTheme: async () => {},
+  toggleThemeMode: async () => {},
+  setThemeMode: async () => {},
 });
+
+const LOCAL_THEME_MODE_KEY = 'controlRopa.localThemeMode';
 
 const cleanColor = (value?: string | null) => {
   if (!value) return undefined;
@@ -217,6 +241,7 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
     Appearance.getColorScheme()
   );
   const [theme, setTheme] = useState<AppTheme>(createDefaultTheme(systemScheme));
+  const [localThemeMode, setLocalThemeMode] = useState<'LIGHT' | 'DARK' | null>(null);
   const [isLoadingTheme, setIsLoadingTheme] = useState(true);
 
   useEffect(() => {
@@ -228,14 +253,40 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
+    AsyncStorage.getItem(LOCAL_THEME_MODE_KEY)
+      .then((value) => {
+        if (cancelled) return;
+        setLocalThemeMode(value === 'DARK' ? 'DARK' : value === 'LIGHT' ? 'LIGHT' : null);
+      })
+      .catch(() => {
+        if (!cancelled) setLocalThemeMode(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     reloadTheme();
-  }, [systemScheme]);
+  }, [systemScheme, localThemeMode]);
+
+  const setThemeMode = async (mode: 'LIGHT' | 'DARK') => {
+    await AsyncStorage.setItem(LOCAL_THEME_MODE_KEY, mode);
+    setLocalThemeMode(mode);
+  };
+
+  const toggleThemeMode = async () => {
+    await setThemeMode(theme.isDark ? 'LIGHT' : 'DARK');
+  };
 
   const reloadTheme = async () => {
     try {
       setIsLoadingTheme(true);
       const settings = await getAppearanceSettings();
-      const configuredMode = settings.themeMode ?? 'LIGHT';
+      const configuredMode = localThemeMode ?? settings.themeMode ?? 'LIGHT';
       const resolvedScheme =
         configuredMode === 'AUTO'
           ? systemScheme
@@ -310,6 +361,11 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
           menuButtonText:
             cleanColor(settings.menuButtonTextColor) ??
             baseTheme.colors.menuButtonText,
+          neutralButtonBackground: baseTheme.colors.neutralButtonBackground,
+          neutralButtonText: baseTheme.colors.neutralButtonText,
+          neutralButtonBorder: baseTheme.colors.neutralButtonBorder,
+          disabledButtonBackground: baseTheme.colors.disabledButtonBackground,
+          disabledButtonText: baseTheme.colors.disabledButtonText,
           infoCardBackground:
             cleanColor(settings.infoCardBackgroundColor) ??
             baseTheme.colors.infoCardBackground,
@@ -352,7 +408,14 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
   };
 
   const value = useMemo(
-    () => ({ theme, isLoadingTheme, reloadTheme }),
+    () => ({
+      theme,
+      themeMode: (theme.isDark ? 'DARK' : 'LIGHT') as 'LIGHT' | 'DARK',
+      isLoadingTheme,
+      reloadTheme,
+      toggleThemeMode,
+      setThemeMode,
+    }),
     [theme, isLoadingTheme]
   );
 

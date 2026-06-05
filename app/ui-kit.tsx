@@ -6,6 +6,7 @@ import ListTemplate from '@/components/templates/ListTemplate';
 import MonitoringTemplate from '@/components/templates/MonitoringTemplate';
 import OperationalTemplate from '@/components/templates/OperationalTemplate';
 import ActionTile from '@/components/ui/ActionTile';
+import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
 import AppText from '@/components/ui/AppText';
@@ -72,7 +73,7 @@ function buildNavSections(session: UserSession | null): SidebarSection[] {
 }
 
 export default function UiKitPreview() {
-  const { theme } = useAppTheme();
+  const { theme, themeMode, toggleThemeMode } = useAppTheme();
   const [loading, setLoading] = useState(true);
   const [isLogged, setIsLogged] = useState(false);
   const [session, setSession] = useState<UserSession | null>(null);
@@ -118,6 +119,8 @@ export default function UiKitPreview() {
       <AppShell
         title="UI Kit"
         subtitle="Catalogo interno de componentes y templates"
+        contextTitle="Catalogo UI"
+        contextSubtitle="Componentes, tokens y templates internos"
         activeRoute="ui-kit"
         session={session}
         navSections={navSections}
@@ -135,6 +138,8 @@ export default function UiKitPreview() {
     <AppShell
       title="UI Kit"
       subtitle="Catalogo interno de componentes y templates"
+      contextTitle="Catalogo UI"
+      contextSubtitle="Componentes, tokens y templates internos"
       activeRoute="ui-kit"
       session={session}
       navSections={navSections}
@@ -187,6 +192,32 @@ export default function UiKitPreview() {
 
       <SectionHeader title="Componentes UI" subtitle="Piezas base del UI Kit interno" />
       <AppResponsiveGrid tabletColumns={2} desktopColumns={3}>
+        <AppCard style={styles.previewCard}>
+          <SectionHeader
+            title="Tema activo"
+            subtitle="El toggle vive en el TopBar y se guarda localmente"
+          />
+          <StatusBadge label={themeMode === 'DARK' ? 'Dark theme' : 'Light theme'} tone="info" />
+          <AppButton
+            title={themeMode === 'DARK' ? 'Cambiar a claro' : 'Cambiar a oscuro'}
+            variant="neutral"
+            onPress={toggleThemeMode}
+          />
+        </AppCard>
+        <AppCard style={styles.previewCard}>
+          <SectionHeader title="Button variants" subtitle="Jerarquia visual base" />
+          <AppButton title="Primary" variant="primary" onPress={() => undefined} />
+          <AppButton title="Secondary" variant="secondary" onPress={() => undefined} />
+          <AppButton title="Neutral" variant="neutral" onPress={() => undefined} />
+          <AppButton title="Danger" variant="danger" onPress={() => undefined} />
+          <AppButton
+            title="Disabled"
+            variant="primary"
+            disabled
+            disabledReason="Preview de accion bloqueada."
+            onPress={() => undefined}
+          />
+        </AppCard>
         <AppCard>
           <SectionHeader title="StatusBadge" />
           <View style={styles.inlineList}>
@@ -292,6 +323,9 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: designTokens.spacing.md,
     justifyContent: 'center',
+  },
+  previewCard: {
+    gap: designTokens.spacing.sm,
   },
   swatch: {
     borderRadius: designTokens.radius.md,

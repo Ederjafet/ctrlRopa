@@ -272,6 +272,12 @@ export default function HomeDashboard() {
     <AppShell
       title="Inicio"
       subtitle="Resumen operativo"
+      contextTitle="Resumen operativo"
+      contextSubtitle={
+        selectedBranch
+          ? `${selectedBranch.branchName} · ${dashboard?.date ?? 'Hoy'} · Accesos y pendientes`
+          : 'Actividad, pendientes y accesos permitidos para tu usuario'
+      }
       activeRoute="home"
       session={session}
       navSections={navSections}

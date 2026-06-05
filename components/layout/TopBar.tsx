@@ -25,7 +25,7 @@ export default function TopBar({
   onMenuPress,
   showMenuButton,
 }: Props) {
-  const { theme } = useAppTheme();
+  const { theme, toggleThemeMode } = useAppTheme();
   const { isPhone, isWideDesktop } = useResponsiveLayout();
   const roleLabel = session?.roles?.map((role) => role.code).join(', ') || 'Sin rol';
 
@@ -68,6 +68,29 @@ export default function TopBar({
         ) : null}
       </View>
       <View style={[styles.userBlock, isPhone ? styles.userBlockCompact : null]}>
+        <Pressable
+          onPress={toggleThemeMode}
+          style={({ pressed }) => [
+            styles.themeButton,
+            {
+              backgroundColor: theme.colors.neutralButtonBackground,
+              borderColor: theme.colors.neutralButtonBorder,
+              borderRadius: designTokens.radius.full,
+              opacity: pressed ? 0.75 : 1,
+            },
+          ]}
+        >
+          <MaterialIcons
+            name={theme.isDark ? 'light-mode' : 'dark-mode'}
+            size={18}
+            color={theme.colors.neutralButtonText}
+          />
+          {!isPhone ? (
+            <AppText variant="caption" color={theme.colors.neutralButtonText} bold>
+              {theme.isDark ? 'Claro' : 'Oscuro'}
+            </AppText>
+          ) : null}
+        </Pressable>
         {session ? (
           <>
             <StatusBadge label={roleLabel} tone="info" />
@@ -100,6 +123,14 @@ const styles = StyleSheet.create({
   titleBlock: {
     flex: 1,
     minWidth: 0,
+  },
+  themeButton: {
+    alignItems: 'center',
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: designTokens.spacing.xs,
+    paddingHorizontal: designTokens.spacing.sm,
+    paddingVertical: designTokens.spacing.xs,
   },
   topBar: {
     alignItems: 'center',

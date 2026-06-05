@@ -4,6 +4,17 @@ Proyecto: control-ropa-app
 Rama: feature/live-z5-operator-actor-ux
 Fecha: 2026-05-29
 
+## Nota LIVE-Z6A - AppShell
+
+El 2026-06-04 se integro `/live` al `AppShell` del UI Kit interno.
+
+- Se mantiene el modelo de actores LIVE definido en Z5.
+- Se mantiene el flujo operador: preparar prenda, prenda al aire, precio, cliente/interesado y reserva.
+- Se mantiene la vista vendedor/presentadora y supervisor.
+- No se reescribieron reglas operativas profundas.
+- No se tocaron backend, AUTH/RBAC, pagos, caja, reportes, billing ni IA.
+- Los templates internos quedan como pendiente de migracion gradual para LIVE-Z6B.
+
 ## Objetivo
 
 Reducir la confusion visual de `/live` y formalizar una capa frontend de vista LIVE derivada de AUTH real. El actor LIVE no reemplaza roles ni permisos; solo decide la experiencia visual usando `/api/me`, roles reales y permisos efectivos.

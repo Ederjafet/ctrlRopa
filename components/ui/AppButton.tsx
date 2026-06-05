@@ -3,7 +3,15 @@ import { ActivityIndicator, Alert, Pressable, PressableProps, StyleSheet, Text }
 
 type Props = PressableProps & {
   title: string;
-  variant?: 'primary' | 'secondary' | 'operation' | 'danger' | 'cancel' | 'back' | 'menu';
+  variant?:
+    | 'primary'
+    | 'secondary'
+    | 'neutral'
+    | 'operation'
+    | 'danger'
+    | 'cancel'
+    | 'back'
+    | 'menu';
   loading?: boolean;
   disabledReason?: string;
 };
@@ -22,7 +30,9 @@ export default function AppButton({
   const isBlocked = Boolean(disabled && !loading);
 
   const backgroundColor =
-    variant === 'danger'
+    isBlocked
+      ? theme.colors.disabledButtonBackground
+      : variant === 'danger'
       ? theme.colors.dangerButtonBackground
       : variant === 'cancel'
         ? theme.colors.cancelButtonBackground
@@ -32,12 +42,16 @@ export default function AppButton({
           ? theme.colors.menuButtonBackground
           : variant === 'operation'
             ? theme.colors.operationButtonBackground
+            : variant === 'neutral'
+              ? theme.colors.neutralButtonBackground
       : variant === 'secondary'
         ? theme.colors.secondaryButtonBackground
         : theme.colors.primaryButtonBackground;
 
   const textColor =
-    variant === 'danger'
+    isBlocked
+      ? theme.colors.disabledButtonText
+      : variant === 'danger'
       ? theme.colors.dangerButtonText
       : variant === 'cancel'
         ? theme.colors.cancelButtonText
@@ -47,6 +61,8 @@ export default function AppButton({
             ? theme.colors.menuButtonText
             : variant === 'operation'
               ? theme.colors.operationButtonText
+              : variant === 'neutral'
+                ? theme.colors.neutralButtonText
       : variant === 'secondary'
         ? theme.colors.secondaryButtonText
         : theme.colors.primaryButtonText;
@@ -57,10 +73,12 @@ export default function AppButton({
         styles.button,
         {
           backgroundColor,
+          borderColor: variant === 'neutral' ? theme.colors.neutralButtonBorder : backgroundColor,
+          borderWidth: variant === 'neutral' ? StyleSheet.hairlineWidth : 0,
           borderRadius: theme.radius.md,
           paddingVertical: theme.density === 'COMPACT' ? 11 : 15,
           paddingHorizontal: theme.spacing.md,
-          opacity: disabled || loading ? 0.55 : pressed ? 0.85 : 1,
+          opacity: loading ? 0.55 : pressed ? 0.85 : 1,
         },
         style as any,
       ]}
