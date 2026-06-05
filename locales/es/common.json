@@ -559,7 +559,16 @@
     "operationalHoldReactivatedMessage": "El registro volvio a estado Apartado para seguimiento. No se registro pago ni caja.",
     "operationalStatusNoChangesTitle": "Sin cambios",
     "operationalStatusNoChangesMessage": "Este registro ya estaba como Apartado.",
-    "returnToReservedHelp": "Regresa este registro a estado Apartado para seguimiento. No registra pago ni caja."
+    "returnToReservedHelp": "Regresa este registro a estado Apartado para seguimiento. No registra pago ni caja.",
+    "removePreparedItem": "QUITAR PRENDA PREPARADA",
+    "removePreparedItemHelp": "Quita esta prenda de preparacion. No afecta la prenda al aire.",
+    "itemAlreadyLiveTitle": "Prenda ya al aire",
+    "itemAlreadyLiveMessage": "Esta prenda ya esta al aire. Selecciona otra prenda para prepararla como cambio.",
+    "prepareItemBeforeSwitch": "Primero prepara una prenda para poder cambiarla.",
+    "preparedItemNowLiveTitle": "La prenda preparada paso al aire",
+    "preparedItemNowLiveMessage": "La prenda preparada paso al aire y quedo lista para apartados.",
+    "preparedItemRemovedTitle": "Prenda preparada retirada",
+    "preparedItemRemovedMessage": "La prenda preparada fue retirada."
   },
   "payments": {
     "title": "Pagos / Cobros",

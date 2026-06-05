@@ -1,0 +1,9 @@
+﻿ app/live.tsx                                       | 135 +++++++++++++++------
+ docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md        |   3 +
+ docs/LIVE_Z9B_APARTADO_COPY_ALIGNMENT.md           |   4 +
+ docs/LIVE_Z9C_ACTIONABLE_HOLD_STATES.md            |   4 +
+ docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md          |  80 ++++++++++++
+ locales/en/common.json                             |  11 +-
+ locales/es/common.json                             |  11 +-
+ ...pared-item-flow-fixes-report-20260605-150727.md |  45 +++++++
+ 8 files changed, 254 insertions(+), 39 deletions(-)

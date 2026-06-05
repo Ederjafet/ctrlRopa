@@ -61,6 +61,10 @@ Implementacion frontend:
 
 LIVE-Z9C refina `Apartados recientes` para que las acciones visibles dependan del estado actual. `Mantener apartado` deja de mostrarse cuando el registro ya esta en estado visible `Apartado`, porque no genera un cambio operativo perceptible para la persona usuaria.
 
+## Continuidad LIVE-Z9D
+
+LIVE-Z9D mantiene la regla de conservar la prenda preparada al apartar la prenda al aire y agrega controles para usarla o retirarla de forma explicita: `Cambiar por prenda preparada` ejecuta el cambio directo y `Quitar prenda preparada` limpia solo la preparacion local.
+
 ## Sin cambios funcionales backend
 
 No se modifico:

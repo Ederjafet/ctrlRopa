@@ -2009,6 +2009,15 @@ export default function LiveScreen() {
       return;
     }
 
+    if (activeItem?.id === item.id) {
+      setLiveNotice({
+        title: t('live.itemAlreadyLiveTitle'),
+        message: t('live.itemAlreadyLiveMessage'),
+        tone: 'warning',
+      });
+      return;
+    }
+
     const availability = getItemLiveAvailability(item);
     if (!availability.canGoOnAir) {
       setLiveNotice({
@@ -2070,21 +2079,28 @@ export default function LiveScreen() {
       return;
     }
 
+    const itemToSet = selectedItem;
+    const isSwitchingPreparedItem = !!activeItem && activeItem.id !== itemToSet.id;
     setIsSavingActiveItem(true);
 
     try {
-      const updated = await setLiveActiveItem(selectedLive.id, selectedItem.id);
+      const updated = await setLiveActiveItem(selectedLive.id, itemToSet.id);
       setSelectedLive(updated);
       setLives((current) =>
         current.map((live) => (live.id === updated.id ? updated : live))
       );
       setActiveItemForReservation(activeItemFromLive(updated));
+      setSelectedItem(null);
       await updateLiveEvents(updated.id);
       setLiveNotice({
-        title: t('live.activeProductUpdatedTitle'),
-        message: t('live.activeProductUpdatedMessage', {
-          item: selectedItem.code,
-        }),
+        title: isSwitchingPreparedItem
+          ? t('live.preparedItemNowLiveTitle')
+          : t('live.activeProductUpdatedTitle'),
+        message: isSwitchingPreparedItem
+          ? t('live.preparedItemNowLiveMessage')
+          : t('live.activeProductUpdatedMessage', {
+              item: itemToSet.code,
+            }),
         tone: 'success',
       });
     } catch (err: any) {
@@ -2096,6 +2112,17 @@ export default function LiveScreen() {
     } finally {
       setIsSavingActiveItem(false);
     }
+  };
+
+  const handleRemovePreparedItem = () => {
+    if (!selectedItem) return;
+
+    setSelectedItem(null);
+    setLiveNotice({
+      title: t('live.preparedItemRemovedTitle'),
+      message: t('live.preparedItemRemovedMessage'),
+      tone: 'success',
+    });
   };
 
   const handleClearActiveItem = async () => {
@@ -2654,34 +2681,49 @@ export default function LiveScreen() {
           </View>
 
           {options.showOnAirAction ? (
-            <AppButton
-              title={
-                isOnAir
-                  ? t('live.productAlreadyOnAir')
-                  : t('live.markSelectedProductOnAir')
-              }
-              variant={isOnAir ? 'neutral' : 'primary'}
-              onPress={handleSetSelectedItemActive}
-              loading={isSavingActiveItem}
-              disabled={
-                isSavingActiveItem ||
-                !operatorFlowEnabled ||
-                !maySetActiveItem ||
-                isOnAir ||
-                !availability.canGoOnAir
-              }
-              disabledReason={
-                !maySetActiveItem
-                  ? t('live.liveOperatePermissionError')
-                  : !operatorFlowEnabled
-                    ? t('live.selectOpenLiveReason')
-                    : isOnAir
-                      ? t('live.productAlreadyOnAir')
-                      : !availability.canGoOnAir
-                        ? availability.reason
-                      : undefined
-              }
-            />
+            <View style={styles.preparedItemActions}>
+              <AppButton
+                title={
+                  isOnAir
+                    ? t('live.productAlreadyOnAir')
+                    : t('live.markSelectedProductOnAir')
+                }
+                variant={isOnAir ? 'neutral' : 'primary'}
+                onPress={handleSetSelectedItemActive}
+                loading={isSavingActiveItem}
+                disabled={
+                  isSavingActiveItem ||
+                  !operatorFlowEnabled ||
+                  !maySetActiveItem ||
+                  isOnAir ||
+                  !availability.canGoOnAir
+                }
+                disabledReason={
+                  !maySetActiveItem
+                    ? t('live.liveOperatePermissionError')
+                    : !operatorFlowEnabled
+                      ? t('live.selectOpenLiveReason')
+                      : isOnAir
+                        ? t('live.productAlreadyOnAir')
+                        : !availability.canGoOnAir
+                          ? availability.reason
+                        : undefined
+                }
+              />
+              {isPreparedForChange ? (
+                <>
+                  <AppButton
+                    title={t('live.removePreparedItem')}
+                    variant="neutral"
+                    onPress={handleRemovePreparedItem}
+                    disabled={isSavingActiveItem}
+                  />
+                  <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+                    {t('live.removePreparedItemHelp')}
+                  </AppText>
+                </>
+              ) : null}
+            </View>
           ) : null}
           {options.highlighted && isOnAir && options.showActiveActions !== false ? (
             <View style={styles.buttonRow}>
@@ -2708,12 +2750,28 @@ export default function LiveScreen() {
                 <AppButton
                   title={t('live.changeItemOnAir')}
                   variant="secondary"
-                  onPress={() => setIsItemModalVisible(true)}
-                  disabled={!maySelectItem}
-                  disabledReason={t('live.itemPermissionError')}
+                  onPress={handleSetSelectedItemActive}
+                  loading={isSavingActiveItem}
+                  disabled={
+                    isSavingActiveItem ||
+                    !preparedItem ||
+                    !operatorFlowEnabled ||
+                    !maySetActiveItem
+                  }
+                  disabledReason={
+                    !maySetActiveItem
+                      ? t('live.liveOperatePermissionError')
+                      : !operatorFlowEnabled
+                        ? t('live.selectOpenLiveReason')
+                        : !preparedItem
+                          ? t('live.prepareItemBeforeSwitch')
+                          : undefined
+                  }
                 />
                 <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
-                  {t('live.changeItemOnAirHelp')}
+                  {preparedItem
+                    ? t('live.changeItemOnAirHelp')
+                    : t('live.prepareItemBeforeSwitch')}
                 </AppText>
               </View>
             </View>
@@ -5716,6 +5774,9 @@ const styles = StyleSheet.create({
   },
   actionHelperText: {
     marginTop: 4,
+  },
+  preparedItemActions: {
+    gap: 8,
   },
   buttonRow: {
     flexDirection: 'row',

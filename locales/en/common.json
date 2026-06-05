@@ -559,7 +559,16 @@
     "operationalHoldReactivatedMessage": "The record returned to Hold for follow-up. No payment or cash register movement was recorded.",
     "operationalStatusNoChangesTitle": "No changes",
     "operationalStatusNoChangesMessage": "This record was already on hold.",
-    "returnToReservedHelp": "Returns this record to Hold for follow-up. It does not record payment or cash register movement."
+    "returnToReservedHelp": "Returns this record to Hold for follow-up. It does not record payment or cash register movement.",
+    "removePreparedItem": "REMOVE PREPARED ITEM",
+    "removePreparedItemHelp": "This removes the prepared item only. It does not affect the live item.",
+    "itemAlreadyLiveTitle": "Item already live",
+    "itemAlreadyLiveMessage": "This item is already live. Select another item to prepare it as a switch.",
+    "prepareItemBeforeSwitch": "Prepare an item first before switching.",
+    "preparedItemNowLiveTitle": "The prepared item is now live",
+    "preparedItemNowLiveMessage": "The prepared item is now live and ready for holds.",
+    "preparedItemRemovedTitle": "Prepared item removed",
+    "preparedItemRemovedMessage": "The prepared item was removed."
   },
   "payments": {
     "title": "Payments / Collections",
