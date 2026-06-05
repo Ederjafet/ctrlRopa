@@ -1,0 +1,4 @@
+﻿
+Untracked/force-added evidence included:
+docs/PRODUCT_D3_VISUAL_QA_RESULTS.md | 62 lines
+qa-reports/PRODUCT-D3-visual-qa-results-report-20260605-124421.md | 81 lines
