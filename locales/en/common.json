@@ -595,5 +595,14 @@
     "channelDoorSale": "Counter sale",
     "channelMixed": "Mixed",
     "reservationSettledHelp": "Reservation settled. New regular payments are no longer allowed from this screen."
+  },
+  "itemsCreate": {
+    "validationTitle": "Could not create item",
+    "validationMessage": "Complete the required fields to continue.",
+    "requiredField": "This field is required.",
+    "selectSize": "Select a size.",
+    "validPrice": "Enter a valid price.",
+    "validQuantity": "Enter a valid quantity.",
+    "liveReturnHelp": "After creating the item, you can return to LIVE to prepare it or put it on air."
   }
 }

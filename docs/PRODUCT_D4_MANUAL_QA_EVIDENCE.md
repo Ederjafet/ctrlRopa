@@ -109,3 +109,14 @@ La validacion manual posterior debe revisar tambien:
 - `Mantener apartado`;
 - diferencia entre `Retirar prenda del aire`, `Cambiar por prenda preparada` y `Finalizar en vivo`;
 - que apartar la prenda al aire no oculte la prenda preparada para cambio.
+
+## Nota LIVE-Z9E
+
+La corrida manual desde LIVE debe agregar el caso `Crear prenda rapida`:
+
+- abrir `/items-create?returnTo=/live`;
+- dejar un campo obligatorio vacio, especialmente `Talla`;
+- presionar `Generar prendas`;
+- confirmar que aparece resumen de validacion y error visible por campo;
+- completar datos validos;
+- confirmar que la creacion correcta mantiene el regreso a LIVE.

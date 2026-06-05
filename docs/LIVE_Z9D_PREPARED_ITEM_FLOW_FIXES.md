@@ -78,3 +78,7 @@ Si el operador selecciona en el modal la misma prenda que ya esta al aire:
 ## GO/NO-GO
 
 GO si las validaciones tecnicas pasan y el flujo manual confirma que el boton de cambio ya no abre selector cuando existe prenda preparada.
+
+## Continuidad LIVE-Z9E
+
+LIVE-Z9E mejora la validacion de `Crear prenda rapida` cuando abre `/items-create?returnTo=/live`, mostrando errores visibles por campo antes de volver al flujo LIVE para preparar o poner al aire la prenda creada.

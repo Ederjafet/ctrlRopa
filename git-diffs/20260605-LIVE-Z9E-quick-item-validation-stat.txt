@@ -1,0 +1,11 @@
+﻿ app/items-create.tsx                               | 117 ++++++++++++++++++++-
+ components/ui/AppInput.tsx                         |  13 ++-
+ components/ui/AppSelectorField.tsx                 |  12 ++-
+ docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md        |   2 +
+ docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md          |   4 +
+ docs/LIVE_Z9E_QUICK_ITEM_VALIDATION.md             |  69 ++++++++++++
+ docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md              |  11 ++
+ locales/en/common.json                             |   9 ++
+ locales/es/common.json                             |   9 ++
+ ...quick-item-validation-report-20260605-152657.md |  52 +++++++++
+ 10 files changed, 291 insertions(+), 7 deletions(-)
