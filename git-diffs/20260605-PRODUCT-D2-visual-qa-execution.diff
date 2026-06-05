@@ -1,0 +1,373 @@
+﻿diff --git a/docs/PRODUCT_D_ROLE_BASED_QA_HANDOFF.md b/docs/PRODUCT_D_ROLE_BASED_QA_HANDOFF.md
+index b5b8855..ca41dc5 100644
+--- a/docs/PRODUCT_D_ROLE_BASED_QA_HANDOFF.md
++++ b/docs/PRODUCT_D_ROLE_BASED_QA_HANDOFF.md
+@@ -84,6 +84,8 @@ Para una corrida visual/manual real:
+ - CSV smoke actualizado con resultado PASS/FAIL;
+ - hallazgos priorizados.
+
++PRODUCT-D2 deja el handoff operativo en `docs/PRODUCT_D2_VISUAL_QA_EXECUTION_HANDOFF.md` y el CSV ejecutable en `qa-reports/PRODUCT-D2-visual-qa-execution-smoke-*.csv`. Los casos arrancan como `PENDIENTE_MANUAL`; no deben marcarse como PASS sin evidencia.
++
+ ## Entregables de esta fase
+
+ - `docs/PRODUCT_D_ROLE_BASED_QA_MATRIX.md`
+
+diff --git a/docs/PRODUCT_D2_VISUAL_QA_EXECUTION_HANDOFF.md b/docs/PRODUCT_D2_VISUAL_QA_EXECUTION_HANDOFF.md
+new file mode 100644
+--- /dev/null
++++ b/docs/PRODUCT_D2_VISUAL_QA_EXECUTION_HANDOFF.md
+@@ -0,0 +1,155 @@
++# PRODUCT-D2 - Handoff de corrida visual/manual QA por roles
++
++## Proposito
++
++PRODUCT-D2 prepara la ejecucion manual real de QA visual por rol, ruta, tema, preset y dispositivo. Este documento no marca resultados visuales como aprobados; define como ejecutar, capturar evidencia y reportar hallazgos.
++
++## Alcance
++
++Validar manualmente:
++
++- login/logout por usuario QA;
++- navegacion AppShell en desktop/tablet/mobile;
++- rutas principales autenticadas;
++- vistas LIVE por capacidades;
++- tema claro/oscuro;
++- presets visuales PRODUCT-C1;
++- editor controlado PRODUCT-C2;
++- prenda reservada rojo premium;
++- detalle de reserva con permisos/restriccion pagos.
++
++Fuera de alcance:
++
++- cambios backend;
++- cambios AUTH/RBAC;
++- pagos/caja reales;
++- reportes backend;
++- billing;
++- IA;
++- reglas LIVE nuevas.
++
++## Preparar entorno
++
++Backend:
++
++```powershell
++cd backend/control-ropa
++.\mvnw.cmd spring-boot:run
++```
++
++Frontend web:
++
++```powershell
++npm.cmd run start -- --host 0.0.0.0
++```
++
++Alternativa Expo habitual si el comando anterior no abre web automaticamente:
++
++```powershell
++npx.cmd expo start --web
++```
++
++URL esperada:
++
++```text
++http://localhost:8081
++```
++
++Si el puerto ya esta ocupado, usar el puerto reportado por Expo.
++
++## Usuarios QA
++
++- `qa.admin@local.test`
++- `qa.vendedor.centro@local.test`
++- `qa.supervisor.centro@local.test`
++- `qa.sinpermisos@local.test`
++
++No duplicar contrasenas en evidencia. Usar credenciales internas QA vigentes.
++
++## Orden recomendado
++
++1. Admin en desktop, light, `retailPremium`.
++2. Admin en desktop, dark, `darkConsole`.
++3. Admin en `/ui-kit`: cambiar preset, aplicar editor local y restaurar.
++4. Admin en `/live`: validar consola, prenda reservada y reservas recientes.
++5. Vendedor en tablet/mobile: validar vista apoyo y acciones bloqueadas.
++6. Supervisor en desktop dark: validar dashboard/monitoreo.
++7. Sin permisos en desktop/mobile: validar bloqueo y ausencia de navegacion util.
++8. Detalle de reserva con id valido: validar permisos y secciones restringidas.
++
++## Dispositivos / viewports
++
++- Desktop: 1366px o mas.
++- Tablet: 768px a 1199px.
++- Mobile: 360px a 430px.
++- AnyDesk/pantalla remota: validar que sidebar/drawer no comprima contenido.
++
++## Que capturar
++
++Por caso:
++
++- screenshot o video corto;
++- usuario;
++- ruta;
++- viewport/dispositivo;
++- tema;
++- preset;
++- resultado real;
++- estado PASS/FAIL/BLOQUEADO;
++- severidad si falla.
++
++Guardar evidencia con nombre sugerido:
++
++```text
++PRODUCT-D2_<ID>_<usuario>_<ruta>_<tema>_<dispositivo>.png
++```
++
++## Como llenar CSV
++
++Archivo:
++
++```text
++qa-reports/PRODUCT-D2-visual-qa-execution-smoke-YYYYMMDD-HHMMSS.csv
++```
++
++Campos importantes:
++
++- `Resultado real`: lo que se observo.
++- `Estado`: `PASS`, `FAIL`, `BLOQUEADO`, `NO_APLICA` o `PENDIENTE_MANUAL`.
++- `Evidencia`: nombre/ruta del screenshot o nota.
++- `Severidad si falla`: `S1`, `S2`, `S3`, `S4`.
++
++No marcar PASS sin evidencia manual real.
++
++## Severidad
++
++- S1: exposicion de permisos, accion critica no autorizada, bloqueo total.
++- S2: flujo principal roto, LIVE incorrecto por rol, tema ilegible en ruta clave.
++- S3: problema visual importante, responsive defectuoso, texto secundario poco legible.
++- S4: detalle menor de copy, spacing o pulido visual.
++
++## Si falla
++
++1. Registrar caso y evidencia.
++2. No corregir directamente en esta corrida si requiere cambios funcionales.
++3. Abrir PRODUCT-D3 para correcciones puntuales.
++4. Si es un hallazgo de seguridad/permisos, tratar como S1/S2 y no aprobar merge.
++
++## Criterios de cierre
++
++GO tecnico:
++
++- lint, TypeScript, export web, Maven test/package y `git diff --check` pasan.
++
++GO visual:
++
++- pendiente hasta ejecutar manualmente el CSV y adjuntar evidencias.
++
++NO-GO visual:
++
++- cualquier S1;
++- S2 sin workaround seguro;
++- UI Kit/editor accesible para no admin;
++- vendedor/supervisor con vista equivocada;
++- textos criticos invisibles;
++- pagos consultados sin `VIEW_PAYMENTS`.
+
+diff --git a/qa-reports/PRODUCT-D2-visual-qa-execution-report-20260605-122258.md b/qa-reports/PRODUCT-D2-visual-qa-execution-report-20260605-122258.md
+new file mode 100644
+--- /dev/null
++++ b/qa-reports/PRODUCT-D2-visual-qa-execution-report-20260605-122258.md
+@@ -0,0 +1,158 @@
++# PRODUCT-D2 - Corrida visual/manual QA por roles
++
++Fecha: 2026-06-05 12:22:58
++Rama: feature/product-d2-visual-qa-execution
++
++## Objetivo
++
++Preparar la corrida visual/manual real por usuario, rol, ruta, tema, preset y dispositivo. Esta fase estructura evidencia y validaciones tecnicas, pero no marca resultados visuales como PASS sin ejecucion manual en navegador/AnyDesk.
++
++## Alcance
++
++Incluido:
++
++- handoff de ejecucion visual;
++- CSV smoke con casos `PENDIENTE_MANUAL`;
++- reporte de corrida;
++- validaciones tecnicas frontend/backend;
++- evidencia git-diff/stat.
++
++No incluido:
++
++- cambios funcionales;
++- cambios backend;
++- cambios AUTH/RBAC;
++- pagos/caja/reportes backend;
++- billing;
++- IA;
++- reglas LIVE nuevas;
++- resultados visuales inventados.
++
++## Usuarios QA
++
++- `qa.admin@local.test`
++- `qa.vendedor.centro@local.test`
++- `qa.supervisor.centro@local.test`
++- `qa.sinpermisos@local.test`
++
++## Rutas
++
++- `/`
++- `/live`
++- `/ui-kit`
++- `/customers`
++- `/reservations`
++- `/users`
++- `/system`
++- `/reports`
++- `/appearance`
++- `/reservation-detail?id=<id valido>`
++
++## Smoke minimo
++
++| Caso | Usuario | Dimension | Resultado esperado |
++| --- | --- | --- | --- |
++| Inicio admin | Admin | desktop + claro + retailPremium | AppShell completo sin duplicidad |
++| LIVE operador dark | Admin | desktop + oscuro + darkConsole | Consola LIVE legible |
++| UI Kit presets/editor | Admin | desktop + claro/oscuro | Selector y editor solo admin |
++| LIVE vendedor | Vendedor | tablet/mobile + claro | Vista apoyo, sin acciones admin |
++| LIVE supervisor | Supervisor | desktop + oscuro | Dashboard supervisor, no vendedor |
++| NO_ACCESS | Sin permisos | desktop/mobile | Acceso restringido |
++| Prenda reservada | Admin | LIVE | Rojo premium, no ambar dominante |
++| Reservation detail | Admin | id real | DetailTemplate y restricciones correctas |
++
++## Matriz extendida
++
++La matriz extendida queda en:
++
++```text
++qa-reports/PRODUCT-D2-visual-qa-execution-smoke-20260605-122258.csv
++```
++
++Todos los casos quedan inicialmente en `PENDIENTE_MANUAL`.
++
++## Instrucciones de ejecucion manual
++
++1. Levantar backend y frontend segun `docs/PRODUCT_D2_VISUAL_QA_EXECUTION_HANDOFF.md`.
++2. Ejecutar casos en orden por usuario.
++3. Registrar resultado real.
++4. Adjuntar evidencia por caso.
++5. Marcar estado: `PASS`, `FAIL`, `BLOQUEADO`, `NO_APLICA`.
++6. Si falla, asignar severidad `S1` a `S4`.
++
++## Captura de evidencia
++
++Nombre sugerido:
++
++```text
++PRODUCT-D2_<ID>_<usuario>_<ruta>_<tema>_<dispositivo>.png
++```
++
++No guardar contrasenas en capturas o notas.
++
++## Criterios PASS / FAIL
++
++PASS:
++
++- resultado coincide con esperado;
++- evidencia adjunta;
++- no hay errores visibles ni permisos indebidos.
++
++FAIL:
++
++- ruta visible sin permiso;
++- vista LIVE incorrecta;
++- editor UI Kit visible para no admin;
++- texto critico invisible;
++- overflow que bloquea uso;
++- detalle confunde 403/404;
++- pagos consultados sin permiso.
++
++BLOQUEADO:
++
++- backend no disponible;
++- dato real requerido no existe;
++- usuario QA no disponible;
++- ambiente no permite reproducir.
++
++## Riesgos
++
++- El CSV requiere ejecucion real en browser/AnyDesk para cerrar GO visual.
++- `reservation-detail` requiere un id valido de reserva.
++- La vista de vendedor/supervisor depende de permisos reales en `/api/me`.
++- Presets extremos y overrides locales requieren validacion visual humana.
++
++## Hallazgos pendientes
++
++No hay hallazgos visuales confirmados en esta fase. Pendientes de corrida manual:
++
++- screenshots por usuario/ruta;
++- resultado PASS/FAIL por caso;
++- evidencias de responsive;
++- validacion de prenda reservada rojo premium con reserva real.
++
++## Validaciones tecnicas
++
++- `git branch --show-current`: OK, `feature/product-d2-visual-qa-execution`.
++- `git status`: OK inicial limpio.
++- `git log --oneline -12`: OK.
++- `git --no-pager diff --stat`: OK inicial vacio.
++- `git --no-pager diff --name-only`: OK inicial vacio.
++- `git --no-pager diff --check`: OK inicial.
++- `npm.cmd run lint`: OK, 0 errores, 60 warnings preexistentes.
++- `npx.cmd tsc --noEmit`: OK.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
++- `cd backend/control-ropa; .\\mvnw.cmd test`: OK, 73 tests.
++- `cd backend/control-ropa; .\\mvnw.cmd -q -DskipTests package`: OK.
++
++## GO / NO-GO
++
++GO tecnico. Validaciones automatizadas ejecutadas correctamente.
++
++GO visual pendiente: requiere ejecutar manualmente el CSV y adjuntar evidencias.
++
++## Siguiente fase
++
++Si la corrida visual pasa: mergear a develop segun flujo del equipo.
++
++Si falla: abrir PRODUCT-D3 para correcciones puntuales priorizadas por severidad.
+
+diff --git a/qa-reports/PRODUCT-D2-visual-qa-execution-smoke-20260605-122258.csv b/qa-reports/PRODUCT-D2-visual-qa-execution-smoke-20260605-122258.csv
+new file mode 100644
+--- /dev/null
++++ b/qa-reports/PRODUCT-D2-visual-qa-execution-smoke-20260605-122258.csv
+@@ -0,0 +1,29 @@
++ID,Usuario,Rol esperado,Ruta,Dispositivo,Tema,Preset,Caso,Pasos,Resultado esperado,Resultado real,Estado,Evidencia,Notas,Severidad si falla
++D2-001,qa.admin@local.test,ADMIN,/,desktop,claro,retailPremium,Inicio admin base,"Login admin; abrir /; revisar sidebar/topbar/cards","Inicio visible con AppShell, sidebar completo, sin duplicidad de usuario",,PENDIENTE_MANUAL,,Smoke minimo,S2
++D2-002,qa.admin@local.test,ADMIN,/live,desktop,oscuro,darkConsole,LIVE operador dark,"Login admin; cambiar darkConsole; abrir /live","Vista operador LIVE, texto legible, botones jerarquizados",,PENDIENTE_MANUAL,,Smoke minimo,S2
++D2-003,qa.admin@local.test,ADMIN,/ui-kit,desktop,claro,boutique,UI Kit presets,"Abrir /ui-kit; seleccionar Boutique; observar previews","Selector de preset visible solo admin y app cambia visualmente",,PENDIENTE_MANUAL,,Smoke minimo,S3
++D2-004,qa.admin@local.test,ADMIN,/ui-kit,desktop,oscuro,blueCorporate,Editor controlado,"Abrir editor; cambiar primary/danger; aplicar localmente; restaurar","Overrides se aplican localmente y restaurar vuelve a base",,PENDIENTE_MANUAL,,Smoke minimo,S2
++D2-005,qa.admin@local.test,ADMIN,/live,desktop,claro,retailPremium,Prenda reservada rojo premium,"Con reserva activa de prenda al aire; revisar card y chip","Reservada usa danger/dangerSoft, un solo mensaje y reserva bloqueada",,PENDIENTE_MANUAL,,Requiere dato real,S2
++D2-006,qa.admin@local.test,ADMIN,/reservation-detail?id=<id valido>,desktop,claro,retailPremium,Detalle reserva admin,"Abrir detalle desde reserva real","DetailTemplate visible, pagos/restricciones correctos, no 403/404 errado",,PENDIENTE_MANUAL,,Requiere id real,S2
++D2-007,qa.admin@local.test,ADMIN,/customers,tablet,oscuro,classicErp,Clientes tablet,"Cambiar viewport tablet; abrir /customers","Lista/cards legibles, drawer funcional, sin overflow",,PENDIENTE_MANUAL,,Smoke minimo,S3
++D2-008,qa.admin@local.test,ADMIN,/reservations,mobile,claro,retailPremium,Reservas mobile,"Cambiar viewport mobile; abrir /reservations","Cards/acciones touch-friendly, estados legibles",,PENDIENTE_MANUAL,,Smoke minimo,S3
++D2-009,qa.admin@local.test,ADMIN,/users,desktop,oscuro,retailPremium,Usuarios admin,"Abrir /users","Usuarios visible solo admin/MANAGE_USERS, badges legibles",,PENDIENTE_MANUAL,,Extendido,S2
++D2-010,qa.admin@local.test,ADMIN,/system,desktop,claro,retailPremium,Sistema admin,"Abrir /system","Hub sistema visible solo permisos/admin",,PENDIENTE_MANUAL,,Extendido,S2
++D2-011,qa.admin@local.test,ADMIN,/reports,desktop,oscuro,blueCorporate,Reportes admin,"Abrir /reports","Hub reportes visible y consistente",,PENDIENTE_MANUAL,,Extendido,S3
++D2-012,qa.admin@local.test,ADMIN,/appearance,desktop,claro,retailPremium,Appearance legado,"Abrir /appearance","Configuracion no rompe tema ni duplica editor",,PENDIENTE_MANUAL,,Extendido,S4
++D2-013,qa.vendedor.centro@local.test,SELLER,/live,tablet,claro,retailPremium,LIVE vendedor apoyo,"Login vendedor; abrir /live","Vista apoyo/presentador si canViewLive; sin consola admin",,PENDIENTE_MANUAL,,Smoke minimo,S2
++D2-014,qa.vendedor.centro@local.test,SELLER,/users,tablet,claro,retailPremium,Bloqueo usuarios vendedor,"Intentar /users o revisar sidebar","No ve usuarios/admin si falta MANAGE_USERS",,PENDIENTE_MANUAL,,Smoke minimo,S1
++D2-015,qa.vendedor.centro@local.test,SELLER,/ui-kit,mobile,oscuro,retailPremium,Bloqueo UI Kit vendedor,"Intentar /ui-kit","Acceso restringido; no editor visual",,PENDIENTE_MANUAL,,Smoke minimo,S1
++D2-016,qa.vendedor.centro@local.test,SELLER,/customers,mobile,claro,retailPremium,Clientes vendedor si aplica,"Abrir /customers si aparece en nav","Visible solo si VIEW_CUSTOMERS real; si no, restringido",,PENDIENTE_MANUAL,,Permiso real variable,S3
++D2-017,qa.vendedor.centro@local.test,SELLER,/reservations,mobile,claro,retailPremium,Reservas vendedor si aplica,"Abrir /reservations si aparece","Visible solo si permisos reales; acciones no admin bloqueadas",,PENDIENTE_MANUAL,,Permiso real variable,S3
++D2-018,qa.supervisor.centro@local.test,SUPERVISOR,/live,desktop,oscuro,darkConsole,LIVE supervisor,"Login supervisor; abrir /live","Vista supervisor/monitoreo; no cae en vendedor",,PENDIENTE_MANUAL,,Smoke minimo,S2
++D2-019,qa.supervisor.centro@local.test,SUPERVISOR,/reports,desktop,oscuro,retailPremium,Reportes supervisor si aplica,"Abrir /reports si aparece","Visible solo si VIEW_REPORTS real",,PENDIENTE_MANUAL,,Permiso real variable,S3
++D2-020,qa.supervisor.centro@local.test,SUPERVISOR,/ui-kit,desktop,claro,retailPremium,Bloqueo UI Kit supervisor,"Intentar /ui-kit","Acceso restringido si no admin",,PENDIENTE_MANUAL,,Smoke minimo,S1
++D2-021,qa.supervisor.centro@local.test,SUPERVISOR,/live,tablet,claro,blueCorporate,Supervisor tablet,"Viewport tablet; abrir /live","Drawer usable, dashboard legible, sin acciones operador indebidas",,PENDIENTE_MANUAL,,Extendido,S3
++D2-022,qa.sinpermisos@local.test,NO_ACCESS,/,desktop,claro,retailPremium,Bloqueo home sin permisos,"Login sin permisos; abrir /","Acceso restringido o navegacion no util",,PENDIENTE_MANUAL,,Smoke minimo,S1
++D2-023,qa.sinpermisos@local.test,NO_ACCESS,/live,mobile,oscuro,retailPremium,Bloqueo LIVE sin permisos,"Abrir /live mobile","NO_ACCESS bloqueado, sin operacion LIVE",,PENDIENTE_MANUAL,,Smoke minimo,S1
++D2-024,qa.sinpermisos@local.test,NO_ACCESS,/ui-kit,desktop,claro,retailPremium,Bloqueo UI Kit sin permisos,"Intentar /ui-kit","Acceso restringido y sin editor",,PENDIENTE_MANUAL,,Smoke minimo,S1
++D2-025,qa.admin@local.test,ADMIN,/live,desktop,claro,classicErp,Precio LIVE visible,"Abrir /live con Classic ERP; revisar seccion precio","Texto de precio y helper visibles sin seleccionar",,PENDIENTE_MANUAL,,Regresion visual,S2
++D2-026,qa.admin@local.test,ADMIN,/live,mobile,oscuro,boutique,LIVE mobile oscuro,"Viewport mobile; dark; Boutique; abrir /live","Sin overflow; botones usables; cards apiladas",,PENDIENTE_MANUAL,,Responsive,S3
++D2-027,qa.admin@local.test,ADMIN,/ui-kit,desktop,oscuro,classicErp,Restaurar identidad,"Aplicar override; refrescar; restaurar plantilla","Persistencia local funciona; restaurar limpia override",,PENDIENTE_MANUAL,,Editor visual,S2
++D2-028,qa.admin@local.test,ADMIN,/reservation-detail?id=<id valido>,mobile,oscuro,retailPremium,Detalle mobile dark,"Abrir detalle en mobile dark","Cards apiladas, restricted sections legibles",,PENDIENTE_MANUAL,,Requiere id real,S3
