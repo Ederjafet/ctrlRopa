@@ -1,0 +1,7 @@
+﻿ app/live.tsx                                       | 108 ++++++++++++---------
+ docs/LIVE_Z9B_APARTADO_COPY_ALIGNMENT.md           |   4 +
+ docs/LIVE_Z9C_ACTIONABLE_HOLD_STATES.md            |  61 ++++++++++++
+ locales/en/common.json                             |  15 ++-
+ locales/es/common.json                             |  13 ++-
+ ...ctionable-hold-states-report-20260605-145326.md |  48 +++++++++
+ 6 files changed, 195 insertions(+), 54 deletions(-)

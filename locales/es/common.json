@@ -505,8 +505,8 @@
     "operationalSoldConfirmTitle": "Cerrar como venta LIVE",
     "operationalSoldConfirmMessage": "Cerrar este apartado como venta LIVE? Esto no registra pago ni caja.",
     "confirmOperationalSold": "Cerrar como venta LIVE",
-    "operationalSoldTitle": "Venta LIVE cerrada",
-    "operationalSoldMessage": "El apartado quedo cerrado como venta dentro del LIVE. No se proceso ningun pago.",
+    "operationalSoldTitle": "Venta LIVE registrada",
+    "operationalSoldMessage": "El apartado quedo cerrado como venta dentro del en vivo. No se registro pago ni caja.",
     "operationalSoldStatus": "Venta LIVE",
     "operationalSoldNoPaymentHelp": "Cierre operativo del LIVE; no registra cobro ni caja.",
     "operationalSoldPersistedNoPaymentHelp": "Venta LIVE guardada; no registra cobro ni caja.",
@@ -552,7 +552,14 @@
     "noPrice": "Sin precio",
     "markOperationalSoldHelp": "Cierra este apartado como venta dentro del LIVE. No registra pago ni caja.",
     "markPendingHelp": "Deja el apartado activo para seguimiento. No confirma venta, pago ni caja.",
-    "cancelOperationalHelp": "Cancela el apartado operativo de esta prenda. No registra pago ni caja."
+    "cancelOperationalHelp": "Cancela el apartado operativo de esta prenda. No registra pago ni caja.",
+    "operationalCancelledTitle": "Apartado cancelado",
+    "operationalCancelledMessage": "El apartado fue cancelado operativamente. No se registro pago ni caja.",
+    "operationalHoldReactivatedTitle": "Apartado reactivado",
+    "operationalHoldReactivatedMessage": "El registro volvio a estado Apartado para seguimiento. No se registro pago ni caja.",
+    "operationalStatusNoChangesTitle": "Sin cambios",
+    "operationalStatusNoChangesMessage": "Este registro ya estaba como Apartado.",
+    "returnToReservedHelp": "Regresa este registro a estado Apartado para seguimiento. No registra pago ni caja."
   },
   "payments": {
     "title": "Pagos / Cobros",

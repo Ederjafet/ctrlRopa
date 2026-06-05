@@ -1575,6 +1575,13 @@ export default function LiveScreen() {
     status: LiveReservationOperationalStatus,
     reason?: string
   ) => {
+    const currentReservation =
+      branchReservations.find((reservation) => reservation.id === reservationId) ||
+      recentReservations.find((entry) => entry.reservation.id === reservationId)?.reservation;
+    const currentStatus = currentReservation
+      ? getLiveReservationOperationalStatus(currentReservation)
+      : null;
+
     const canApplyStatus =
       status === 'OPERATIONAL_SOLD'
         ? mayMarkLiveOperationalSold
@@ -1588,6 +1595,15 @@ export default function LiveScreen() {
       setLiveNotice({
         title: t('live.permissionDeniedTitle'),
         message: t('live.liveOperatePermissionError'),
+        tone: 'warning',
+      });
+      return;
+    }
+
+    if (currentStatus === status) {
+      setLiveNotice({
+        title: t('live.operationalStatusNoChangesTitle'),
+        message: t('live.operationalStatusNoChangesMessage'),
         tone: 'warning',
       });
       return;
@@ -1615,16 +1631,35 @@ export default function LiveScreen() {
       );
       await updateLiveEvents(selectedLive.id);
 
+      const notice =
+        status === 'OPERATIONAL_SOLD'
+          ? {
+              title: t('live.operationalSoldTitle'),
+              message: t('live.operationalSoldMessage'),
+              tone: 'success' as const,
+            }
+          : status === 'CANCELLED'
+            ? {
+                title: t('live.operationalCancelledTitle'),
+                message: t('live.operationalCancelledMessage'),
+                tone: 'warning' as const,
+              }
+            : status === 'RESERVED'
+              ? {
+                  title: t('live.operationalHoldReactivatedTitle'),
+                  message: t('live.operationalHoldReactivatedMessage'),
+                  tone: 'success' as const,
+                }
+              : {
+                  title: t('live.operationalStatusUpdatedTitle'),
+                  message: t('live.operationalStatusUpdatedMessage'),
+                  tone: 'success' as const,
+                };
+
       setLiveNotice({
-        title:
-          status === 'OPERATIONAL_SOLD'
-            ? t('live.operationalSoldTitle')
-            : t('live.operationalStatusUpdatedTitle'),
-        message:
-          status === 'OPERATIONAL_SOLD'
-            ? t('live.operationalSoldMessage')
-            : t('live.operationalStatusUpdatedMessage'),
-        tone: status === 'CANCELLED' ? 'warning' : 'success',
+        title: notice.title,
+        message: notice.message,
+        tone: notice.tone,
       });
     } catch (err: any) {
       setLiveNotice({
@@ -4122,24 +4157,6 @@ export default function LiveScreen() {
                                   </AppText>
                                 </View>
                               ) : null}
-                              {operationalStatus === 'RESERVED' && mayMarkLivePending ? (
-                                <View style={styles.buttonFill}>
-                                  <AppButton
-                                    title={t('live.markPending')}
-                                    variant="neutral"
-                                    loading={isUpdatingOperationalStatus}
-                                    onPress={() =>
-                                      handleUpdateReservationOperationalStatus(
-                                        reservation.id,
-                                        'PENDING'
-                                      )
-                                    }
-                                  />
-                                  <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
-                                    {t('live.markPendingHelp')}
-                                  </AppText>
-                                </View>
-                              ) : null}
                               {(operationalStatus === 'PENDING' || operationalSold) &&
                               mayChangeLiveReservationStatus ? (
                                 <View style={styles.buttonFill}>
@@ -4154,6 +4171,9 @@ export default function LiveScreen() {
                                       )
                                     }
                                   />
+                                  <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+                                    {t('live.returnToReservedHelp')}
+                                  </AppText>
                                 </View>
                               ) : null}
                               {!operationalCancelled && mayCancelLiveReservation ? (
@@ -4185,7 +4205,7 @@ export default function LiveScreen() {
                               {operationalCancelled && mayChangeLiveReservationStatus ? (
                                 <View style={styles.buttonFill}>
                                   <AppButton
-                                    title={t('live.reactivateReserved')}
+                                    title={t('live.returnToReserved')}
                                     variant="secondary"
                                     loading={isUpdatingOperationalStatus}
                                     onPress={() =>
@@ -4195,6 +4215,9 @@ export default function LiveScreen() {
                                       )
                                     }
                                   />
+                                  <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+                                    {t('live.returnToReservedHelp')}
+                                  </AppText>
                                 </View>
                               ) : null}
                             </View>
@@ -5209,24 +5232,6 @@ export default function LiveScreen() {
                       </AppText>
                     </View>
                   ) : null}
-                    {operationalStatus === 'RESERVED' && mayMarkLivePending ? (
-                      <View style={styles.buttonFill}>
-                      <AppButton
-                        title={t('live.markPending')}
-                        variant="neutral"
-                        loading={isUpdatingOperationalStatus}
-                          onPress={() =>
-                            handleUpdateReservationOperationalStatus(
-                              reservation.id,
-                              'PENDING'
-                          )
-                        }
-                      />
-                      <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
-                        {t('live.markPendingHelp')}
-                      </AppText>
-                    </View>
-                  ) : null}
                     {operationalStatus === 'PENDING' && mayChangeLiveReservationStatus ? (
                       <View style={styles.buttonFill}>
                         <AppButton
@@ -5240,6 +5245,9 @@ export default function LiveScreen() {
                             )
                           }
                         />
+                        <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+                          {t('live.returnToReservedHelp')}
+                        </AppText>
                       </View>
                     ) : null}
                     {operationalSold && mayChangeLiveReservationStatus ? (
@@ -5255,6 +5263,9 @@ export default function LiveScreen() {
                             )
                           }
                         />
+                        <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+                          {t('live.returnToReservedHelp')}
+                        </AppText>
                       </View>
                     ) : null}
                     {!operationalCancelled && mayCancelLiveReservation ? (
@@ -5273,7 +5284,7 @@ export default function LiveScreen() {
                     {operationalCancelled && mayChangeLiveReservationStatus ? (
                       <View style={styles.buttonFill}>
                         <AppButton
-                          title={t('live.reactivateReserved')}
+                          title={t('live.returnToReserved')}
                           variant="secondary"
                           loading={isUpdatingOperationalStatus}
                           onPress={() =>
@@ -5283,6 +5294,9 @@ export default function LiveScreen() {
                             )
                           }
                         />
+                        <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+                          {t('live.returnToReservedHelp')}
+                        </AppText>
                       </View>
                     ) : null}
                     {!settled && !operationalCancelled && canViewPayments && canAccessCashbox ? (
