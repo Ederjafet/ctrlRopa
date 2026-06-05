@@ -799,3 +799,58 @@ Hacer mas visible la diferencia visual del UI Kit interno y acercar la app a un 
 ### Restricciones respetadas
 
 No se tocaron backend, AUTH/RBAC, pagos, caja, reportes, billing, IA ni reglas operativas LIVE.
+
+---
+
+## Continuidad PRODUCT-C
+
+Fecha: 2026-06-04
+
+PRODUCT-C formaliza la direccion visual **Enterprise retail premium** y consolida el UI Kit como sistema visual global.
+
+Cambios clave:
+
+- `AppCard` incorpora variantes semanticas.
+- `SectionHeader` gana acento y jerarquia.
+- `/ui-kit` muestra cards, notices, inputs y panel LIVE premium como referencia real.
+- `RestrictedSection` hereda warning premium.
+
+Ver `docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md`.
+
+---
+
+## Continuidad PRODUCT-C1
+
+Fecha: 2026-06-05
+
+PRODUCT-C1 extiende el rollout visual premium a pantallas autenticadas principales.
+
+Pantallas migradas al lenguaje AppShell/UI Kit:
+
+- `app/customers.tsx`
+- `app/reservations.tsx`
+- `app/users.tsx`
+- `app/system.tsx`
+- `app/reports.tsx`
+
+Tambien se centralizo la navegacion principal en `components/layout/appNavigation.ts` y se formalizo la regla visual `Reservada = dangerSoft/danger premium`.
+
+Ver `docs/PRODUCT_C1_GLOBAL_PREMIUM_ROLLOUT.md`.
+
+---
+
+## Continuidad PRODUCT-C1 - Identidad visual local
+
+Fecha: 2026-06-05
+
+Se agregaron presets visuales controlados para preparar branding por cliente:
+
+- `retailPremium`
+- `darkConsole`
+- `blueCorporate`
+- `boutique`
+- `classicErp`
+
+La seleccion se realiza desde `/ui-kit` y se guarda localmente. La persistencia por cliente/tenant queda fuera de PRODUCT-C1.
+
+Ver `docs/PRODUCT_C_CLIENT_VISUAL_IDENTITY_PRESETS.md`.

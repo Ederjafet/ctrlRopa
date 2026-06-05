@@ -1,0 +1,30 @@
+﻿ app/customers.tsx                            | 141 +++++++-----
+ app/live.tsx                                 |  20 +-
+ app/reports.tsx                              |  98 +++-----
+ app/reservations.tsx                         | 221 ++++++++----------
+ app/system.tsx                               |  46 ++--
+ app/ui-kit.tsx                               | 150 +++++++++++-
+ app/users.tsx                                | 127 ++++-------
+ components/layout/AppShell.tsx               |   2 +-
+ components/layout/Sidebar.tsx                |  26 ++-
+ components/ui/ActionTile.tsx                 |   3 +
+ components/ui/AppCard.tsx                    |  49 +++-
+ components/ui/AppInfoCard.tsx                |  14 +-
+ components/ui/AppText.tsx                    |  16 +-
+ components/ui/MetricCard.tsx                 |   7 +-
+ components/ui/RestrictedSection.tsx          |   2 +-
+ components/ui/SectionHeader.tsx              |  25 +-
+ components/ui/StatusBadge.tsx                |  14 +-
+ context/AppThemeContext.tsx                  | 330 ++++++++++++++++++---------
+ docs/LIVE_Z8B_DARK_THEME_STANDARDIZATION.md  |  18 ++
+ docs/PRODUCT_B_INTERNAL_UI_KIT_FOUNDATION.md |  55 +++++
+ theme/designTokens.ts                        |  10 +
+ 21 files changed, 850 insertions(+), 524 deletions(-)
+
+Untracked/force-added evidence included:
+components/layout/appNavigation.ts | 62 lines
+theme/designPresets.ts | 511 lines
+docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md | 251 lines
+docs/PRODUCT_C1_GLOBAL_PREMIUM_ROLLOUT.md | 246 lines
+docs/PRODUCT_C_CLIENT_VISUAL_IDENTITY_PRESETS.md | 189 lines
+qa-reports/PRODUCT-C-global-premium-visual-system-report-20260605-091155.md | 148 lines

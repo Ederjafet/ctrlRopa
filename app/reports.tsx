@@ -1,11 +1,13 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShell from '@/components/layout/AppShell';
+import { buildMainNavSections, getSessionScopeLabel } from '@/components/layout/appNavigation';
+import ActionTile from '@/components/ui/ActionTile';
 import AppInfoCard from '@/components/ui/AppInfoCard';
 import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
+import { getSession, UserSession } from '@/services/sessionStorage';
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
 
 type ReportAccess = {
   title: string;
@@ -25,8 +27,8 @@ const reports: ReportAccess[] = [
     route: '/report-deliveries',
   },
   {
-    title: 'Depósitos diarios',
-    description: 'Pagos recibidos, métodos, referencias y totales del día.',
+    title: 'Depositos diarios',
+    description: 'Pagos recibidos, metodos, referencias y totales del dia.',
     route: '/report-deposits',
   },
   {
@@ -36,7 +38,7 @@ const reports: ReportAccess[] = [
   },
   {
     title: 'Control Live',
-    description: 'Paquetes, piezas, saldos y liquidación de operación Live.',
+    description: 'Paquetes, piezas, saldos y liquidacion de operacion Live.',
     route: '/report-live',
   },
   {
@@ -49,79 +51,41 @@ const reports: ReportAccess[] = [
 export default function ReportsScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
+  const [session, setSession] = useState<UserSession | null>(null);
+  const navSections = useMemo(() => buildMainNavSections(session), [session]);
+
+  useEffect(() => {
+    getSession().then(setSession);
+  }, []);
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute="/" />
-
-      <AppText variant="title" bold>
-        Reportes
-      </AppText>
-
+    <AppShell
+      title="Reportes"
+      subtitle="Consultas operativas por fecha y sucursal"
+      contextTitle="Centro de reportes"
+      contextSubtitle={getSessionScopeLabel(session)}
+      activeRoute="reports"
+      session={session}
+      navSections={navSections}
+    >
       <AppInfoCard title="Reportes operativos">
         <AppText color={theme.colors.infoCardText}>
-          Consulta reportes por fecha y sucursal. Incluye operación diaria,
-          depósitos, entregas, cancelaciones, control Live y remisiones.
+          Consulta reportes por fecha y sucursal. Incluye operacion diaria, depositos, entregas,
+          cancelaciones, control Live y remisiones.
         </AppText>
       </AppInfoCard>
 
       <AppResponsiveGrid tabletColumns={2} desktopColumns={3}>
         {reports.map((report) => (
-          <Pressable
+          <ActionTile
             key={report.title}
+            title={report.title}
+            subtitle={report.description}
+            icon="analytics"
             onPress={() => router.push(report.route as any)}
-            style={({ pressed }) => [
-              styles.reportCard,
-              {
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.border,
-                borderRadius: theme.radius.md,
-                opacity: pressed ? 0.8 : 1,
-                padding: theme.spacing.md,
-              },
-            ]}
-          >
-            <View style={styles.headerRow}>
-              <View style={styles.headerText}>
-                <AppText variant="subtitle" bold>
-                  {report.title}
-                </AppText>
-                <AppText color={theme.colors.mutedText}>{report.description}</AppText>
-                <AppText bold color={theme.colors.accent} style={styles.actionText}>
-                  Abrir reporte
-                </AppText>
-              </View>
-              <AppText color={theme.colors.accent} style={styles.chevron}>
-                ›
-              </AppText>
-            </View>
-          </Pressable>
+          />
         ))}
       </AppResponsiveGrid>
-    </AppScreen>
+    </AppShell>
   );
 }
-
-const styles = StyleSheet.create({
-  headerRow: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'space-between',
-  },
-  headerText: {
-    flex: 1,
-  },
-  reportCard: {
-    borderWidth: 1,
-    marginBottom: 12,
-    minHeight: 118,
-  },
-  actionText: {
-    marginTop: 12,
-  },
-  chevron: {
-    fontSize: 28,
-    lineHeight: 32,
-  },
-});

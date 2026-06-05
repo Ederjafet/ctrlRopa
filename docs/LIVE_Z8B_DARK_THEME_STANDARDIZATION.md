@@ -182,3 +182,21 @@ Estos tokens agregan profundidad y jerarquia sin hardcodear colores por pantalla
 - Pagos/caja/reportes/billing/IA.
 - Reglas operativas LIVE-Z6/Z7/Z8.
 - AuthorizationRequestPanel ni su comportamiento.
+
+---
+
+## PRODUCT-C1 - Ajuste global posterior
+
+Fecha: 2026-06-05
+
+PRODUCT-C1 cambia la semantica visual de prenda reservada:
+
+- Antes: warning/ambar suave.
+- Ahora: `reserved` basado en `dangerSoft` + borde/chip `danger`.
+
+Motivo:
+
+- Una prenda reservada es bloqueo operativo, no solo advertencia.
+- Debe diferenciarse de prenda preparada y de disponibilidad normal.
+
+No cambia reglas LIVE, permisos, reserva, autorizaciones ni backend.

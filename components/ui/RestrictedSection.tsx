@@ -12,7 +12,7 @@ export default function RestrictedSection({ error, title = 'Acceso restringido' 
   const { theme } = useAppTheme();
 
   return (
-    <AppCard>
+    <AppCard variant="warning">
       <AppText variant="subtitle" bold color={theme.colors.warning}>
         {title}
       </AppText>

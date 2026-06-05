@@ -1,12 +1,14 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShell from '@/components/layout/AppShell';
+import { buildMainNavSections, getSessionScopeLabel } from '@/components/layout/appNavigation';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
-import { useAppTheme } from '@/context/AppThemeContext';
+import EmptyState from '@/components/ui/EmptyState';
+import StatusBadge from '@/components/ui/StatusBadge';
 import { canManageUsers } from '@/services/livePermissionGuards';
-import { getSession } from '@/services/sessionStorage';
+import { getSession, UserSession } from '@/services/sessionStorage';
 import {
   activateUser,
   AdminUser,
@@ -15,13 +17,7 @@ import {
 } from '@/services/userAdminService';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, FlatList, StyleSheet, View } from 'react-native';
 
 function isActive(user: AdminUser) {
   return String(user.status).toUpperCase() === 'ACTIVE';
@@ -50,12 +46,13 @@ function inheritedPermissionCount(user: AdminUser) {
 
 export default function UsersScreen() {
   const router = useRouter();
-  const { theme } = useAppTheme();
 
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [busyUserId, setBusyUserId] = useState<number | null>(null);
+  const [session, setSession] = useState<UserSession | null>(null);
+  const navSections = useMemo(() => buildMainNavSections(session), [session]);
 
   useFocusEffect(
     useCallback(() => {
@@ -66,8 +63,10 @@ export default function UsersScreen() {
   const loadUsers = async () => {
     try {
       setIsLoading(true);
-      const session = await getSession();
-      if (!canManageUsers(session)) {
+      const currentSession = await getSession();
+      setSession(currentSession);
+
+      if (!canManageUsers(currentSession)) {
         router.replace('/access-denied');
         return;
       }
@@ -104,8 +103,8 @@ export default function UsersScreen() {
     const active = isActive(user);
     const title = active ? 'Desactivar usuario' : 'Activar usuario';
     const message = active
-      ? `¿Desactivar a ${user.name}? No se eliminará, solo quedará inactivo.`
-      : `¿Activar nuevamente a ${user.name}?`;
+      ? `Desactivar a ${user.name}? No se eliminara, solo quedara inactivo.`
+      : `Activar nuevamente a ${user.name}?`;
 
     Alert.alert(title, message, [
       { text: 'Cancelar', style: 'cancel' },
@@ -142,21 +141,21 @@ export default function UsersScreen() {
   }
 
   return (
-    <AppScreen scroll={false}>
-      <AppBackButton fallbackRoute="/" />
-
-      <AppText variant="title" bold>
-        Usuarios
-      </AppText>
-
-      <AppText color={theme.colors.mutedText} style={styles.description}>
+    <AppShell
+      title="Usuarios"
+      subtitle="Administracion de accesos y estado operativo"
+      contextTitle="Control de usuarios"
+      contextSubtitle={getSessionScopeLabel(session)}
+      activeRoute="users"
+      session={session}
+      navSections={navSections}
+      rightContent={
+        <AppButton title="Nuevo usuario" variant="secondary" onPress={() => router.push('/users-form' as any)} />
+      }
+    >
+      <AppText>
         Administra usuarios del sistema. No se eliminan registros: se activan o desactivan.
       </AppText>
-
-      <AppButton
-        title="Nuevo usuario"
-        onPress={() => router.push('/users-form' as any)}
-      />
 
       <View style={styles.search}>
         <AppInput
@@ -180,48 +179,28 @@ export default function UsersScreen() {
           const inheritedPermissions = inheritedPermissionCount(item);
 
           return (
-            <AppCard>
+            <AppCard variant="elevated">
               <View style={styles.headerRow}>
                 <View style={styles.headerInfo}>
                   <AppText bold>{item.name}</AppText>
                   <AppText>{item.email}</AppText>
                 </View>
 
-                <View
-                  style={[
-                    styles.statusBadge,
-                    {
-                      backgroundColor: active
-                        ? theme.colors.optionPressedBackground
-                        : theme.colors.inputBackground,
-                      borderColor: active
-                        ? theme.colors.accent
-                        : theme.colors.border,
-                    },
-                  ]}
-                >
-                  <AppText
-                    variant="caption"
-                    color={active ? theme.colors.accent : theme.colors.mutedText}
-                    bold
-                  >
-                    {active ? 'Activo' : 'Inactivo'}
-                  </AppText>
-                </View>
+                <StatusBadge label={active ? 'Activo' : 'Inactivo'} tone={active ? 'success' : 'neutral'} />
               </View>
 
               <AppText style={styles.meta}>Sucursal: {item.branchName || 'Sin sucursal'}</AppText>
               <AppText style={styles.meta}>Roles: {roleSummary(item)}</AppText>
 
-              {item.phone ? <AppText style={styles.meta}>Teléfono: {item.phone}</AppText> : null}
+              {item.phone ? <AppText style={styles.meta}>Telefono: {item.phone}</AppText> : null}
 
-              <AppText variant="caption" color={theme.colors.mutedText} style={styles.meta}>
+              <AppText variant="caption" style={styles.meta}>
                 Permisos directos del usuario: {directPermissions.length}
               </AppText>
-              <AppText variant="caption" color={theme.colors.mutedText} style={styles.metaCompact}>
+              <AppText variant="caption" style={styles.metaCompact}>
                 Permisos heredados por roles: {inheritedPermissions}
               </AppText>
-              <AppText variant="caption" color={theme.colors.mutedText} style={styles.metaCompact}>
+              <AppText variant="caption" style={styles.metaCompact}>
                 Permisos efectivos totales: {effectivePermissions.length}
               </AppText>
 
@@ -246,43 +225,36 @@ export default function UsersScreen() {
             </AppCard>
           );
         }}
-        ListEmptyComponent={
-          <AppCard>
-            <AppText>No hay usuarios para mostrar.</AppText>
-          </AppCard>
-        }
+        ListEmptyComponent={<EmptyState title="No hay usuarios para mostrar" />}
       />
-    </AppScreen>
+    </AppShell>
   );
 }
 
 const styles = StyleSheet.create({
-  description: {
-    marginBottom: 12,
+  actionButton: {
+    flex: 1,
   },
-  search: {
+  actions: {
+    flexDirection: 'row',
+    gap: 10,
     marginTop: 12,
+  },
+  headerInfo: {
+    flex: 1,
+  },
+  headerRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'space-between',
   },
   list: {
     flex: 1,
   },
   listContent: {
+    gap: 12,
     paddingBottom: 24,
-  },
-  headerRow: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  headerInfo: {
-    flex: 1,
-  },
-  statusBadge: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
   },
   meta: {
     marginTop: 6,
@@ -290,12 +262,7 @@ const styles = StyleSheet.create({
   metaCompact: {
     marginTop: 2,
   },
-  actions: {
-    flexDirection: 'row',
-    gap: 10,
+  search: {
     marginTop: 12,
-  },
-  actionButton: {
-    flex: 1,
   },
 });

@@ -46,6 +46,18 @@ export default function Sidebar({ sections, activeRoute, onNavigate, session, on
             },
           ]}
         >
+          <View
+            style={[
+              styles.brandMark,
+              {
+                backgroundColor: theme.colors.accentSoft,
+                borderColor: theme.colors.accent,
+                borderRadius: designTokens.radius.md,
+              },
+            ]}
+          >
+            <MaterialIcons name="storefront" size={18} color={theme.colors.accent} />
+          </View>
           <AppText variant="subtitle" bold>
             Ctrl Ropa
           </AppText>
@@ -61,8 +73,8 @@ export default function Sidebar({ sections, activeRoute, onNavigate, session, on
             style={({ pressed }) => [
               styles.closeButton,
               {
-              backgroundColor: theme.colors.infoCardBackground,
-              borderColor: theme.colors.borderSubtle,
+                backgroundColor: theme.colors.infoCardBackground,
+                borderColor: theme.colors.borderSubtle,
                 borderRadius: designTokens.radius.md,
                 opacity: pressed ? 0.72 : 1,
               },
@@ -148,11 +160,19 @@ export default function Sidebar({ sections, activeRoute, onNavigate, session, on
 
 const styles = StyleSheet.create({
   brand: {
-    flex: 1,
     borderWidth: 1,
+    flex: 1,
     minWidth: 0,
     paddingHorizontal: designTokens.spacing.md,
     paddingVertical: designTokens.spacing.sm,
+  },
+  brandMark: {
+    alignItems: 'center',
+    borderWidth: 1,
+    height: 34,
+    justifyContent: 'center',
+    marginBottom: designTokens.spacing.sm,
+    width: 34,
   },
   brandRow: {
     alignItems: 'flex-start',

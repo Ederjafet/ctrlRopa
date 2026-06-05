@@ -1,29 +1,20 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShell from '@/components/layout/AppShell';
+import { buildMainNavSections, getSessionScopeLabel } from '@/components/layout/appNavigation';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
+import EmptyState from '@/components/ui/EmptyState';
+import StatusBadge from '@/components/ui/StatusBadge';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
-
-import {
-    Customer,
-    getCustomersByBranch,
-} from '@/services/customerService';
-
-import { ApiError } from '@/services/apiClient';
 import { canAccessByPermission } from '@/services/accessControl';
-import { getSession } from '@/services/sessionStorage';
-
+import { ApiError } from '@/services/apiClient';
+import { Customer, getCustomersByBranch } from '@/services/customerService';
+import { getSession, UserSession } from '@/services/sessionStorage';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
-import {
-    ActivityIndicator,
-    FlatList,
-    Pressable,
-    StyleSheet,
-    View,
-} from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 
 export default function CustomersScreen() {
   const router = useRouter();
@@ -35,6 +26,8 @@ export default function CustomersScreen() {
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [canCreateCustomer, setCanCreateCustomer] = useState(false);
+  const [session, setSession] = useState<UserSession | null>(null);
+  const navSections = useMemo(() => buildMainNavSections(session), [session]);
 
   useFocusEffect(
     useCallback(() => {
@@ -43,19 +36,21 @@ export default function CustomersScreen() {
   );
 
   const loadCustomers = async () => {
-    const session = await getSession();
-    if (!session) return;
+    const currentSession = await getSession();
+    if (!currentSession) return;
 
-    if (!canAccessByPermission(session, 'VIEW_CUSTOMERS')) {
+    setSession(currentSession);
+
+    if (!canAccessByPermission(currentSession, 'VIEW_CUSTOMERS')) {
       router.replace('/access-denied' as any);
       return;
     }
 
-    setCanCreateCustomer(canAccessByPermission(session, 'CREATE_CUSTOMER'));
+    setCanCreateCustomer(canAccessByPermission(currentSession, 'CREATE_CUSTOMER'));
 
     try {
       setIsLoading(true);
-      const data = await getCustomersByBranch(session.branchId);
+      const data = await getCustomersByBranch(currentSession.branchId);
       setCustomers(data);
       setFiltered(data);
     } catch (err: any) {
@@ -97,23 +92,27 @@ export default function CustomersScreen() {
   }
 
   return (
-    <AppScreen scroll={false}>
-      <AppBackButton fallbackRoute="/" />
-
-      <AppText variant="title" bold>
-        Clientes
-      </AppText>
-
-      {canCreateCustomer ? (
-        <AppButton
-          title="Nuevo cliente"
-          onPress={() => router.push('/customers-create' as any)}
-        />
-      ) : null}
-
+    <AppShell
+      title="Clientes"
+      subtitle="Seguimiento comercial y datos de contacto"
+      contextTitle="Cartera de clientes"
+      contextSubtitle={getSessionScopeLabel(session)}
+      activeRoute="customers"
+      session={session}
+      navSections={navSections}
+      rightContent={
+        canCreateCustomer ? (
+          <AppButton
+            title="Nuevo cliente"
+            variant="secondary"
+            onPress={() => router.push('/customers-create' as any)}
+          />
+        ) : null
+      }
+    >
       <View style={styles.search}>
         <AppInput
-          placeholder="Buscar por nombre, teléfono o correo"
+          placeholder="Buscar por nombre, telefono o correo"
           value={search}
           onChangeText={handleSearch}
         />
@@ -132,51 +131,69 @@ export default function CustomersScreen() {
             style={styles.customerTile}
             onPress={() => router.push(`/customers/${item.id}` as any)}
           >
-            <AppCard>
-              <AppText bold>{item.name}</AppText>
+            <AppCard variant="elevated" style={styles.customerCard}>
+              <View style={styles.customerHeader}>
+                <View style={styles.customerText}>
+                  <AppText bold numberOfLines={2}>
+                    {item.name}
+                  </AppText>
+                  <AppText numberOfLines={2}>
+                    {item.phone || 'Sin telefono'} · {item.email || 'Sin correo'}
+                  </AppText>
+                </View>
+                {item.isGeneric ? (
+                  <StatusBadge label={`Generico ${item.genericType || ''}`.trim()} tone="info" />
+                ) : null}
+              </View>
 
-              <AppText>
-                {item.phone || 'Sin teléfono'} ·{' '}
-                {item.email || 'Sin correo'}
-              </AppText>
-
-              {item.isGeneric ? (
-                <AppText variant="caption" color="#666666">
-                  Cliente genérico {item.genericType || ''}
-                </AppText>
-              ) : null}
-
-              <AppText variant="caption" color="#666666" style={styles.hint}>
+              <AppText variant="caption" style={styles.hint}>
                 Tocar para ver detalle
               </AppText>
             </AppCard>
           </Pressable>
         )}
         ListEmptyComponent={
-          <AppText>No hay clientes registrados.</AppText>
+          <EmptyState
+            title="No hay clientes registrados"
+            message="Cuando existan clientes, apareceran aqui."
+          />
         }
       />
-    </AppScreen>
+    </AppShell>
   );
 }
 
 const styles = StyleSheet.create({
-  list: {
+  customerCard: {
+    minHeight: 126,
+  },
+  customerHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  customerText: {
     flex: 1,
-  },
-  listContent: {
-    paddingBottom: 24,
-  },
-  search: {
-    marginTop: 12,
-  },
-  hint: {
-    marginTop: 8,
+    minWidth: 0,
   },
   customerTile: {
     flex: 1,
   },
+  hint: {
+    marginTop: 8,
+  },
+  list: {
+    flex: 1,
+  },
   listColumns: {
     gap: 12,
+  },
+  listContent: {
+    gap: 12,
+    paddingBottom: 24,
+  },
+  search: {
+    marginBottom: 12,
   },
 });

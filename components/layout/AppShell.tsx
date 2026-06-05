@@ -73,7 +73,6 @@ export default function AppShell({
   return (
     <View style={[styles.shell, { backgroundColor: theme.colors.background }]}>
       <View
-        pointerEvents="none"
         style={[
           styles.ambientPanel,
           {
@@ -138,6 +137,7 @@ const styles = StyleSheet.create({
     height: 188,
     left: 0,
     opacity: 0.82,
+    pointerEvents: 'none',
     position: 'absolute',
     right: 0,
     top: 0,

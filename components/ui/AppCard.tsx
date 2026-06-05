@@ -5,23 +5,60 @@ import { StyleSheet, View, ViewProps } from 'react-native';
 
 type Props = ViewProps & {
   children: ReactNode;
+  variant?: 'default' | 'elevated' | 'subtle' | 'warning' | 'success' | 'danger' | 'info' | 'selected';
 };
 
-export default function AppCard({ children, style, ...rest }: Props) {
+export default function AppCard({ children, style, variant = 'default', ...rest }: Props) {
   const { theme } = useAppTheme();
   const { isPhone } = useResponsiveLayout();
+  const isSubtle = variant === 'subtle';
+  const toneColor =
+    variant === 'warning'
+      ? theme.colors.warning
+      : variant === 'success'
+        ? theme.colors.success
+        : variant === 'danger'
+          ? theme.colors.danger
+          : variant === 'info'
+            ? theme.colors.info
+            : variant === 'selected'
+              ? theme.colors.accent
+              : theme.colors.borderSubtle;
+  const backgroundColor =
+    variant === 'warning'
+        ? theme.isDark
+          ? theme.colors.surfaceElevated
+          : theme.colors.warningBackground
+      : variant === 'success'
+        ? theme.isDark
+          ? theme.colors.surfaceElevated
+          : theme.colors.successBackground
+        : variant === 'danger'
+          ? theme.isDark
+            ? theme.colors.surfaceElevated
+            : theme.colors.dangerBackground
+          : variant === 'info'
+            ? theme.isDark
+              ? theme.colors.surfaceElevated
+              : theme.colors.infoSoft
+            : isSubtle
+              ? theme.colors.surfaceAlt
+              : theme.colors.surfaceElevated;
 
   return (
     <View
       style={[
         styles.card,
         {
-          backgroundColor: theme.colors.surfaceElevated,
-          borderColor: theme.colors.borderSubtle,
-          borderRadius: theme.radius.lg,
+          backgroundColor,
+          borderColor: toneColor,
+          borderLeftColor: variant === 'default' || isSubtle ? toneColor : toneColor,
+          borderLeftWidth: variant === 'default' || isSubtle ? 1 : 4,
+          borderRadius: variant === 'elevated' || variant === 'selected' ? theme.radius.xl : theme.radius.lg,
           padding: isPhone ? theme.spacing.md : theme.spacing.lg,
-          shadowColor: theme.isDark ? theme.colors.overlay : theme.colors.primary,
-          shadowOpacity: theme.isDark ? 0.18 : 0.08,
+          shadowColor: theme.colors.shadow,
+          shadowOpacity: isSubtle ? 0.03 : theme.isDark ? 0.18 : 0.08,
+          elevation: isSubtle ? 0 : variant === 'elevated' || variant === 'selected' ? 3 : 2,
         },
         style,
       ]}

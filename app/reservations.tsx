@@ -1,4 +1,5 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShell from '@/components/layout/AppShell';
+import { buildMainNavSections, getSessionScopeLabel } from '@/components/layout/appNavigation';
 import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
@@ -6,8 +7,8 @@ import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
 import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
-import { useAppTheme } from '@/context/AppThemeContext';
-
+import EmptyState from '@/components/ui/EmptyState';
+import StatusBadge from '@/components/ui/StatusBadge';
 import { Box, getActiveBoxesByBranch } from '@/services/boxService';
 import {
   assignReservationToBox,
@@ -15,18 +16,10 @@ import {
   getReservationsWithoutBox,
   type Reservation,
 } from '@/services/reservationService';
-import { getSession } from '@/services/sessionStorage';
-
+import { getSession, UserSession } from '@/services/sessionStorage';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
 
 type ReservationFilter = 'ACTIVE' | 'WITHOUT_BOX';
 
@@ -74,10 +67,23 @@ function formatMoney(value?: number | null) {
   return `$${Number(value).toFixed(2)}`;
 }
 
+function getReservationTone(status?: string): 'success' | 'warning' | 'danger' | 'info' | 'neutral' {
+  switch (status) {
+    case 'ACTIVE':
+      return 'success';
+    case 'CANCELLED':
+      return 'danger';
+    case 'COMPLETED':
+    case 'CONVERTED_TO_SALE':
+      return 'info';
+    default:
+      return 'neutral';
+  }
+}
+
 export default function ReservationsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
-  const { theme } = useAppTheme();
   const returnTo = Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo;
   const isLiveContext = returnTo === '/live';
 
@@ -91,15 +97,18 @@ export default function ReservationsScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
   const [isBoxModalVisible, setIsBoxModalVisible] = useState(false);
+  const [session, setSession] = useState<UserSession | null>(null);
+  const navSections = useMemo(() => buildMainNavSections(session), [session]);
 
   const loadReservations = useCallback(
     async (refreshing = false, nextFilter: ReservationFilter = filter) => {
-      const session = await getSession();
+      const currentSession = await getSession();
+      setSession(currentSession);
 
-      if (!session?.branchId) {
+      if (!currentSession?.branchId) {
         setReservations([]);
         setBoxes([]);
-        setErrorMessage('No se encontró sucursal activa en la sesión.');
+        setErrorMessage('No se encontro sucursal activa en la sesion.');
         setIsLoading(false);
         setIsRefreshing(false);
         return;
@@ -116,9 +125,9 @@ export default function ReservationsScreen() {
 
         const [reservationData, boxData] = await Promise.all([
           nextFilter === 'WITHOUT_BOX'
-            ? getReservationsWithoutBox(session.branchId)
-            : getReservationsByBranch(session.branchId),
-          getActiveBoxesByBranch(session.branchId),
+            ? getReservationsWithoutBox(currentSession.branchId)
+            : getReservationsByBranch(currentSession.branchId),
+          getActiveBoxesByBranch(currentSession.branchId),
         ]);
 
         const active = reservationData.filter((reservation) => {
@@ -156,7 +165,7 @@ export default function ReservationsScreen() {
         ${reservation.itemCode ?? ''}
         ${reservation.customerName ?? ''}
         ${reservation.status ?? ''}
-                ${reservation.salesChannelName ?? ''}
+        ${reservation.salesChannelName ?? ''}
         ${reservation.liveId ?? ''}
         ${reservation.liveNotes ?? ''}
         ${reservation.boxCode ?? ''}
@@ -211,37 +220,30 @@ export default function ReservationsScreen() {
   }
 
   return (
-    <AppScreen scroll={false}>
-      <AppBackButton fallbackRoute={returnTo || '/'} />
-
-      <View style={styles.header}>
-        <AppText variant="title" bold>
-          Apartados / Reservas
-        </AppText>
-        <AppText variant="caption">
-          Reservas activas de la sucursal
-        </AppText>
-      </View>
-
-      {isLiveContext ? (
-        <AppButton
-          title="Volver al live activo"
-          variant="secondary"
-          onPress={() => router.replace('/live' as any)}
-          style={styles.liveReturnButton}
-        />
-      ) : null}
-
+    <AppShell
+      title="Reservas"
+      subtitle="Apartados activos, cajas y seguimiento"
+      contextTitle="Apartados y reservas"
+      contextSubtitle={getSessionScopeLabel(session)}
+      activeRoute="reservations"
+      session={session}
+      navSections={navSections}
+      rightContent={
+        isLiveContext ? (
+          <AppButton title="Volver al live" variant="secondary" onPress={() => router.replace('/live' as any)} />
+        ) : null
+      }
+    >
       <View style={styles.filterRow}>
         <AppButton
           title="Activas"
-          variant={filter === 'ACTIVE' ? 'primary' : 'secondary'}
+          variant={filter === 'ACTIVE' ? 'primary' : 'neutral'}
           onPress={() => changeFilter('ACTIVE')}
           style={styles.filterButton}
         />
         <AppButton
           title="Sin caja"
-          variant={filter === 'WITHOUT_BOX' ? 'primary' : 'secondary'}
+          variant={filter === 'WITHOUT_BOX' ? 'primary' : 'neutral'}
           onPress={() => changeFilter('WITHOUT_BOX')}
           style={styles.filterButton}
         />
@@ -254,7 +256,7 @@ export default function ReservationsScreen() {
       />
 
       {errorMessage ? (
-        <AppCard>
+        <AppCard variant="danger">
           <AppText>{errorMessage}</AppText>
           <AppButton
             title="Reintentar"
@@ -278,39 +280,25 @@ export default function ReservationsScreen() {
               })
             }
           >
-            <AppCard>
+            <AppCard variant="elevated">
               <View style={styles.cardHeader}>
-                <AppText bold>Apartado #{item.id}</AppText>
-                <AppText bold>{getReservationStatusLabel(item.status)}</AppText>
+                <View style={styles.cardTitle}>
+                  <AppText bold>Apartado #{item.id}</AppText>
+                  <AppText variant="caption">
+                    {getSalesChannelLabel(item.salesChannelCode, item.salesChannelName) || 'Canal no capturado'}
+                  </AppText>
+                </View>
+                <StatusBadge label={getReservationStatusLabel(item.status)} tone={getReservationTone(item.status)} />
               </View>
 
-              <AppText>
-                Cliente: {item.customerName || `ID ${item.customerId}`}
-              </AppText>
-
-              <AppText>
-                Prenda: {item.itemCode || `ID ${item.itemId}`}
-              </AppText>
-
-              {getSalesChannelLabel(item.salesChannelCode, item.salesChannelName) ? (
-                <AppText>
-                  Canal: {getSalesChannelLabel(item.salesChannelCode, item.salesChannelName)}
-                </AppText>
-              ) : null}
-
-              {item.liveId ? (
-                <AppText>
-                  Live: {getLiveLabel(item)}
-                </AppText>
-              ) : null}
-
+              <AppText>Cliente: {item.customerName || `ID ${item.customerId}`}</AppText>
+              <AppText>Prenda: {item.itemCode || `ID ${item.itemId}`}</AppText>
+              {item.liveId ? <AppText>Live: {getLiveLabel(item)}</AppText> : null}
               <AppText>Caja: {item.boxCode || 'Sin caja'}</AppText>
 
               <View style={styles.row}>
                 <AppText bold>{formatMoney(item.price)}</AppText>
-                <AppText variant="caption" color={theme.colors.mutedText}>
-                  Tocar para ver detalle
-                </AppText>
+                <AppText variant="caption">Tocar para ver detalle</AppText>
               </View>
 
               {!item.boxId ? (
@@ -328,30 +316,21 @@ export default function ReservationsScreen() {
         onRefresh={() => loadReservations(true)}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
-          <AppCard>
-            <AppText>
-              {filter === 'WITHOUT_BOX'
-                ? 'No hay apartados activos sin caja.'
-                : 'No hay apartados activos.'}
-            </AppText>
-          </AppCard>
+          <EmptyState
+            title={filter === 'WITHOUT_BOX' ? 'No hay apartados activos sin caja' : 'No hay apartados activos'}
+            message="Cuando existan reservas para este filtro, apareceran aqui."
+          />
         }
       />
 
-      <AppBottomModal
-        visible={isBoxModalVisible}
-        title="Asignar caja"
-        onClose={closeBoxModal}
-      >
+      <AppBottomModal visible={isBoxModalVisible} title="Asignar caja" onClose={closeBoxModal}>
         {selectedReservation ? (
-          <AppCard>
+          <AppCard variant="subtle">
             <AppText bold>Apartado #{selectedReservation.id}</AppText>
             <AppText>
               Cliente: {selectedReservation.customerName || `ID ${selectedReservation.customerId}`}
             </AppText>
-            <AppText>
-              Prenda: {selectedReservation.itemCode || `ID ${selectedReservation.itemId}`}
-            </AppText>
+            <AppText>Prenda: {selectedReservation.itemCode || `ID ${selectedReservation.itemId}`}</AppText>
           </AppCard>
         ) : null}
 
@@ -365,68 +344,62 @@ export default function ReservationsScreen() {
             />
           ))
         ) : (
-          <AppText color={theme.colors.mutedText}>
-            No hay cajas activas configuradas para esta sucursal.
-          </AppText>
+          <AppText>No hay cajas activas configuradas para esta sucursal.</AppText>
         )}
 
-        {isAssigningBox ? (
-          <AppText color={theme.colors.mutedText} style={styles.savingText}>
-            Asignando caja...
-          </AppText>
-        ) : null}
+        {isAssigningBox ? <AppText style={styles.savingText}>Asignando caja...</AppText> : null}
       </AppBottomModal>
-    </AppScreen>
+    </AppShell>
   );
 }
 
 const styles = StyleSheet.create({
-  list: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
+  assignButton: {
     marginTop: 12,
   },
-  header: {
-    marginBottom: 12,
+  cardHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  cardTitle: {
+    flex: 1,
+    minWidth: 0,
+  },
+  filterButton: {
+    flex: 1,
   },
   filterRow: {
     flexDirection: 'row',
     gap: 8,
     marginBottom: 12,
   },
-  liveReturnButton: {
-    marginBottom: 12,
-  },
-  filterButton: {
+  list: {
     flex: 1,
+  },
+  listContent: {
+    gap: 12,
+    paddingBottom: 24,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
   },
   retryButton: {
     marginTop: 12,
   },
-  listContent: {
-    paddingBottom: 24,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 8,
-  },
   row: {
-    marginTop: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    flexDirection: 'row',
     gap: 12,
-  },
-  assignButton: {
-    marginTop: 12,
+    justifyContent: 'space-between',
+    marginTop: 10,
   },
   savingText: {
     marginTop: 12,

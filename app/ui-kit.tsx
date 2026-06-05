@@ -9,6 +9,7 @@ import ActionTile from '@/components/ui/ActionTile';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
+import AppNoticeDropdown from '@/components/ui/AppNoticeDropdown';
 import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
 import AppText from '@/components/ui/AppText';
 import EmptyState from '@/components/ui/EmptyState';
@@ -74,7 +75,14 @@ function buildNavSections(session: UserSession | null): SidebarSection[] {
 }
 
 export default function UiKitPreview() {
-  const { theme, themeMode, toggleThemeMode } = useAppTheme();
+  const {
+    theme,
+    themeMode,
+    toggleThemeMode,
+    visualPresetId,
+    designPresets,
+    setVisualPresetId,
+  } = useAppTheme();
   const [loading, setLoading] = useState(true);
   const [isLogged, setIsLogged] = useState(false);
   const [session, setSession] = useState<UserSession | null>(null);
@@ -149,6 +157,61 @@ export default function UiKitPreview() {
         title="Datos de ejemplo para preview visual"
         subtitle="Estos datos solo viven en /ui-kit; no se usan en pantallas reales."
       />
+
+      <SectionHeader
+        title="Identidad visual"
+        subtitle="Selector local de plantilla visual. Persistencia por cliente/tenant queda pendiente."
+      />
+      <View style={styles.previewCard}>
+        <View style={styles.themePreviewHeader}>
+          <View style={styles.previewTextBlock}>
+            <AppText bold>Plantilla visual activa</AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              Esta configuracion se guarda localmente en esta fase.
+            </AppText>
+          </View>
+          <StatusBadge
+            label={designPresets.find((preset) => preset.id === visualPresetId)?.label ?? 'Preset'}
+            tone="role"
+          />
+        </View>
+        <AppResponsiveGrid tabletColumns={2} desktopColumns={3}>
+          {designPresets
+            .filter((preset) => preset.active)
+            .map((preset) => (
+              <AppCard
+                key={preset.id}
+                variant={preset.id === visualPresetId ? 'selected' : 'subtle'}
+                style={styles.presetCard}
+              >
+                <View style={styles.themePreviewHeader}>
+                  <View style={styles.previewTextBlock}>
+                    <AppText bold>{preset.label}</AppText>
+                    <AppText variant="caption" color={theme.colors.mutedText}>
+                      {preset.description}
+                    </AppText>
+                  </View>
+                  {preset.id === visualPresetId ? <StatusBadge label="Activo" tone="success" /> : null}
+                </View>
+                <View style={styles.presetSwatches}>
+                  {[
+                    preset.colors[theme.isDark ? 'dark' : 'light'].primary,
+                    preset.colors[theme.isDark ? 'dark' : 'light'].accent,
+                    preset.colors[theme.isDark ? 'dark' : 'light'].success,
+                    preset.colors[theme.isDark ? 'dark' : 'light'].danger,
+                  ].map((color) => (
+                    <View key={color} style={[styles.presetSwatch, { backgroundColor: color }]} />
+                  ))}
+                </View>
+                <AppButton
+                  title={preset.id === visualPresetId ? 'Plantilla activa' : 'Usar plantilla'}
+                  variant={preset.id === visualPresetId ? 'neutral' : 'secondary'}
+                  onPress={() => setVisualPresetId(preset.id)}
+                />
+              </AppCard>
+            ))}
+        </AppResponsiveGrid>
+      </View>
 
       <SectionHeader title="Design tokens" subtitle="Colores, radios, sombras y spacing base" />
       <AppResponsiveGrid tabletColumns={2} desktopColumns={4}>
@@ -233,7 +296,7 @@ export default function UiKitPreview() {
                 </AppText>
                 <View style={styles.inlineList}>
                   <StatusBadge label="Disponible" tone="success" />
-                  <StatusBadge label="Reservada" tone="warning" />
+                  <StatusBadge label="Reservada" tone="reserved" />
                   <StatusBadge label="Bloqueada" />
                 </View>
               </View>
@@ -309,6 +372,59 @@ export default function UiKitPreview() {
             <StatusBadge label="Info" tone="info" />
           </View>
         </AppCard>
+        <AppCard variant="elevated" style={styles.previewCard}>
+          <SectionHeader title="Card variants" subtitle="Superficies listas para pantallas reales" />
+          <View
+            style={[
+              styles.surfacePreview,
+              {
+                backgroundColor: theme.colors.surfaceAlt,
+                borderColor: theme.colors.borderSubtle,
+              },
+            ]}
+          >
+            <AppText bold>Subtle</AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              Contexto de baja prioridad.
+            </AppText>
+          </View>
+          <View
+            style={[
+              styles.surfacePreview,
+              {
+                backgroundColor: theme.colors.surfaceElevated,
+                borderColor: theme.colors.accent,
+                borderLeftColor: theme.colors.accent,
+                borderLeftWidth: 4,
+              },
+            ]}
+          >
+            <AppText bold>Selected</AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              Registro o modulo activo.
+            </AppText>
+          </View>
+          <View style={styles.inlineList}>
+            <StatusBadge label="warning" tone="warning" />
+            <StatusBadge label="success" tone="success" />
+            <StatusBadge label="danger" tone="danger" />
+          </View>
+        </AppCard>
+        <AppCard variant="elevated" style={styles.previewCard}>
+          <SectionHeader title="Notices" subtitle="Mensajes operativos con jerarquia" />
+          <AppNoticeDropdown
+            title="Autorizacion pendiente"
+            message="La solicitud requiere integracion backend antes de ejecutar la accion."
+            tone="warning"
+            defaultExpanded={false}
+          />
+          <AppNoticeDropdown
+            title="Operacion lista"
+            message="Los datos requeridos estan completos para continuar."
+            tone="success"
+            defaultExpanded={false}
+          />
+        </AppCard>
         <MetricCard label="MetricCard" value="$12,450" helper="Dato de ejemplo para preview" />
         <AppCard style={styles.previewCard}>
           <SectionHeader title="Inputs" subtitle="Texto, placeholder y readonly en claro/oscuro" />
@@ -335,7 +451,7 @@ export default function UiKitPreview() {
 
       <SectionHeader title="Panel LIVE premium" subtitle="Referencia visual usada por consola operativa" />
       <AppResponsiveGrid tabletColumns={2} desktopColumns={3}>
-        <AppCard style={styles.previewCard}>
+        <AppCard variant="danger" style={styles.previewCard}>
           <View style={styles.themePreviewHeader}>
             <StatusBadge label="Preparada" tone="warning" />
             <AppText variant="caption" color={theme.colors.mutedText}>
@@ -348,7 +464,7 @@ export default function UiKitPreview() {
           </AppText>
           <AppButton title="Poner al aire" variant="primary" onPress={() => undefined} />
         </AppCard>
-        <AppCard style={[styles.previewCard, { borderColor: theme.colors.success }]}>
+        <AppCard variant="success" style={styles.previewCard}>
           <View style={styles.themePreviewHeader}>
             <StatusBadge label="Al aire" tone="success" />
             <StatusBadge label="Disponible" tone="success" />
@@ -359,10 +475,10 @@ export default function UiKitPreview() {
           </AppText>
           <AppButton title="Reservar ahora" variant="primary" onPress={() => undefined} />
         </AppCard>
-        <AppCard style={[styles.previewCard, { borderColor: theme.colors.warning }]}>
+        <AppCard variant="warning" style={styles.previewCard}>
           <View style={styles.themePreviewHeader}>
             <StatusBadge label="Al aire" tone="success" />
-            <StatusBadge label="Reservada" tone="warning" />
+            <StatusBadge label="Reservada" tone="reserved" />
           </View>
           <AppText bold>Prenda reservada</AppText>
           <AppText variant="caption" color={theme.colors.warning}>
@@ -458,10 +574,32 @@ const styles = StyleSheet.create({
   previewCard: {
     gap: designTokens.spacing.sm,
   },
+  previewTextBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  presetCard: {
+    gap: designTokens.spacing.sm,
+  },
+  presetSwatches: {
+    flexDirection: 'row',
+    gap: designTokens.spacing.xs,
+  },
+  presetSwatch: {
+    borderRadius: designTokens.radius.full,
+    height: 20,
+    width: 20,
+  },
   swatch: {
     borderRadius: designTokens.radius.md,
     height: 42,
     width: '100%',
+  },
+  surfacePreview: {
+    borderRadius: designTokens.radius.lg,
+    borderWidth: 1,
+    gap: designTokens.spacing.xs,
+    padding: designTokens.spacing.md,
   },
   themePreviewCanvas: {
     borderRadius: designTokens.radius.lg,

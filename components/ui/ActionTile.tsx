@@ -24,10 +24,13 @@ export default function ActionTile({ title, subtitle, icon = 'chevron-right', di
         {
           backgroundColor: theme.colors.surfaceElevated,
           borderColor: theme.colors.borderSubtle,
+          borderLeftColor: theme.colors.accent,
+          borderLeftWidth: 3,
           borderRadius: designTokens.radius.xl,
           opacity: disabled ? 0.45 : pressed ? 0.78 : 1,
           shadowColor: theme.isDark ? theme.colors.overlay : theme.colors.primary,
           shadowOpacity: theme.isDark ? 0.18 : 0.09,
+          elevation: disabled ? 0 : 2,
         },
       ]}
     >
