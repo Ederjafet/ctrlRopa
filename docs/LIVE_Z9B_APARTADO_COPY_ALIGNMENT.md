@@ -57,6 +57,10 @@ Implementacion frontend:
 - ahora solo se limpia si `selectedItem` era la misma prenda apartada;
 - si `selectedItem` representa la prenda preparada, se conserva.
 
+## Continuidad LIVE-Z9C
+
+LIVE-Z9C refina `Apartados recientes` para que las acciones visibles dependan del estado actual. `Mantener apartado` deja de mostrarse cuando el registro ya esta en estado visible `Apartado`, porque no genera un cambio operativo perceptible para la persona usuaria.
+
 ## Sin cambios funcionales backend
 
 No se modifico:
