@@ -16,7 +16,7 @@ export default function EmptyState({ title, message, icon = 'inbox' }: Props) {
 
   return (
     <AppCard style={styles.card}>
-      <View style={[styles.iconWrap, { backgroundColor: theme.colors.infoCardBackground }]}>
+      <View style={[styles.iconWrap, { backgroundColor: theme.colors.accentSoft }]}>
         <MaterialIcons name={icon} size={24} color={theme.colors.accent} />
       </View>
       <View style={styles.textBlock}>

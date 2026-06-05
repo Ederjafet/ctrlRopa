@@ -1,0 +1,1903 @@
+diff --git a/app/live.tsx b/app/live.tsx
+index 5e2471b..0f6ddcf 100644
+--- a/app/live.tsx
++++ b/app/live.tsx
+@@ -1,4 +1,5 @@
+ import QRScannerModal from '@/components/qr/QRScannerModal';
++import AuthorizationRequestPanel from '@/components/live/AuthorizationRequestPanel';
+ import AppShell from '@/components/layout/AppShell';
+ import { SidebarSection } from '@/components/layout/Sidebar';
+ import LiveDesktopLayout from '@/components/live/LiveDesktopLayout';
+@@ -16,6 +17,7 @@ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInfoCard from '@/components/ui/AppInfoCard';
+ import AppInput from '@/components/ui/AppInput';
++import EmptyState from '@/components/ui/EmptyState';
+ import AppOptionRow from '@/components/ui/AppOptionRow';
+ import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
+ import AppText from '@/components/ui/AppText';
+@@ -98,6 +100,14 @@ type LiveNotice = {
+   tone: 'success' | 'warning' | 'danger';
+ };
+
++type AuthorizationRequestContext =
++  | 'price'
++  | 'release'
++  | 'cancel'
++  | 'close'
++  | 'operationalSold'
++  | 'startLive';
++
+ type ActivityFeedEvent = {
+   badge: string;
+   label: string;
+@@ -489,9 +499,8 @@ export default function LiveScreen() {
+   const [closeLiveToConfirm, setCloseLiveToConfirm] = useState<Live | null>(null);
+   const [activateLiveToConfirm, setActivateLiveToConfirm] = useState<Live | null>(null);
+   const [cancelReservationToConfirm, setCancelReservationToConfirm] = useState<number | null>(null);
+-  const [authorizationRequestContext, setAuthorizationRequestContext] = useState<
+-    'price' | 'release' | 'close' | 'cancel' | null
+-  >(null);
++  const [authorizationRequestContext, setAuthorizationRequestContext] =
++    useState<AuthorizationRequestContext | null>(null);
+   const [reservationIssue, setReservationIssue] = useState<string | null>(null);
+   const [showDemoMetrics, setShowDemoMetrics] = useState(true);
+   const [liveLayoutPreferences, setLiveLayoutPreferences] =
+@@ -1669,17 +1678,42 @@ export default function LiveScreen() {
+     await handleUpdateReservationOperationalStatus(reservationId, 'CANCELLED', reason);
+   };
+
+-  const handleRequestAuthorization = (
+-    context: 'price' | 'release' | 'close' | 'cancel'
+-  ) => {
++  const handleRequestAuthorization = (context: AuthorizationRequestContext) => {
+     setAuthorizationRequestContext(context);
+   };
+
++  const getAuthorizationActionLabel = (context: AuthorizationRequestContext | null) => {
++    switch (context) {
++      case 'price':
++        return t('live.authorizationActionPrice');
++      case 'release':
++        return t('live.authorizationActionReleaseItem');
++      case 'cancel':
++        return t('live.authorizationActionCancelHold');
++      case 'close':
++        return t('live.authorizationActionCloseLive');
++      case 'operationalSold':
++        return t('live.authorizationActionOperationalSold');
++      case 'startLive':
++        return t('live.authorizationActionStartLive');
++      default:
++        return t('live.authorizationGenericAction');
++    }
++  };
++
++  const getAuthorizationPrompt = (context: AuthorizationRequestContext | null) =>
++    context === 'price'
++      ? t('live.authorizationPricePrompt')
++      : t('live.authorizationGenericPrompt', {
++          action: getAuthorizationActionLabel(context),
++        });
++
+   const confirmAuthorizationRequest = (reason: string) => {
++    const action = getAuthorizationActionLabel(authorizationRequestContext);
+     setAuthorizationRequestContext(null);
+     setLiveNotice({
+       title: t('live.authorizationRequestPendingTitle'),
+-      message: t('live.authorizationRequestPendingMessage', { reason }),
++      message: t('live.authorizationRequestPendingMessage', { action, reason }),
+       tone: 'warning',
+     });
+   };
+@@ -2368,23 +2402,23 @@ export default function LiveScreen() {
+       ? theme.colors.success
+       : isPreparedForChange
+         ? theme.colors.warning
+-        : theme.colors.border;
++        : theme.colors.borderSubtle;
+     const cardBackgroundColor = isHighlightedReserved
+-      ? theme.colors.surface
++      ? theme.colors.surfaceElevated
+       : isHighlightedBlocked
+-        ? theme.colors.surface
++        ? theme.colors.surfaceElevated
+       : options.highlighted
+-      ? theme.colors.successBackground
++      ? theme.colors.surfaceElevated
+       : isPreparedForChange
+-        ? theme.colors.warningBackground
+-        : theme.colors.surface;
++        ? theme.colors.surfaceAlt
++        : theme.colors.surfaceElevated;
+     const placeholderBackgroundColor = isHighlightedReserved
+-      ? theme.colors.surface
++      ? theme.colors.surfaceAlt
+       : options.highlighted
+-      ? theme.colors.surface
++      ? theme.colors.accentSoft
+       : isPreparedForChange
+-        ? theme.colors.surface
+-        : theme.colors.infoCardBackground;
++        ? theme.colors.warningBackground
++        : theme.colors.accentSoft;
+     const stateColor = isHighlightedReserved
+       ? theme.colors.warning
+       : isHighlightedBlocked
+@@ -2521,7 +2555,9 @@ export default function LiveScreen() {
+               style={[
+                 styles.operatorItemNotice,
+                 {
+-                  backgroundColor: theme.colors.warningBackground,
++                  backgroundColor: theme.isDark
++                    ? theme.colors.surfaceMuted
++                    : theme.colors.warningBackground,
+                   borderColor: theme.colors.warning,
+                   borderRadius: theme.radius.sm,
+                 },
+@@ -2851,10 +2887,12 @@ export default function LiveScreen() {
+       style={({ pressed }) => [
+         styles.operatorItemActionCard,
+         {
+-          backgroundColor: theme.colors.surface,
+-          borderColor: theme.colors.border,
+-          borderRadius: theme.radius.md,
++          backgroundColor: theme.colors.surfaceElevated,
++          borderColor: theme.colors.borderSubtle,
++          borderRadius: theme.radius.lg,
+           opacity: options.disabled ? 0.52 : pressed ? 0.78 : 1,
++          shadowColor: theme.isDark ? theme.colors.overlay : theme.colors.primary,
++          shadowOpacity: theme.isDark ? 0.16 : 0.08,
+           width: isPhone ? '100%' : undefined,
+         },
+       ]}
+@@ -2863,7 +2901,7 @@ export default function LiveScreen() {
+         style={[
+           styles.operatorItemActionIcon,
+           {
+-            backgroundColor: theme.colors.infoCardBackground,
++            backgroundColor: theme.colors.accentSoft,
+             borderRadius: theme.radius.md,
+           },
+         ]}
+@@ -3460,6 +3498,20 @@ export default function LiveScreen() {
+
+         {renderSupportActiveItemPanel()}
+
++        <LiveCompactCard style={styles.supervisorSectionCard}>
++          <AppText variant="subtitle" bold>
++            {t('live.authorizationPendingRequestsTitle')}
++          </AppText>
++          <EmptyState
++            icon="pending-actions"
++            title={t('live.authorizationPendingRequestsEmptyTitle')}
++            message={t('live.authorizationPendingRequestsEmptyMessage')}
++          />
++          <AppText variant="caption" color={theme.colors.mutedText}>
++            {t('live.authorizationApprovalBackendPending')}
++          </AppText>
++        </LiveCompactCard>
++
+         <LiveCompactCard style={styles.supervisorSectionCard}>
+           <AppText variant="subtitle" bold>
+             {t('live.recentReservations')}
+@@ -3784,16 +3836,16 @@ export default function LiveScreen() {
+                         : t('live.operatorStepPriceEmpty')}
+                     </AppText>
+                     {activeItem && !mayChangeLivePrice ? (
+-                      <View style={styles.operatorPriceAuthorizationBox}>
+-                        <AppText variant="caption" color={theme.colors.mutedText}>
+-                          {t('live.livePriceAuthorizationHelp')}
+-                        </AppText>
+-                        <AppButton
+-                          title={t('live.requestAuthorization')}
+-                          variant="secondary"
+-                          onPress={() => handleRequestAuthorization('price')}
+-                        />
+-                      </View>
++                      <AuthorizationRequestPanel
++                        actionLabel={t('live.authorizationActionPrice')}
++                        requiredCapability="canChangeLivePrice"
++                        reason={t('live.livePriceAuthorizationHelp')}
++                        entityContext={activeItem.code}
++                        pendingBackendLabel={t('live.authorizationBackendRequired')}
++                        requestLabel={t('live.requestAuthorization')}
++                        onRequestAuthorization={() => handleRequestAuthorization('price')}
++                        style={styles.operatorPriceAuthorizationBox}
++                      />
+                     ) : null}
+                   </LiveCompactCard>
+
+@@ -4098,6 +4150,19 @@ export default function LiveScreen() {
+                                     onPress={() => handleCancelLiveReservation(reservation.id)}
+                                   />
+                                 </View>
++                              ) : !operationalCancelled && !mayCancelLiveReservation ? (
++                                <AuthorizationRequestPanel
++                                  actionLabel={t('live.authorizationActionCancelHold')}
++                                  requiredCapability="canCancelReservation"
++                                  reason={t('live.authorizationCancelHelp')}
++                                  entityContext={t('live.reservationNumber', {
++                                    id: reservation.id,
++                                  })}
++                                  pendingBackendLabel={t('live.authorizationBackendRequired')}
++                                  requestLabel={t('live.requestAuthorization')}
++                                  onRequestAuthorization={() => handleRequestAuthorization('cancel')}
++                                  style={styles.authorizationInlinePanel}
++                                />
+                               ) : null}
+                               {operationalCancelled && mayChangeLiveReservationStatus ? (
+                                 <View style={styles.buttonFill}>
+@@ -4137,6 +4202,19 @@ export default function LiveScreen() {
+                   disabled={isSavingLive || !selectedLiveIsOperable || !mayCloseLive}
+                   disabledReason={operatorFinishDisabledReason}
+                 />
++                {selectedLiveIsOperable && !mayCloseLive ? (
++                  <AuthorizationRequestPanel
++                    actionLabel={t('live.authorizationActionCloseLive')}
++                    requiredCapability="canCloseLive"
++                    reason={t('live.authorizationCloseHelp')}
++                    entityContext={
++                      selectedLive ? t('live.liveNumber', { id: selectedLive.id }) : undefined
++                    }
++                    pendingBackendLabel={t('live.authorizationBackendRequired')}
++                    requestLabel={t('live.requestAuthorization')}
++                    onRequestAuthorization={() => handleRequestAuthorization('close')}
++                  />
++                ) : null}
+               </>
+             )}
+           </LiveActionCard>
+@@ -5225,9 +5303,16 @@ export default function LiveScreen() {
+                 style={styles.buttonSpacing}
+               />
+             ) : (
+-              <AppText variant="caption" color={theme.colors.mutedText} style={styles.buttonSpacing}>
+-                {t('live.presenterReadOnlyHelp')}
+-              </AppText>
++              <AuthorizationRequestPanel
++                actionLabel={t('live.authorizationActionCloseLive')}
++                requiredCapability="canCloseLive"
++                reason={t('live.authorizationCloseHelp')}
++                entityContext={t('live.liveNumber', { id: selectedLive.id })}
++                pendingBackendLabel={t('live.authorizationBackendRequired')}
++                requestLabel={t('live.requestAuthorization')}
++                onRequestAuthorization={() => handleRequestAuthorization('close')}
++                style={styles.buttonSpacing}
++              />
+             )}
+           </AppCard>
+         ) : null}
+@@ -5417,10 +5502,11 @@ export default function LiveScreen() {
+         onClose={() => setAuthorizationRequestContext(null)}
+         showCancelButton={false}
+       >
++        <AppText bold>
++          {getAuthorizationActionLabel(authorizationRequestContext)}
++        </AppText>
+         <AppText color={theme.colors.mutedText}>
+-          {authorizationRequestContext === 'price'
+-            ? t('live.authorizationPricePrompt')
+-            : t('live.authorizationGenericPrompt')}
++          {getAuthorizationPrompt(authorizationRequestContext)}
+         </AppText>
+         {[
+           t('live.authorizationReasonLivePromotion'),
+@@ -5580,6 +5666,10 @@ const styles = StyleSheet.create({
+     justifyContent: 'space-between',
+     padding: 10,
+   },
++  authorizationInlinePanel: {
++    flexBasis: '100%',
++    marginTop: 4,
++  },
+   buttonRow: {
+     flexDirection: 'row',
+     flexWrap: 'wrap',
+@@ -5788,7 +5878,6 @@ const styles = StyleSheet.create({
+     gap: 12,
+     marginBottom: 12,
+     padding: 12,
+-    shadowColor: '#0f172a',
+     shadowOffset: { width: 0, height: 6 },
+     shadowOpacity: 0.08,
+     shadowRadius: 14,
+@@ -5933,7 +6022,6 @@ const styles = StyleSheet.create({
+   operatorRecentReservationsCard: {
+     elevation: 1,
+     gap: 8,
+-    shadowColor: '#0f172a',
+     shadowOffset: { width: 0, height: 4 },
+     shadowOpacity: 0.05,
+     shadowRadius: 10,
+@@ -5957,25 +6045,27 @@ const styles = StyleSheet.create({
+   },
+   operatorItemCard: {
+     borderWidth: 1,
+-    elevation: 1,
++    elevation: 2,
+     flexDirection: 'row',
+     flexWrap: 'wrap',
+-    gap: 10,
+-    padding: 10,
+-    shadowColor: '#0f172a',
+-    shadowOffset: { width: 0, height: 3 },
+-    shadowOpacity: 0.05,
+-    shadowRadius: 8,
++    gap: 12,
++    padding: 12,
++    shadowOffset: { width: 0, height: 8 },
++    shadowOpacity: 0.08,
++    shadowRadius: 18,
+   },
+   operatorItemActionCard: {
+     alignItems: 'center',
+     borderWidth: 1,
++    elevation: 1,
+     flex: 1,
+     flexDirection: 'row',
+     gap: 8,
+     minHeight: 62,
+     minWidth: 170,
+     padding: 10,
++    shadowOffset: { width: 0, height: 8 },
++    shadowRadius: 18,
+   },
+   operatorItemActionGrid: {
+     flexDirection: 'row',
+@@ -6088,7 +6178,6 @@ const styles = StyleSheet.create({
+     elevation: 1,
+     gap: 8,
+     minWidth: 0,
+-    shadowColor: '#0f172a',
+     shadowOffset: { width: 0, height: 4 },
+     shadowOpacity: 0.05,
+     shadowRadius: 10,
+@@ -6213,7 +6302,6 @@ const styles = StyleSheet.create({
+     elevation: 5,
+     gap: 14,
+     maxWidth: 420,
+-    shadowColor: '#000000',
+     shadowOffset: { width: 0, height: 3 },
+     shadowOpacity: 0.18,
+     shadowRadius: 8,
+diff --git a/app/reservation-detail.tsx b/app/reservation-detail.tsx
+index e1a803f..403907a 100644
+--- a/app/reservation-detail.tsx
++++ b/app/reservation-detail.tsx
+@@ -625,16 +625,16 @@ export default function ReservationDetailScreen() {
+                   style={[
+                     styles.remainingBox,
+                     {
+-                      backgroundColor: theme.isDark ? '#451a03' : '#fff7ed',
+-                      borderColor: theme.isDark ? '#92400e' : '#fed7aa',
++                      backgroundColor: theme.colors.warningBackground,
++                      borderColor: theme.colors.warning,
+                     },
+                   ]}
+                 >
+-                  <AppText color={theme.isDark ? '#fdba74' : '#9a3412'} bold>
++                  <AppText color={theme.colors.warning} bold>
+                     Restante: ${remaining.toFixed(2)}
+                   </AppText>
+                   {overpaid > 0 ? (
+-                    <AppText color={theme.isDark ? '#fdba74' : '#9a3412'}>
++                    <AppText color={theme.colors.warning}>
+                       Excedente / saldo a favor: ${overpaid.toFixed(2)}
+                     </AppText>
+                   ) : null}
+diff --git a/app/ui-kit.tsx b/app/ui-kit.tsx
+index ba6d505..86fe622 100644
+--- a/app/ui-kit.tsx
++++ b/app/ui-kit.tsx
+@@ -8,6 +8,7 @@ import OperationalTemplate from '@/components/templates/OperationalTemplate';
+ import ActionTile from '@/components/ui/ActionTile';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
++import AppInput from '@/components/ui/AppInput';
+ import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
+ import AppText from '@/components/ui/AppText';
+ import EmptyState from '@/components/ui/EmptyState';
+@@ -162,6 +163,85 @@ export default function UiKitPreview() {
+         ))}
+       </AppResponsiveGrid>
+
++      <SectionHeader
++        title="Tokens semanticos del tema activo"
++        subtitle="Superficies, texto, inputs y estados usados por AppShell, LIVE y detalle"
++      />
++      <AppResponsiveGrid tabletColumns={2} desktopColumns={4}>
++        {[
++          ['background', theme.colors.background],
++          ['surface', theme.colors.surface],
++          ['surfaceAlt', theme.colors.surfaceAlt],
++          ['surfaceMuted', theme.colors.surfaceMuted],
++          ['textPrimary', theme.colors.textPrimary],
++          ['textSecondary', theme.colors.textSecondary],
++          ['textMuted', theme.colors.textMuted],
++          ['inputBackground', theme.colors.inputBackground],
++          ['inputText', theme.colors.inputText],
++          ['inputPlaceholder', theme.colors.inputPlaceholder],
++          ['disabledBackground', theme.colors.disabledBackground],
++          ['disabledText', theme.colors.disabledText],
++        ].map(([name, color]) => (
++          <AppCard key={name} style={styles.tokenCard}>
++            <View
++              style={[
++                styles.swatch,
++                {
++                  backgroundColor: color,
++                  borderColor: theme.colors.borderStrong,
++                  borderWidth: StyleSheet.hairlineWidth,
++                },
++              ]}
++            />
++            <AppText bold>{name}</AppText>
++            <AppText variant="caption" color={theme.colors.mutedText}>
++              {color}
++            </AppText>
++          </AppCard>
++        ))}
++      </AppResponsiveGrid>
++
++      <SectionHeader
++        title="Comparativo claro / oscuro"
++        subtitle="Referencia rapida para detectar contraste bajo antes de migrar pantallas"
++      />
++      <AppResponsiveGrid tabletColumns={2} desktopColumns={2}>
++        {[
++          { label: 'Light', palette: designTokens.colors },
++          { label: 'Dark', palette: designTokens.darkColors },
++        ].map(({ label, palette }) => (
++          <AppCard key={label} style={styles.previewCard}>
++            <View style={styles.themePreviewHeader}>
++              <AppText bold>{label}</AppText>
++              <StatusBadge label={label === 'Dark' ? 'dark' : 'light'} tone="info" />
++            </View>
++            <View style={[styles.themePreviewCanvas, { backgroundColor: palette.background }]}>
++              <View
++                style={[
++                  styles.themePreviewPanel,
++                  {
++                    backgroundColor: palette.surface,
++                    borderColor: palette.border,
++                  },
++                ]}
++              >
++                <AppText color={palette.textPrimary} bold>
++                  Card premium
++                </AppText>
++                <AppText variant="caption" color={palette.textSecondary}>
++                  Texto secundario legible y con menor jerarquia.
++                </AppText>
++                <View style={styles.inlineList}>
++                  <StatusBadge label="Disponible" tone="success" />
++                  <StatusBadge label="Reservada" tone="warning" />
++                  <StatusBadge label="Bloqueada" />
++                </View>
++              </View>
++            </View>
++          </AppCard>
++        ))}
++      </AppResponsiveGrid>
++
+       <AppResponsiveGrid tabletColumns={3} desktopColumns={3}>
+         <EntitySummaryCard
+           title="Radius"
+@@ -209,6 +289,7 @@ export default function UiKitPreview() {
+           <AppButton title="Primary" variant="primary" onPress={() => undefined} />
+           <AppButton title="Secondary" variant="secondary" onPress={() => undefined} />
+           <AppButton title="Neutral" variant="neutral" onPress={() => undefined} />
++          <AppButton title="Ghost" variant="ghost" onPress={() => undefined} />
+           <AppButton title="Danger" variant="danger" onPress={() => undefined} />
+           <AppButton
+             title="Disabled"
+@@ -229,6 +310,11 @@ export default function UiKitPreview() {
+           </View>
+         </AppCard>
+         <MetricCard label="MetricCard" value="$12,450" helper="Dato de ejemplo para preview" />
++        <AppCard style={styles.previewCard}>
++          <SectionHeader title="Inputs" subtitle="Texto, placeholder y readonly en claro/oscuro" />
++          <AppInput label="Precio LIVE" value="1299.00" onChangeText={() => undefined} />
++          <AppInput label="Precio solo lectura" value="1299.00" editable={false} />
++        </AppCard>
+         <ActionTile
+           title="ActionTile"
+           subtitle="Accion compacta reutilizable"
+@@ -247,6 +333,51 @@ export default function UiKitPreview() {
+         <EmptyState title="EmptyState" message="Estado vacio profesional y reutilizable." />
+       </AppResponsiveGrid>
+
++      <SectionHeader title="Panel LIVE premium" subtitle="Referencia visual usada por consola operativa" />
++      <AppResponsiveGrid tabletColumns={2} desktopColumns={3}>
++        <AppCard style={styles.previewCard}>
++          <View style={styles.themePreviewHeader}>
++            <StatusBadge label="Preparada" tone="warning" />
++            <AppText variant="caption" color={theme.colors.mutedText}>
++              Secundaria
++            </AppText>
++          </View>
++          <AppText bold>Prenda lista para pasar al aire</AppText>
++          <AppText variant="caption" color={theme.colors.mutedText}>
++            Aun no se usa para reservas.
++          </AppText>
++          <AppButton title="Poner al aire" variant="primary" onPress={() => undefined} />
++        </AppCard>
++        <AppCard style={[styles.previewCard, { borderColor: theme.colors.success }]}>
++          <View style={styles.themePreviewHeader}>
++            <StatusBadge label="Al aire" tone="success" />
++            <StatusBadge label="Disponible" tone="success" />
++          </View>
++          <AppText bold>Prenda protagonista</AppText>
++          <AppText variant="caption" color={theme.colors.mutedText}>
++            Esta es la prenda que se reservara.
++          </AppText>
++          <AppButton title="Reservar ahora" variant="primary" onPress={() => undefined} />
++        </AppCard>
++        <AppCard style={[styles.previewCard, { borderColor: theme.colors.warning }]}>
++          <View style={styles.themePreviewHeader}>
++            <StatusBadge label="Al aire" tone="success" />
++            <StatusBadge label="Reservada" tone="warning" />
++          </View>
++          <AppText bold>Prenda reservada</AppText>
++          <AppText variant="caption" color={theme.colors.warning}>
++            Cambia o sacala del aire para continuar.
++          </AppText>
++          <AppButton
++            title="Reservar ahora"
++            variant="neutral"
++            disabled
++            disabledReason="La prenda ya tiene una reserva activa."
++            onPress={() => undefined}
++          />
++        </AppCard>
++      </AppResponsiveGrid>
++
+       <SectionHeader title="Templates" subtitle="Previews estructurales para fases futuras" />
+       <DashboardTemplate
+         header={<EntitySummaryCard title="DashboardTemplate" subtitle="Inicio o resumen operativo" badge="Preview" />}
+@@ -332,6 +463,23 @@ const styles = StyleSheet.create({
+     height: 42,
+     width: '100%',
+   },
++  themePreviewCanvas: {
++    borderRadius: designTokens.radius.lg,
++    padding: designTokens.spacing.lg,
++  },
++  themePreviewHeader: {
++    alignItems: 'center',
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: designTokens.spacing.sm,
++    justifyContent: 'space-between',
++  },
++  themePreviewPanel: {
++    borderRadius: designTokens.radius.md,
++    borderWidth: 1,
++    gap: designTokens.spacing.sm,
++    padding: designTokens.spacing.md,
++  },
+   tokenCard: {
+     gap: designTokens.spacing.sm,
+   },
+diff --git a/components/layout/AppShell.tsx b/components/layout/AppShell.tsx
+index 16c3d14..132912e 100644
+--- a/components/layout/AppShell.tsx
++++ b/components/layout/AppShell.tsx
+@@ -72,6 +72,16 @@ export default function AppShell({
+
+   return (
+     <View style={[styles.shell, { backgroundColor: theme.colors.background }]}>
++      <View
++        pointerEvents="none"
++        style={[
++          styles.ambientPanel,
++          {
++            backgroundColor: theme.colors.backgroundElevated,
++            borderColor: theme.colors.borderSubtle,
++          },
++        ]}
++      />
+       {showSidebar ? <View style={styles.fixedSidebar}>{renderSidebar(false)}</View> : null}
+       <View style={styles.mainPane}>
+         <ScrollView
+@@ -103,7 +113,10 @@ export default function AppShell({
+       </View>
+       <Modal visible={!showSidebar && menuOpen} transparent animationType="fade">
+         <View style={styles.modalRoot}>
+-          <Pressable style={styles.modalBackdrop} onPress={() => setMenuOpen(false)} />
++          <Pressable
++            style={[styles.modalBackdrop, { backgroundColor: theme.colors.overlay }]}
++            onPress={() => setMenuOpen(false)}
++          />
+           <View style={[styles.mobileSidebar, { width: drawerWidth }]}>{renderSidebar(true)}</View>
+         </View>
+       </Modal>
+@@ -120,6 +133,15 @@ const styles = StyleSheet.create({
+   fixedSidebar: {
+     width: designTokens.layout.sidebarWidth,
+   },
++  ambientPanel: {
++    borderBottomWidth: 1,
++    height: 188,
++    left: 0,
++    opacity: 0.82,
++    position: 'absolute',
++    right: 0,
++    top: 0,
++  },
+   mainPane: {
+     flex: 1,
+     minWidth: 0,
+@@ -133,7 +155,6 @@ const styles = StyleSheet.create({
+   },
+   modalBackdrop: {
+     ...StyleSheet.absoluteFillObject,
+-    backgroundColor: 'rgba(0,0,0,0.35)',
+   },
+   modalRoot: {
+     flex: 1,
+diff --git a/components/layout/Sidebar.tsx b/components/layout/Sidebar.tsx
+index b7cb06f..0dff424 100644
+--- a/components/layout/Sidebar.tsx
++++ b/components/layout/Sidebar.tsx
+@@ -31,12 +31,21 @@ export default function Sidebar({ sections, activeRoute, onNavigate, session, on
+         styles.sidebar,
+         {
+           backgroundColor: theme.colors.surface,
+-          borderColor: theme.colors.border,
++          borderColor: theme.colors.borderSubtle,
+         },
+       ]}
+     >
+       <View style={styles.brandRow}>
+-        <View style={styles.brand}>
++        <View
++          style={[
++            styles.brand,
++            {
++              backgroundColor: theme.colors.surfaceAlt,
++              borderColor: theme.colors.borderSubtle,
++              borderRadius: designTokens.radius.lg,
++            },
++          ]}
++        >
+           <AppText variant="subtitle" bold>
+             Ctrl Ropa
+           </AppText>
+@@ -52,8 +61,8 @@ export default function Sidebar({ sections, activeRoute, onNavigate, session, on
+             style={({ pressed }) => [
+               styles.closeButton,
+               {
+-                backgroundColor: theme.colors.infoCardBackground,
+-                borderColor: theme.colors.infoCardBorder,
++              backgroundColor: theme.colors.infoCardBackground,
++              borderColor: theme.colors.borderSubtle,
+                 borderRadius: designTokens.radius.md,
+                 opacity: pressed ? 0.72 : 1,
+               },
+@@ -92,22 +101,35 @@ export default function Sidebar({ sections, activeRoute, onNavigate, session, on
+         ))}
+       </ScrollView>
+       {session ? (
+-        <View style={[styles.sessionPanel, { borderColor: theme.colors.border }]}>
+-          <StatusBadge label={roleLabel} tone="info" />
+-          <AppText bold numberOfLines={1}>
+-            {session.name || session.email}
+-          </AppText>
+-          <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+-            {session.email}
+-          </AppText>
++        <View
++          style={[
++            styles.sessionPanel,
++            {
++              backgroundColor: theme.colors.surfaceAlt,
++              borderColor: theme.colors.borderSubtle,
++              borderRadius: designTokens.radius.lg,
++            },
++          ]}
++        >
++          <View style={styles.sessionHeader}>
++            <StatusBadge label={roleLabel} tone="info" />
++          </View>
++          <View style={styles.sessionIdentity}>
++            <AppText bold numberOfLines={1}>
++              {session.name || session.email}
++            </AppText>
++            <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
++              {session.email}
++            </AppText>
++          </View>
+           <Pressable
+             onPress={onSignOut}
+             accessibilityRole="button"
+             style={({ pressed }) => [
+               styles.signOutButton,
+               {
+-                backgroundColor: theme.colors.dangerBackground,
+-                borderColor: theme.colors.danger,
++                backgroundColor: theme.isDark ? theme.colors.surfaceMuted : theme.colors.surface,
++                borderColor: theme.isDark ? theme.colors.borderStrong : theme.colors.dangerBackground,
+                 borderRadius: designTokens.radius.md,
+                 opacity: pressed ? 0.72 : 1,
+               },
+@@ -127,7 +149,10 @@ export default function Sidebar({ sections, activeRoute, onNavigate, session, on
+ const styles = StyleSheet.create({
+   brand: {
+     flex: 1,
++    borderWidth: 1,
+     minWidth: 0,
++    paddingHorizontal: designTokens.spacing.md,
++    paddingVertical: designTokens.spacing.sm,
+   },
+   brandRow: {
+     alignItems: 'flex-start',
+@@ -150,22 +175,30 @@ const styles = StyleSheet.create({
+     paddingBottom: designTokens.spacing.md,
+   },
+   section: {
+-    marginBottom: designTokens.spacing.md,
++    marginBottom: designTokens.spacing.lg,
+   },
+   sectionLabel: {
+-    marginBottom: designTokens.spacing.xs,
++    letterSpacing: 0.8,
++    marginBottom: designTokens.spacing.sm,
+     textTransform: 'uppercase',
+   },
++  sessionHeader: {
++    alignItems: 'flex-start',
++  },
++  sessionIdentity: {
++    gap: 2,
++    minWidth: 0,
++  },
+   sessionPanel: {
+-    borderTopWidth: 1,
++    borderWidth: 1,
+     gap: designTokens.spacing.xs,
+-    paddingTop: designTokens.spacing.sm,
++    padding: designTokens.spacing.sm,
+   },
+   sidebar: {
+     borderRightWidth: 1,
+     flex: 1,
+     minHeight: '100%',
+-    padding: designTokens.spacing.md,
++    padding: designTokens.spacing.lg,
+     width: '100%',
+   },
+   signOutButton: {
+diff --git a/components/layout/SidebarNavItem.tsx b/components/layout/SidebarNavItem.tsx
+index cdd4d7f..8af2fcc 100644
+--- a/components/layout/SidebarNavItem.tsx
++++ b/components/layout/SidebarNavItem.tsx
+@@ -22,7 +22,7 @@ type Props = {
+ export default function SidebarNavItem({ item, active, onPress }: Props) {
+   const { theme } = useAppTheme();
+   const disabled = item.disabled || !item.route;
+-  const iconColor = active ? theme.colors.primaryButtonText : theme.colors.mutedText;
++  const iconColor = active ? theme.colors.accent : theme.colors.mutedText;
+
+   return (
+     <Pressable
+@@ -31,8 +31,8 @@ export default function SidebarNavItem({ item, active, onPress }: Props) {
+       style={({ pressed }) => [
+         styles.item,
+         {
+-          backgroundColor: active ? theme.colors.primaryButtonBackground : 'transparent',
+-          borderColor: active ? theme.colors.primaryButtonBackground : theme.colors.border,
++          backgroundColor: active ? theme.colors.accentSoft : 'transparent',
++          borderColor: active ? theme.colors.accent : theme.colors.borderSubtle,
+           borderRadius: designTokens.radius.md,
+           opacity: disabled ? 0.45 : pressed ? 0.78 : 1,
+         },
+@@ -42,7 +42,7 @@ export default function SidebarNavItem({ item, active, onPress }: Props) {
+       <View style={styles.textBlock}>
+         <AppText
+           bold={active}
+-          color={active ? theme.colors.primaryButtonText : theme.colors.text}
++          color={active ? theme.colors.textPrimary : theme.colors.text}
+           numberOfLines={1}
+         >
+           {item.label}
+@@ -50,7 +50,7 @@ export default function SidebarNavItem({ item, active, onPress }: Props) {
+         {item.helper ? (
+           <AppText
+             variant="caption"
+-            color={active ? theme.colors.primaryButtonText : theme.colors.mutedText}
++            color={active ? theme.colors.textSecondary : theme.colors.mutedText}
+             numberOfLines={1}
+           >
+             {item.helper}
+diff --git a/components/layout/TopBar.tsx b/components/layout/TopBar.tsx
+index f5c6098..a3edbf3 100644
+--- a/components/layout/TopBar.tsx
++++ b/components/layout/TopBar.tsx
+@@ -28,6 +28,7 @@ export default function TopBar({
+   const { theme, toggleThemeMode } = useAppTheme();
+   const { isPhone, isWideDesktop } = useResponsiveLayout();
+   const roleLabel = session?.roles?.map((role) => role.code).join(', ') || 'Sin rol';
++  const showCompactRole = Boolean(session && !isWideDesktop);
+
+   return (
+     <View
+@@ -35,9 +36,10 @@ export default function TopBar({
+         styles.topBar,
+         {
+           backgroundColor: theme.colors.surface,
+-          borderColor: theme.colors.border,
+-          borderRadius: designTokens.radius.lg,
+-          ...designTokens.shadows.card,
++          borderColor: theme.colors.borderSubtle,
++          borderRadius: designTokens.radius.xl,
++          shadowColor: theme.isDark ? theme.colors.overlay : theme.colors.primary,
++          shadowOpacity: theme.isDark ? 0.2 : 0.1,
+         },
+       ]}
+     >
+@@ -48,7 +50,7 @@ export default function TopBar({
+             styles.menuButton,
+             {
+               backgroundColor: theme.colors.infoCardBackground,
+-              borderColor: theme.colors.infoCardBorder,
++              borderColor: theme.colors.borderSubtle,
+               borderRadius: designTokens.radius.md,
+               opacity: pressed ? 0.75 : 1,
+             },
+@@ -58,7 +60,10 @@ export default function TopBar({
+         </Pressable>
+       ) : null}
+       <View style={styles.titleBlock}>
+-        <AppText variant="title" bold>
++        <AppText variant="caption" color={theme.colors.accent} bold style={styles.eyebrow}>
++          Panel operativo
++        </AppText>
++        <AppText variant="title" bold style={styles.title}>
+           {title}
+         </AppText>
+         {subtitle ? (
+@@ -67,14 +72,14 @@ export default function TopBar({
+           </AppText>
+         ) : null}
+       </View>
+-      <View style={[styles.userBlock, isPhone ? styles.userBlockCompact : null]}>
++      <View style={[styles.actionBlock, isPhone ? styles.actionBlockCompact : null]}>
+         <Pressable
+           onPress={toggleThemeMode}
+           style={({ pressed }) => [
+             styles.themeButton,
+             {
+               backgroundColor: theme.colors.neutralButtonBackground,
+-              borderColor: theme.colors.neutralButtonBorder,
++              borderColor: theme.colors.borderStrong,
+               borderRadius: designTokens.radius.full,
+               opacity: pressed ? 0.75 : 1,
+             },
+@@ -91,20 +96,8 @@ export default function TopBar({
+             </AppText>
+           ) : null}
+         </Pressable>
+-        {session ? (
+-          <>
+-            <StatusBadge label={roleLabel} tone="info" />
+-            {isWideDesktop ? (
+-              <>
+-                <AppText bold numberOfLines={1}>
+-                  {session.name || session.email}
+-                </AppText>
+-                <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+-                  {session.companyCode || 'Empresa'} / {session.branchName}
+-                </AppText>
+-              </>
+-            ) : null}
+-          </>
++        {showCompactRole ? (
++          <StatusBadge label={roleLabel} tone="info" />
+         ) : null}
+         {rightContent}
+       </View>
+@@ -120,13 +113,21 @@ const styles = StyleSheet.create({
+     justifyContent: 'center',
+     width: 44,
+   },
++  eyebrow: {
++    marginBottom: 2,
++    textTransform: 'uppercase',
++  },
+   titleBlock: {
+     flex: 1,
+     minWidth: 0,
+   },
++  title: {
++    marginBottom: 2,
++  },
+   themeButton: {
+     alignItems: 'center',
+     borderWidth: 1,
++    minHeight: 36,
+     flexDirection: 'row',
+     gap: designTokens.spacing.xs,
+     paddingHorizontal: designTokens.spacing.sm,
+@@ -138,13 +139,20 @@ const styles = StyleSheet.create({
+     flexDirection: 'row',
+     gap: designTokens.spacing.md,
+     marginBottom: designTokens.spacing.md,
+-    padding: designTokens.spacing.md,
++    paddingHorizontal: designTokens.spacing.lg,
++    paddingVertical: designTokens.spacing.md,
++    shadowOffset: { width: 0, height: 10 },
++    shadowRadius: 22,
+   },
+-  userBlock: {
++  actionBlock: {
+     alignItems: 'flex-end',
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: designTokens.spacing.sm,
++    justifyContent: 'flex-end',
+     maxWidth: 280,
+   },
+-  userBlockCompact: {
++  actionBlockCompact: {
+     maxWidth: 120,
+   },
+ });
+diff --git a/components/live/LiveCommerceCards.tsx b/components/live/LiveCommerceCards.tsx
+index ac59f2f..66cdcd9 100644
+--- a/components/live/LiveCommerceCards.tsx
++++ b/components/live/LiveCommerceCards.tsx
+@@ -31,10 +31,12 @@ function LiveBaseCard({ title, subtitle, children, style, tone }: BaseProps & {
+
+   const backgroundColor =
+     tone === 'warning'
+-      ? theme.colors.warningBackground
++      ? theme.isDark
++        ? theme.colors.surfaceAlt
++        : theme.colors.warningBackground
+       : tone === 'success'
+         ? theme.colors.successBackground
+-        : theme.colors.surface;
++        : theme.colors.surfaceElevated;
+
+   return (
+     <View
+@@ -42,8 +44,10 @@ function LiveBaseCard({ title, subtitle, children, style, tone }: BaseProps & {
+         styles.card,
+         {
+           backgroundColor,
+-          borderColor: tone === 'neutral' ? theme.colors.border : toneColor,
++          borderColor: tone === 'neutral' ? theme.colors.borderSubtle : toneColor,
+           borderRadius: theme.radius.lg,
++          shadowColor: theme.isDark ? theme.colors.overlay : theme.colors.primary,
++          shadowOpacity: theme.isDark ? 0.18 : 0.08,
+         },
+         style,
+       ]}
+@@ -118,8 +122,11 @@ export function LiveMetricCard({ label, value, helper, compact = false }: Metric
+ const styles = StyleSheet.create({
+   card: {
+     borderWidth: 1,
++    elevation: 2,
+     gap: 8,
+     padding: 14,
++    shadowOffset: { width: 0, height: 8 },
++    shadowRadius: 18,
+   },
+   compact: {
+     gap: 6,
+diff --git a/components/ui/ActionTile.tsx b/components/ui/ActionTile.tsx
+index c77943c..8b09c39 100644
+--- a/components/ui/ActionTile.tsx
++++ b/components/ui/ActionTile.tsx
+@@ -22,15 +22,16 @@ export default function ActionTile({ title, subtitle, icon = 'chevron-right', di
+       style={({ pressed }) => [
+         styles.tile,
+         {
+-          backgroundColor: theme.colors.surface,
+-          borderColor: theme.colors.border,
+-          borderRadius: designTokens.radius.lg,
++          backgroundColor: theme.colors.surfaceElevated,
++          borderColor: theme.colors.borderSubtle,
++          borderRadius: designTokens.radius.xl,
+           opacity: disabled ? 0.45 : pressed ? 0.78 : 1,
+-          ...designTokens.shadows.card,
++          shadowColor: theme.isDark ? theme.colors.overlay : theme.colors.primary,
++          shadowOpacity: theme.isDark ? 0.18 : 0.09,
+         },
+       ]}
+     >
+-      <View style={[styles.iconWrap, { backgroundColor: theme.colors.infoCardBackground }]}>
++      <View style={[styles.iconWrap, { backgroundColor: theme.colors.accentSoft }]}>
+         <MaterialIcons name={icon} size={20} color={theme.colors.accent} />
+       </View>
+       <View style={styles.textBlock}>
+@@ -68,5 +69,7 @@ const styles = StyleSheet.create({
+     marginBottom: designTokens.spacing.sm,
+     minHeight: 64,
+     padding: designTokens.spacing.md,
++    shadowOffset: { width: 0, height: 8 },
++    shadowRadius: 18,
+   },
+ });
+diff --git a/components/ui/AppButton.tsx b/components/ui/AppButton.tsx
+index 9f487f6..c70895e 100644
+--- a/components/ui/AppButton.tsx
++++ b/components/ui/AppButton.tsx
+@@ -11,7 +11,8 @@ type Props = PressableProps & {
+     | 'danger'
+     | 'cancel'
+     | 'back'
+-    | 'menu';
++    | 'menu'
++    | 'ghost';
+   loading?: boolean;
+   disabledReason?: string;
+ };
+@@ -32,6 +33,8 @@ export default function AppButton({
+   const backgroundColor =
+     isBlocked
+       ? theme.colors.disabledButtonBackground
++      : variant === 'ghost'
++        ? 'transparent'
+       : variant === 'danger'
+       ? theme.colors.dangerButtonBackground
+       : variant === 'cancel'
+@@ -51,6 +54,8 @@ export default function AppButton({
+   const textColor =
+     isBlocked
+       ? theme.colors.disabledButtonText
++      : variant === 'ghost'
++        ? theme.colors.accent
+       : variant === 'danger'
+       ? theme.colors.dangerButtonText
+       : variant === 'cancel'
+@@ -66,6 +71,11 @@ export default function AppButton({
+       : variant === 'secondary'
+         ? theme.colors.secondaryButtonText
+         : theme.colors.primaryButtonText;
++  const hasSubtleBorder = variant === 'neutral' || variant === 'secondary' || variant === 'ghost';
++  const borderColor =
++    variant === 'secondary' || variant === 'ghost'
++      ? theme.colors.accent
++      : theme.colors.neutralButtonBorder;
+
+   return (
+     <Pressable
+@@ -73,8 +83,8 @@ export default function AppButton({
+         styles.button,
+         {
+           backgroundColor,
+-          borderColor: variant === 'neutral' ? theme.colors.neutralButtonBorder : backgroundColor,
+-          borderWidth: variant === 'neutral' ? StyleSheet.hairlineWidth : 0,
++          borderColor: hasSubtleBorder ? borderColor : backgroundColor,
++          borderWidth: hasSubtleBorder ? StyleSheet.hairlineWidth : 0,
+           borderRadius: theme.radius.md,
+           paddingVertical: theme.density === 'COMPACT' ? 11 : 15,
+           paddingHorizontal: theme.spacing.md,
+diff --git a/components/ui/AppCard.tsx b/components/ui/AppCard.tsx
+index edf523a..2086c8b 100644
+--- a/components/ui/AppCard.tsx
++++ b/components/ui/AppCard.tsx
+@@ -16,10 +16,12 @@ export default function AppCard({ children, style, ...rest }: Props) {
+       style={[
+         styles.card,
+         {
+-          backgroundColor: theme.colors.surface,
+-          borderColor: theme.colors.border,
++          backgroundColor: theme.colors.surfaceElevated,
++          borderColor: theme.colors.borderSubtle,
+           borderRadius: theme.radius.lg,
+           padding: isPhone ? theme.spacing.md : theme.spacing.lg,
++          shadowColor: theme.isDark ? theme.colors.overlay : theme.colors.primary,
++          shadowOpacity: theme.isDark ? 0.18 : 0.08,
+         },
+         style,
+       ]}
+@@ -33,11 +35,9 @@ export default function AppCard({ children, style, ...rest }: Props) {
+ const styles = StyleSheet.create({
+   card: {
+     borderWidth: 1,
+-    elevation: 1,
+-    marginBottom: 12,
+-    shadowColor: '#000000',
+-    shadowOffset: { width: 0, height: 1 },
+-    shadowOpacity: 0.08,
+-    shadowRadius: 3,
++    elevation: 2,
++    marginBottom: 14,
++    shadowOffset: { width: 0, height: 8 },
++    shadowRadius: 18,
+   },
+ });
+diff --git a/components/ui/AppInput.tsx b/components/ui/AppInput.tsx
+index 00e42c4..7545f9d 100644
+--- a/components/ui/AppInput.tsx
++++ b/components/ui/AppInput.tsx
+@@ -8,6 +8,7 @@ type Props = TextInputProps & {
+
+ export default function AppInput({ label, style, ...rest }: Props) {
+   const { theme } = useAppTheme();
++  const isReadonly = rest.editable === false;
+
+   return (
+     <View style={styles.container}>
+@@ -25,8 +26,12 @@ export default function AppInput({ label, style, ...rest }: Props) {
+             borderRadius: theme.radius.md,
+             padding: theme.spacing.md,
+             minHeight: theme.density === 'COMPACT' ? 46 : 54,
+-            backgroundColor: theme.colors.inputBackground,
+-            color: theme.colors.inputText,
++            backgroundColor: isReadonly
++              ? theme.colors.disabledBackground
++              : theme.colors.inputBackground,
++            color: isReadonly ? theme.colors.textSecondary : theme.colors.inputText,
++            shadowColor: theme.isDark ? theme.colors.overlay : theme.colors.primary,
++            shadowOpacity: isReadonly ? 0 : 0.04,
+           },
+           style,
+         ]}
+@@ -45,5 +50,7 @@ const styles = StyleSheet.create({
+   input: {
+     borderWidth: 1,
+     fontSize: 16,
++    shadowOffset: { width: 0, height: 4 },
++    shadowRadius: 10,
+   },
+ });
+diff --git a/components/ui/AppNoticeDropdown.tsx b/components/ui/AppNoticeDropdown.tsx
+index b61fbdd..b884359 100644
+--- a/components/ui/AppNoticeDropdown.tsx
++++ b/components/ui/AppNoticeDropdown.tsx
+@@ -45,7 +45,9 @@ export default function AppNoticeDropdown({
+     tone === 'danger'
+       ? theme.colors.dangerBackground
+       : tone === 'warning'
+-        ? theme.colors.warningBackground
++        ? theme.isDark
++          ? theme.colors.surfaceAlt
++          : theme.colors.warningBackground
+         : tone === 'success'
+           ? theme.colors.successBackground
+           : theme.colors.infoCardBackground;
+@@ -69,6 +71,8 @@ export default function AppNoticeDropdown({
+           borderColor: color,
+           borderRadius: theme.radius.lg,
+           padding: theme.spacing.md,
++          shadowColor: theme.isDark ? theme.colors.overlay : theme.colors.primary,
++          shadowOpacity: theme.isDark ? 0.16 : 0.1,
+         },
+         style,
+       ]}
+@@ -115,9 +119,7 @@ const styles = StyleSheet.create({
+     borderWidth: 1,
+     elevation: 2,
+     marginBottom: 12,
+-    shadowColor: '#000000',
+     shadowOffset: { width: 0, height: 2 },
+-    shadowOpacity: 0.1,
+     shadowRadius: 5,
+   },
+   header: {
+diff --git a/components/ui/AppText.tsx b/components/ui/AppText.tsx
+index fe40d44..8d6b2e2 100644
+--- a/components/ui/AppText.tsx
++++ b/components/ui/AppText.tsx
+@@ -35,9 +35,7 @@ export default function AppText({
+ }
+
+ const styles = StyleSheet.create({
+-  base: {
+-    color: '#111111',
+-  },
++  base: {},
+ });
+
+ const variantStyles = StyleSheet.create({
+diff --git a/components/ui/EmptyState.tsx b/components/ui/EmptyState.tsx
+index 4e6c48e..97da8de 100644
+--- a/components/ui/EmptyState.tsx
++++ b/components/ui/EmptyState.tsx
+@@ -16,7 +16,7 @@ export default function EmptyState({ title, message, icon = 'inbox' }: Props) {
+
+   return (
+     <AppCard style={styles.card}>
+-      <View style={[styles.iconWrap, { backgroundColor: theme.colors.infoCardBackground }]}>
++      <View style={[styles.iconWrap, { backgroundColor: theme.colors.accentSoft }]}>
+         <MaterialIcons name={icon} size={24} color={theme.colors.accent} />
+       </View>
+       <View style={styles.textBlock}>
+diff --git a/components/ui/EntitySummaryCard.tsx b/components/ui/EntitySummaryCard.tsx
+index 5879dcb..1bbc71a 100644
+--- a/components/ui/EntitySummaryCard.tsx
++++ b/components/ui/EntitySummaryCard.tsx
+@@ -21,7 +21,7 @@ export default function EntitySummaryCard({ title, subtitle, badge, meta = [] }:
+   const { theme } = useAppTheme();
+
+   return (
+-    <AppCard>
++    <AppCard style={styles.card}>
+       <View style={styles.header}>
+         <View style={styles.titleBlock}>
+           <AppText bold numberOfLines={2}>
+@@ -60,6 +60,9 @@ const styles = StyleSheet.create({
+     gap: designTokens.spacing.md,
+     justifyContent: 'space-between',
+   },
++  card: {
++    gap: designTokens.spacing.xs,
++  },
+   metaGrid: {
+     flexDirection: 'row',
+     flexWrap: 'wrap',
+diff --git a/components/ui/MetricCard.tsx b/components/ui/MetricCard.tsx
+index f26bc3c..eca0b63 100644
+--- a/components/ui/MetricCard.tsx
++++ b/components/ui/MetricCard.tsx
+@@ -18,7 +18,7 @@ export default function MetricCard({ label, value, helper, accent, icon }: Props
+   const resolvedAccent = accent ?? theme.colors.dashboardAccent;
+
+   return (
+-    <AppCard style={styles.card}>
++    <AppCard style={[styles.card, { borderColor: theme.colors.borderSubtle }]}>
+       <View style={styles.header}>
+         <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+           {label}
+@@ -28,6 +28,7 @@ export default function MetricCard({ label, value, helper, accent, icon }: Props
+       <AppText bold style={[styles.value, { color: resolvedAccent }]} numberOfLines={2}>
+         {value}
+       </AppText>
++      <View style={[styles.accentLine, { backgroundColor: resolvedAccent }]} />
+       {helper ? (
+         <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={2}>
+           {helper}
+@@ -39,8 +40,15 @@ export default function MetricCard({ label, value, helper, accent, icon }: Props
+
+ const styles = StyleSheet.create({
+   card: {
++    gap: designTokens.spacing.xs,
+     minHeight: 92,
+   },
++  accentLine: {
++    borderRadius: designTokens.radius.full,
++    height: 3,
++    opacity: 0.9,
++    width: 44,
++  },
+   header: {
+     alignItems: 'center',
+     flexDirection: 'row',
+@@ -48,7 +56,6 @@ const styles = StyleSheet.create({
+   },
+   value: {
+     fontSize: 24,
+-    marginBottom: designTokens.spacing.xs,
+     marginTop: designTokens.spacing.sm,
+   },
+ });
+diff --git a/components/ui/StatusBadge.tsx b/components/ui/StatusBadge.tsx
+index f5be3f5..c71d300 100644
+--- a/components/ui/StatusBadge.tsx
++++ b/components/ui/StatusBadge.tsx
+@@ -22,7 +22,7 @@ export default function StatusBadge({ label, tone = 'neutral', style }: Props) {
+           ? theme.colors.danger
+           : tone === 'info'
+             ? theme.colors.accent
+-            : theme.colors.mutedText;
++            : theme.colors.textSecondary;
+   const backgroundColor =
+     tone === 'success'
+       ? theme.colors.successBackground
+@@ -32,7 +32,7 @@ export default function StatusBadge({ label, tone = 'neutral', style }: Props) {
+           ? theme.colors.dangerBackground
+           : tone === 'info'
+             ? theme.colors.infoCardBackground
+-            : theme.colors.optionPressedBackground;
++            : theme.colors.surfaceMuted;
+
+   return (
+     <View
+@@ -40,7 +40,7 @@ export default function StatusBadge({ label, tone = 'neutral', style }: Props) {
+         styles.badge,
+         {
+           backgroundColor,
+-          borderColor: color,
++          borderColor: tone === 'neutral' ? theme.colors.borderStrong : color,
+           borderRadius: designTokens.radius.full,
+         },
+         style,
+diff --git a/context/AppThemeContext.tsx b/context/AppThemeContext.tsx
+index 677ce25..cc51c01 100644
+--- a/context/AppThemeContext.tsx
++++ b/context/AppThemeContext.tsx
+@@ -8,20 +8,37 @@ type ThemeColors = {
+   secondary: string;
+   accent: string;
+   background: string;
++  backgroundElevated: string;
+   surface: string;
++  surfaceAlt: string;
++  surfaceElevated: string;
++  surfaceMuted: string;
+   text: string;
++  textPrimary: string;
++  textSecondary: string;
++  textMuted: string;
++  textOnPrimary: string;
++  textOnAccent: string;
+   mutedText: string;
+   border: string;
++  borderSubtle: string;
++  borderStrong: string;
+   danger: string;
+   dangerBackground: string;
+   success: string;
+   successBackground: string;
+   warning: string;
+   warningBackground: string;
++  accentSoft: string;
+   inputBackground: string;
+   inputText: string;
+   inputBorder: string;
+   placeholderText: string;
++  inputPlaceholder: string;
++  disabledBackground: string;
++  disabledText: string;
++  focusRing: string;
++  overlay: string;
+   modalBackground: string;
+   optionBackground: string;
+   optionPressedBackground: string;
+@@ -78,36 +95,53 @@ export type AppTheme = {
+ };
+
+ const lightColors: ThemeColors = {
+-  primary: '#111111',
+-  secondary: '#666666',
++  primary: '#0f172a',
++  secondary: '#475569',
+   accent: '#2563eb',
+-  background: '#f5f5f5',
++  background: '#f8fafc',
++  backgroundElevated: '#eef2f7',
+   surface: '#ffffff',
+-  text: '#111111',
+-  mutedText: '#666666',
+-  border: '#dddddd',
+-  danger: '#b00020',
+-  dangerBackground: '#fee2e2',
+-  success: '#d4edda',
+-  successBackground: '#ecfdf3',
++  surfaceAlt: '#f8fafc',
++  surfaceElevated: '#ffffff',
++  surfaceMuted: '#f1f5f9',
++  text: '#0f172a',
++  textPrimary: '#0f172a',
++  textSecondary: '#475569',
++  textMuted: '#64748b',
++  textOnPrimary: '#ffffff',
++  textOnAccent: '#ffffff',
++  mutedText: '#64748b',
++  border: '#e2e8f0',
++  borderSubtle: '#edf2f7',
++  borderStrong: '#cbd5e1',
++  danger: '#b91c1c',
++  dangerBackground: '#fef2f2',
++  success: '#15803d',
++  successBackground: '#ecfdf5',
+   warning: '#b45309',
+-  warningBackground: '#fef3c7',
++  warningBackground: '#fffbeb',
++  accentSoft: '#dbeafe',
+   inputBackground: '#ffffff',
+-  inputText: '#111111',
+-  inputBorder: '#dddddd',
+-  placeholderText: '#777777',
++  inputText: '#0f172a',
++  inputBorder: '#cbd5e1',
++  placeholderText: '#64748b',
++  inputPlaceholder: '#64748b',
++  disabledBackground: '#e2e8f0',
++  disabledText: '#64748b',
++  focusRing: '#2563eb',
++  overlay: 'rgba(15,23,42,0.38)',
+   modalBackground: '#ffffff',
+   optionBackground: '#ffffff',
+-  optionPressedBackground: '#f0f0f0',
+-  optionBorder: '#eeeeee',
+-  backdrop: 'rgba(0,0,0,0.35)',
+-  primaryButtonBackground: '#111111',
++  optionPressedBackground: '#f1f5f9',
++  optionBorder: '#e2e8f0',
++  backdrop: 'rgba(15,23,42,0.38)',
++  primaryButtonBackground: '#0f172a',
+   primaryButtonText: '#ffffff',
+-  secondaryButtonBackground: '#666666',
++  secondaryButtonBackground: '#2563eb',
+   secondaryButtonText: '#ffffff',
+   operationButtonBackground: '#0f172a',
+   operationButtonText: '#ffffff',
+-  dangerButtonBackground: '#b00020',
++  dangerButtonBackground: '#b91c1c',
+   dangerButtonText: '#ffffff',
+   cancelButtonBackground: '#6b7280',
+   cancelButtonText: '#ffffff',
+@@ -118,50 +152,67 @@ const lightColors: ThemeColors = {
+   neutralButtonBackground: '#f8fafc',
+   neutralButtonText: '#334155',
+   neutralButtonBorder: '#cbd5e1',
+-  disabledButtonBackground: '#e5e7eb',
++  disabledButtonBackground: '#e2e8f0',
+   disabledButtonText: '#64748b',
+-  infoCardBackground: '#eef2ff',
+-  infoCardText: '#1e293b',
+-  infoCardBorder: '#93c5fd',
++  infoCardBackground: '#eff6ff',
++  infoCardText: '#1e3a8a',
++  infoCardBorder: '#bfdbfe',
+   calendarSelectedBackground: '#0f172a',
+   calendarSelectedText: '#ffffff',
+-  calendarText: '#111111',
++  calendarText: '#0f172a',
+   dashboardMetricBackground: '#ffffff',
+-  dashboardMetricText: '#111111',
++  dashboardMetricText: '#0f172a',
+   dashboardAccent: '#2563eb',
+ };
+
+ const darkColors: ThemeColors = {
+-  primary: '#111827',
+-  secondary: '#374151',
+-  accent: '#60a5fa',
+-  background: '#0f172a',
+-  surface: '#111827',
+-  text: '#f9fafb',
++  primary: '#e2e8f0',
++  secondary: '#94a3b8',
++  accent: '#93c5fd',
++  background: '#020617',
++  backgroundElevated: '#07111f',
++  surface: '#0f172a',
++  surfaceAlt: '#111827',
++  surfaceElevated: '#111827',
++  surfaceMuted: '#1e293b',
++  text: '#f8fafc',
++  textPrimary: '#f8fafc',
++  textSecondary: '#cbd5e1',
++  textMuted: '#94a3b8',
++  textOnPrimary: '#020617',
++  textOnAccent: '#020617',
+   mutedText: '#cbd5e1',
+   border: '#334155',
+-  danger: '#dc2626',
+-  dangerBackground: '#450a0a',
+-  success: '#14532d',
++  borderSubtle: '#1e293b',
++  borderStrong: '#475569',
++  danger: '#fca5a5',
++  dangerBackground: '#3f1218',
++  success: '#86efac',
+   successBackground: '#052e16',
+-  warning: '#f59e0b',
+-  warningBackground: '#451a03',
+-  inputBackground: '#1f2937',
+-  inputText: '#f9fafb',
+-  inputBorder: '#475569',
+-  placeholderText: '#94a3b8',
++  warning: '#fbbf24',
++  warningBackground: '#3b2506',
++  accentSoft: '#172554',
++  inputBackground: '#111827',
++  inputText: '#f8fafc',
++  inputBorder: '#64748b',
++  placeholderText: '#cbd5e1',
++  inputPlaceholder: '#cbd5e1',
++  disabledBackground: '#1e293b',
++  disabledText: '#94a3b8',
++  focusRing: '#93c5fd',
++  overlay: 'rgba(0,0,0,0.62)',
+   modalBackground: '#111827',
+   optionBackground: '#111827',
+   optionPressedBackground: '#1f2937',
+   optionBorder: '#334155',
+-  backdrop: 'rgba(0,0,0,0.55)',
+-  primaryButtonBackground: '#2563eb',
+-  primaryButtonText: '#ffffff',
+-  secondaryButtonBackground: '#334155',
+-  secondaryButtonText: '#f9fafb',
+-  operationButtonBackground: '#0f172a',
+-  operationButtonText: '#ffffff',
+-  dangerButtonBackground: '#dc2626',
++  backdrop: 'rgba(0,0,0,0.62)',
++  primaryButtonBackground: '#60a5fa',
++  primaryButtonText: '#020617',
++  secondaryButtonBackground: '#1e293b',
++  secondaryButtonText: '#e2e8f0',
++  operationButtonBackground: '#93c5fd',
++  operationButtonText: '#020617',
++  dangerButtonBackground: '#ef4444',
+   dangerButtonText: '#ffffff',
+   cancelButtonBackground: '#475569',
+   cancelButtonText: '#ffffff',
+@@ -169,20 +220,20 @@ const darkColors: ThemeColors = {
+   backButtonText: '#f9fafb',
+   menuButtonBackground: '#2563eb',
+   menuButtonText: '#ffffff',
+-  neutralButtonBackground: '#1e293b',
++  neutralButtonBackground: '#0f172a',
+   neutralButtonText: '#e2e8f0',
+   neutralButtonBorder: '#475569',
+-  disabledButtonBackground: '#334155',
++  disabledButtonBackground: '#1e293b',
+   disabledButtonText: '#94a3b8',
+-  infoCardBackground: '#172554',
++  infoCardBackground: '#0b2245',
+   infoCardText: '#dbeafe',
+   infoCardBorder: '#2563eb',
+-  calendarSelectedBackground: '#2563eb',
+-  calendarSelectedText: '#ffffff',
+-  calendarText: '#f9fafb',
+-  dashboardMetricBackground: '#1f2937',
+-  dashboardMetricText: '#f9fafb',
+-  dashboardAccent: '#60a5fa',
++  calendarSelectedBackground: '#60a5fa',
++  calendarSelectedText: '#020617',
++  calendarText: '#f8fafc',
++  dashboardMetricBackground: '#0f172a',
++  dashboardMetricText: '#f8fafc',
++  dashboardAccent: '#93c5fd',
+ };
+
+ const createDefaultTheme = (scheme: ColorSchemeName = 'light'): AppTheme => {
+@@ -295,7 +346,6 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
+             : 'light';
+
+       const baseTheme = createDefaultTheme(resolvedScheme);
+-      const isDark = baseTheme.isDark;
+
+       setTheme({
+         ...baseTheme,
+@@ -314,8 +364,9 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
+           primary: cleanColor(settings.primaryColor) ?? baseTheme.colors.primary,
+           secondary:
+             cleanColor(settings.secondaryColor) ?? baseTheme.colors.secondary,
+-          mutedText:
+-            cleanColor(settings.secondaryColor) ?? baseTheme.colors.mutedText,
++          mutedText: baseTheme.colors.mutedText,
++          textSecondary: baseTheme.colors.textSecondary,
++          textMuted: baseTheme.colors.textMuted,
+           accent: cleanColor(settings.accentColor) ?? baseTheme.colors.accent,
+           primaryButtonBackground:
+             cleanColor(settings.primaryButtonColor) ??
+@@ -392,14 +443,19 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
+           dashboardAccent:
+             cleanColor(settings.dashboardAccentColor) ??
+             baseTheme.colors.dashboardAccent,
+-          inputBackground: isDark ? '#1f2937' : '#ffffff',
+-          inputText: isDark ? '#f9fafb' : '#111111',
+-          inputBorder: isDark ? '#475569' : '#dddddd',
+-          placeholderText: isDark ? '#94a3b8' : '#777777',
+-          modalBackground: isDark ? '#111827' : '#ffffff',
+-          optionBackground: isDark ? '#111827' : '#ffffff',
+-          optionPressedBackground: isDark ? '#1f2937' : '#f0f0f0',
+-          optionBorder: isDark ? '#334155' : '#eeeeee',
++          inputBackground: baseTheme.colors.inputBackground,
++          inputText: baseTheme.colors.inputText,
++          inputBorder: baseTheme.colors.inputBorder,
++          placeholderText: baseTheme.colors.placeholderText,
++          inputPlaceholder: baseTheme.colors.inputPlaceholder,
++          disabledBackground: baseTheme.colors.disabledBackground,
++          disabledText: baseTheme.colors.disabledText,
++          focusRing: baseTheme.colors.focusRing,
++          overlay: baseTheme.colors.overlay,
++          modalBackground: baseTheme.colors.modalBackground,
++          optionBackground: baseTheme.colors.optionBackground,
++          optionPressedBackground: baseTheme.colors.optionPressedBackground,
++          optionBorder: baseTheme.colors.optionBorder,
+         },
+       });
+     } finally {
+diff --git a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+index 7c3910b..b7fa007 100644
+--- a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
++++ b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+@@ -411,6 +411,13 @@ Hacer que `/live` consuma el sistema visual de PRODUCT-B de forma real, con tema
+ - Si el precio LIVE difiere del precio sugerido/base, se solicita confirmacion antes de crear la reserva.
+ - La liberacion segura de prenda queda pendiente porque requiere confirmar pagos y un endpoint especifico.
+
++### Continuidad a LIVE-Z8
++
++- LIVE-Z8 agrega `AuthorizationRequestPanel` como UI reutilizable para acciones bloqueadas por capacidades.
++- La vista Supervisor/Admin muestra `Solicitudes pendientes` con EmptyState real mientras no exista backend.
++- No se simulan aprobaciones ni se ejecutan acciones despues de solicitar autorizacion.
++- Persistencia, inbox supervisor y auditoria operacional quedan para LIVE-Z9.
++
+ ## GO/NO-GO
+
+ GO tecnico para LIVE-Z6A, Z6B, Z6C y Z6C2.
+@@ -421,3 +428,21 @@ GO visual condicionado a QA manual con usuarios:
+ - `qa.vendedor.centro@local.test`
+ - `qa.supervisor.centro@local.test`
+ - `qa.sinpermisos@local.test`
++
++## LIVE-Z8B / PRODUCT-B4 - Dark theme premium
++
++Fecha: 2026-06-04
++
++### Ajuste visual
++
++- Se reforzo dark mode para que LIVE herede tokens semanticos reales y no colores hardcodeados.
++- El bloque `3. PRECIO` queda legible en modo oscuro sin seleccionar texto.
++- Inputs, helper texts, captions, disabled states, badges y alertas usan tokens del tema.
++- Las alertas warning en dark mode se suavizan para verse premium y no como bloques ambar dominantes.
++- La prenda reservada conserva acento warning sin saturar toda la card.
++- `AppShell`, `TopBar`, `Sidebar`, Home, UI Kit y `reservation-detail` mantienen el mismo lenguaje visual claro/oscuro.
++
++### No se cambio
++
++- No se tocaron backend, AUTH/RBAC, pagos, caja, reportes, billing ni IA.
++- No se cambiaron capacidades LIVE ni reglas operativas Z6/Z7/Z8.
+diff --git a/docs/LIVE_Z7_PERMISSIONS_PRICE_APPROVAL.md b/docs/LIVE_Z7_PERMISSIONS_PRICE_APPROVAL.md
+index 7cb2840..d357084 100644
+--- a/docs/LIVE_Z7_PERMISSIONS_PRICE_APPROVAL.md
++++ b/docs/LIVE_Z7_PERMISSIONS_PRICE_APPROVAL.md
+@@ -130,6 +130,18 @@ No se crea backend ni se simula aprobacion.
+
+ Pendiente recomendado: `LIVE-Z8 - mensajeria interna y solicitudes de autorizacion`.
+
++## Continuidad LIVE-Z8
++
++LIVE-Z8 implementa una base UI reutilizable para solicitudes de autorizacion:
++
++- `components/live/AuthorizationRequestPanel.tsx`.
++- Panel contextual para precio LIVE bloqueado.
++- Panel contextual para cancelar apartado sin capacidad.
++- Panel contextual para finalizar live sin capacidad.
++- Seccion `Solicitudes pendientes` para Supervisor/Admin con estado vacio real.
++
++No se simula aprobacion ni se desbloquean acciones. La persistencia backend queda pendiente para LIVE-Z9.
++
+ ## Auditoria operacional
+
+ Eventos existentes/revisados:
+diff --git a/docs/PRODUCT_B_INTERNAL_UI_KIT_FOUNDATION.md b/docs/PRODUCT_B_INTERNAL_UI_KIT_FOUNDATION.md
+index 01473db..43b5ded 100644
+--- a/docs/PRODUCT_B_INTERNAL_UI_KIT_FOUNDATION.md
++++ b/docs/PRODUCT_B_INTERNAL_UI_KIT_FOUNDATION.md
+@@ -709,3 +709,93 @@ No se instalaron librerias externas. No se tocaron backend, AUTH backend, RBAC,
+ - Ver `/live` en claro y oscuro.
+ - Confirmar contraste de botones y badges.
+ - Confirmar `reservation-detail` heredando tema desde AppShell.
++
++---
++
++## PRODUCT-B4 - Dark theme premium y estandarizacion visual
++
++Fecha: 2026-06-04
++
++### Objetivo
++
++Corregir inconsistencias de dark mode y estandarizar el lenguaje visual en pantallas que ya usan AppShell/UI Kit.
++
++### Cambios
++
++- Se fortalecieron tokens semanticos para superficies, texto, inputs, disabled, overlay y alertas.
++- `mutedText`, `textSecondary` y `textMuted` quedan definidos por el tema claro/oscuro y no por colores configurables de light mode.
++- `AppInput` aplica tokens especificos para readonly/disabled, corrigiendo la legibilidad de precio LIVE en dark mode.
++- `AppButton`, `AppCard`, `StatusBadge`, `AppShell`, `AppNoticeDropdown` y `LiveCommerceCards` consumen mejor los tokens del tema.
++- `/ui-kit` agrega tokens semanticos del tema activo y comparativo claro/oscuro.
++- `reservation-detail` elimina hardcodes warning en la seccion de pagos.
++
++### Restricciones respetadas
++
++No se tocaron backend, AUTH/RBAC, pagos, caja, reportes, billing, IA ni reglas operativas LIVE.
++
++### Evidencia relacionada
++
++Ver `docs/LIVE_Z8B_DARK_THEME_STANDARDIZATION.md`.
++
++---
++
++## PRODUCT-B4.1 - Premium AppShell polish
++
++Fecha: 2026-06-04
++
++### Objetivo
++
++Pulir `AppShell`, `TopBar` y `Sidebar` para evitar duplicidad de usuario/rol en desktop.
++
++### Cambios
++
++- `TopBar` deja de mostrar usuario completo en desktop.
++- `TopBar` mantiene contexto de pantalla y toggle claro/oscuro.
++- En tablet/mobile, `TopBar` puede mostrar rol compacto porque el Sidebar esta oculto como drawer.
++- `Sidebar` footer queda como fuente visual principal para sesion:
++  - rol;
++  - usuario;
++  - correo;
++  - cerrar sesion.
++- El footer usa tokens `surfaceAlt`, `border`, `danger` y respeta claro/oscuro.
++
++### Validacion esperada
++
++- En desktop no debe verse `ADMIN / QA Admin General / DEFAULT / QA Centro` duplicado entre TopBar y Sidebar.
++- En mobile/tablet el drawer mantiene usuario y logout.
++- El toggle claro/oscuro sigue visible.
++
++---
++
++## PRODUCT-B4.2 - Premium visual redesign pass
++
++Fecha: 2026-06-04
++
++### Objetivo
++
++Hacer mas visible la diferencia visual del UI Kit interno y acercar la app a un panel operativo premium.
++
++### Cambios visuales
++
++- Tokens nuevos:
++  - `backgroundElevated`;
++  - `surfaceElevated`;
++  - `borderSubtle`;
++  - `accentSoft`.
++- AppShell agrega profundidad visual con una superficie ambiental.
++- Sidebar mejora active state, brand panel, spacing de secciones y footer de sesion.
++- TopBar gana jerarquia con eyebrow contextual, sombra y borde sutil.
++- Cards, tiles, metricas, empty states, badges, inputs y botones consumen mejor tokens semanticos.
++- `AppButton` agrega variante `ghost`.
++- `/ui-kit` muestra botones, inputs y panel LIVE premium como referencia real.
++
++### Pantallas impactadas
++
++- Inicio.
++- LIVE.
++- UI Kit.
++- Reservation detail.
++
++### Restricciones respetadas
++
++No se tocaron backend, AUTH/RBAC, pagos, caja, reportes, billing, IA ni reglas operativas LIVE.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index fd63083..d47e1dd 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -196,7 +196,21 @@
+     "requestAuthorization": "Request authorization",
+     "authorizationRequestTitle": "Request authorization",
+     "authorizationPricePrompt": "Select the reason to request authorization for changing the LIVE price.",
+-    "authorizationGenericPrompt": "Select the reason to request authorization.",
++    "authorizationGenericPrompt": "Select the reason to request authorization for: {{action}}.",
++    "authorizationGenericAction": "Operational action",
++    "authorizationActionPrice": "Change LIVE price",
++    "authorizationActionReleaseItem": "Release item",
++    "authorizationActionCancelHold": "Cancel hold",
++    "authorizationActionCloseLive": "Close live",
++    "authorizationActionOperationalSold": "Mark operational sold",
++    "authorizationActionStartLive": "Start live",
++    "authorizationBackendRequired": "Authorization requests still require backend integration.",
++    "authorizationCancelHelp": "Request authorization to cancel this hold.",
++    "authorizationCloseHelp": "Request authorization to close the live.",
++    "authorizationPendingRequestsTitle": "Pending requests",
++    "authorizationPendingRequestsEmptyTitle": "Authorization requests are pending integration.",
++    "authorizationPendingRequestsEmptyMessage": "When a request backend exists, pending authorizations will appear here.",
++    "authorizationApprovalBackendPending": "Real approval remains pending backend support; no sample data is shown.",
+     "authorizationReasonLivePromotion": "Live promotion",
+     "authorizationReasonDefectAdjustment": "Defect adjustment",
+     "authorizationReasonFrequentCustomer": "Frequent customer",
+@@ -250,6 +264,7 @@
+     "openLivesHelp": "Choose where reservations will be registered.",
+     "selectedLive": "Selected live",
+     "liveNumber": "Live #{{id}}",
++    "reservationNumber": "Reservation #{{id}}",
+     "liveSessionTitle": "Active stream",
+     "liveSessionEmpty": "No stream selected. Open one or choose a ready stream.",
+     "desktopHeaderHelp": "Commercial panel for activity, product, and reservations.",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index b88e643..9e62e7d 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -196,7 +196,21 @@
+     "requestAuthorization": "Solicitar autorizacion",
+     "authorizationRequestTitle": "Solicitar autorizacion",
+     "authorizationPricePrompt": "Selecciona el motivo para solicitar autorizacion de cambio de precio LIVE.",
+-    "authorizationGenericPrompt": "Selecciona el motivo para solicitar autorizacion.",
++    "authorizationGenericPrompt": "Selecciona el motivo para solicitar autorizacion de: {{action}}.",
++    "authorizationGenericAction": "Accion operativa",
++    "authorizationActionPrice": "Cambiar precio LIVE",
++    "authorizationActionReleaseItem": "Liberar prenda",
++    "authorizationActionCancelHold": "Cancelar apartado",
++    "authorizationActionCloseLive": "Finalizar en vivo",
++    "authorizationActionOperationalSold": "Marcar vendido operativo",
++    "authorizationActionStartLive": "Iniciar en vivo",
++    "authorizationBackendRequired": "La solicitud de autorizacion todavia requiere integracion backend.",
++    "authorizationCancelHelp": "Solicita autorizacion para cancelar este apartado.",
++    "authorizationCloseHelp": "Solicita autorizacion para finalizar el en vivo.",
++    "authorizationPendingRequestsTitle": "Solicitudes pendientes",
++    "authorizationPendingRequestsEmptyTitle": "Solicitudes de autorizacion pendientes de integrar.",
++    "authorizationPendingRequestsEmptyMessage": "Cuando exista backend de solicitudes, aqui apareceran las autorizaciones pendientes.",
++    "authorizationApprovalBackendPending": "La aprobacion real queda pendiente de backend; no se muestran datos de ejemplo.",
+     "authorizationReasonLivePromotion": "Promocion en vivo",
+     "authorizationReasonDefectAdjustment": "Ajuste por defecto",
+     "authorizationReasonFrequentCustomer": "Cliente frecuente",
+@@ -250,6 +264,7 @@
+     "openLivesHelp": "Elige dónde se registrarán las reservas.",
+     "selectedLive": "Transmisión seleccionada",
+     "liveNumber": "En vivo #{{id}}",
++    "reservationNumber": "Reserva #{{id}}",
+     "liveSessionTitle": "Transmisión activa",
+     "liveSessionEmpty": "No hay transmisión seleccionada. Crea una o elige una abierta.",
+     "desktopHeaderHelp": "Panel comercial para leer actividad, producto y reservas.",
+diff --git a/theme/designTokens.ts b/theme/designTokens.ts
+index 46b339b..7c9cbae 100644
+--- a/theme/designTokens.ts
++++ b/theme/designTokens.ts
+@@ -8,11 +8,67 @@ export const designTokens = {
+     danger: '#dc2626',
+     info: '#0ea5e9',
+     surface: '#ffffff',
++    surfaceAlt: '#f8fafc',
++    surfaceElevated: '#ffffff',
++    surfaceMuted: '#f1f5f9',
+     background: '#f8fafc',
++    backgroundElevated: '#eef2f7',
+     border: '#e2e8f0',
++    borderSubtle: '#edf2f7',
++    borderStrong: '#cbd5e1',
+     textPrimary: '#0f172a',
+     textSecondary: '#475569',
++    textMuted: '#64748b',
++    textOnPrimary: '#ffffff',
++    textOnAccent: '#ffffff',
+     muted: '#94a3b8',
++    inputBackground: '#ffffff',
++    inputBorder: '#cbd5e1',
++    inputText: '#0f172a',
++    inputPlaceholder: '#64748b',
++    disabledBackground: '#e2e8f0',
++    disabledText: '#64748b',
++    focusRing: '#2563eb',
++    accentSoft: '#dbeafe',
++    overlay: 'rgba(15,23,42,0.38)',
++    shadow: '#0f172a',
++    alertSurface: '#fffbeb',
++    alertBorder: '#f59e0b',
++  },
++  darkColors: {
++    primary: '#e2e8f0',
++    secondary: '#94a3b8',
++    accent: '#93c5fd',
++    success: '#86efac',
++    warning: '#fbbf24',
++    danger: '#fca5a5',
++    info: '#93c5fd',
++    background: '#020617',
++    backgroundElevated: '#07111f',
++    surface: '#0f172a',
++    surfaceAlt: '#111827',
++    surfaceElevated: '#111827',
++    surfaceMuted: '#1e293b',
++    border: '#334155',
++    borderSubtle: '#1e293b',
++    borderStrong: '#475569',
++    textPrimary: '#f8fafc',
++    textSecondary: '#cbd5e1',
++    textMuted: '#94a3b8',
++    textOnPrimary: '#020617',
++    textOnAccent: '#020617',
++    inputBackground: '#111827',
++    inputBorder: '#64748b',
++    inputText: '#f8fafc',
++    inputPlaceholder: '#cbd5e1',
++    disabledBackground: '#1e293b',
++    disabledText: '#94a3b8',
++    focusRing: '#93c5fd',
++    accentSoft: '#172554',
++    overlay: 'rgba(0,0,0,0.62)',
++    shadow: '#000000',
++    alertSurface: '#1f2937',
++    alertBorder: '#fbbf24',
+   },
+   spacing: {
+     xs: 4,

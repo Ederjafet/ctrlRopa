@@ -22,7 +22,7 @@ export default function StatusBadge({ label, tone = 'neutral', style }: Props) {
           ? theme.colors.danger
           : tone === 'info'
             ? theme.colors.accent
-            : theme.colors.mutedText;
+            : theme.colors.textSecondary;
   const backgroundColor =
     tone === 'success'
       ? theme.colors.successBackground
@@ -32,7 +32,7 @@ export default function StatusBadge({ label, tone = 'neutral', style }: Props) {
           ? theme.colors.dangerBackground
           : tone === 'info'
             ? theme.colors.infoCardBackground
-            : theme.colors.optionPressedBackground;
+            : theme.colors.surfaceMuted;
 
   return (
     <View
@@ -40,7 +40,7 @@ export default function StatusBadge({ label, tone = 'neutral', style }: Props) {
         styles.badge,
         {
           backgroundColor,
-          borderColor: color,
+          borderColor: tone === 'neutral' ? theme.colors.borderStrong : color,
           borderRadius: designTokens.radius.full,
         },
         style,

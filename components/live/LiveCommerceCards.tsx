@@ -31,10 +31,12 @@ function LiveBaseCard({ title, subtitle, children, style, tone }: BaseProps & { 
 
   const backgroundColor =
     tone === 'warning'
-      ? theme.colors.warningBackground
+      ? theme.isDark
+        ? theme.colors.surfaceAlt
+        : theme.colors.warningBackground
       : tone === 'success'
         ? theme.colors.successBackground
-        : theme.colors.surface;
+        : theme.colors.surfaceElevated;
 
   return (
     <View
@@ -42,8 +44,10 @@ function LiveBaseCard({ title, subtitle, children, style, tone }: BaseProps & { 
         styles.card,
         {
           backgroundColor,
-          borderColor: tone === 'neutral' ? theme.colors.border : toneColor,
+          borderColor: tone === 'neutral' ? theme.colors.borderSubtle : toneColor,
           borderRadius: theme.radius.lg,
+          shadowColor: theme.isDark ? theme.colors.overlay : theme.colors.primary,
+          shadowOpacity: theme.isDark ? 0.18 : 0.08,
         },
         style,
       ]}
@@ -118,8 +122,11 @@ export function LiveMetricCard({ label, value, helper, compact = false }: Metric
 const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
+    elevation: 2,
     gap: 8,
     padding: 14,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 18,
   },
   compact: {
     gap: 6,

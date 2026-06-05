@@ -625,16 +625,16 @@ export default function ReservationDetailScreen() {
                   style={[
                     styles.remainingBox,
                     {
-                      backgroundColor: theme.isDark ? '#451a03' : '#fff7ed',
-                      borderColor: theme.isDark ? '#92400e' : '#fed7aa',
+                      backgroundColor: theme.colors.warningBackground,
+                      borderColor: theme.colors.warning,
                     },
                   ]}
                 >
-                  <AppText color={theme.isDark ? '#fdba74' : '#9a3412'} bold>
+                  <AppText color={theme.colors.warning} bold>
                     Restante: ${remaining.toFixed(2)}
                   </AppText>
                   {overpaid > 0 ? (
-                    <AppText color={theme.isDark ? '#fdba74' : '#9a3412'}>
+                    <AppText color={theme.colors.warning}>
                       Excedente / saldo a favor: ${overpaid.toFixed(2)}
                     </AppText>
                   ) : null}

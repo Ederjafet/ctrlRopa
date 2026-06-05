@@ -130,6 +130,18 @@ No se crea backend ni se simula aprobacion.
 
 Pendiente recomendado: `LIVE-Z8 - mensajeria interna y solicitudes de autorizacion`.
 
+## Continuidad LIVE-Z8
+
+LIVE-Z8 implementa una base UI reutilizable para solicitudes de autorizacion:
+
+- `components/live/AuthorizationRequestPanel.tsx`.
+- Panel contextual para precio LIVE bloqueado.
+- Panel contextual para cancelar apartado sin capacidad.
+- Panel contextual para finalizar live sin capacidad.
+- Seccion `Solicitudes pendientes` para Supervisor/Admin con estado vacio real.
+
+No se simula aprobacion ni se desbloquean acciones. La persistencia backend queda pendiente para LIVE-Z9.
+
 ## Auditoria operacional
 
 Eventos existentes/revisados:

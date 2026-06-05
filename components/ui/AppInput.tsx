@@ -8,6 +8,7 @@ type Props = TextInputProps & {
 
 export default function AppInput({ label, style, ...rest }: Props) {
   const { theme } = useAppTheme();
+  const isReadonly = rest.editable === false;
 
   return (
     <View style={styles.container}>
@@ -25,8 +26,12 @@ export default function AppInput({ label, style, ...rest }: Props) {
             borderRadius: theme.radius.md,
             padding: theme.spacing.md,
             minHeight: theme.density === 'COMPACT' ? 46 : 54,
-            backgroundColor: theme.colors.inputBackground,
-            color: theme.colors.inputText,
+            backgroundColor: isReadonly
+              ? theme.colors.disabledBackground
+              : theme.colors.inputBackground,
+            color: isReadonly ? theme.colors.textSecondary : theme.colors.inputText,
+            shadowColor: theme.isDark ? theme.colors.overlay : theme.colors.primary,
+            shadowOpacity: isReadonly ? 0 : 0.04,
           },
           style,
         ]}
@@ -45,5 +50,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     fontSize: 16,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
   },
 });

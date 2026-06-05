@@ -1,4 +1,5 @@
 import QRScannerModal from '@/components/qr/QRScannerModal';
+import AuthorizationRequestPanel from '@/components/live/AuthorizationRequestPanel';
 import AppShell from '@/components/layout/AppShell';
 import { SidebarSection } from '@/components/layout/Sidebar';
 import LiveDesktopLayout from '@/components/live/LiveDesktopLayout';
@@ -16,6 +17,7 @@ import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInfoCard from '@/components/ui/AppInfoCard';
 import AppInput from '@/components/ui/AppInput';
+import EmptyState from '@/components/ui/EmptyState';
 import AppOptionRow from '@/components/ui/AppOptionRow';
 import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
 import AppText from '@/components/ui/AppText';
@@ -97,6 +99,14 @@ type LiveNotice = {
   message: string;
   tone: 'success' | 'warning' | 'danger';
 };
+
+type AuthorizationRequestContext =
+  | 'price'
+  | 'release'
+  | 'cancel'
+  | 'close'
+  | 'operationalSold'
+  | 'startLive';
 
 type ActivityFeedEvent = {
   badge: string;
@@ -489,9 +499,8 @@ export default function LiveScreen() {
   const [closeLiveToConfirm, setCloseLiveToConfirm] = useState<Live | null>(null);
   const [activateLiveToConfirm, setActivateLiveToConfirm] = useState<Live | null>(null);
   const [cancelReservationToConfirm, setCancelReservationToConfirm] = useState<number | null>(null);
-  const [authorizationRequestContext, setAuthorizationRequestContext] = useState<
-    'price' | 'release' | 'close' | 'cancel' | null
-  >(null);
+  const [authorizationRequestContext, setAuthorizationRequestContext] =
+    useState<AuthorizationRequestContext | null>(null);
   const [reservationIssue, setReservationIssue] = useState<string | null>(null);
   const [showDemoMetrics, setShowDemoMetrics] = useState(true);
   const [liveLayoutPreferences, setLiveLayoutPreferences] =
@@ -1669,17 +1678,42 @@ export default function LiveScreen() {
     await handleUpdateReservationOperationalStatus(reservationId, 'CANCELLED', reason);
   };
 
-  const handleRequestAuthorization = (
-    context: 'price' | 'release' | 'close' | 'cancel'
-  ) => {
+  const handleRequestAuthorization = (context: AuthorizationRequestContext) => {
     setAuthorizationRequestContext(context);
   };
 
+  const getAuthorizationActionLabel = (context: AuthorizationRequestContext | null) => {
+    switch (context) {
+      case 'price':
+        return t('live.authorizationActionPrice');
+      case 'release':
+        return t('live.authorizationActionReleaseItem');
+      case 'cancel':
+        return t('live.authorizationActionCancelHold');
+      case 'close':
+        return t('live.authorizationActionCloseLive');
+      case 'operationalSold':
+        return t('live.authorizationActionOperationalSold');
+      case 'startLive':
+        return t('live.authorizationActionStartLive');
+      default:
+        return t('live.authorizationGenericAction');
+    }
+  };
+
+  const getAuthorizationPrompt = (context: AuthorizationRequestContext | null) =>
+    context === 'price'
+      ? t('live.authorizationPricePrompt')
+      : t('live.authorizationGenericPrompt', {
+          action: getAuthorizationActionLabel(context),
+        });
+
   const confirmAuthorizationRequest = (reason: string) => {
+    const action = getAuthorizationActionLabel(authorizationRequestContext);
     setAuthorizationRequestContext(null);
     setLiveNotice({
       title: t('live.authorizationRequestPendingTitle'),
-      message: t('live.authorizationRequestPendingMessage', { reason }),
+      message: t('live.authorizationRequestPendingMessage', { action, reason }),
       tone: 'warning',
     });
   };
@@ -2368,23 +2402,23 @@ export default function LiveScreen() {
       ? theme.colors.success
       : isPreparedForChange
         ? theme.colors.warning
-        : theme.colors.border;
+        : theme.colors.borderSubtle;
     const cardBackgroundColor = isHighlightedReserved
-      ? theme.colors.surface
+      ? theme.colors.surfaceElevated
       : isHighlightedBlocked
-        ? theme.colors.surface
+        ? theme.colors.surfaceElevated
       : options.highlighted
-      ? theme.colors.successBackground
+      ? theme.colors.surfaceElevated
+      : isPreparedForChange
+        ? theme.colors.surfaceAlt
+        : theme.colors.surfaceElevated;
+    const placeholderBackgroundColor = isHighlightedReserved
+      ? theme.colors.surfaceAlt
+      : options.highlighted
+      ? theme.colors.accentSoft
       : isPreparedForChange
         ? theme.colors.warningBackground
-        : theme.colors.surface;
-    const placeholderBackgroundColor = isHighlightedReserved
-      ? theme.colors.surface
-      : options.highlighted
-      ? theme.colors.surface
-      : isPreparedForChange
-        ? theme.colors.surface
-        : theme.colors.infoCardBackground;
+        : theme.colors.accentSoft;
     const stateColor = isHighlightedReserved
       ? theme.colors.warning
       : isHighlightedBlocked
@@ -2521,7 +2555,9 @@ export default function LiveScreen() {
               style={[
                 styles.operatorItemNotice,
                 {
-                  backgroundColor: theme.colors.warningBackground,
+                  backgroundColor: theme.isDark
+                    ? theme.colors.surfaceMuted
+                    : theme.colors.warningBackground,
                   borderColor: theme.colors.warning,
                   borderRadius: theme.radius.sm,
                 },
@@ -2851,10 +2887,12 @@ export default function LiveScreen() {
       style={({ pressed }) => [
         styles.operatorItemActionCard,
         {
-          backgroundColor: theme.colors.surface,
-          borderColor: theme.colors.border,
-          borderRadius: theme.radius.md,
+          backgroundColor: theme.colors.surfaceElevated,
+          borderColor: theme.colors.borderSubtle,
+          borderRadius: theme.radius.lg,
           opacity: options.disabled ? 0.52 : pressed ? 0.78 : 1,
+          shadowColor: theme.isDark ? theme.colors.overlay : theme.colors.primary,
+          shadowOpacity: theme.isDark ? 0.16 : 0.08,
           width: isPhone ? '100%' : undefined,
         },
       ]}
@@ -2863,7 +2901,7 @@ export default function LiveScreen() {
         style={[
           styles.operatorItemActionIcon,
           {
-            backgroundColor: theme.colors.infoCardBackground,
+            backgroundColor: theme.colors.accentSoft,
             borderRadius: theme.radius.md,
           },
         ]}
@@ -3462,6 +3500,20 @@ export default function LiveScreen() {
 
         <LiveCompactCard style={styles.supervisorSectionCard}>
           <AppText variant="subtitle" bold>
+            {t('live.authorizationPendingRequestsTitle')}
+          </AppText>
+          <EmptyState
+            icon="pending-actions"
+            title={t('live.authorizationPendingRequestsEmptyTitle')}
+            message={t('live.authorizationPendingRequestsEmptyMessage')}
+          />
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            {t('live.authorizationApprovalBackendPending')}
+          </AppText>
+        </LiveCompactCard>
+
+        <LiveCompactCard style={styles.supervisorSectionCard}>
+          <AppText variant="subtitle" bold>
             {t('live.recentReservations')}
           </AppText>
           {recentReservations.length === 0 ? (
@@ -3784,16 +3836,16 @@ export default function LiveScreen() {
                         : t('live.operatorStepPriceEmpty')}
                     </AppText>
                     {activeItem && !mayChangeLivePrice ? (
-                      <View style={styles.operatorPriceAuthorizationBox}>
-                        <AppText variant="caption" color={theme.colors.mutedText}>
-                          {t('live.livePriceAuthorizationHelp')}
-                        </AppText>
-                        <AppButton
-                          title={t('live.requestAuthorization')}
-                          variant="secondary"
-                          onPress={() => handleRequestAuthorization('price')}
-                        />
-                      </View>
+                      <AuthorizationRequestPanel
+                        actionLabel={t('live.authorizationActionPrice')}
+                        requiredCapability="canChangeLivePrice"
+                        reason={t('live.livePriceAuthorizationHelp')}
+                        entityContext={activeItem.code}
+                        pendingBackendLabel={t('live.authorizationBackendRequired')}
+                        requestLabel={t('live.requestAuthorization')}
+                        onRequestAuthorization={() => handleRequestAuthorization('price')}
+                        style={styles.operatorPriceAuthorizationBox}
+                      />
                     ) : null}
                   </LiveCompactCard>
 
@@ -4098,6 +4150,19 @@ export default function LiveScreen() {
                                     onPress={() => handleCancelLiveReservation(reservation.id)}
                                   />
                                 </View>
+                              ) : !operationalCancelled && !mayCancelLiveReservation ? (
+                                <AuthorizationRequestPanel
+                                  actionLabel={t('live.authorizationActionCancelHold')}
+                                  requiredCapability="canCancelReservation"
+                                  reason={t('live.authorizationCancelHelp')}
+                                  entityContext={t('live.reservationNumber', {
+                                    id: reservation.id,
+                                  })}
+                                  pendingBackendLabel={t('live.authorizationBackendRequired')}
+                                  requestLabel={t('live.requestAuthorization')}
+                                  onRequestAuthorization={() => handleRequestAuthorization('cancel')}
+                                  style={styles.authorizationInlinePanel}
+                                />
                               ) : null}
                               {operationalCancelled && mayChangeLiveReservationStatus ? (
                                 <View style={styles.buttonFill}>
@@ -4137,6 +4202,19 @@ export default function LiveScreen() {
                   disabled={isSavingLive || !selectedLiveIsOperable || !mayCloseLive}
                   disabledReason={operatorFinishDisabledReason}
                 />
+                {selectedLiveIsOperable && !mayCloseLive ? (
+                  <AuthorizationRequestPanel
+                    actionLabel={t('live.authorizationActionCloseLive')}
+                    requiredCapability="canCloseLive"
+                    reason={t('live.authorizationCloseHelp')}
+                    entityContext={
+                      selectedLive ? t('live.liveNumber', { id: selectedLive.id }) : undefined
+                    }
+                    pendingBackendLabel={t('live.authorizationBackendRequired')}
+                    requestLabel={t('live.requestAuthorization')}
+                    onRequestAuthorization={() => handleRequestAuthorization('close')}
+                  />
+                ) : null}
               </>
             )}
           </LiveActionCard>
@@ -5225,9 +5303,16 @@ export default function LiveScreen() {
                 style={styles.buttonSpacing}
               />
             ) : (
-              <AppText variant="caption" color={theme.colors.mutedText} style={styles.buttonSpacing}>
-                {t('live.presenterReadOnlyHelp')}
-              </AppText>
+              <AuthorizationRequestPanel
+                actionLabel={t('live.authorizationActionCloseLive')}
+                requiredCapability="canCloseLive"
+                reason={t('live.authorizationCloseHelp')}
+                entityContext={t('live.liveNumber', { id: selectedLive.id })}
+                pendingBackendLabel={t('live.authorizationBackendRequired')}
+                requestLabel={t('live.requestAuthorization')}
+                onRequestAuthorization={() => handleRequestAuthorization('close')}
+                style={styles.buttonSpacing}
+              />
             )}
           </AppCard>
         ) : null}
@@ -5417,10 +5502,11 @@ export default function LiveScreen() {
         onClose={() => setAuthorizationRequestContext(null)}
         showCancelButton={false}
       >
+        <AppText bold>
+          {getAuthorizationActionLabel(authorizationRequestContext)}
+        </AppText>
         <AppText color={theme.colors.mutedText}>
-          {authorizationRequestContext === 'price'
-            ? t('live.authorizationPricePrompt')
-            : t('live.authorizationGenericPrompt')}
+          {getAuthorizationPrompt(authorizationRequestContext)}
         </AppText>
         {[
           t('live.authorizationReasonLivePromotion'),
@@ -5579,6 +5665,10 @@ const styles = StyleSheet.create({
     gap: 10,
     justifyContent: 'space-between',
     padding: 10,
+  },
+  authorizationInlinePanel: {
+    flexBasis: '100%',
+    marginTop: 4,
   },
   buttonRow: {
     flexDirection: 'row',
@@ -5788,7 +5878,6 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 12,
     padding: 12,
-    shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.08,
     shadowRadius: 14,
@@ -5933,7 +6022,6 @@ const styles = StyleSheet.create({
   operatorRecentReservationsCard: {
     elevation: 1,
     gap: 8,
-    shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
     shadowRadius: 10,
@@ -5957,25 +6045,27 @@ const styles = StyleSheet.create({
   },
   operatorItemCard: {
     borderWidth: 1,
-    elevation: 1,
+    elevation: 2,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    padding: 10,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    gap: 12,
+    padding: 12,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
   },
   operatorItemActionCard: {
     alignItems: 'center',
     borderWidth: 1,
+    elevation: 1,
     flex: 1,
     flexDirection: 'row',
     gap: 8,
     minHeight: 62,
     minWidth: 170,
     padding: 10,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 18,
   },
   operatorItemActionGrid: {
     flexDirection: 'row',
@@ -6088,7 +6178,6 @@ const styles = StyleSheet.create({
     elevation: 1,
     gap: 8,
     minWidth: 0,
-    shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
     shadowRadius: 10,
@@ -6213,7 +6302,6 @@ const styles = StyleSheet.create({
     elevation: 5,
     gap: 14,
     maxWidth: 420,
-    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.18,
     shadowRadius: 8,
