@@ -1,0 +1,411 @@
+﻿diff --git a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+index 386deac..ef1c635 100644
+--- a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
++++ b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+@@ -265,3 +265,17 @@ preset base + overrides locales + light/dark mode = tokens finales
+ El editor vive en `/ui-kit`, valida colores hexadecimales `#RRGGBB`, permite restaurar la plantilla y guarda la personalizacion solo en frontend. No se agregaron endpoints, migraciones ni persistencia por tenant.
+
+ Ver `docs/PRODUCT_C2_VISUAL_IDENTITY_EDITOR.md`.
++
++---
++
++## Continuidad PRODUCT-D - QA operativo por roles
++
++Fecha: 2026-06-05
++
++PRODUCT-D formaliza la validacion por rol, ruta, permisos, tema claro/oscuro, presets visuales, editor controlado y responsive. La fase no cambia el sistema visual; agrega matriz, checklist y handoff para corrida manual real.
++
++Ver:
++
++- `docs/PRODUCT_D_ROLE_BASED_QA_MATRIX.md`
++- `docs/PRODUCT_D_QA_CHECKLIST.md`
++- `docs/PRODUCT_D_ROLE_BASED_QA_HANDOFF.md`
+
+diff --git a/docs/PRODUCT_D_ROLE_BASED_QA_MATRIX.md b/docs/PRODUCT_D_ROLE_BASED_QA_MATRIX.md
+new file mode 100644
+--- /dev/null
++++ b/docs/PRODUCT_D_ROLE_BASED_QA_MATRIX.md
+@@ -0,0 +1,67 @@
++# PRODUCT-D - Matriz QA operativo por roles
++
++## Objetivo
++
++Documentar la validacion operativa por usuario QA, rol, rutas, permisos, vistas LIVE, tema claro/oscuro, presets visuales y responsive. Esta fase no cambia AUTH/RBAC ni reglas funcionales.
++
++## Fuente de verdad
++
++La seguridad real sigue el flujo:
++
++```text
++AUTH real -> permisos reales -> capacidades -> vista/acciones permitidas
++```
++
++Los perfiles Operador, Vendedor/Presentadora y Supervisor son vistas de experiencia derivadas de capacidades, no roles paralelos de seguridad.
++
++## Usuarios QA base
++
++| Usuario QA | Rol real esperado | Vista esperada | Rutas permitidas | Rutas restringidas | Acciones permitidas | Acciones bloqueadas | Tema claro/oscuro | Presets visuales | Resultado esperado | Evidencia requerida |
++| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
++| `qa.admin@local.test` | ADMIN o equivalente tenant admin | Home ejecutivo, LIVE operador, administracion | `/`, `/live`, `/customers`, `/reservations`, `/users`, `/system`, `/reports`, `/ui-kit`, `/appearance`, `/reservation-detail?id=<id valido>` | Ninguna principal esperada si conserva permisos admin | Navegar, operar LIVE, ver UI Kit, cambiar tema, cambiar preset local, usar editor controlado local | Solo acciones bloqueadas por estado operativo o backend no implementado | Debe poder alternar claro/oscuro | Debe poder seleccionar preset y aplicar overrides locales en `/ui-kit` | Acceso completo sin duplicidad visual ni texto invisible | Screenshot o nota por ruta, preset y tema |
++| `qa.vendedor.centro@local.test` | SELLER o QA_TENANT_SELLER | Vista apoyo/presentador LIVE si tiene canal LIVE | `/`, `/live` si `canViewLive`, rutas que sus permisos reales expongan | `/users`, `/system`, `/reports`, `/ui-kit` salvo permisos/admin | Ver apoyo LIVE, consultar informacion permitida, navegar rutas permitidas | No debe administrar, operar como admin, editar UI Kit ni ver acciones no permitidas | Debe conservar legibilidad claro/oscuro | No debe usar editor visual si UI Kit esta restringido | No escala privilegios; LIVE no muestra consola admin | Evidencia de sidebar y vista LIVE |
++| `qa.supervisor.centro@local.test` | SUPERVISOR | Vista supervision LIVE | `/`, `/live`, reportes/dashboard si permisos reales lo permiten | UI Kit y administracion si no es admin | Ver monitoreo, indicadores y eventos segun capacidades | No debe caer en vendedor, no debe operar si falta capacidad | Debe conservar legibilidad claro/oscuro | No debe usar editor visual si UI Kit esta restringido | Supervisor ve dashboard/control, no vendedor por fallback | Evidencia de vista LIVE supervisor |
++| `qa.sinpermisos@local.test` | NO_ACCESS o sin permisos efectivos | Acceso restringido | Login y pantalla bloqueada/acceso restringido | Navegacion util y rutas operativas | Cerrar sesion si llega al shell | Operar LIVE, ver rutas protegidas, usar UI Kit | Mensajes legibles en claro/oscuro | No debe ver selector/editor visual | Bloqueado sin navegacion util | Evidencia de bloqueo y ausencia de acciones |
++
++## Rutas principales
++
++| Ruta | Existe | Usuarios que deben verla | Usuarios que no deben verla | Comportamiento esperado | Riesgo | Evidencia manual esperada |
++| --- | --- | --- | --- | --- | --- | --- |
++| `/` | Si, `app/index.tsx` | Usuarios autenticados con acceso minimo | Sin sesion | Dashboard/resumen con AppShell, tema/preset aplicado | Datos vacios o permisos limitados deben verse claros | Screenshot light/dark |
++| `/live` | Si, `app/live.tsx` | Admin, vendedor/supervisor con capacidades LIVE | NO_ACCESS o sin canal/permisos LIVE | Vista por capacidad: operador, soporte o supervisor | Caer en vista incorrecta o mostrar acciones no permitidas | Evidencia por usuario QA |
++| `/ui-kit` | Si, `app/ui-kit.tsx` | Admin | Vendedor, supervisor no admin, sin permisos | Catalogo UI, presets y editor controlado | Exponer editor visual a no admin | Screenshot admin y bloqueo no admin |
++| `/customers` | Si, `app/customers.tsx` | Usuarios con `VIEW_CUSTOMERS` o admin | Usuarios sin permiso | Listado premium, sin datos fake | Navegacion visible sin permiso | Evidencia sidebar/listado |
++| `/reservations` | Si, `app/reservations.tsx` | Usuarios con reserva puerta o LIVE, admin | Usuarios sin permiso | Lista de reservas, estados consistentes | Acciones visibles sin capacidad | Evidencia filtros/lista |
++| `/users` | Si, `app/users.tsx` | Admin o `MANAGE_USERS` | Vendedor/supervisor sin permiso, NO_ACCESS | Administracion de usuarios visual premium | Exponer usuarios sin permiso | Evidencia admin y bloqueo |
++| `/system` | Si, `app/system.tsx` | Admin o permisos sistema | Usuarios sin permisos sistema | Hub de sistema | Exponer configuracion delicada | Evidencia admin/bloqueo |
++| `/reports` | Si, `app/reports.tsx` | Admin o `VIEW_REPORTS` | Usuarios sin reportes | Hub de reportes visual | Reportes visibles sin permiso | Evidencia admin/supervisor si aplica |
++| `/appearance` | Si, `app/appearance.tsx` | Admin desde navegacion | No admin | Configuracion visual legacy/appearance si aplica | Duplicidad con editor `/ui-kit` | Validar que no rompe tema |
++| `/reservation-detail?id=<id valido>` | Si, `app/reservation-detail.tsx` | Usuarios con acceso a reserva/detalle | Sin permiso o id no valido | DetailTemplate, 403 vs 404 correcto, pagos restringidos si falta permiso | Mostrar 404 cuando es 403 o pagos sin permiso | Evidencia desde reserva real |
++
++## Capacidades LIVE esperadas
++
++| Vista | Condicion de entrada | Acciones esperadas | Acciones bloqueadas |
++| --- | --- | --- | --- |
++| Operador | `canOperateLive` y no vendedor/supervisor | Preparar, poner al aire, reservar, marcar pendiente/vendido operativo segun capacidades | Doble reserva, acciones sin permiso, pagos sin `VIEW_PAYMENTS` |
++| Vendedor/Presentador | `canViewLive` sin capacidad admin/supervisor | Ver prenda al aire y apoyo | Consola operador, dashboard supervisor, acciones administrativas |
++| Supervisor | rol `SUPERVISOR` o dashboard/reportes segun resolver | Ver monitoreo/control | No debe caer en vendedor por fallback |
++| NO_ACCESS | sin `canViewLive` o sin permisos efectivos | Acceso restringido | Toda operacion LIVE |
++
++## Presets y tema
++
++Validar para admin:
++
++- `retailPremium`;
++- `darkConsole`;
++- `blueCorporate`;
++- `boutique`;
++- `classicErp`;
++- overrides locales PRODUCT-C2;
++- restaurar plantilla.
++
++Validar en light/dark que no haya:
++
++- texto invisible;
++- botones sin jerarquia;
++- prenda reservada ambar dominante;
++- usuario duplicado entre TopBar y Sidebar.
+
+diff --git a/docs/PRODUCT_D_QA_CHECKLIST.md b/docs/PRODUCT_D_QA_CHECKLIST.md
+new file mode 100644
+--- /dev/null
++++ b/docs/PRODUCT_D_QA_CHECKLIST.md
+@@ -0,0 +1,80 @@
++# PRODUCT-D - Checklist QA operativo por roles
++
++## A. Login / logout
++
++- [ ] Iniciar sesion con `qa.admin@local.test`.
++- [ ] Iniciar sesion con `qa.vendedor.centro@local.test`.
++- [ ] Iniciar sesion con `qa.supervisor.centro@local.test`.
++- [ ] Iniciar sesion con `qa.sinpermisos@local.test`.
++- [ ] Confirmar logout visible en Sidebar/drawer.
++- [ ] Confirmar que logout limpia sesion y vuelve a login.
++- [ ] Confirmar que backend caido muestra mensaje de conexion y no "sesion iniciada en otro equipo".
++- [ ] Confirmar que single session real muestra mensaje de sesion reemplazada solo cuando corresponde.
++
++## B. Navegacion
++
++- [ ] Desktop: Sidebar fijo visible y sin duplicidad de usuario con TopBar.
++- [ ] Tablet: drawer abre/cierra, contenido no queda comprimido.
++- [ ] Mobile: menu oculto por defecto, boton menu visible, overlay cierra.
++- [ ] Logout accesible en drawer mobile.
++- [ ] ADMIN ve Inicio, LIVE, Clientes, Reservas, Usuarios, Sistema, Reportes, Configuracion y UI Kit.
++- [ ] VENDEDOR solo ve rutas permitidas por permisos reales.
++- [ ] SUPERVISOR ve rutas permitidas y no cae en vista vendedor.
++- [ ] SIN PERMISOS no ve navegacion util.
++
++## C. Visual / tema
++
++- [ ] Light mode legible en `/`, `/live`, `/ui-kit`, `/customers`, `/reservations`, `/users`, `/system`, `/reports`.
++- [ ] Dark mode legible en las mismas rutas.
++- [ ] No hay textos invisibles en labels, captions, inputs, helper texts o disabled.
++- [ ] Presets visuales cambian la app real, no solo UI Kit.
++- [ ] Editor controlado permite aplicar cambios locales y restaurar plantilla.
++- [ ] Prenda reservada se ve rojo premium (`danger/dangerSoft`), no ambar dominante.
++- [ ] Botones primary/secondary/neutral/danger/disabled mantienen jerarquia.
++- [ ] Sidebar footer se mantiene como zona principal de usuario en desktop.
++
++## D. LIVE
++
++- [ ] ADMIN ve vista operador.
++- [ ] ADMIN puede iniciar/operar LIVE segun capacidades reales.
++- [ ] Preparar siguiente prenda no cambia precio principal.
++- [ ] Prenda al aire define precio LIVE/reserva.
++- [ ] Reservar prenda al aire crea reserva y la marca reservada.
++- [ ] Doble reserva queda bloqueada con mensaje claro.
++- [ ] Vendido operativo dice que no confirma pago.
++- [ ] Solicitudes de autorizacion no simulan backend.
++- [ ] VENDEDOR ve vista apoyo/presentador si tiene `canViewLive`.
++- [ ] VENDEDOR no ve consola operador si no tiene capacidad.
++- [ ] SUPERVISOR ve dashboard/monitoreo y no cae en vendedor.
++- [ ] SIN PERMISOS queda bloqueado.
++- [ ] No hay rafagas de pagos si falta `VIEW_PAYMENTS`.
++
++## E. Pantallas principales
++
++- [ ] `/` muestra dashboard/resumen con AppShell.
++- [ ] `/customers` respeta `VIEW_CUSTOMERS`.
++- [ ] `/reservations` respeta permisos y mantiene estados.
++- [ ] `/users` respeta `MANAGE_USERS`/admin.
++- [ ] `/system` respeta permisos sistema/admin.
++- [ ] `/reports` respeta `VIEW_REPORTS`/admin.
++- [ ] `/ui-kit` solo admin; muestra presets y editor controlado.
++- [ ] `/reservation-detail?id=<id valido>` mantiene DetailTemplate.
++- [ ] Detalle de reserva no muestra 404 cuando el problema es permiso.
++- [ ] Secciones de pagos permanecen restringidas sin `VIEW_PAYMENTS`.
++
++## F. Responsive
++
++- [ ] Desktop 1366px o mas: sidebar fijo, contenido centrado, sin duplicidad.
++- [ ] Tablet 768-1199px: drawer, cards legibles, sin overflow.
++- [ ] Mobile 360-430px: contenido apilado, botones touch-friendly.
++- [ ] AnyDesk/pantalla remota: sidebar no domina el contenido.
++- [ ] LIVE mantiene jerarquia: preparar, prenda al aire, precio/cliente, reserva, recientes.
++
++## G. Evidencia minima
++
++- [ ] Screenshot o nota por usuario en `/live`.
++- [ ] Screenshot o nota admin en `/ui-kit` con preset cambiado.
++- [ ] Screenshot o nota admin en dark mode.
++- [ ] Screenshot o nota vendedor/supervisor con rutas visibles.
++- [ ] Screenshot o nota `qa.sinpermisos` bloqueado.
++- [ ] Registro de validaciones tecnicas.
+
+diff --git a/docs/PRODUCT_D_ROLE_BASED_QA_HANDOFF.md b/docs/PRODUCT_D_ROLE_BASED_QA_HANDOFF.md
+new file mode 100644
+--- /dev/null
++++ b/docs/PRODUCT_D_ROLE_BASED_QA_HANDOFF.md
+@@ -0,0 +1,94 @@
++# PRODUCT-D - Handoff QA operativo por roles
++
++## Proposito
++
++PRODUCT-D deja preparada una corrida formal de QA operativo por roles para validar rutas, permisos, vistas, tema claro/oscuro, presets visuales, editor controlado y responsive.
++
++## Alcance
++
++Validar:
++
++- autenticacion y logout;
++- navegacion AppShell;
++- rutas principales autenticadas;
++- vistas LIVE por capacidades;
++- tema claro/oscuro;
++- presets visuales PRODUCT-C1;
++- editor controlado PRODUCT-C2;
++- responsive desktop/tablet/mobile;
++- bloqueo de usuario sin permisos.
++
++Fuera de alcance:
++
++- cambios backend;
++- cambios AUTH/RBAC;
++- pagos/caja reales;
++- reportes backend;
++- billing;
++- IA;
++- reglas operativas LIVE nuevas.
++
++## Usuarios QA
++
++- `qa.admin@local.test`
++- `qa.vendedor.centro@local.test`
++- `qa.supervisor.centro@local.test`
++- `qa.sinpermisos@local.test`
++
++Las contrasenas no se documentan aqui para evitar duplicarlas en evidencia publica del repositorio. Usar credenciales internas QA vigentes.
++
++## Rutas minimas
++
++- `/`
++- `/live`
++- `/ui-kit`
++- `/customers`
++- `/reservations`
++- `/users`
++- `/system`
++- `/reports`
++- `/appearance`
++- `/reservation-detail?id=<id valido>`
++
++## Criterios de aprobacion
++
++GO si:
++
++- cada usuario ve solo rutas/acciones esperadas;
++- LIVE resuelve la vista correcta por capacidades;
++- `qa.sinpermisos` queda bloqueado;
++- light/dark son legibles;
++- presets y editor local no rompen pantallas;
++- no hay overflow responsive grave;
++- validaciones tecnicas pasan.
++
++NO-GO si:
++
++- usuario sin permiso accede a rutas sensibles;
++- vendedor opera como admin sin capacidad real;
++- supervisor cae en vista vendedor;
++- UI Kit/editor quedan visibles para no admin;
++- texto critico queda invisible;
++- detalle de reserva confunde 403 con 404;
++- pagos se consultan sin `VIEW_PAYMENTS`;
++- validaciones tecnicas fallan por cambios de esta fase.
++
++## Evidencia esperada en PRODUCT-D2
++
++Para una corrida visual/manual real:
++
++- capturas por rol en `/live`;
++- capturas admin en `/ui-kit` con preset y editor;
++- capturas light/dark;
++- notas por ruta restringida;
++- CSV smoke actualizado con resultado PASS/FAIL;
++- hallazgos priorizados.
++
++## Entregables de esta fase
++
++- `docs/PRODUCT_D_ROLE_BASED_QA_MATRIX.md`
++- `docs/PRODUCT_D_QA_CHECKLIST.md`
++- `docs/PRODUCT_D_ROLE_BASED_QA_HANDOFF.md`
++- reporte QA en `qa-reports/`
++- CSV smoke en `qa-reports/`
++- diff/stat en `git-diffs/`
+
+diff --git a/qa-reports/PRODUCT-D-role-based-qa-report-20260605-121239.md b/qa-reports/PRODUCT-D-role-based-qa-report-20260605-121239.md
+new file mode 100644
+--- /dev/null
++++ b/qa-reports/PRODUCT-D-role-based-qa-report-20260605-121239.md
+@@ -0,0 +1,102 @@
++# PRODUCT-D - QA operativo por roles
++
++Fecha: 2026-06-05 12:12:39
++Rama: feature/product-d-role-based-qa
++
++## Objetivo
++
++Formalizar la validacion operativa por usuario/rol para rutas, permisos, vistas LIVE, tema claro/oscuro, presets visuales, editor controlado y responsive.
++
++## Alcance
++
++Incluye:
++
++- documentacion de matriz QA por rol;
++- checklist operativo manual;
++- handoff para corrida visual/manual real;
++- validaciones tecnicas frontend/backend;
++- evidencia documental y CSV smoke.
++
++No incluye:
++
++- cambios backend;
++- cambios AUTH/RBAC;
++- pagos/caja/reportes backend;
++- billing;
++- IA;
++- reglas LIVE nuevas;
++- datos fake;
++- merge a develop.
++
++## Usuarios QA cubiertos
++
++- `qa.admin@local.test`
++- `qa.vendedor.centro@local.test`
++- `qa.supervisor.centro@local.test`
++- `qa.sinpermisos@local.test`
++
++## Rutas cubiertas
++
++- `/`
++- `/live`
++- `/ui-kit`
++- `/customers`
++- `/reservations`
++- `/users`
++- `/system`
++- `/reports`
++- `/appearance`
++- `/reservation-detail?id=<id valido>`
++
++## Matriz resumida
++
++| Usuario | Resultado esperado |
++| --- | --- |
++| Admin | Acceso completo a rutas principales, LIVE operador, UI Kit, presets/editor local |
++| Vendedor | Solo rutas permitidas, LIVE apoyo/presentador si tiene capacidad, sin administracion |
++| Supervisor | LIVE supervisor/monitoreo, no fallback vendedor, acciones solo por capacidad |
++| Sin permisos | Acceso restringido, sin navegacion util ni operacion LIVE |
++
++## Checklist creado
++
++`docs/PRODUCT_D_QA_CHECKLIST.md` cubre:
++
++- login/logout;
++- navegacion;
++- visual;
++- LIVE;
++- pantallas principales;
++- responsive;
++- evidencia minima.
++
++## Hallazgos
++
++No se detectaron errores funcionales nuevos porque esta fase solo agrega documentacion y evidencia. La corrida visual/manual real queda propuesta para PRODUCT-D2.
++
++## Riesgos
++
++- La matriz depende de permisos reales devueltos por `/api/me`; si cambian roles/permissions QA, debe actualizarse.
++- El CSV smoke queda preparado como plan, no como evidencia visual ejecutada.
++- Presets visuales y editor local requieren QA manual en browser para validar contraste real.
++
++## Validaciones tecnicas
++
++- `git branch --show-current`: OK, `feature/product-d-role-based-qa`.
++- `git status`: OK inicial limpio.
++- `git log --oneline -12`: OK.
++- `git --no-pager diff --stat`: OK.
++- `git --no-pager diff --name-only`: OK.
++- `git --no-pager diff --check`: OK inicial.
++- `npm.cmd run lint`: OK, 0 errores, 60 warnings preexistentes.
++- `npx.cmd tsc --noEmit`: OK.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
++- `cd backend/control-ropa; .\\mvnw.cmd test`: OK, 73 tests.
++- `cd backend/control-ropa; .\\mvnw.cmd -q -DskipTests package`: OK.
++
++## GO / NO-GO
++
++GO documental. Validaciones tecnicas ejecutadas correctamente; queda pendiente la corrida visual/manual con capturas para PRODUCT-D2.
++
++## Siguiente fase recomendada
++
++PRODUCT-D2: corrida visual/manual real con capturas por rol, tema, preset, dispositivo y hallazgos priorizados.
+
+diff --git a/qa-reports/PRODUCT-D-role-based-qa-smoke-20260605-121239.csv b/qa-reports/PRODUCT-D-role-based-qa-smoke-20260605-121239.csv
+new file mode 100644
+--- /dev/null
++++ b/qa-reports/PRODUCT-D-role-based-qa-smoke-20260605-121239.csv
+@@ -0,0 +1,16 @@
++caso,usuario,ruta,dispositivo,tema,preset,esperado,resultado,evidencia,notas
++PD-001,qa.admin@local.test,/,desktop,light,retailPremium,"Dashboard visible con AppShell y navegacion completa",PENDIENTE,"captura requerida","Validar no duplicidad usuario"
++PD-002,qa.admin@local.test,/live,desktop,dark,darkConsole,"Vista operador LIVE con acciones segun capacidades",PENDIENTE,"captura requerida","Validar prenda reservada rojo premium"
++PD-003,qa.admin@local.test,/ui-kit,desktop,light,boutique,"UI Kit visible con presets y editor controlado",PENDIENTE,"captura requerida","Aplicar y restaurar cambios locales"
++PD-004,qa.admin@local.test,/customers,tablet,dark,blueCorporate,"Clientes visible si conserva VIEW_CUSTOMERS",PENDIENTE,"captura requerida","Sin overflow horizontal"
++PD-005,qa.admin@local.test,/reservations,mobile,light,classicErp,"Reservas visible con estados y acciones permitidas",PENDIENTE,"captura requerida","Botones touch-friendly"
++PD-006,qa.admin@local.test,/users,desktop,dark,retailPremium,"Usuarios visible para admin",PENDIENTE,"captura requerida","No exponer datos fuera de permisos"
++PD-007,qa.admin@local.test,/system,desktop,light,retailPremium,"Sistema visible para admin",PENDIENTE,"captura requerida","Validar cards premium"
++PD-008,qa.admin@local.test,/reports,desktop,dark,retailPremium,"Reportes visible para admin/VIEW_REPORTS",PENDIENTE,"captura requerida","No tocar reportes backend"
++PD-009,qa.admin@local.test,/reservation-detail?id=<id valido>,desktop,light,retailPremium,"Detalle con 403/404 correcto y pagos restringidos si aplica",PENDIENTE,"captura requerida","Usar id real"
++PD-010,qa.vendedor.centro@local.test,/live,desktop,light,retailPremium,"Vista apoyo/presentador si canViewLive",PENDIENTE,"captura requerida","No consola operador"
++PD-011,qa.vendedor.centro@local.test,/users,desktop,light,retailPremium,"Ruta restringida si no tiene MANAGE_USERS",PENDIENTE,"captura requerida","No navegacion admin"
++PD-012,qa.supervisor.centro@local.test,/live,desktop,dark,retailPremium,"Vista supervisor/monitoreo, no vendedor",PENDIENTE,"captura requerida","Validar indicadores"
++PD-013,qa.supervisor.centro@local.test,/reports,tablet,light,retailPremium,"Reportes visibles solo si VIEW_REPORTS real",PENDIENTE,"captura requerida","Documentar permiso real"
++PD-014,qa.sinpermisos@local.test,/,desktop,light,retailPremium,"Acceso restringido o sin navegacion util",PENDIENTE,"captura requerida","No operar LIVE"
++PD-015,qa.sinpermisos@local.test,/live,mobile,dark,retailPremium,"NO_ACCESS bloqueado",PENDIENTE,"captura requerida","Drawer sin rutas utiles"

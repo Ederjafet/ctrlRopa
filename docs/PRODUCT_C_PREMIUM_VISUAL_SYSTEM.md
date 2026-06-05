@@ -265,3 +265,17 @@ preset base + overrides locales + light/dark mode = tokens finales
 El editor vive en `/ui-kit`, valida colores hexadecimales `#RRGGBB`, permite restaurar la plantilla y guarda la personalizacion solo en frontend. No se agregaron endpoints, migraciones ni persistencia por tenant.
 
 Ver `docs/PRODUCT_C2_VISUAL_IDENTITY_EDITOR.md`.
+
+---
+
+## Continuidad PRODUCT-D - QA operativo por roles
+
+Fecha: 2026-06-05
+
+PRODUCT-D formaliza la validacion por rol, ruta, permisos, tema claro/oscuro, presets visuales, editor controlado y responsive. La fase no cambia el sistema visual; agrega matriz, checklist y handoff para corrida manual real.
+
+Ver:
+
+- `docs/PRODUCT_D_ROLE_BASED_QA_MATRIX.md`
+- `docs/PRODUCT_D_QA_CHECKLIST.md`
+- `docs/PRODUCT_D_ROLE_BASED_QA_HANDOFF.md`
