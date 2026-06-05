@@ -14,6 +14,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 type Props = {
   title: string;
   subtitle?: string;
+  contextTitle?: string;
+  contextSubtitle?: string;
   activeRoute?: string;
   session?: UserSession | null;
   navSections: SidebarSection[];
@@ -24,6 +26,8 @@ type Props = {
 export default function AppShell({
   title,
   subtitle,
+  contextTitle,
+  contextSubtitle,
   activeRoute,
   session,
   navSections,
@@ -40,6 +44,8 @@ export default function AppShell({
   const drawerWidth = isPhone
     ? Math.min(width * 0.85, designTokens.layout.drawerWidthMobile)
     : designTokens.layout.drawerWidthTablet;
+  const topBarTitle = showSidebar && contextTitle ? contextTitle : title;
+  const topBarSubtitle = showSidebar && contextTitle ? contextSubtitle : subtitle;
 
   const navigate = (item: SidebarNavItemConfig) => {
     if (!item.route || item.disabled) return;
@@ -85,8 +91,8 @@ export default function AppShell({
           ]}
         >
           <TopBar
-            title={title}
-            subtitle={subtitle}
+            title={topBarTitle}
+            subtitle={topBarSubtitle}
             session={session}
             rightContent={rightContent}
             showMenuButton={!showSidebar}

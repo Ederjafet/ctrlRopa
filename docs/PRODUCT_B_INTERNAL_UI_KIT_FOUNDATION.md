@@ -648,3 +648,64 @@ No se instalaron librerias externas y no se tocaron backend, AUTH backend, RBAC,
 - Confirmar sidebar compacto en desktop/AnyDesk.
 - Confirmar drawer mobile/tablet.
 - Confirmar Home y `/ui-kit` sin overflow.
+
+---
+
+## PRODUCT-B2.4 - Tema claro/oscuro y jerarquia visual aplicada a LIVE
+
+Fecha: 2026-06-04
+
+### Objetivo
+
+Formalizar el sistema visual para que LIVE consuma el UI Kit interno de forma mas real: tokens, tema claro/oscuro, variantes de botones y estados consistentes.
+
+### Cambios del sistema visual
+
+- `AppThemeContext` expone `themeMode`, `setThemeMode` y `toggleThemeMode`.
+- La preferencia `LIGHT`/`DARK` se guarda localmente con AsyncStorage.
+- `TopBar` incluye un toggle visible para cambiar entre claro y oscuro.
+- `AppButton` incorpora la variante `neutral` y un estilo bloqueado basado en tokens.
+- El estado disabled deja de depender solo de opacidad y usa:
+  - `disabledButtonBackground`;
+  - `disabledButtonText`.
+- Se agregan tokens de boton neutral:
+  - `neutralButtonBackground`;
+  - `neutralButtonText`;
+  - `neutralButtonBorder`.
+
+### UI Kit
+
+`/ui-kit` se actualizo para mostrar:
+
+- tema activo;
+- boton para alternar claro/oscuro;
+- preview de botones:
+  - Primary;
+  - Secondary;
+  - Neutral;
+  - Danger;
+  - Disabled;
+- badges, templates y tokens existentes.
+
+### LIVE
+
+`/live` ahora usa la jerarquia visual del UI Kit:
+
+- `primary`: accion principal inmediata.
+- `secondary`: accion frecuente de menor prioridad.
+- `neutral`: soporte operativo/outline/subtle.
+- `danger`: accion destructiva.
+- disabled: accion bloqueada con motivo visible.
+
+Tambien reemplaza colores de estado hardcodeados en cards de prenda por tokens del tema.
+
+### Restricciones respetadas
+
+No se instalaron librerias externas. No se tocaron backend, AUTH backend, RBAC, pagos, caja, reportes, billing, IA ni contratos de API.
+
+### Validacion visual pendiente
+
+- Ver `/ui-kit` en claro y oscuro.
+- Ver `/live` en claro y oscuro.
+- Confirmar contraste de botones y badges.
+- Confirmar `reservation-detail` heredando tema desde AppShell.

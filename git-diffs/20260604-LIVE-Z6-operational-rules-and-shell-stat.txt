@@ -1,0 +1,17 @@
+ app/index.tsx                                |   6 +
+ app/live.tsx                                 | 723 ++++++++++++++++++---------
+ app/ui-kit.tsx                               |  36 +-
+ components/layout/AppShell.tsx               |  10 +-
+ components/layout/TopBar.tsx                 |  33 +-
+ components/ui/AppButton.tsx                  |  26 +-
+ context/AppThemeContext.tsx                  |  69 ++-
+ docs/ERP_LIVE_ACTORS_MATRIX.md               |   3 +
+ docs/ERP_LIVE_Z5_OPERATOR_ACTOR_UX.md        |  11 +
+ docs/PRODUCT_B_INTERNAL_UI_KIT_FOUNDATION.md |  61 +++
+ locales/en/common.json                       |  20 +-
+ locales/es/common.json                       |  20 +-
+ services/apiClient.ts                        |  10 +-
+ services/apiError.ts                         |  10 +
+ services/liveActorResolver.ts                |  91 +---
+ services/livePermissionGuards.ts             |  25 +-
+ 16 files changed, 802 insertions(+), 352 deletions(-)

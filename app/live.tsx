@@ -1,4 +1,6 @@
 import QRScannerModal from '@/components/qr/QRScannerModal';
+import AppShell from '@/components/layout/AppShell';
+import { SidebarSection } from '@/components/layout/Sidebar';
 import LiveDesktopLayout from '@/components/live/LiveDesktopLayout';
 import LiveMobileLayout from '@/components/live/LiveMobileLayout';
 import LiveTabletLayout from '@/components/live/LiveTabletLayout';
@@ -9,7 +11,6 @@ import {
   LiveMetricCard,
   LiveWarningCard,
 } from '@/components/live/LiveCommerceCards';
-import AppBackButton from '@/components/ui/AppBackButton';
 import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
@@ -17,11 +18,15 @@ import AppInfoCard from '@/components/ui/AppInfoCard';
 import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
 import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
-import { hasEffectivePermission } from '@/services/accessControl';
+import {
+  canAccess,
+  canAccessByPermission,
+  hasEffectivePermission,
+  isAdmin,
+} from '@/services/accessControl';
 import { ApiError } from '@/services/apiClient';
 import { Customer, getCustomersByBranch } from '@/services/customerService';
 import { getItemsByBranch, Item } from '@/services/itemService';
@@ -53,7 +58,6 @@ import {
   LiveLayoutPreferences,
 } from '@/services/liveLayoutPreferences';
 import {
-  canOperateLive,
   canSelectLiveCustomer,
   canSelectLiveItem,
   canViewLive,
@@ -77,12 +81,10 @@ import {
   Alert,
   FlatList,
   Modal,
-  Platform,
   Pressable,
   StyleSheet,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type RecentLiveReservation = {
   reservation: Reservation;
@@ -214,6 +216,58 @@ function getItemStatusLabel(status: string | null | undefined, t: (key: string) 
     default:
       return t('live.itemStatusUnknown');
   }
+}
+
+function buildLiveNavSections(session: UserSession | null): SidebarSection[] {
+  const liveAllowed = canViewLive(session);
+  const customersAllowed = canAccessByPermission(session, 'VIEW_CUSTOMERS');
+  const reservationsAllowed =
+    canAccess(session, 'DOOR_RESERVATION', 'DO_DOOR_RESERVATION') || liveAllowed;
+  const usersAllowed = canAccessByPermission(session, 'MANAGE_USERS') || isAdmin(session);
+  const systemAllowed =
+    canAccessByPermission(session, 'MANAGE_ROLES') ||
+    canAccessByPermission(session, 'MANAGE_BRANCH_CHANNELS') ||
+    isAdmin(session);
+  const reportsAllowed = canAccessByPermission(session, 'VIEW_REPORTS') || isAdmin(session);
+  const appearanceAllowed = isAdmin(session);
+
+  const primaryItems = [
+    { key: 'home', label: 'Inicio', route: '/', icon: 'space-dashboard' as const },
+    liveAllowed ? { key: 'live', label: 'LIVE', route: '/live', icon: 'live-tv' as const } : null,
+    customersAllowed
+      ? { key: 'customers', label: 'Clientes', route: '/customers', icon: 'groups' as const }
+      : null,
+    reservationsAllowed
+      ? { key: 'reservations', label: 'Reservas', route: '/reservations', icon: 'bookmark' as const }
+      : null,
+  ].filter(Boolean);
+
+  const controlItems = [
+    usersAllowed
+      ? { key: 'users', label: 'Usuarios', route: '/users', icon: 'manage-accounts' as const }
+      : null,
+    systemAllowed
+      ? { key: 'system', label: 'Sistema', route: '/system', icon: 'settings' as const }
+      : null,
+    reportsAllowed
+      ? { key: 'reports', label: 'Reportes', route: '/reports', icon: 'analytics' as const }
+      : null,
+    appearanceAllowed
+      ? { key: 'appearance', label: 'Configuracion', route: '/appearance', icon: 'palette' as const }
+      : null,
+  ].filter(Boolean);
+
+  const developmentItems = [
+    appearanceAllowed
+      ? { key: 'ui-kit', label: 'UI Kit', route: '/ui-kit', icon: 'dashboard-customize' as const }
+      : null,
+  ].filter(Boolean);
+
+  return [
+    { title: 'Operacion', items: primaryItems },
+    { title: 'Control', items: controlItems },
+    { title: 'Desarrollo', items: developmentItems },
+  ].filter((section) => section.items.length > 0) as SidebarSection[];
 }
 
 function activeItemFromLive(live: Live | null): Item | null {
@@ -417,7 +471,6 @@ function LiveNoticeModal({ notice, onClose }: LiveNoticeModalProps) {
 export default function LiveScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
-  const insets = useSafeAreaInsets();
   const { isDesktop, isTablet, isPhone } = useResponsiveLayout();
   const { t } = useTranslation('common');
   const LiveLayout = isDesktop
@@ -435,6 +488,7 @@ export default function LiveScreen() {
   const [liveNotice, setLiveNotice] = useState<LiveNotice | null>(null);
   const [closeLiveToConfirm, setCloseLiveToConfirm] = useState<Live | null>(null);
   const [activateLiveToConfirm, setActivateLiveToConfirm] = useState<Live | null>(null);
+  const [cancelReservationToConfirm, setCancelReservationToConfirm] = useState<number | null>(null);
   const [reservationIssue, setReservationIssue] = useState<string | null>(null);
   const [showDemoMetrics, setShowDemoMetrics] = useState(true);
   const [liveLayoutPreferences, setLiveLayoutPreferences] =
@@ -880,12 +934,23 @@ export default function LiveScreen() {
     : !liveChannelId
       ? t('live.channelReason')
     : '';
-  const mayOperateLive = liveCapabilities.canOperateLive;
   const maySelectCustomer = liveCapabilities.canSelectCustomer;
   const mayCreateCustomer = liveCapabilities.canCreateCustomer;
   const maySelectItem = liveCapabilities.canSelectItem;
   const mayCreateItem = liveCapabilities.canCreateItem;
-  const canViewPayments = hasEffectivePermission(session, 'VIEW_PAYMENTS');
+  const mayStartLive = liveCapabilities.canStartLive;
+  const mayCloseLive = liveCapabilities.canCloseLive;
+  const mayPrepareItem = liveCapabilities.canPrepareItem;
+  const maySetActiveItem = liveCapabilities.canSetActiveItem;
+  const mayClearActiveItem = liveCapabilities.canClearActiveItem;
+  const mayReserveLive = liveCapabilities.canCreateReservation;
+  const mayCancelLiveReservation = liveCapabilities.canCancelReservation;
+  const mayMarkLivePending = liveCapabilities.canMarkPending;
+  const mayMarkLiveOperationalSold = liveCapabilities.canMarkOperationalSold;
+  const mayChangeLiveReservationStatus = liveCapabilities.canChangeReservationStatus;
+  const mayChangeLivePrice = liveCapabilities.canChangeLivePrice;
+  const canViewPayments = liveCapabilities.canViewPayments;
+  const canAccessCashbox = liveCapabilities.canAccessCashbox;
   const mayViewAnalytics = canViewLiveAnalytics(session);
   const isMobileLayout = isPhone;
   const showRolesWidget =
@@ -1151,6 +1216,15 @@ export default function LiveScreen() {
     : selectedLiveStatus === 'CLOSED'
       ? t('live.operatorLiveClosedHelp')
       : t('live.operatorNoLiveStateHelp');
+  const operatorHeaderMeta = [
+    selectedLive ? t('live.liveNumber', { id: selectedLive.id }) : t('live.operatorNoLiveActiveShort'),
+    session?.branchName || t('live.branchUnavailable'),
+    operatorLatestReservation
+      ? t('live.operatorLatestReservation', {
+          id: operatorLatestReservation.reservation.id,
+        })
+      : t('live.noRecentReservationsShort'),
+  ];
   const selectedCustomerSummary = useMemo(() => {
     if (!selectedCustomer) {
       return null;
@@ -1210,7 +1284,7 @@ export default function LiveScreen() {
         : getLiveReservationOperationalStatusLabel(operationalStatus, t);
 
     return (
-      <LiveCompactCard>
+      <View style={styles.recentReservationInfoPanel}>
         <View style={styles.recentReservationHeader}>
           <View style={styles.recentReservationText}>
             <View style={styles.recentReservationBadgeRow}>
@@ -1305,7 +1379,7 @@ export default function LiveScreen() {
             {t('live.operationalSoldPersistedNoPaymentHelp')}
           </AppText>
         ) : null}
-      </LiveCompactCard>
+      </View>
     );
   };
   const getItemLiveAvailability = useCallback(
@@ -1394,12 +1468,12 @@ export default function LiveScreen() {
     },
     [branchReservations, canViewPayments, paidByReservationId, t]
   );
-  const operatorStartDisabledReason = !mayOperateLive
+  const operatorStartDisabledReason = !mayStartLive
     ? t('live.liveOperatePermissionError')
     : isSavingLive
       ? t('live.actionInProgress')
       : '';
-  const operatorFinishDisabledReason = !mayOperateLive
+  const operatorFinishDisabledReason = !mayCloseLive
     ? t('live.liveOperatePermissionError')
     : !selectedLiveIsOperable
       ? t('live.selectOpenLiveReason')
@@ -1486,9 +1560,19 @@ export default function LiveScreen() {
 
   const handleUpdateReservationOperationalStatus = async (
     reservationId: number,
-    status: LiveReservationOperationalStatus
+    status: LiveReservationOperationalStatus,
+    reason?: string
   ) => {
-    if (!session || !selectedLive || !canOperateLive(session)) {
+    const canApplyStatus =
+      status === 'OPERATIONAL_SOLD'
+        ? mayMarkLiveOperationalSold
+        : status === 'CANCELLED'
+          ? mayCancelLiveReservation
+          : status === 'PENDING'
+            ? mayMarkLivePending
+            : mayChangeLiveReservationStatus;
+
+    if (!session || !selectedLive || !canApplyStatus) {
       setLiveNotice({
         title: t('live.permissionDeniedTitle'),
         message: t('live.liveOperatePermissionError'),
@@ -1502,7 +1586,8 @@ export default function LiveScreen() {
     try {
       const updatedReservation = await updateLiveReservationOperationalStatus(
         reservationId,
-        status
+        status,
+        reason
       );
 
       const applyReservation = (reservation: Reservation) =>
@@ -1540,13 +1625,54 @@ export default function LiveScreen() {
     }
   };
 
+  const handleConfirmOperationalSold = (reservationId: number) => {
+    if (!mayMarkLiveOperationalSold) {
+      setLiveNotice({
+        title: t('live.permissionDeniedTitle'),
+        message: t('live.liveOperatePermissionError'),
+        tone: 'warning',
+      });
+      return;
+    }
+
+    Alert.alert(t('live.operationalSoldConfirmTitle'), t('live.operationalSoldConfirmMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('live.confirmOperationalSold'),
+        onPress: () =>
+          handleUpdateReservationOperationalStatus(reservationId, 'OPERATIONAL_SOLD'),
+      },
+    ]);
+  };
+
+  const handleCancelLiveReservation = (reservationId: number) => {
+    if (!mayCancelLiveReservation) {
+      setLiveNotice({
+        title: t('live.permissionDeniedTitle'),
+        message: t('live.liveOperatePermissionError'),
+        tone: 'warning',
+      });
+      return;
+    }
+
+    setCancelReservationToConfirm(reservationId);
+  };
+
+  const confirmCancelLiveReservation = async (reason: string) => {
+    if (!cancelReservationToConfirm) return;
+
+    const reservationId = cancelReservationToConfirm;
+    setCancelReservationToConfirm(null);
+    await handleUpdateReservationOperationalStatus(reservationId, 'CANCELLED', reason);
+  };
+
   const handleCreateLive = async () => {
     if (!session) {
       Alert.alert(t('live.sessionTitle'), t('live.noActiveSession'));
       return;
     }
 
-    if (!canOperateLive(session)) {
+    if (!mayStartLive) {
       setLiveNotice({
         title: t('live.permissionDeniedTitle'),
         message: t('live.liveOperatePermissionError'),
@@ -1605,7 +1731,7 @@ export default function LiveScreen() {
       return;
     }
 
-    if (!mayOperateLive) {
+    if (!mayStartLive) {
       setLiveNotice({
         title: t('live.permissionDeniedTitle'),
         message: t('live.liveOperatePermissionError'),
@@ -1685,7 +1811,7 @@ export default function LiveScreen() {
   const handleActivateLive = async (live: Live) => {
     if (!session) return;
 
-    if (!canOperateLive(session)) {
+    if (!mayStartLive) {
       setLiveNotice({
         title: t('live.permissionDeniedTitle'),
         message: t('live.liveOperatePermissionError'),
@@ -1720,7 +1846,7 @@ export default function LiveScreen() {
   };
 
   const handleCloseLive = (live: Live) => {
-    if (!canOperateLive(session)) {
+    if (!mayCloseLive) {
       setLiveNotice({
         title: t('live.permissionDeniedTitle'),
         message: t('live.liveOperatePermissionError'),
@@ -1829,7 +1955,7 @@ export default function LiveScreen() {
       return;
     }
 
-    if (!canOperateLive(session)) {
+    if (!maySetActiveItem) {
       setLiveNotice({
         title: t('live.permissionDeniedTitle'),
         message: t('live.liveOperatePermissionError'),
@@ -1890,7 +2016,7 @@ export default function LiveScreen() {
       return;
     }
 
-    if (!canOperateLive(session)) {
+    if (!mayClearActiveItem) {
       setLiveNotice({
         title: t('live.permissionDeniedTitle'),
         message: t('live.liveOperatePermissionError'),
@@ -1974,7 +2100,7 @@ export default function LiveScreen() {
       return false;
     }
 
-    if (!canOperateLive(session)) {
+    if (!mayReserveLive) {
       setReservationIssue(t('live.liveOperatePermissionError'));
       return false;
     }
@@ -2177,37 +2303,37 @@ export default function LiveScreen() {
     const availability = getItemLiveAvailability(item);
     const blockingReservation = findBlockingReservationForItem(item.id);
     const isHighlightedReserved = !!options.highlighted && !!blockingReservation;
+    const isHighlightedBlocked =
+      !!options.highlighted && !isHighlightedReserved && !availability.canGoOnAir;
     const cardBorderColor = isHighlightedReserved
-      ? '#f59e0b'
+      ? theme.colors.warning
+      : isHighlightedBlocked
+        ? theme.colors.danger
       : options.highlighted
       ? theme.colors.success
       : isPreparedForChange
-        ? '#f59e0b'
+        ? theme.colors.warning
         : theme.colors.border;
     const cardBackgroundColor = isHighlightedReserved
-      ? theme.isDark
-        ? '#451a03'
-        : '#fff7e6'
+      ? theme.colors.surface
+      : isHighlightedBlocked
+        ? theme.colors.surface
       : options.highlighted
       ? theme.colors.successBackground
       : isPreparedForChange
-        ? theme.isDark
-          ? '#451a03'
-          : '#fff7e6'
+        ? theme.colors.warningBackground
         : theme.colors.surface;
     const placeholderBackgroundColor = isHighlightedReserved
-      ? theme.isDark
-        ? '#78350f'
-        : '#fffbeb'
+      ? theme.colors.surface
       : options.highlighted
       ? theme.colors.surface
       : isPreparedForChange
-        ? theme.isDark
-          ? '#78350f'
-          : '#fffbeb'
+        ? theme.colors.surface
         : theme.colors.infoCardBackground;
     const stateColor = isHighlightedReserved
       ? theme.colors.warning
+      : isHighlightedBlocked
+        ? theme.colors.danger
       : options.highlighted
       ? theme.colors.success
       : isPreparedForChange
@@ -2218,6 +2344,8 @@ export default function LiveScreen() {
       : availability.label;
     const availabilityTone = isHighlightedReserved
       ? theme.colors.warning
+      : isHighlightedBlocked
+        ? theme.colors.danger
       : availability.canGoOnAir
         ? theme.colors.success
         : theme.colors.warning;
@@ -2230,6 +2358,8 @@ export default function LiveScreen() {
             borderColor: cardBorderColor,
             borderRadius: theme.radius.md,
             backgroundColor: cardBackgroundColor,
+            borderLeftColor: cardBorderColor,
+            borderLeftWidth: options.highlighted || isPreparedForChange ? 5 : 1,
           },
         ]}
       >
@@ -2259,15 +2389,15 @@ export default function LiveScreen() {
               <AppText bold numberOfLines={2}>
                 {itemName}
               </AppText>
-              <AppText variant="caption" color={theme.colors.mutedText}>
-                {isHighlightedReserved
-                  ? t('live.activeItemReservedHelp')
-                  : options.highlighted
+              {!isHighlightedReserved ? (
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  {options.highlighted
                     ? t('live.activeItemReservationHelp')
-                  : options.showOnAirAction && activeItem
-                    ? t('live.preparedItemReservationHelp')
-                    : t('live.productOnAirHelp')}
-              </AppText>
+                    : options.showOnAirAction && activeItem
+                      ? t('live.preparedItemReservationHelp')
+                      : t('live.productOnAirHelp')}
+                </AppText>
+              ) : null}
             </View>
             {isOnAir ? (
               <>
@@ -2290,8 +2420,8 @@ export default function LiveScreen() {
                     style={[
                       styles.operatorItemBadge,
                       {
-                        backgroundColor: theme.isDark ? '#78350f' : '#fffbeb',
-                        borderColor: '#f59e0b',
+                        backgroundColor: theme.colors.warningBackground,
+                        borderColor: theme.colors.warning,
                         borderRadius: theme.radius.sm,
                       },
                     ]}
@@ -2307,8 +2437,8 @@ export default function LiveScreen() {
                 style={[
                   styles.operatorItemBadge,
                   {
-                    backgroundColor: theme.isDark ? '#78350f' : '#fffbeb',
-                    borderColor: '#f59e0b',
+                    backgroundColor: theme.colors.warningBackground,
+                    borderColor: theme.colors.warning,
                     borderRadius: theme.radius.sm,
                   },
                 ]}
@@ -2332,11 +2462,25 @@ export default function LiveScreen() {
             </AppText>
           ) : null}
           {isHighlightedReserved ? (
-            <AppText variant="caption" color={theme.colors.warning}>
-              {t('live.activeItemReservedNextStepHelp')}
-            </AppText>
+            <View
+              style={[
+                styles.operatorItemNotice,
+                {
+                  backgroundColor: theme.colors.warningBackground,
+                  borderColor: theme.colors.warning,
+                  borderRadius: theme.radius.sm,
+                },
+              ]}
+            >
+              <AppText variant="caption" color={theme.colors.warning}>
+                {t('live.activeItemReservedNextStepHelp')}
+              </AppText>
+            </View>
           ) : !availability.canGoOnAir && availability.reason ? (
-            <AppText variant="caption" color={theme.colors.warning}>
+            <AppText
+              variant="caption"
+              color={isHighlightedBlocked ? theme.colors.danger : theme.colors.warning}
+            >
               {availability.reason}
             </AppText>
           ) : null}
@@ -2387,18 +2531,18 @@ export default function LiveScreen() {
                   ? t('live.productAlreadyOnAir')
                   : t('live.markSelectedProductOnAir')
               }
-              variant={isOnAir ? 'secondary' : 'operation'}
+              variant={isOnAir ? 'neutral' : 'primary'}
               onPress={handleSetSelectedItemActive}
               loading={isSavingActiveItem}
               disabled={
                 isSavingActiveItem ||
                 !operatorFlowEnabled ||
-                !mayOperateLive ||
+                !maySetActiveItem ||
                 isOnAir ||
                 !availability.canGoOnAir
               }
               disabledReason={
-                !mayOperateLive
+                !maySetActiveItem
                   ? t('live.liveOperatePermissionError')
                   : !operatorFlowEnabled
                     ? t('live.selectOpenLiveReason')
@@ -2415,12 +2559,12 @@ export default function LiveScreen() {
               <View style={styles.buttonFill}>
                 <AppButton
                   title={t('live.clearProductOnAir')}
-                  variant="secondary"
+                  variant="neutral"
                   onPress={handleClearActiveItem}
                   loading={isSavingActiveItem}
-                  disabled={isSavingActiveItem || !operatorFlowEnabled || !mayOperateLive}
+                  disabled={isSavingActiveItem || !operatorFlowEnabled || !mayClearActiveItem}
                   disabledReason={
-                    !mayOperateLive
+                    !mayClearActiveItem
                       ? t('live.liveOperatePermissionError')
                       : !operatorFlowEnabled
                         ? t('live.selectOpenLiveReason')
@@ -2448,9 +2592,9 @@ export default function LiveScreen() {
       style={[
         styles.operatorItemCard,
         {
-          borderColor: theme.isDark ? '#1d4ed8' : '#bfdbfe',
+          borderColor: theme.colors.infoCardBorder,
           borderRadius: theme.radius.md,
-          backgroundColor: theme.isDark ? '#172554' : '#eff6ff',
+          backgroundColor: theme.colors.infoCardBackground,
         },
       ]}
     >
@@ -2544,8 +2688,8 @@ export default function LiveScreen() {
           style={[
             styles.presenterEmptyOnAirCard,
             {
-              backgroundColor: theme.isDark ? '#172554' : '#eff6ff',
-              borderColor: theme.isDark ? '#1d4ed8' : '#bfdbfe',
+              backgroundColor: theme.colors.infoCardBackground,
+              borderColor: theme.colors.infoCardBorder,
               borderRadius: theme.radius.md,
             },
           ]}
@@ -3348,35 +3492,43 @@ export default function LiveScreen() {
   };
   const preparedItem =
     selectedItem && activeItem?.id !== selectedItem.id ? selectedItem : null;
-  const liveHeaderSafeTop =
-    Platform.OS === 'android' ? Math.max(insets.top - 12, 8) : 0;
+  const navSections = useMemo(() => buildLiveNavSections(session), [session]);
+  const liveShellSubtitle = isTablet
+    ? t('live.tabletHeaderHelp')
+    : isDesktop
+      ? t('live.desktopHeaderHelp')
+      : t('live.mobileHeaderHelp');
+  const liveShellContextSubtitle = selectedLive
+    ? operatorHeaderMeta.join(' · ')
+    : t('live.noActiveTransmission');
 
   if (isAllowed === null || isLoading) {
     return (
-      <AppScreen>
+      <AppShell
+        title={t('live.title')}
+        subtitle={liveShellSubtitle}
+        contextTitle={t('live.liveOperationTitle')}
+        contextSubtitle={liveShellContextSubtitle}
+        activeRoute="live"
+        session={session}
+        navSections={navSections}
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShell>
     );
   }
 
   return (
     <>
-      <AppScreen>
-        <View style={[styles.liveHeader, { paddingTop: liveHeaderSafeTop }]}>
-          <AppBackButton fallbackRoute="/" />
-          <View style={styles.liveHeaderText}>
-            <AppText variant="title" bold>
-              {t('live.title')}
-            </AppText>
-            <AppText color={theme.colors.mutedText} numberOfLines={2}>
-              {isTablet
-                ? t('live.tabletHeaderHelp')
-                : isDesktop
-                  ? t('live.desktopHeaderHelp')
-                  : t('live.mobileHeaderHelp')}
-            </AppText>
-          </View>
-        </View>
+      <AppShell
+        title={t('live.title')}
+        subtitle={liveShellSubtitle}
+        contextTitle={t('live.liveOperationTitle')}
+        contextSubtitle={liveShellContextSubtitle}
+        activeRoute="live"
+        session={session}
+        navSections={navSections}
+      >
         {liveLoadIssue ? (
           <AppInfoCard title={t('live.liveLoadIssueTitle')}>
             <AppText>{liveLoadIssue}</AppText>
@@ -3389,18 +3541,34 @@ export default function LiveScreen() {
         ) : null}
 
         {isOperatorFocusedView ? (
-          <LiveActionCard style={styles.operatorHeroCard}>
+          <LiveActionCard
+            style={[
+              styles.operatorHeroCard,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border,
+              },
+            ]}
+          >
             <View style={styles.operatorHeroTop}>
               <View style={styles.operatorHeroTitle}>
                 <AppText variant="caption" color={theme.colors.accent} bold>
-                  {t(liveActorContext.labelKey)}
+                  {t(liveActorContext.labelKey)} · {t('live.operatorReservationTracking')}
                 </AppText>
-                <AppText variant="title" bold>
-                  {t('live.operatorReservationTracking')}
-                </AppText>
-                <AppText color={theme.colors.mutedText}>
-                  {t(liveActorContext.subtitleKey)}
-                </AppText>
+                {!isDesktop ? (
+                  <View style={styles.operatorHeroMetaRow}>
+                    {operatorHeaderMeta.map((entry) => (
+                      <AppText
+                        key={entry}
+                        variant="caption"
+                        color={theme.colors.mutedText}
+                        numberOfLines={1}
+                      >
+                        {entry}
+                      </AppText>
+                    ))}
+                  </View>
+                ) : null}
               </View>
               <View
                 style={[
@@ -3435,32 +3603,9 @@ export default function LiveScreen() {
                 </AppText>
               </View>
             </View>
-
-            <View
-              style={[
-                styles.operatorLiveStateCard,
-                {
-                  borderColor: operatorLiveIsActive
-                    ? theme.colors.success
-                    : selectedLiveStatus === 'CLOSED'
-                      ? theme.colors.danger
-                      : theme.colors.border,
-                  borderRadius: theme.radius.md,
-                  backgroundColor: operatorLiveIsActive
-                    ? theme.colors.successBackground
-                    : theme.colors.surface,
-                },
-              ]}
-            >
-              <AppText
-                variant="caption"
-                color={operatorLiveIsActive ? theme.colors.success : theme.colors.mutedText}
-                bold
-              >
-                {operatorLiveStateLabel}
-              </AppText>
-              <AppText color={theme.colors.mutedText}>{operatorLiveStateHelp}</AppText>
-            </View>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {operatorLiveStateHelp}
+            </AppText>
 
             {!operatorLiveIsActive ? (
               <AppButton
@@ -3469,10 +3614,10 @@ export default function LiveScreen() {
                     ? t('live.operatorStartNewLive')
                     : t('live.operatorStartLive')
                 }
-                variant="operation"
+                variant="primary"
                 onPress={handleStartLiveNow}
                 loading={isSavingLive}
-                disabled={isSavingLive || !mayOperateLive}
+                disabled={isSavingLive || !mayStartLive}
                 disabledReason={operatorStartDisabledReason}
                 style={styles.operatorPrimaryButton}
               />
@@ -3489,7 +3634,7 @@ export default function LiveScreen() {
             ) : (
               <>
                 <View style={styles.operatorStepStack}>
-                  <LiveCompactCard style={styles.operatorFlowStepCard}>
+                  <LiveCompactCard style={[styles.operatorFlowStepCard, styles.operatorPrepareItemPanel]}>
                     <AppText variant="caption" color={theme.colors.accent} bold>
                       1. {t('live.operatorStepProduct')}
                     </AppText>
@@ -3503,14 +3648,14 @@ export default function LiveScreen() {
                         title: t('live.searchItem'),
                         subtitle: t('live.searchItemActionHelp'),
                         onPress: () => setIsItemModalVisible(true),
-                        disabled: !maySelectItem,
+                        disabled: !mayPrepareItem,
                       })}
                       {renderOperatorItemActionCard({
                         icon: 'qr-code-scanner',
                         title: t('live.scanQr'),
                         subtitle: t('live.scanQrActionHelp'),
                         onPress: () => setIsScannerVisible(true),
-                        disabled: !maySelectItem,
+                        disabled: !mayPrepareItem,
                       })}
                       {renderOperatorItemActionCard({
                         icon: 'add-circle-outline',
@@ -3530,7 +3675,7 @@ export default function LiveScreen() {
                       : null}
                   </LiveCompactCard>
 
-                  <LiveCompactCard style={styles.operatorFlowStepCard}>
+                  <LiveCompactCard style={[styles.operatorFlowStepCard, styles.operatorActiveItemPanel]}>
                     <AppText variant="caption" color={theme.colors.accent} bold>
                       2. {t('live.operatorStepActiveItem')}
                     </AppText>
@@ -3549,13 +3694,16 @@ export default function LiveScreen() {
                       : null}
                   </LiveCompactCard>
 
-                  <LiveCompactCard style={styles.operatorFlowStepCard}>
+                  <View style={styles.operatorBookingGrid}>
+                  <LiveCompactCard style={[styles.operatorFlowStepCard, styles.operatorInlinePanel]}>
                     <AppText variant="caption" color={theme.colors.accent} bold>
                       3. {t('live.operatorStepPrice')}
                     </AppText>
                     <AppText variant="caption" color={theme.colors.mutedText}>
                       {activeItem
-                        ? t('live.priceUsesActiveItemHelp')
+                        ? mayChangeLivePrice
+                          ? t('live.priceUsesActiveItemHelp')
+                          : t('live.livePriceReadOnlyHelp')
                         : t('live.reserveNeedsActiveItem')}
                     </AppText>
                     {activeItem?.price !== null && activeItem?.price !== undefined ? (
@@ -3571,7 +3719,7 @@ export default function LiveScreen() {
                       onChangeText={setPriceText}
                       placeholder="0.00"
                       keyboardType="numeric"
-                      editable={!!activeItem}
+                      editable={!!activeItem && mayChangeLivePrice}
                     />
                     <AppText variant="caption" color={theme.colors.mutedText}>
                       {hasValidReservationPrice
@@ -3582,9 +3730,9 @@ export default function LiveScreen() {
                     </AppText>
                   </LiveCompactCard>
 
-                  <LiveCompactCard style={styles.operatorFlowStepCard}>
+                  <LiveCompactCard style={[styles.operatorFlowStepCard, styles.operatorInlinePanel]}>
                     <AppText variant="caption" color={theme.colors.accent} bold>
-                      4. {t('live.operatorStepCustomer')}
+                      3. {t('live.operatorStepCustomer')}
                     </AppText>
                     {!activeItem ? (
                       <AppText variant="caption" color={theme.colors.mutedText}>
@@ -3683,7 +3831,7 @@ export default function LiveScreen() {
                               ? t('live.changeCustomer')
                               : t('live.selectCustomer')
                           }
-                          variant="operation"
+                          variant="primary"
                           onPress={() => setIsCustomerModalVisible(true)}
                           disabled={!maySelectCustomer || !activeItem || !hasValidReservationPrice}
                           disabledReason={
@@ -3715,52 +3863,62 @@ export default function LiveScreen() {
                     </View>
                   </LiveCompactCard>
 
-                  <LiveCompactCard style={styles.operatorFlowStepCard}>
+                  </View>
+
+                  <LiveCompactCard style={[styles.operatorFlowStepCard, styles.operatorReservePanel]}>
                     <AppText variant="caption" color={theme.colors.accent} bold>
-                      5. {t('live.operatorStepReservation')}
+                      4. {t('live.operatorStepReservation')}
                     </AppText>
                     <AppText variant="caption" color={theme.colors.mutedText}>
                       {t('live.reserveActiveItemHelp')}
                     </AppText>
-                    <LiveWarningCard style={styles.reservationRiskCard}>
-                      <AppText variant="caption" color={theme.colors.warning} bold>
-                        {t('live.reservationRiskTitle')}
-                      </AppText>
+                    {activeItemBlockingReservationForValidation ? (
+                      <LiveWarningCard style={styles.reservationRiskCard}>
+                        <AppText variant="caption" color={theme.colors.warning} bold>
+                          {t('live.activeItemAlreadyReservedTitle')}
+                        </AppText>
+                        <AppText variant="caption" color={theme.colors.mutedText}>
+                          {t('live.activeItemAlreadyReservedReason')}
+                        </AppText>
+                      </LiveWarningCard>
+                    ) : (
                       <AppText variant="caption" color={theme.colors.mutedText}>
                         {t('live.reservationRiskHelp')}
                       </AppText>
-                    </LiveWarningCard>
+                    )}
+                    {reservationPendingReason || activeItemBlockingReservationForValidation ? (
+                      <AppText
+                        variant="caption"
+                        color={
+                          activeItemBlockingReservationForValidation
+                            ? theme.colors.warning
+                            : theme.colors.mutedText
+                        }
+                      >
+                        {activeItemBlockingReservationForValidation
+                          ? t('live.activeItemAlreadyReservedReason')
+                          : reservationPendingReason}
+                      </AppText>
+                    ) : null}
+                    <AppButton
+                      title={t('live.operatorReserveNow')}
+                      variant={activeItemBlockingReservationForValidation ? 'neutral' : 'primary'}
+                      onPress={handleCreateReservation}
+                      loading={isSavingReservation}
+                      disabled={
+                        isSavingReservation ||
+                        !mayReserveLive ||
+                        !!activeItemBlockingReservationForValidation
+                      }
+                      disabledReason={
+                        activeItemBlockingReservationForValidation
+                          ? t('live.activeItemAlreadyReservedReason')
+                          : reservationPendingReason || t('live.liveOperatePermissionError')
+                      }
+                      style={styles.operatorPrimaryButton}
+                    />
                   </LiveCompactCard>
                 </View>
-
-                {activeItemBlockingReservationForValidation ? (
-                  <LiveWarningCard style={styles.reservationRiskCard}>
-                    <AppText variant="caption" color={theme.colors.warning} bold>
-                      {t('live.activeItemAlreadyReservedTitle')}
-                    </AppText>
-                    <AppText variant="caption" color={theme.colors.mutedText}>
-                      {t('live.activeItemAlreadyReservedReason')}
-                    </AppText>
-                  </LiveWarningCard>
-                ) : null}
-
-                <AppButton
-                  title={t('live.operatorReserveNow')}
-                  variant="operation"
-                  onPress={handleCreateReservation}
-                  loading={isSavingReservation}
-                  disabled={
-                    isSavingReservation ||
-                    !mayOperateLive ||
-                    !!activeItemBlockingReservationForValidation
-                  }
-                  disabledReason={
-                    activeItemBlockingReservationForValidation
-                      ? t('live.activeItemAlreadyReservedReason')
-                      : reservationPendingReason || t('live.liveOperatePermissionError')
-                  }
-                  style={styles.operatorPrimaryButton}
-                />
 
                 <View style={styles.operatorFollowUpRow}>
                   <AppText variant="caption" color={theme.colors.mutedText}>
@@ -3823,26 +3981,21 @@ export default function LiveScreen() {
                                   onPress={() => goToReservationDetail(reservation.id)}
                                 />
                               </View>
-                              {!settled && !operationalSold && !operationalCancelled && mayOperateLive ? (
+                              {!settled && !operationalSold && !operationalCancelled && mayMarkLiveOperationalSold ? (
                                 <View style={styles.buttonFill}>
                                   <AppButton
                                     title={t('live.markOperationalSold')}
-                                    variant="operation"
+                                    variant="primary"
                                     loading={isUpdatingOperationalStatus}
-                                    onPress={() =>
-                                      handleUpdateReservationOperationalStatus(
-                                        reservation.id,
-                                        'OPERATIONAL_SOLD'
-                                      )
-                                    }
+                                    onPress={() => handleConfirmOperationalSold(reservation.id)}
                                   />
                                 </View>
                               ) : null}
-                              {operationalStatus === 'RESERVED' && mayOperateLive ? (
+                              {operationalStatus === 'RESERVED' && mayMarkLivePending ? (
                                 <View style={styles.buttonFill}>
                                   <AppButton
                                     title={t('live.markPending')}
-                                    variant="secondary"
+                                    variant="neutral"
                                     loading={isUpdatingOperationalStatus}
                                     onPress={() =>
                                       handleUpdateReservationOperationalStatus(
@@ -3853,7 +4006,8 @@ export default function LiveScreen() {
                                   />
                                 </View>
                               ) : null}
-                              {(operationalStatus === 'PENDING' || operationalSold) && mayOperateLive ? (
+                              {(operationalStatus === 'PENDING' || operationalSold) &&
+                              mayChangeLiveReservationStatus ? (
                                 <View style={styles.buttonFill}>
                                   <AppButton
                                     title={t('live.returnToReserved')}
@@ -3868,22 +4022,17 @@ export default function LiveScreen() {
                                   />
                                 </View>
                               ) : null}
-                              {!operationalCancelled && mayOperateLive ? (
+                              {!operationalCancelled && mayCancelLiveReservation ? (
                                 <View style={styles.buttonFill}>
                                   <AppButton
                                     title={t('live.cancelOperational')}
-                                    variant="cancel"
+                                    variant="danger"
                                     loading={isUpdatingOperationalStatus}
-                                    onPress={() =>
-                                      handleUpdateReservationOperationalStatus(
-                                        reservation.id,
-                                        'CANCELLED'
-                                      )
-                                    }
+                                    onPress={() => handleCancelLiveReservation(reservation.id)}
                                   />
                                 </View>
                               ) : null}
-                              {operationalCancelled && mayOperateLive ? (
+                              {operationalCancelled && mayChangeLiveReservationStatus ? (
                                 <View style={styles.buttonFill}>
                                   <AppButton
                                     title={t('live.reactivateReserved')}
@@ -3918,7 +4067,7 @@ export default function LiveScreen() {
                   variant="danger"
                   onPress={() => (selectedLive ? handleCloseLive(selectedLive) : undefined)}
                   loading={isSavingLive}
-                  disabled={isSavingLive || !selectedLiveIsOperable || !mayOperateLive}
+                  disabled={isSavingLive || !selectedLiveIsOperable || !mayCloseLive}
                   disabledReason={operatorFinishDisabledReason}
                 />
               </>
@@ -4492,7 +4641,7 @@ export default function LiveScreen() {
               ) : null}
 
               <View style={styles.buttonRow}>
-                {mayOperateLive && selectedLive.status === 'OPEN' ? (
+                {mayStartLive && selectedLive.status === 'OPEN' ? (
                   <View style={styles.buttonFill}>
                     <AppButton
                       title={t('live.activateLive')}
@@ -4520,7 +4669,7 @@ export default function LiveScreen() {
             {t('live.createLiveHelp')}
           </AppText>
 
-          {mayOperateLive ? (
+          {mayStartLive ? (
             <>
               <AppInput
                 label={t('live.locationNotesLabel')}
@@ -4649,7 +4798,7 @@ export default function LiveScreen() {
                     ? t('live.changeCustomer')
                     : t('live.selectCustomer')
                 }
-                variant="operation"
+                variant="primary"
                 onPress={() => setIsCustomerModalVisible(true)}
               />
             ) : (
@@ -4710,7 +4859,7 @@ export default function LiveScreen() {
             {maySelectItem ? (
                 <AppButton
                   title={t('live.addItemPrimary')}
-                  variant="operation"
+                  variant="primary"
                   onPress={() => addItemByCode(scanInput)}
                 />
               ) : (
@@ -4728,17 +4877,17 @@ export default function LiveScreen() {
                       ? t('live.productAlreadyOnAir')
                       : t('live.markProductOnAir')
                   }
-                  variant="secondary"
+                  variant="primary"
                   onPress={handleSetSelectedItemActive}
                   loading={isSavingActiveItem}
                   disabled={
                     isSavingActiveItem ||
                     !selectedLiveIsOperable ||
-                    !mayOperateLive ||
+                    !maySetActiveItem ||
                     activeItem?.id === selectedItem.id
                   }
                   disabledReason={
-                    !mayOperateLive
+                    !maySetActiveItem
                       ? t('live.liveOperatePermissionError')
                       : !selectedLiveIsOperable
                         ? t('live.selectOpenLiveReason')
@@ -4757,14 +4906,14 @@ export default function LiveScreen() {
                 <View style={styles.buttonFill}>
                   <AppButton
                     title={t('live.searchItem')}
-                    variant="secondary"
+                    variant="neutral"
                     onPress={() => setIsItemModalVisible(true)}
                   />
                 </View>
                 <View style={styles.buttonFill}>
                 <AppButton
                   title={t('live.scanQr')}
-                  variant="secondary"
+                  variant="neutral"
                   onPress={() => setIsScannerVisible(true)}
                 />
                 </View>
@@ -4822,8 +4971,8 @@ export default function LiveScreen() {
             title={t('live.reserveNow')}
             onPress={handleCreateReservation}
             loading={isSavingReservation}
-            disabled={isSavingReservation || !mayOperateLive}
-            disabledReason={!mayOperateLive ? t('live.liveOperatePermissionError') : undefined}
+            disabled={isSavingReservation || !mayReserveLive}
+            disabledReason={!mayReserveLive ? t('live.liveOperatePermissionError') : undefined}
           />
         </LiveActionCard>
         ) : null}
@@ -4881,26 +5030,21 @@ export default function LiveScreen() {
                         onPress={() => goToReservationDetail(reservation.id)}
                       />
                     </View>
-                    {!settled && !operationalSold && !operationalCancelled && mayOperateLive ? (
+                    {!settled && !operationalSold && !operationalCancelled && mayMarkLiveOperationalSold ? (
                       <View style={styles.buttonFill}>
                         <AppButton
                           title={t('live.markOperationalSold')}
-                          variant="operation"
+                          variant="primary"
                           loading={isUpdatingOperationalStatus}
-                          onPress={() =>
-                            handleUpdateReservationOperationalStatus(
-                              reservation.id,
-                              'OPERATIONAL_SOLD'
-                            )
-                          }
+                          onPress={() => handleConfirmOperationalSold(reservation.id)}
                         />
                       </View>
                     ) : null}
-                    {operationalStatus === 'RESERVED' && mayOperateLive ? (
+                    {operationalStatus === 'RESERVED' && mayMarkLivePending ? (
                       <View style={styles.buttonFill}>
                         <AppButton
                           title={t('live.markPending')}
-                          variant="secondary"
+                          variant="neutral"
                           loading={isUpdatingOperationalStatus}
                           onPress={() =>
                             handleUpdateReservationOperationalStatus(
@@ -4911,7 +5055,22 @@ export default function LiveScreen() {
                         />
                       </View>
                     ) : null}
-                    {operationalStatus === 'PENDING' && mayOperateLive ? (
+                    {operationalStatus === 'PENDING' && mayChangeLiveReservationStatus ? (
+                      <View style={styles.buttonFill}>
+                        <AppButton
+                          title={t('live.returnToReserved')}
+                          variant="neutral"
+                          loading={isUpdatingOperationalStatus}
+                          onPress={() =>
+                            handleUpdateReservationOperationalStatus(
+                              reservation.id,
+                              'RESERVED'
+                            )
+                          }
+                        />
+                      </View>
+                    ) : null}
+                    {operationalSold && mayChangeLiveReservationStatus ? (
                       <View style={styles.buttonFill}>
                         <AppButton
                           title={t('live.returnToReserved')}
@@ -4926,37 +5085,17 @@ export default function LiveScreen() {
                         />
                       </View>
                     ) : null}
-                    {operationalSold && mayOperateLive ? (
-                      <View style={styles.buttonFill}>
-                        <AppButton
-                          title={t('live.returnToReserved')}
-                          variant="secondary"
-                          loading={isUpdatingOperationalStatus}
-                          onPress={() =>
-                            handleUpdateReservationOperationalStatus(
-                              reservation.id,
-                              'RESERVED'
-                            )
-                          }
-                        />
-                      </View>
-                    ) : null}
-                    {!operationalCancelled && mayOperateLive ? (
+                    {!operationalCancelled && mayCancelLiveReservation ? (
                       <View style={styles.buttonFill}>
                         <AppButton
                           title={t('live.cancelOperational')}
-                          variant="cancel"
+                          variant="danger"
                           loading={isUpdatingOperationalStatus}
-                          onPress={() =>
-                            handleUpdateReservationOperationalStatus(
-                              reservation.id,
-                              'CANCELLED'
-                            )
-                          }
+                          onPress={() => handleCancelLiveReservation(reservation.id)}
                         />
                       </View>
                     ) : null}
-                    {operationalCancelled && mayOperateLive ? (
+                    {operationalCancelled && mayChangeLiveReservationStatus ? (
                       <View style={styles.buttonFill}>
                         <AppButton
                           title={t('live.reactivateReserved')}
@@ -4971,7 +5110,7 @@ export default function LiveScreen() {
                         />
                       </View>
                     ) : null}
-                    {!settled && !operationalCancelled && mayOperateLive && canViewPayments ? (
+                    {!settled && !operationalCancelled && canViewPayments && canAccessCashbox ? (
                       <View style={styles.buttonFill}>
                         <AppButton
                           title={t('live.charge')}
@@ -5006,11 +5145,11 @@ export default function LiveScreen() {
             {selectedLive.status === 'CLOSED' ? (
               <AppButton
                 title={t('live.liveClosedButton')}
-                variant="cancel"
+                variant="neutral"
                 disabled
                 style={styles.buttonSpacing}
               />
-            ) : mayOperateLive ? (
+            ) : mayCloseLive ? (
               <AppButton
                 title={t('live.closeLive')}
                 variant="danger"
@@ -5071,7 +5210,7 @@ export default function LiveScreen() {
             })}
           </AppCard>
         ) : null}
-      </AppScreen>
+      </AppShell>
 
       <QRScannerModal
         visible={isScannerVisible}
@@ -5167,6 +5306,41 @@ export default function LiveScreen() {
               {itemLoadIssue || t('live.noAvailableItems')}
             </AppText>
           }
+        />
+      </AppBottomModal>
+
+      <AppBottomModal
+        visible={cancelReservationToConfirm !== null}
+        title={t('live.cancelHoldTitle')}
+        onClose={() => setCancelReservationToConfirm(null)}
+        showCancelButton={false}
+      >
+        <AppText color={theme.colors.mutedText}>
+          {t('live.cancelHoldReasonPrompt')}
+        </AppText>
+        {[
+          t('live.cancelReasonCustomerDeclined'),
+          t('live.cancelReasonCaptureError'),
+          t('live.cancelReasonDuplicate'),
+          t('live.cancelReasonNoInventory'),
+          t('live.cancelReasonOther'),
+        ].map((reason) => (
+          <AppOptionRow
+            key={reason}
+            title={reason}
+            subtitle={
+              reason === t('live.cancelReasonOther')
+                ? t('live.cancelReasonOtherPendingNote')
+                : undefined
+            }
+            onPress={() => confirmCancelLiveReservation(reason)}
+          />
+        ))}
+        <AppButton
+          title={t('common.cancel')}
+          variant="secondary"
+          onPress={() => setCancelReservationToConfirm(null)}
+          disabled={updatingOperationalReservationId !== null}
         />
       </AppBottomModal>
 
@@ -5435,13 +5609,6 @@ const styles = StyleSheet.create({
   liveButtonGrid: {
     marginTop: 8,
   },
-  liveHeader: {
-    gap: 8,
-    marginBottom: 2,
-  },
-  liveHeaderText: {
-    gap: 4,
-  },
   livePulse: {
     height: 9,
     width: 9,
@@ -5514,7 +5681,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   operatorHeroCard: {
+    elevation: 2,
+    gap: 12,
     marginBottom: 12,
+    padding: 12,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+  },
+  operatorHeroMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
   operatorHeroTitle: {
     flex: 1,
@@ -5605,7 +5784,7 @@ const styles = StyleSheet.create({
     minWidth: 120,
   },
   operatorPrimaryButton: {
-    minHeight: 54,
+    minHeight: 48,
   },
   operatorRecentLiveCard: {
     borderWidth: 1,
@@ -5645,7 +5824,12 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   operatorRecentReservationsCard: {
-    gap: 10,
+    elevation: 1,
+    gap: 8,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
   },
   operatorProductStrip: {
     alignItems: 'center',
@@ -5661,25 +5845,30 @@ const styles = StyleSheet.create({
   operatorItemBadge: {
     alignSelf: 'flex-start',
     borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
   },
   operatorItemCard: {
     borderWidth: 1,
+    elevation: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    padding: 12,
+    gap: 10,
+    padding: 10,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
   },
   operatorItemActionCard: {
     alignItems: 'center',
     borderWidth: 1,
     flex: 1,
     flexDirection: 'row',
-    gap: 10,
-    minHeight: 74,
-    minWidth: 190,
-    padding: 12,
+    gap: 8,
+    minHeight: 62,
+    minWidth: 170,
+    padding: 10,
   },
   operatorItemActionGrid: {
     flexDirection: 'row',
@@ -5688,9 +5877,9 @@ const styles = StyleSheet.create({
   },
   operatorItemActionIcon: {
     alignItems: 'center',
-    height: 42,
+    height: 36,
     justifyContent: 'center',
-    width: 42,
+    width: 36,
   },
   operatorItemActionText: {
     flex: 1,
@@ -5699,7 +5888,7 @@ const styles = StyleSheet.create({
   },
   operatorItemDetails: {
     flex: 1,
-    gap: 10,
+    gap: 8,
     minWidth: 220,
   },
   operatorItemHeader: {
@@ -5712,18 +5901,23 @@ const styles = StyleSheet.create({
   operatorItemMeta: {
     flex: 1,
     gap: 2,
-    minWidth: 96,
+    minWidth: 88,
   },
   operatorItemMetaGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
   },
+  operatorItemNotice: {
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
   operatorItemPlaceholder: {
     alignItems: 'center',
-    height: 92,
+    height: 78,
     justifyContent: 'center',
-    width: 92,
+    width: 78,
   },
   operatorItemTitleBlock: {
     flex: 1,
@@ -5755,8 +5949,8 @@ const styles = StyleSheet.create({
   },
   operatorCustomerSummaryCard: {
     borderWidth: 1,
-    gap: 10,
-    padding: 12,
+    gap: 8,
+    padding: 10,
   },
   operatorCustomerText: {
     flex: 1,
@@ -5784,7 +5978,34 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   operatorFlowStepCard: {
+    elevation: 1,
+    gap: 8,
+    minWidth: 0,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+  },
+  operatorActiveItemPanel: {
+    elevation: 2,
+    padding: 14,
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+  },
+  operatorPrepareItemPanel: {
+    opacity: 0.96,
+  },
+  operatorBookingGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
+  },
+  operatorInlinePanel: {
+    flex: 1,
+    minWidth: 280,
+  },
+  operatorReservePanel: {
+    minWidth: 0,
   },
   operatorStepCard: {
     borderWidth: 1,
@@ -5893,7 +6114,11 @@ const styles = StyleSheet.create({
   },
   recentRow: {
     borderBottomWidth: 1,
-    paddingVertical: 12,
+    gap: 8,
+    paddingVertical: 8,
+  },
+  recentReservationInfoPanel: {
+    gap: 8,
   },
   recentReservationHeader: {
     alignItems: 'center',

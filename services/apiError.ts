@@ -89,6 +89,16 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
     };
   }
 
+  if (status === 0) {
+    return {
+      status,
+      category: 'network',
+      message: 'No se pudo conectar con el servidor. Revisa tu conexion o intenta nuevamente.',
+      requiredPermission,
+      raw: error,
+    };
+  }
+
   if (status === 401) {
     return {
       status,

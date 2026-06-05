@@ -1,12 +1,9 @@
 import { hasPermission, hasRole, isAdmin, isNoAccess } from '@/services/accessControl';
 import {
-  canCreateLiveCustomer,
-  canCreateLiveItem,
-  canOperateLive,
-  canSelectLiveCustomer,
-  canSelectLiveItem,
-  canViewLive,
-} from '@/services/livePermissionGuards';
+  blockedLiveCapabilities,
+  LiveCapabilities,
+  resolveLiveCapabilities,
+} from '@/services/liveCapabilities';
 import { UserSession } from '@/services/sessionStorage';
 
 export type LiveActorRole =
@@ -16,20 +13,10 @@ export type LiveActorRole =
   | 'PRESENTER'
   | 'NO_ACCESS';
 
-export type LiveActorCapabilities = {
-  canViewLive: boolean;
-  canOperateLive: boolean;
-  canStartLive: boolean;
-  canCloseLive: boolean;
-  canSelectCustomer: boolean;
-  canCreateCustomer: boolean;
-  canSelectItem: boolean;
-  canCreateItem: boolean;
+export type LiveActorCapabilities = LiveCapabilities & {
   canSetActiveProduct: boolean;
   canReserve: boolean;
-  canChangeReservationStatus: boolean;
   canViewEvents: boolean;
-  viewMode: 'operator' | 'support' | 'supervisor' | 'blocked';
 };
 
 export type LiveActorContext = {
@@ -41,23 +28,24 @@ export type LiveActorContext = {
 };
 
 const blockedCapabilities: LiveActorCapabilities = {
-  canViewLive: false,
-  canOperateLive: false,
-  canStartLive: false,
-  canCloseLive: false,
-  canSelectCustomer: false,
-  canCreateCustomer: false,
-  canSelectItem: false,
-  canCreateItem: false,
+  ...blockedLiveCapabilities,
   canSetActiveProduct: false,
   canReserve: false,
-  canChangeReservationStatus: false,
   canViewEvents: false,
-  viewMode: 'blocked',
 };
 
+function withLegacyAliases(capabilities: LiveCapabilities): LiveActorCapabilities {
+  return {
+    ...capabilities,
+    canSetActiveProduct: capabilities.canSetActiveItem,
+    canReserve: capabilities.canCreateReservation,
+    canViewEvents: capabilities.canViewLiveEvents,
+  };
+}
+
 export function resolveLiveActorContext(user: UserSession | null): LiveActorContext {
-  const viewLive = canViewLive(user);
+  const capabilities = withLegacyAliases(resolveLiveCapabilities(user));
+  const viewLive = capabilities.canViewLive;
 
   if (!user || isNoAccess(user) || !viewLive) {
     return {
@@ -69,60 +57,30 @@ export function resolveLiveActorContext(user: UserSession | null): LiveActorCont
     };
   }
 
-  const operate = canOperateLive(user);
-  const selectCustomer = canSelectLiveCustomer(user);
-  const createCustomer = canCreateLiveCustomer(user);
-  const selectItem = canSelectLiveItem(user);
-  const createItem = canCreateLiveItem(user);
-  const baseCapabilities: LiveActorCapabilities = {
-    canViewLive: viewLive,
-    canOperateLive: operate,
-    canStartLive: operate,
-    canCloseLive: operate,
-    canSelectCustomer: selectCustomer,
-    canCreateCustomer: createCustomer,
-    canSelectItem: selectItem,
-    canCreateItem: createItem,
-    canSetActiveProduct: operate && selectItem,
-    canReserve: operate,
-    canChangeReservationStatus: operate,
-    canViewEvents: viewLive,
-    viewMode: 'support',
-  };
-
   if (hasRole(user, 'SUPERVISOR')) {
     return {
       actor: 'SUPERVISOR',
       labelKey: 'live.actorSupervisorLabel',
       subtitleKey: 'live.actorSupervisorSubtitle',
-      capabilities: {
-        ...baseCapabilities,
-        viewMode: 'supervisor',
-      },
+      capabilities,
     };
   }
 
-  if (operate && (hasRole(user, 'SELLER') || hasRole(user, 'QA_TENANT_SELLER'))) {
+  if (capabilities.canOperateLive && (hasRole(user, 'SELLER') || hasRole(user, 'QA_TENANT_SELLER'))) {
     return {
       actor: 'SELLER',
       labelKey: 'live.actorSellerLabel',
       subtitleKey: 'live.actorSellerSubtitle',
-      capabilities: {
-        ...baseCapabilities,
-        viewMode: 'support',
-      },
+      capabilities,
     };
   }
 
-  if (operate || isAdmin(user) || hasRole(user, 'QA_TENANT_ADMIN')) {
+  if (capabilities.canOperateLive || isAdmin(user) || hasRole(user, 'QA_TENANT_ADMIN')) {
     return {
       actor: 'OPERATOR',
       labelKey: 'live.actorOperatorLabel',
       subtitleKey: 'live.actorOperatorSubtitle',
-      capabilities: {
-        ...baseCapabilities,
-        viewMode: 'operator',
-      },
+      capabilities,
     };
   }
 
@@ -131,10 +89,7 @@ export function resolveLiveActorContext(user: UserSession | null): LiveActorCont
       actor: 'SUPERVISOR',
       labelKey: 'live.actorSupervisorLabel',
       subtitleKey: 'live.actorSupervisorSubtitle',
-      capabilities: {
-        ...baseCapabilities,
-        viewMode: 'supervisor',
-      },
+      capabilities,
     };
   }
 

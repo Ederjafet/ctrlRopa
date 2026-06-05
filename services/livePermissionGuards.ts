@@ -1,47 +1,36 @@
 import {
-  canAccess,
-  canAccessByPermission,
   can,
-  hasChannel,
   hasAnyPermission,
   hasPermission,
   hasRole,
   isAdmin,
   isNoAccess,
 } from '@/services/accessControl';
+import { resolveLiveCapabilities } from '@/services/liveCapabilities';
 import { UserSession } from '@/services/sessionStorage';
 
-const LIVE_CHANNEL = 'LIVE';
-
 export function canViewLive(user: UserSession | null): boolean {
-  return (
-    hasChannel(user, LIVE_CHANNEL) &&
-    (isAdmin(user) ||
-      hasRole(user, 'QA_TENANT_ADMIN') ||
-      hasRole(user, 'QA_TENANT_SELLER') ||
-      hasPermission(user, 'DO_LIVE_RESERVATION') ||
-      hasPermission(user, 'VIEW_REPORTS'))
-  );
+  return resolveLiveCapabilities(user).canViewLive;
 }
 
 export function canOperateLive(user: UserSession | null): boolean {
-  return canAccess(user, LIVE_CHANNEL, 'DO_LIVE_RESERVATION');
+  return resolveLiveCapabilities(user).canOperateLive;
 }
 
 export function canSelectLiveCustomer(user: UserSession | null): boolean {
-  return canOperateLive(user) && canAccessByPermission(user, 'VIEW_CUSTOMERS');
+  return resolveLiveCapabilities(user).canSelectCustomer;
 }
 
 export function canCreateLiveCustomer(user: UserSession | null): boolean {
-  return canOperateLive(user) && canAccessByPermission(user, 'CREATE_CUSTOMER');
+  return resolveLiveCapabilities(user).canCreateCustomer;
 }
 
 export function canSelectLiveItem(user: UserSession | null): boolean {
-  return canOperateLive(user) && canAccessByPermission(user, 'VIEW_INVENTORY');
+  return resolveLiveCapabilities(user).canSelectItem;
 }
 
 export function canCreateLiveItem(user: UserSession | null): boolean {
-  return canOperateLive(user) && canAccessByPermission(user, 'MANAGE_INVENTORY');
+  return resolveLiveCapabilities(user).canCreateItem;
 }
 
 export function canViewLiveAnalytics(user: UserSession | null): boolean {

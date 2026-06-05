@@ -45,6 +45,7 @@ modifica RBAC.
 ## Archivos relacionados
 
 - `services/liveActorResolver.ts`
+- `services/liveCapabilities.ts`
 - `services/livePermissionGuards.ts`
 - `services/accessControl.ts`
 - `app/live.tsx`
@@ -54,6 +55,8 @@ modifica RBAC.
 
 ## Pendientes
 
+- LIVE-Z6A integro `/live` al `AppShell` sin cambiar la derivacion de actores ni permisos reales.
+- LIVE-Z6B centralizo capacidades en `services/liveCapabilities.ts`: AUTH real -> capacidades LIVE -> vista/acciones.
 - Validar visualmente con los cuatro usuarios QA en navegador.
 - Definir en una fase futura si un `SUPERVISOR` con permisos operativos debe tener acciones administrativas acotadas o solo consulta.
 - Formalizar realtime LIVE (`LIVE-RT`) con SSE o WebSocket para reemplazar polling ligero.

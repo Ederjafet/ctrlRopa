@@ -40,6 +40,7 @@ export class SessionRedirectError extends ApiError {
 }
 
 function friendlyStatusMessage(status: number): string {
+  if (status === 0) return 'No se pudo conectar con el servidor. Revisa tu conexion o intenta nuevamente.';
   if (status === 400) return 'Revisa la información capturada e intenta de nuevo.';
   if (status === 401) return 'Tu sesión expiró. Inicia sesión nuevamente.';
   if (status === 403) return 'No tienes permisos para realizar esta acción.';
@@ -118,7 +119,7 @@ async function validateServerSession(session: UserSession): Promise<UserSession>
       },
     });
   } catch {
-    return await redirectSessionToLogin();
+    return session;
   }
 
   const text = await response.text();
@@ -210,7 +211,12 @@ export async function apiRequest<T>(
     });
   } catch (error) {
     console.warn(`[api] ${method} ${url} NETWORK_ERROR ${Date.now() - startedAt}ms`, error);
-    throw error;
+    throw new ApiError(
+      0,
+      JSON.stringify({
+        message: 'No se pudo conectar con el servidor. Revisa tu conexion o intenta nuevamente.',
+      })
+    );
   }
 
   const text = await response.text();
