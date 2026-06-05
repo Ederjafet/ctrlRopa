@@ -60,3 +60,7 @@ NO-GO visual: no hay evidencia manual suficiente para aprobar PRODUCT-D2/D3 visu
 ## Recomendacion
 
 Abrir o continuar PRODUCT-D4 para ejecutar la corrida manual real y completar el CSV con PASS/FAIL/BLOQUEADO, evidencia y severidad real. PRODUCT-E no deberia avanzar como aprobacion visual final hasta cerrar los casos manuales criticos, especialmente los S1/S2 potenciales.
+
+## Continuidad PRODUCT-D4
+
+PRODUCT-D4 prepara la estructura de evidencia manual y el CSV ejecutable para convertir los 28 casos pendientes en `PASS`, `FAIL`, `BLOQUEADO` o `NO_APLICA`. Mientras no existan capturas o enlaces de evidencia real, el NO-GO visual de PRODUCT-D3 se mantiene.
