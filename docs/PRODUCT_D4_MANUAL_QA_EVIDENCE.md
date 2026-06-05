@@ -98,3 +98,14 @@ Falta evidencia para los 28 casos del smoke PRODUCT-D4, incluyendo:
 ## Recomendacion
 
 Ejecutar la corrida manual real y llenar el CSV PRODUCT-D4. Si aparecen S1/S2 confirmados, abrir PRODUCT-D5 para correcciones puntuales. Si solo quedan S3/S4 aceptables, se puede evaluar avanzar a PRODUCT-E con riesgo documentado.
+
+## Nota LIVE-Z9B
+
+La validacion manual posterior debe revisar tambien:
+
+- uso consistente de `Apartado` en la pantalla LIVE;
+- `Apartar ahora`;
+- `Cerrar como venta LIVE`;
+- `Mantener apartado`;
+- diferencia entre `Retirar prenda del aire`, `Cambiar por prenda preparada` y `Finalizar en vivo`;
+- que apartar la prenda al aire no oculte la prenda preparada para cambio.
