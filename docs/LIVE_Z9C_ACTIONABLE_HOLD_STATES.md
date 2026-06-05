@@ -59,3 +59,7 @@ Se reemplaza el mensaje generico `Estado actualizado` por confirmaciones segun a
 ## GO/NO-GO
 
 GO si pasan validaciones tecnicas y en manual no aparece ninguna accion sin efecto perceptible en `Apartados recientes`.
+
+## Continuidad LIVE-Z9D
+
+LIVE-Z9D corrige el flujo de `Prenda preparada para cambio`: `Cambiar por prenda preparada` ya no abre el selector cuando existe una preparada visible, se agrega `Quitar prenda preparada` y se muestra aviso si se intenta preparar la misma prenda que ya esta al aire.
