@@ -18,9 +18,9 @@ export default function MetricCard({ label, value, helper, accent, icon }: Props
   const resolvedAccent = accent ?? theme.colors.dashboardAccent;
 
   return (
-    <AppCard style={[styles.card, { borderColor: theme.colors.borderSubtle }]}>
+    <AppCard variant="elevated" style={styles.card}>
       <View style={styles.header}>
-        <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+        <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1} style={styles.label}>
           {label}
         </AppText>
         {icon}
@@ -53,6 +53,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  label: {
+    textTransform: 'uppercase',
   },
   value: {
     fontSize: 24,

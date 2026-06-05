@@ -2395,7 +2395,7 @@ export default function LiveScreen() {
     const isHighlightedBlocked =
       !!options.highlighted && !isHighlightedReserved && !availability.canGoOnAir;
     const cardBorderColor = isHighlightedReserved
-      ? theme.colors.warning
+      ? theme.colors.danger
       : isHighlightedBlocked
         ? theme.colors.danger
       : options.highlighted
@@ -2413,14 +2413,14 @@ export default function LiveScreen() {
         ? theme.colors.surfaceAlt
         : theme.colors.surfaceElevated;
     const placeholderBackgroundColor = isHighlightedReserved
-      ? theme.colors.surfaceAlt
+      ? theme.colors.dangerSoft
       : options.highlighted
       ? theme.colors.accentSoft
       : isPreparedForChange
         ? theme.colors.warningBackground
         : theme.colors.accentSoft;
     const stateColor = isHighlightedReserved
-      ? theme.colors.warning
+      ? theme.colors.danger
       : isHighlightedBlocked
         ? theme.colors.danger
       : options.highlighted
@@ -2432,7 +2432,7 @@ export default function LiveScreen() {
       ? t('live.activeItemReservedStatus')
       : availability.label;
     const availabilityTone = isHighlightedReserved
-      ? theme.colors.warning
+      ? theme.colors.danger
       : isHighlightedBlocked
         ? theme.colors.danger
       : availability.canGoOnAir
@@ -2509,13 +2509,13 @@ export default function LiveScreen() {
                     style={[
                       styles.operatorItemBadge,
                       {
-                        backgroundColor: theme.colors.warningBackground,
-                        borderColor: theme.colors.warning,
+                        backgroundColor: theme.colors.dangerSoft,
+                        borderColor: theme.colors.danger,
                         borderRadius: theme.radius.sm,
                       },
                     ]}
                   >
-                    <AppText variant="caption" color={theme.colors.warning} bold>
+                    <AppText variant="caption" color={theme.colors.danger} bold>
                       {t('live.activeItemReservedChip')}
                     </AppText>
                   </View>
@@ -2557,13 +2557,13 @@ export default function LiveScreen() {
                 {
                   backgroundColor: theme.isDark
                     ? theme.colors.surfaceMuted
-                    : theme.colors.warningBackground,
-                  borderColor: theme.colors.warning,
+                    : theme.colors.dangerSoft,
+                  borderColor: theme.colors.danger,
                   borderRadius: theme.radius.sm,
                 },
               ]}
             >
-              <AppText variant="caption" color={theme.colors.warning}>
+              <AppText variant="caption" color={theme.colors.danger}>
                 {t('live.activeItemReservedNextStepHelp')}
               </AppText>
             </View>

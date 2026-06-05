@@ -1,6 +1,7 @@
 import { useAppTheme } from '@/context/AppThemeContext';
 import { ReactNode } from 'react';
-import { StyleSheet, View, ViewProps } from 'react-native';
+import { StyleSheet, ViewProps } from 'react-native';
+import AppCard from './AppCard';
 import AppText from './AppText';
 
 type Props = ViewProps & {
@@ -12,15 +13,10 @@ export default function AppInfoCard({ title, children, style, ...rest }: Props) 
   const { theme } = useAppTheme();
 
   return (
-    <View
+    <AppCard
+      variant="info"
       style={[
         styles.card,
-        {
-          backgroundColor: theme.colors.infoCardBackground,
-          borderColor: theme.colors.infoCardBorder,
-          borderRadius: theme.radius.lg,
-          padding: theme.spacing.lg,
-        },
         style,
       ]}
       {...rest}
@@ -33,7 +29,7 @@ export default function AppInfoCard({ title, children, style, ...rest }: Props) 
       ) : (
         children
       )}
-    </View>
+    </AppCard>
   );
 }
 

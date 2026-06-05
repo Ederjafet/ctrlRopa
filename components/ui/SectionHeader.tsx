@@ -15,7 +15,19 @@ export default function SectionHeader({ title, subtitle, rightContent }: Props) 
 
   return (
     <View style={styles.header}>
+      <View
+        style={[
+          styles.accent,
+          {
+            backgroundColor: theme.colors.accent,
+            borderRadius: designTokens.radius.full,
+          },
+        ]}
+      />
       <View style={styles.text}>
+        <AppText variant="caption" color={theme.colors.accent} bold style={styles.eyebrow}>
+          Sistema operativo
+        </AppText>
         <AppText variant="subtitle" bold>
           {title}
         </AppText>
@@ -34,10 +46,19 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'flex-start',
     flexDirection: 'row',
-    gap: designTokens.spacing.md,
+    gap: designTokens.spacing.sm,
     justifyContent: 'space-between',
     marginBottom: designTokens.spacing.md,
-    marginTop: designTokens.spacing.xs,
+    marginTop: designTokens.spacing.sm,
+  },
+  accent: {
+    height: 34,
+    marginTop: 2,
+    width: 4,
+  },
+  eyebrow: {
+    marginBottom: 2,
+    textTransform: 'uppercase',
   },
   text: {
     flex: 1,

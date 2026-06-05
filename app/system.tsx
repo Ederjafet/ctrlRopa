@@ -1,7 +1,8 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShell from '@/components/layout/AppShell';
+import { buildMainNavSections, getSessionScopeLabel } from '@/components/layout/appNavigation';
+import ActionTile from '@/components/ui/ActionTile';
 import AppButton from '@/components/ui/AppButton';
 import AppInfoCard from '@/components/ui/AppInfoCard';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { hasPermission, hasRole } from '@/services/accessControl';
@@ -15,7 +16,7 @@ import {
 } from '@/services/liveLayoutPreferences';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -33,6 +34,7 @@ export default function SystemScreen() {
   const [livePreferences, setLivePreferences] = useState<LiveLayoutPreferences>(
     DEFAULT_LIVE_LAYOUT_PREFERENCES
   );
+  const navSections = useMemo(() => buildMainNavSections(user), [user]);
 
   useEffect(() => {
     getSession().then((currentUser) => {
@@ -57,13 +59,15 @@ export default function SystemScreen() {
   };
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute="/" />
-
-      <AppText variant="title" bold>
-        {t('system.title')}
-      </AppText>
-
+    <AppShell
+      title={t('system.title')}
+      subtitle="Preferencias, canales y controles del sistema"
+      contextTitle="Sistema y configuracion"
+      contextSubtitle={getSessionScopeLabel(user)}
+      activeRoute="system"
+      session={user}
+      navSections={navSections}
+    >
       <AppInfoCard title={t('system.sensitiveTitle')}>
         <AppText>{t('system.sensitiveHelp')}</AppText>
       </AppInfoCard>
@@ -186,7 +190,7 @@ export default function SystemScreen() {
           />
         ) : null}
       </View>
-    </AppScreen>
+    </AppShell>
   );
 }
 
@@ -221,26 +225,8 @@ function LivePreferenceRow({
 }
 
 function SystemTile({ title, description, onPress }: SystemTileProps) {
-  const { theme } = useAppTheme();
-
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.tile,
-        {
-          backgroundColor: pressed ? theme.colors.optionPressedBackground : theme.colors.surface,
-          borderColor: theme.colors.border,
-          borderRadius: theme.radius.md,
-          padding: theme.spacing.md,
-        },
-      ]}
-    >
-      <AppText bold>{title}</AppText>
-      <AppText variant="caption" color={theme.colors.mutedText}>
-        {description}
-      </AppText>
-    </Pressable>
+    <ActionTile title={title} subtitle={description} icon="settings" onPress={onPress} />
   );
 }
 

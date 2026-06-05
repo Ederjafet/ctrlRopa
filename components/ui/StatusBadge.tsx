@@ -3,7 +3,7 @@ import { useAppTheme } from '@/context/AppThemeContext';
 import { designTokens } from '@/theme/designTokens';
 import { StyleSheet, View, ViewStyle } from 'react-native';
 
-type StatusTone = 'neutral' | 'success' | 'warning' | 'danger' | 'info';
+type StatusTone = 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'role' | 'live' | 'reserved';
 
 type Props = {
   label: string;
@@ -14,23 +14,27 @@ type Props = {
 export default function StatusBadge({ label, tone = 'neutral', style }: Props) {
   const { theme } = useAppTheme();
   const color =
-    tone === 'success'
+    tone === 'reserved'
+      ? theme.colors.danger
+      : tone === 'success'
       ? theme.colors.success
       : tone === 'warning'
         ? theme.colors.warning
         : tone === 'danger'
           ? theme.colors.danger
-          : tone === 'info'
+          : tone === 'info' || tone === 'role' || tone === 'live'
             ? theme.colors.accent
             : theme.colors.textSecondary;
   const backgroundColor =
-    tone === 'success'
+    tone === 'reserved'
+      ? theme.colors.dangerSoft
+      : tone === 'success'
       ? theme.colors.successBackground
       : tone === 'warning'
         ? theme.colors.warningBackground
         : tone === 'danger'
           ? theme.colors.dangerBackground
-          : tone === 'info'
+          : tone === 'info' || tone === 'role' || tone === 'live'
             ? theme.colors.infoCardBackground
             : theme.colors.surfaceMuted;
 
