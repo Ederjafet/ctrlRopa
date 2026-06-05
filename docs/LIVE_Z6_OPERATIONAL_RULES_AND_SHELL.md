@@ -446,3 +446,10 @@ Fecha: 2026-06-04
 
 - No se tocaron backend, AUTH/RBAC, pagos, caja, reportes, billing ni IA.
 - No se cambiaron capacidades LIVE ni reglas operativas Z6/Z7/Z8.
+# Nota LIVE-Z9B - Lenguaje de apartados
+
+LIVE-Z9B alinea el copy visible de `/live` para usar `Apartado` como termino operativo principal. `Reserva` queda como termino tecnico interno cuando aplique.
+
+Tambien corrige que, despues de apartar la prenda al aire, la prenda preparada para cambio permanezca visible y pueda usarse con `Cambiar por prenda preparada`.
+
+No se cambiaron backend, permisos, capacidades ni contratos de API.

@@ -2279,12 +2279,15 @@ export default function LiveScreen() {
         const withoutDuplicate = current.filter((entry) => entry.id !== reservation.id);
         return [reservation, ...withoutDuplicate];
       });
+      const reservedItemId = activeItem.id;
       setActiveItemForReservation({
         ...activeItem,
         status: 'RESERVED',
       });
 
-      setSelectedItem(null);
+      setSelectedItem((current) =>
+        current?.id === reservedItemId ? null : current
+      );
       setSelectedCustomer(null);
       setScanInput('');
 
@@ -2659,9 +2662,12 @@ export default function LiveScreen() {
                       ? t('live.liveOperatePermissionError')
                       : !operatorFlowEnabled
                         ? t('live.selectOpenLiveReason')
-                        : undefined
+                      : undefined
                   }
                 />
+                <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+                  {t('live.clearProductOnAirHelp')}
+                </AppText>
               </View>
               <View style={styles.buttonFill}>
                 <AppButton
@@ -2671,6 +2677,9 @@ export default function LiveScreen() {
                   disabled={!maySelectItem}
                   disabledReason={t('live.itemPermissionError')}
                 />
+                <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+                  {t('live.changeItemOnAirHelp')}
+                </AppText>
               </View>
             </View>
           ) : null}
@@ -4108,6 +4117,9 @@ export default function LiveScreen() {
                                     loading={isUpdatingOperationalStatus}
                                     onPress={() => handleConfirmOperationalSold(reservation.id)}
                                   />
+                                  <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+                                    {t('live.markOperationalSoldHelp')}
+                                  </AppText>
                                 </View>
                               ) : null}
                               {operationalStatus === 'RESERVED' && mayMarkLivePending ? (
@@ -4123,6 +4135,9 @@ export default function LiveScreen() {
                                       )
                                     }
                                   />
+                                  <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+                                    {t('live.markPendingHelp')}
+                                  </AppText>
                                 </View>
                               ) : null}
                               {(operationalStatus === 'PENDING' || operationalSold) &&
@@ -4149,6 +4164,9 @@ export default function LiveScreen() {
                                     loading={isUpdatingOperationalStatus}
                                     onPress={() => handleCancelLiveReservation(reservation.id)}
                                   />
+                                  <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+                                    {t('live.cancelOperationalHelp')}
+                                  </AppText>
                                 </View>
                               ) : !operationalCancelled && !mayCancelLiveReservation ? (
                                 <AuthorizationRequestPanel
@@ -4202,6 +4220,9 @@ export default function LiveScreen() {
                   disabled={isSavingLive || !selectedLiveIsOperable || !mayCloseLive}
                   disabledReason={operatorFinishDisabledReason}
                 />
+                <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+                  {t('live.closeLiveHelp')}
+                </AppText>
                 {selectedLiveIsOperable && !mayCloseLive ? (
                   <AuthorizationRequestPanel
                     actionLabel={t('live.authorizationActionCloseLive')}
@@ -5177,29 +5198,35 @@ export default function LiveScreen() {
                     </View>
                     {!settled && !operationalSold && !operationalCancelled && mayMarkLiveOperationalSold ? (
                       <View style={styles.buttonFill}>
-                        <AppButton
-                          title={t('live.markOperationalSold')}
-                          variant="primary"
-                          loading={isUpdatingOperationalStatus}
-                          onPress={() => handleConfirmOperationalSold(reservation.id)}
-                        />
-                      </View>
-                    ) : null}
+                      <AppButton
+                        title={t('live.markOperationalSold')}
+                        variant="primary"
+                        loading={isUpdatingOperationalStatus}
+                        onPress={() => handleConfirmOperationalSold(reservation.id)}
+                      />
+                      <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+                        {t('live.markOperationalSoldHelp')}
+                      </AppText>
+                    </View>
+                  ) : null}
                     {operationalStatus === 'RESERVED' && mayMarkLivePending ? (
                       <View style={styles.buttonFill}>
-                        <AppButton
-                          title={t('live.markPending')}
-                          variant="neutral"
-                          loading={isUpdatingOperationalStatus}
+                      <AppButton
+                        title={t('live.markPending')}
+                        variant="neutral"
+                        loading={isUpdatingOperationalStatus}
                           onPress={() =>
                             handleUpdateReservationOperationalStatus(
                               reservation.id,
                               'PENDING'
-                            )
-                          }
-                        />
-                      </View>
-                    ) : null}
+                          )
+                        }
+                      />
+                      <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+                        {t('live.markPendingHelp')}
+                      </AppText>
+                    </View>
+                  ) : null}
                     {operationalStatus === 'PENDING' && mayChangeLiveReservationStatus ? (
                       <View style={styles.buttonFill}>
                         <AppButton
@@ -5232,14 +5259,17 @@ export default function LiveScreen() {
                     ) : null}
                     {!operationalCancelled && mayCancelLiveReservation ? (
                       <View style={styles.buttonFill}>
-                        <AppButton
-                          title={t('live.cancelOperational')}
-                          variant="danger"
-                          loading={isUpdatingOperationalStatus}
-                          onPress={() => handleCancelLiveReservation(reservation.id)}
-                        />
-                      </View>
-                    ) : null}
+                      <AppButton
+                        title={t('live.cancelOperational')}
+                        variant="danger"
+                        loading={isUpdatingOperationalStatus}
+                        onPress={() => handleCancelLiveReservation(reservation.id)}
+                      />
+                      <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+                        {t('live.cancelOperationalHelp')}
+                      </AppText>
+                    </View>
+                  ) : null}
                     {operationalCancelled && mayChangeLiveReservationStatus ? (
                       <View style={styles.buttonFill}>
                         <AppButton
@@ -5668,6 +5698,9 @@ const styles = StyleSheet.create({
   },
   authorizationInlinePanel: {
     flexBasis: '100%',
+    marginTop: 4,
+  },
+  actionHelperText: {
     marginTop: 4,
   },
   buttonRow: {

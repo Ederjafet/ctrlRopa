@@ -1,0 +1,8 @@
+﻿ app/live.tsx                                       |  87 +++++++---
+ docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md        |   7 +
+ docs/LIVE_Z9B_APARTADO_COPY_ALIGNMENT.md           |  85 ++++++++++
+ docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md              |  11 ++
+ locales/en/common.json                             | 161 +++++++++---------
+ locales/es/common.json                             | 185 ++++++++++-----------
+ ...artado-copy-alignment-report-20260605-141709.md |  45 +++++
+ 7 files changed, 378 insertions(+), 203 deletions(-)
