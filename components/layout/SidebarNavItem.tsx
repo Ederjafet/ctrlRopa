@@ -2,15 +2,19 @@ import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { designTokens } from '@/theme/designTokens';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 export type SidebarNavItemConfig = {
   key: string;
   label: string;
+  labelKey?: string;
   route?: string;
+  activeFor?: string[];
   icon?: keyof typeof MaterialIcons.glyphMap;
   disabled?: boolean;
   helper?: string;
+  helperKey?: string;
 };
 
 type Props = {
@@ -21,8 +25,11 @@ type Props = {
 
 export default function SidebarNavItem({ item, active, onPress }: Props) {
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
   const disabled = item.disabled || !item.route;
   const iconColor = active ? theme.colors.accent : theme.colors.mutedText;
+  const label = item.labelKey ? t(item.labelKey) : item.label;
+  const helper = item.helperKey ? t(item.helperKey) : item.helper;
 
   return (
     <Pressable
@@ -45,15 +52,15 @@ export default function SidebarNavItem({ item, active, onPress }: Props) {
           color={active ? theme.colors.textPrimary : theme.colors.text}
           numberOfLines={1}
         >
-          {item.label}
+          {label}
         </AppText>
-        {item.helper ? (
+        {helper ? (
           <AppText
             variant="caption"
             color={active ? theme.colors.textSecondary : theme.colors.mutedText}
             numberOfLines={1}
           >
-            {item.helper}
+            {helper}
           </AppText>
         ) : null}
       </View>

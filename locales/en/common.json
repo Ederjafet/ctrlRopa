@@ -618,5 +618,46 @@
     "validPrice": "Enter a valid price.",
     "validQuantity": "Enter a valid quantity.",
     "liveReturnHelp": "After creating the item, you can return to LIVE to prepare it or put it on air."
+  },
+  "navigation": {
+    "brandHelp": "Operation and control",
+    "closeMenu": "Close menu",
+    "signOut": "Sign out",
+    "sections": {
+      "home": "Home",
+      "operation": "Operation",
+      "inventory": "Inventory",
+      "administration": "Administration",
+      "reports": "Reports",
+      "security": "Security",
+      "development": "Development"
+    },
+    "items": {
+      "homeSummary": "Operational summary",
+      "live": "Live",
+      "doorSale": "Door sale",
+      "doorHold": "Door hold",
+      "holds": "Holds",
+      "customers": "Customers",
+      "itemsInventory": "Items / Inventory",
+      "createItems": "Create items",
+      "batches": "Batches",
+      "users": "Users",
+      "roles": "Roles",
+      "channels": "Operational channels",
+      "system": "System",
+      "appearance": "Appearance / Branding",
+      "reportsGeneral": "General reports",
+      "dailyStore": "Daily store",
+      "dailyDeliveries": "Daily deliveries",
+      "dailyDeposits": "Daily deposits",
+      "dailyCancellations": "Daily cancellations",
+      "liveControl": "Live control",
+      "remissions": "Remissions",
+      "securityAudit": "Security audit",
+      "devSecurity": "Dev security",
+      "sessionsLocks": "Sessions and locks",
+      "uiKit": "UI Kit"
+    }
   }
 }

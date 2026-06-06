@@ -11,14 +11,9 @@ import EmptyState from '@/components/ui/EmptyState';
 import EntitySummaryCard from '@/components/ui/EntitySummaryCard';
 import SectionHeader from '@/components/ui/SectionHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
-import { SidebarSection } from '@/components/layout/Sidebar';
+import { buildMainNavSections } from '@/components/layout/appNavigation';
 import { useAppTheme } from '@/context/AppThemeContext';
-import {
-  canAccess,
-  canAccessByPermission,
-  hasEffectivePermission,
-  isAdmin,
-} from '@/services/accessControl';
+import { hasEffectivePermission } from '@/services/accessControl';
 import { apiRequest } from '@/services/apiClient';
 import {
   isNotFoundError,
@@ -34,7 +29,6 @@ import {
   cancelReservation,
   removeReservationFromBox,
 } from '@/services/reservationService';
-import { canViewLive } from '@/services/livePermissionGuards';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
@@ -215,55 +209,6 @@ function getPaymentMethodLabel(
   return 'Metodo no especificado';
 }
 
-function buildNavSections(session: UserSession | null): SidebarSection[] {
-  const liveAllowed = canViewLive(session);
-  const customersAllowed = canAccessByPermission(session, 'VIEW_CUSTOMERS');
-  const reservationsAllowed =
-    canAccess(session, 'DOOR_RESERVATION', 'DO_DOOR_RESERVATION') || liveAllowed;
-  const usersAllowed = canAccessByPermission(session, 'MANAGE_USERS') || isAdmin(session);
-  const systemAllowed =
-    canAccessByPermission(session, 'MANAGE_ROLES') ||
-    canAccessByPermission(session, 'MANAGE_BRANCH_CHANNELS') ||
-    isAdmin(session);
-  const reportsAllowed = canAccessByPermission(session, 'VIEW_REPORTS') || isAdmin(session);
-  const adminAllowed = isAdmin(session);
-
-  const primaryItems = [
-    { key: 'home', label: 'Inicio', route: '/', icon: 'space-dashboard' as const },
-    liveAllowed ? { key: 'live', label: 'LIVE', route: '/live', icon: 'live-tv' as const } : null,
-    customersAllowed
-      ? { key: 'customers', label: 'Clientes', route: '/customers', icon: 'groups' as const }
-      : null,
-    reservationsAllowed
-      ? { key: 'reservations', label: 'Reservas', route: '/reservations', icon: 'bookmark' as const }
-      : null,
-  ].filter(Boolean);
-
-  const controlItems = [
-    usersAllowed
-      ? { key: 'users', label: 'Usuarios', route: '/users', icon: 'manage-accounts' as const }
-      : null,
-    systemAllowed
-      ? { key: 'system', label: 'Sistema', route: '/system', icon: 'settings' as const }
-      : null,
-    reportsAllowed
-      ? { key: 'reports', label: 'Reportes', route: '/reports', icon: 'analytics' as const }
-      : null,
-  ].filter(Boolean);
-
-  const developmentItems = [
-    adminAllowed
-      ? { key: 'ui-kit', label: 'UI Kit', route: '/ui-kit', icon: 'dashboard-customize' as const }
-      : null,
-  ].filter(Boolean);
-
-  return [
-    { title: 'Operacion', items: primaryItems },
-    { title: 'Control', items: controlItems },
-    { title: 'Desarrollo', items: developmentItems },
-  ].filter((section) => section.items.length > 0) as SidebarSection[];
-}
-
 export default function ReservationDetailScreen() {
   const { id, returnTo } = useLocalSearchParams<{
     id?: string | string[];
@@ -396,7 +341,7 @@ export default function ReservationDetailScreen() {
   const overpaid = Math.max(totalPaid - total, 0);
   const isActive = reservation?.status === 'ACTIVE';
   const canCancel = isActive && !paymentAccessRestricted && totalPaid <= 0;
-  const navSections = useMemo(() => buildNavSections(session), [session]);
+  const navSections = useMemo(() => buildMainNavSections(session), [session]);
   const isLiveContext =
     returnRoute === '/live' ||
     !!reservation?.liveId ||
@@ -512,7 +457,10 @@ export default function ReservationDetailScreen() {
         session={session}
         navSections={navSections}
       >
-        <AppBackButton fallbackRoute={returnRoute || (isLiveContext ? '/live' : '/reservations')} />
+        <AppBackButton
+          fallbackRoute={returnRoute || (isLiveContext ? '/live' : '/reservations')}
+          showMenuButton={false}
+        />
         <EmptyState title="Cargando apartado..." message="Estamos preparando el detalle." />
       </AppShell>
     );
@@ -527,7 +475,10 @@ export default function ReservationDetailScreen() {
         session={session}
         navSections={navSections}
       >
-        <AppBackButton fallbackRoute={returnRoute || (isLiveContext ? '/live' : '/reservations')} />
+        <AppBackButton
+          fallbackRoute={returnRoute || (isLiveContext ? '/live' : '/reservations')}
+          showMenuButton={false}
+        />
         <EmptyState
           title={loadError?.category === 'not-found' ? 'Apartado no encontrado' : 'No se pudo cargar el apartado'}
           message={loadError?.message || 'No se encontro la informacion solicitada.'}
@@ -549,7 +500,10 @@ export default function ReservationDetailScreen() {
         header={
           <View style={styles.headerStack}>
             <View style={styles.headerActions}>
-              <AppBackButton fallbackRoute={returnRoute || (isLiveContext ? '/live' : '/reservations')} />
+              <AppBackButton
+                fallbackRoute={returnRoute || (isLiveContext ? '/live' : '/reservations')}
+                showMenuButton={false}
+              />
               <View style={styles.headerButtons}>
                 {isLiveContext ? (
                   <AppButton
@@ -558,11 +512,6 @@ export default function ReservationDetailScreen() {
                     onPress={() => router.replace('/live' as any)}
                   />
                 ) : null}
-                <AppButton
-                  title="Menu principal"
-                  variant="secondary"
-                  onPress={() => router.replace('/' as any)}
-                />
               </View>
             </View>
             <SectionHeader

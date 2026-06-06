@@ -32,6 +32,10 @@ La navegacion principal ahora se agrupa desde `components/layout/appNavigation.t
 - Seguridad
 - Desarrollo
 
+## Nota PRODUCT-D6.1
+
+PRODUCT-D6.1 refuerza esta decision: las pantallas AppShell auditadas deben consumir `buildMainNavSections(session)` como unica fuente de navegacion. Las secciones e items agregan claves i18n para que el sidebar/drawer respete Espanol/Ingles y no quede mezclado con el idioma de la pantalla.
+
 Reglas aplicadas:
 
 - No se muestran categorias vacias.

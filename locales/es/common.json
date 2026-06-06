@@ -618,5 +618,46 @@
     "validPrice": "Ingresa un precio valido.",
     "validQuantity": "Ingresa una cantidad valida.",
     "liveReturnHelp": "Al generar la prenda, podras volver al LIVE para prepararla o ponerla al aire."
+  },
+  "navigation": {
+    "brandHelp": "Operacion y control",
+    "closeMenu": "Cerrar menu",
+    "signOut": "Cerrar sesion",
+    "sections": {
+      "home": "Inicio",
+      "operation": "Operacion",
+      "inventory": "Inventario",
+      "administration": "Administracion",
+      "reports": "Reportes",
+      "security": "Seguridad",
+      "development": "Desarrollo"
+    },
+    "items": {
+      "homeSummary": "Resumen operativo",
+      "live": "En vivo",
+      "doorSale": "Venta puerta",
+      "doorHold": "Apartado puerta",
+      "holds": "Apartados",
+      "customers": "Clientes",
+      "itemsInventory": "Prendas / Inventario",
+      "createItems": "Alta de prendas",
+      "batches": "Lotes",
+      "users": "Usuarios",
+      "roles": "Roles",
+      "channels": "Canales operativos",
+      "system": "Sistema",
+      "appearance": "Apariencia / Branding",
+      "reportsGeneral": "Reportes generales",
+      "dailyStore": "Diario tienda",
+      "dailyDeliveries": "Entregas diarias",
+      "dailyDeposits": "Depositos diarios",
+      "dailyCancellations": "Cancelaciones diarias",
+      "liveControl": "Control Live",
+      "remissions": "Remisiones",
+      "securityAudit": "Auditoria de seguridad",
+      "devSecurity": "Seguridad dev",
+      "sessionsLocks": "Sesiones y bloqueos",
+      "uiKit": "UI Kit"
+    }
   }
 }
