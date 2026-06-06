@@ -79,7 +79,9 @@ function selectedNames<T extends { id: number; code?: string; name: string }>(
   if (ids.length === 0) return emptyText;
   const selected = items.filter((item) => ids.includes(item.id));
   if (selected.length === 0) return emptyText;
-  return selected.map((item) => item.code || item.name).join(', ');
+  return selected
+    .map((item) => (item.code ? formatPermissionCode(item.code) : item.name))
+    .join(', ');
 }
 
 function toggleId(ids: number[], id: number) {
@@ -587,8 +589,8 @@ export default function UsersFormScreen() {
                 return (
                   <AppOptionRow
                     key={permission.id}
-                    title={permission.name}
-                    subtitle={formatPermissionCode(permission.code)}
+                    title={formatPermissionCode(permission.code)}
+                    subtitle={`Codigo interno: ${permission.code}`}
                     onPress={() =>
                       setDraftPermissionIds((current) => toggleId(current, permission.id))
                     }

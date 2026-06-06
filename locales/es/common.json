@@ -34,7 +34,21 @@
     "liveWidgetVisible": "Visible en En vivo.",
     "liveWidgetHidden": "Oculto en En vivo.",
     "liveWidgetShow": "Mostrar",
-    "liveWidgetHide": "Ocultar"
+    "liveWidgetHide": "Ocultar",
+    "subtitle": "Preferencias, canales y controles del sistema",
+    "contextTitle": "Sistema y configuracion",
+    "rolesTileTitle": "Roles",
+    "rolesTileHelp": "Crea roles y define que permisos existentes incluye cada uno.",
+    "channelsTileTitle": "Canales operativos",
+    "channelsTileHelp": "Activa o apaga globalmente En vivo, Venta puerta, Apartado puerta y Consignacion.",
+    "supportLogsTileTitle": "Logs de soporte",
+    "supportLogsTileHelp": "Consulta bitacora tecnica de configuracion, rutas, usuarios y respuestas HTTP.",
+    "securityTileTitle": "Seguridad dev",
+    "securityTileHelp": "Parametriza cierre de sesion, intentos fallidos y bloqueo temporal.",
+    "sessionsTileTitle": "Sesiones y bloqueos",
+    "sessionsTileHelp": "Desbloquea usuarios y cierra sesiones activas desde soporte.",
+    "securityAuditTileTitle": "Auditoria de seguridad",
+    "securityAuditTileHelp": "Consulta accesos bloqueados, tokens revocados y eventos de permisos."
   },
   "live": {
     "title": "En vivo",

@@ -2,6 +2,7 @@ import AppCard from '@/components/ui/AppCard';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { NormalizedApiError } from '@/services/apiError';
+import { formatPermissionCode } from '@/services/permissionDependencies';
 
 type Props = {
   error: NormalizedApiError;
@@ -19,7 +20,7 @@ export default function RestrictedSection({ error, title = 'Acceso restringido' 
       <AppText>No tienes permiso para consultar esta informacion.</AppText>
       {error.requiredPermission ? (
         <AppText color={theme.colors.mutedText}>
-          Permiso requerido: {error.requiredPermission}
+          Permiso requerido: {formatPermissionCode(error.requiredPermission)}
         </AppText>
       ) : null}
       <AppText variant="caption" color={theme.colors.mutedText}>

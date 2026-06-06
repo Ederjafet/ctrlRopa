@@ -280,9 +280,9 @@ export default function SystemRolesScreen() {
                       ]}
                     >
                       <View style={styles.permissionText}>
-                        <AppText bold={selected}>{permission.name}</AppText>
+                        <AppText bold={selected}>{formatPermissionCode(permission.code)}</AppText>
                         <AppText variant="caption" color={theme.colors.mutedText}>
-                          {formatPermissionCode(permission.code)}
+                          Codigo interno: {permission.code}
                         </AppText>
                         <AppText color={selected ? theme.colors.accent : theme.colors.mutedText} bold={selected}>
                           {selected ? 'Incluido' : 'Agregar'}

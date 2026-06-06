@@ -25,8 +25,54 @@ const PERMISSION_GROUP_ORDER = [
   'Otros',
 ];
 
+const PERMISSION_LABELS_ES: Record<string, string> = {
+  APPLY_CUSTOMER_BALANCE: 'Aplicar saldo de cliente',
+  CANCEL_RESERVATION: 'Cancelar apartado',
+  CANCEL_SALE: 'Cancelar venta',
+  CREATE_CLOSE_CUSTOMER_PACKAGE: 'Crear cierre de paquete de cliente',
+  CREATE_CUSTOMER: 'Crear cliente',
+  CREATE_ITEM: 'Crear prenda',
+  DO_DOOR_RESERVATION: 'Apartar en puerta',
+  DO_DOOR_SALE: 'Venta puerta',
+  DO_LIVE_RESERVATION: 'Apartar en LIVE',
+  EDIT_CUSTOMER: 'Editar cliente',
+  EDIT_ITEM: 'Editar prenda',
+  MANAGE_BRANCH_CHANNELS: 'Administrar canales operativos',
+  MANAGE_BRANCHES: 'Administrar sucursales',
+  MANAGE_CASH_CLOSURES: 'Administrar cortes de caja',
+  MANAGE_CATALOGS: 'Administrar catalogos',
+  MANAGE_CONSIGNMENTS: 'Administrar consignaciones',
+  MANAGE_INCIDENTS: 'Administrar incidencias',
+  MANAGE_INVENTORY: 'Administrar inventario',
+  MANAGE_REFUNDS: 'Administrar devoluciones',
+  MANAGE_RETURNS: 'Administrar retornos',
+  MANAGE_ROLES: 'Administrar roles',
+  MANAGE_SECURITY_SETTINGS: 'Administrar seguridad',
+  MANAGE_SHIPMENTS: 'Administrar envios',
+  MANAGE_TRANSFERS: 'Administrar transferencias',
+  MANAGE_USERS: 'Administrar usuarios',
+  REASSIGN_CUSTOMERS: 'Reasignar clientes',
+  REGISTER_PAYMENTS: 'Registrar pagos',
+  VIEW_CUSTOMER_ORDERS: 'Ver pedidos de cliente',
+  VIEW_CUSTOMERS: 'Ver clientes',
+  VIEW_INVENTORY: 'Ver inventario',
+  VIEW_PAYMENTS: 'Ver pagos',
+  VIEW_REPORTS: 'Ver reportes',
+  VIEW_SALES: 'Ver ventas',
+  VIEW_SECURITY_AUDIT: 'Ver auditoria de seguridad',
+  VOID_PAYMENT: 'Anular pago',
+};
+
 export function formatPermissionCode(code: string): string {
-  return code.toLowerCase();
+  const normalized = code.toUpperCase();
+  const knownLabel = PERMISSION_LABELS_ES[normalized];
+  if (knownLabel) return knownLabel;
+
+  return normalized
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(' ');
 }
 
 export function inferPermissionGroup(permissionCode: string, permissionName = ''): string {
@@ -62,7 +108,7 @@ export function matchesPermissionSearch(
   const value = search.trim().toLowerCase();
   if (!value) return true;
 
-  return `${permission.name} ${permission.code} ${inferPermissionGroup(permission.code, permission.name)}`
+  return `${permission.name} ${permission.code} ${formatPermissionCode(permission.code)} ${inferPermissionGroup(permission.code, permission.name)}`
     .toLowerCase()
     .includes(value);
 }
@@ -77,7 +123,7 @@ export function sortPermissionsForDisplay<T extends { code: string; name: string
       PERMISSION_GROUP_ORDER.indexOf(leftGroup) - PERMISSION_GROUP_ORDER.indexOf(rightGroup);
     if (groupComparison !== 0) return groupComparison;
 
-    return left.name.localeCompare(right.name, 'es');
+    return formatPermissionCode(left.code).localeCompare(formatPermissionCode(right.code), 'es');
   });
 }
 
