@@ -1,0 +1,430 @@
+diff --git a/app/system-roles.tsx b/app/system-roles.tsx
+index cb6fd3b..c837873 100644
+--- a/app/system-roles.tsx
++++ b/app/system-roles.tsx
+@@ -280,9 +280,9 @@ export default function SystemRolesScreen() {
+                       ]}
+                     >
+                       <View style={styles.permissionText}>
+-                        <AppText bold={selected}>{permission.name}</AppText>
++                        <AppText bold={selected}>{formatPermissionCode(permission.code)}</AppText>
+                         <AppText variant="caption" color={theme.colors.mutedText}>
+-                          {formatPermissionCode(permission.code)}
++                          Codigo interno: {permission.code}
+                         </AppText>
+                         <AppText color={selected ? theme.colors.accent : theme.colors.mutedText} bold={selected}>
+                           {selected ? 'Incluido' : 'Agregar'}
+diff --git a/app/system.tsx b/app/system.tsx
+index c7b5b2b..7ffdbd8 100644
+--- a/app/system.tsx
++++ b/app/system.tsx
+@@ -61,8 +61,8 @@ export default function SystemScreen() {
+   return (
+     <AppShell
+       title={t('system.title')}
+-      subtitle="Preferencias, canales y controles del sistema"
+-      contextTitle="Sistema y configuracion"
++      subtitle={t('system.subtitle')}
++      contextTitle={t('system.contextTitle')}
+       contextSubtitle={getSessionScopeLabel(user)}
+       activeRoute="system"
+       session={user}
+@@ -152,40 +152,40 @@ export default function SystemScreen() {
+
+       <View style={styles.grid}>
+         <SystemTile
+-          title="Roles"
+-          description="Crea roles y define que permisos existentes incluye cada uno."
++          title={t('system.rolesTileTitle')}
++          description={t('system.rolesTileHelp')}
+           onPress={() => router.push('/system-roles' as any)}
+         />
+         <SystemTile
+-          title="Canales operativos"
+-          description="Activa o apaga globalmente En vivo, Venta puerta, Apartado puerta y Consignación."
++          title={t('system.channelsTileTitle')}
++          description={t('system.channelsTileHelp')}
+           onPress={() => router.push('/system-channels' as any)}
+         />
+         {hasRole(user, 'SUPPORT_TECH') ? (
+           <SystemTile
+-            title="Logs de soporte"
+-            description="Consulta bitácora técnica de configuración, rutas, usuarios y respuestas HTTP."
++            title={t('system.supportLogsTileTitle')}
++            description={t('system.supportLogsTileHelp')}
+             onPress={() => router.push('/system-logs' as any)}
+           />
+         ) : null}
+         {hasRole(user, 'SUPPORT_TECH') ? (
+           <SystemTile
+-            title="Seguridad dev"
+-            description="Parametriza cierre de sesión, intentos fallidos y bloqueo temporal."
++            title={t('system.securityTileTitle')}
++            description={t('system.securityTileHelp')}
+             onPress={() => router.push('/system-security' as any)}
+           />
+         ) : null}
+         {hasRole(user, 'SUPPORT_TECH') ? (
+           <SystemTile
+-            title="Sesiones y bloqueos"
+-            description="Desbloquea usuarios y cierra sesiones activas desde soporte."
++            title={t('system.sessionsTileTitle')}
++            description={t('system.sessionsTileHelp')}
+             onPress={() => router.push('/system-sessions' as any)}
+           />
+         ) : null}
+         {hasPermission(user, 'VIEW_SECURITY_AUDIT') ? (
+           <SystemTile
+-            title="Auditoria de seguridad"
+-            description="Consulta accesos bloqueados, tokens revocados y eventos de permisos."
++            title={t('system.securityAuditTileTitle')}
++            description={t('system.securityAuditTileHelp')}
+             onPress={() => router.push('/system-security-audit' as any)}
+           />
+         ) : null}
+diff --git a/app/users-form.tsx b/app/users-form.tsx
+index cb6caba..dae516c 100644
+--- a/app/users-form.tsx
++++ b/app/users-form.tsx
+@@ -79,7 +79,9 @@ function selectedNames<T extends { id: number; code?: string; name: string }>(
+   if (ids.length === 0) return emptyText;
+   const selected = items.filter((item) => ids.includes(item.id));
+   if (selected.length === 0) return emptyText;
+-  return selected.map((item) => item.code || item.name).join(', ');
++  return selected
++    .map((item) => (item.code ? formatPermissionCode(item.code) : item.name))
++    .join(', ');
+ }
+
+ function toggleId(ids: number[], id: number) {
+@@ -587,8 +589,8 @@ export default function UsersFormScreen() {
+                 return (
+                   <AppOptionRow
+                     key={permission.id}
+-                    title={permission.name}
+-                    subtitle={formatPermissionCode(permission.code)}
++                    title={formatPermissionCode(permission.code)}
++                    subtitle={`Codigo interno: ${permission.code}`}
+                     onPress={() =>
+                       setDraftPermissionIds((current) => toggleId(current, permission.id))
+                     }
+diff --git a/components/layout/appNavigation.ts b/components/layout/appNavigation.ts
+index 2babad9..ef406a4 100644
+--- a/components/layout/appNavigation.ts
++++ b/components/layout/appNavigation.ts
+@@ -1,44 +1,137 @@
+ import { SidebarSection } from '@/components/layout/Sidebar';
+-import { canAccess, canAccessByPermission, isAdmin } from '@/services/accessControl';
++import {
++  canAccess,
++  canAccessByPermission,
++  hasAnyPermission,
++  isAdmin,
++  isNoAccess,
++} from '@/services/accessControl';
+ import { canViewLive } from '@/services/livePermissionGuards';
+ import { UserSession } from '@/services/sessionStorage';
+
+ export function buildMainNavSections(session: UserSession | null): SidebarSection[] {
++  if (!session || isNoAccess(session)) {
++    return [];
++  }
++
+   const liveAllowed = canViewLive(session);
++  const doorSaleAllowed = canAccess(session, 'DOOR_SALE', 'DO_DOOR_SALE');
++  const doorReservationAllowed = canAccess(session, 'DOOR_RESERVATION', 'DO_DOOR_RESERVATION');
+   const customersAllowed = canAccessByPermission(session, 'VIEW_CUSTOMERS');
+-  const reservationsAllowed =
+-    canAccess(session, 'DOOR_RESERVATION', 'DO_DOOR_RESERVATION') || liveAllowed;
++  const reservationsAllowed = doorReservationAllowed || liveAllowed;
++  const inventoryAllowed = hasAnyPermission(session, ['VIEW_INVENTORY', 'MANAGE_INVENTORY']);
++  const inventoryManageAllowed = canAccessByPermission(session, 'MANAGE_INVENTORY');
+   const usersAllowed = canAccessByPermission(session, 'MANAGE_USERS') || isAdmin(session);
++  const rolesAllowed = canAccessByPermission(session, 'MANAGE_ROLES') || isAdmin(session);
++  const channelsAllowed = canAccessByPermission(session, 'MANAGE_BRANCH_CHANNELS') || isAdmin(session);
+   const systemAllowed =
+-    canAccessByPermission(session, 'MANAGE_ROLES') ||
+-    canAccessByPermission(session, 'MANAGE_BRANCH_CHANNELS') ||
++    rolesAllowed ||
++    channelsAllowed ||
+     isAdmin(session);
+   const reportsAllowed = canAccessByPermission(session, 'VIEW_REPORTS') || isAdmin(session);
++  const securityAuditAllowed = canAccessByPermission(session, 'VIEW_SECURITY_AUDIT') || isAdmin(session);
+   const adminAllowed = isAdmin(session);
+
++  const homeItems = [
++    { key: 'home', label: 'Resumen operativo', route: '/', icon: 'space-dashboard' as const },
++  ];
++
+   const operationItems = [
+-    { key: 'home', label: 'Inicio', route: '/', icon: 'space-dashboard' as const },
+-    liveAllowed ? { key: 'live', label: 'LIVE', route: '/live', icon: 'live-tv' as const } : null,
++    liveAllowed
++      ? { key: 'live', label: 'En vivo', route: '/live', icon: 'live-tv' as const }
++      : null,
++    doorSaleAllowed
++      ? { key: 'door-sale', label: 'Venta puerta', route: '/door-sale', icon: 'point-of-sale' as const }
++      : null,
++    doorReservationAllowed
++      ? {
++          key: 'door-reservation',
++          label: 'Apartado puerta',
++          route: '/door-reservation',
++          icon: 'assignment' as const,
++        }
++      : null,
++    reservationsAllowed
++      ? { key: 'reservations', label: 'Apartados', route: '/reservations', icon: 'bookmark' as const }
++      : null,
+     customersAllowed
+       ? { key: 'customers', label: 'Clientes', route: '/customers', icon: 'groups' as const }
+       : null,
+-    reservationsAllowed
+-      ? { key: 'reservations', label: 'Reservas', route: '/reservations', icon: 'bookmark' as const }
++  ].filter(Boolean);
++
++  const inventoryItems = [
++    inventoryAllowed
++      ? { key: 'items', label: 'Prendas / Inventario', route: '/items', icon: 'inventory-2' as const }
++      : null,
++    inventoryManageAllowed
++      ? { key: 'items-create', label: 'Alta de prendas', route: '/items-create', icon: 'add-box' as const }
++      : null,
++    inventoryAllowed
++      ? { key: 'batches', label: 'Lotes', route: '/batches', icon: 'inventory' as const }
+       : null,
+   ].filter(Boolean);
+
+-  const controlItems = [
++  const adminItems = [
+     usersAllowed
+       ? { key: 'users', label: 'Usuarios', route: '/users', icon: 'manage-accounts' as const }
+       : null,
++    rolesAllowed
++      ? { key: 'system-roles', label: 'Roles', route: '/system-roles', icon: 'admin-panel-settings' as const }
++      : null,
++    channelsAllowed
++      ? { key: 'system-channels', label: 'Canales operativos', route: '/system-channels', icon: 'hub' as const }
++      : null,
+     systemAllowed
+       ? { key: 'system', label: 'Sistema', route: '/system', icon: 'settings' as const }
+       : null,
++    adminAllowed
++      ? { key: 'appearance', label: 'Apariencia / Branding', route: '/appearance', icon: 'palette' as const }
++      : null,
++  ].filter(Boolean);
++
++  const reportItems = [
+     reportsAllowed
+-      ? { key: 'reports', label: 'Reportes', route: '/reports', icon: 'analytics' as const }
++      ? { key: 'reports', label: 'Reportes generales', route: '/reports', icon: 'analytics' as const }
++      : null,
++    reportsAllowed
++      ? { key: 'report-daily-store', label: 'Diario tienda', route: '/report-daily-store', icon: 'today' as const }
++      : null,
++    reportsAllowed
++      ? { key: 'report-deliveries', label: 'Entregas diarias', route: '/report-deliveries', icon: 'local-shipping' as const }
++      : null,
++    reportsAllowed
++      ? { key: 'report-deposits', label: 'Depositos diarios', route: '/report-deposits', icon: 'payments' as const }
++      : null,
++    reportsAllowed
++      ? {
++          key: 'report-cancellations',
++          label: 'Cancelaciones diarias',
++          route: '/report-cancellations',
++          icon: 'cancel' as const,
++        }
++      : null,
++    reportsAllowed
++      ? { key: 'report-live', label: 'Control Live', route: '/report-live', icon: 'live-tv' as const }
++      : null,
++    reportsAllowed
++      ? { key: 'report-remissions', label: 'Remisiones', route: '/report-remissions', icon: 'receipt-long' as const }
++      : null,
++  ].filter(Boolean);
++
++  const securityItems = [
++    securityAuditAllowed
++      ? {
++          key: 'system-security-audit',
++          label: 'Auditoria de seguridad',
++          route: '/system-security-audit',
++          icon: 'security' as const,
++        }
++      : null,
++    adminAllowed
++      ? { key: 'system-security', label: 'Seguridad dev', route: '/system-security', icon: 'lock' as const }
+       : null,
+     adminAllowed
+-      ? { key: 'appearance', label: 'Configuracion', route: '/appearance', icon: 'palette' as const }
++      ? { key: 'system-sessions', label: 'Sesiones y bloqueos', route: '/system-sessions', icon: 'lock-clock' as const }
+       : null,
+   ].filter(Boolean);
+
+@@ -49,8 +142,12 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
+   ].filter(Boolean);
+
+   return [
++    { title: 'Inicio', items: homeItems },
+     { title: 'Operacion', items: operationItems },
+-    { title: 'Control', items: controlItems },
++    { title: 'Inventario', items: inventoryItems },
++    { title: 'Administracion', items: adminItems },
++    { title: 'Reportes', items: reportItems },
++    { title: 'Seguridad', items: securityItems },
+     { title: 'Desarrollo', items: developmentItems },
+   ].filter((section) => section.items.length > 0) as SidebarSection[];
+ }
+diff --git a/components/ui/RestrictedSection.tsx b/components/ui/RestrictedSection.tsx
+index 9ae467e..c7c9661 100644
+--- a/components/ui/RestrictedSection.tsx
++++ b/components/ui/RestrictedSection.tsx
+@@ -2,6 +2,7 @@ import AppCard from '@/components/ui/AppCard';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import { NormalizedApiError } from '@/services/apiError';
++import { formatPermissionCode } from '@/services/permissionDependencies';
+
+ type Props = {
+   error: NormalizedApiError;
+@@ -19,7 +20,7 @@ export default function RestrictedSection({ error, title = 'Acceso restringido'
+       <AppText>No tienes permiso para consultar esta informacion.</AppText>
+       {error.requiredPermission ? (
+         <AppText color={theme.colors.mutedText}>
+-          Permiso requerido: {error.requiredPermission}
++          Permiso requerido: {formatPermissionCode(error.requiredPermission)}
+         </AppText>
+       ) : null}
+       <AppText variant="caption" color={theme.colors.mutedText}>
+diff --git a/locales/en/common.json b/locales/en/common.json
+index a85e920..e04e09a 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -34,7 +34,21 @@
+     "liveWidgetVisible": "Visible in Live.",
+     "liveWidgetHidden": "Hidden in Live.",
+     "liveWidgetShow": "Show",
+-    "liveWidgetHide": "Hide"
++    "liveWidgetHide": "Hide",
++    "subtitle": "Preferences, channels, and system controls",
++    "contextTitle": "System and configuration",
++    "rolesTileTitle": "Roles",
++    "rolesTileHelp": "Create roles and define which existing permissions each one includes.",
++    "channelsTileTitle": "Operational channels",
++    "channelsTileHelp": "Enable or disable Live, door sale, door hold, and consignment globally.",
++    "supportLogsTileTitle": "Support logs",
++    "supportLogsTileHelp": "Review technical logs for configuration, routes, users, and HTTP responses.",
++    "securityTileTitle": "Dev security",
++    "securityTileHelp": "Configure session expiration, failed attempts, and temporary lockout.",
++    "sessionsTileTitle": "Sessions and locks",
++    "sessionsTileHelp": "Unlock users and close active sessions from support.",
++    "securityAuditTileTitle": "Security audit",
++    "securityAuditTileHelp": "Review blocked access, revoked tokens, and permission events."
+   },
+   "live": {
+     "title": "Live",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index 679e8d5..ec18b5b 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -34,7 +34,21 @@
+     "liveWidgetVisible": "Visible en En vivo.",
+     "liveWidgetHidden": "Oculto en En vivo.",
+     "liveWidgetShow": "Mostrar",
+-    "liveWidgetHide": "Ocultar"
++    "liveWidgetHide": "Ocultar",
++    "subtitle": "Preferencias, canales y controles del sistema",
++    "contextTitle": "Sistema y configuracion",
++    "rolesTileTitle": "Roles",
++    "rolesTileHelp": "Crea roles y define que permisos existentes incluye cada uno.",
++    "channelsTileTitle": "Canales operativos",
++    "channelsTileHelp": "Activa o apaga globalmente En vivo, Venta puerta, Apartado puerta y Consignacion.",
++    "supportLogsTileTitle": "Logs de soporte",
++    "supportLogsTileHelp": "Consulta bitacora tecnica de configuracion, rutas, usuarios y respuestas HTTP.",
++    "securityTileTitle": "Seguridad dev",
++    "securityTileHelp": "Parametriza cierre de sesion, intentos fallidos y bloqueo temporal.",
++    "sessionsTileTitle": "Sesiones y bloqueos",
++    "sessionsTileHelp": "Desbloquea usuarios y cierra sesiones activas desde soporte.",
++    "securityAuditTileTitle": "Auditoria de seguridad",
++    "securityAuditTileHelp": "Consulta accesos bloqueados, tokens revocados y eventos de permisos."
+   },
+   "live": {
+     "title": "En vivo",
+diff --git a/services/permissionDependencies.ts b/services/permissionDependencies.ts
+index 3157acf..d6c2ee7 100644
+--- a/services/permissionDependencies.ts
++++ b/services/permissionDependencies.ts
+@@ -25,8 +25,54 @@ const PERMISSION_GROUP_ORDER = [
+   'Otros',
+ ];
+
++const PERMISSION_LABELS_ES: Record<string, string> = {
++  APPLY_CUSTOMER_BALANCE: 'Aplicar saldo de cliente',
++  CANCEL_RESERVATION: 'Cancelar apartado',
++  CANCEL_SALE: 'Cancelar venta',
++  CREATE_CLOSE_CUSTOMER_PACKAGE: 'Crear cierre de paquete de cliente',
++  CREATE_CUSTOMER: 'Crear cliente',
++  CREATE_ITEM: 'Crear prenda',
++  DO_DOOR_RESERVATION: 'Apartar en puerta',
++  DO_DOOR_SALE: 'Venta puerta',
++  DO_LIVE_RESERVATION: 'Apartar en LIVE',
++  EDIT_CUSTOMER: 'Editar cliente',
++  EDIT_ITEM: 'Editar prenda',
++  MANAGE_BRANCH_CHANNELS: 'Administrar canales operativos',
++  MANAGE_BRANCHES: 'Administrar sucursales',
++  MANAGE_CASH_CLOSURES: 'Administrar cortes de caja',
++  MANAGE_CATALOGS: 'Administrar catalogos',
++  MANAGE_CONSIGNMENTS: 'Administrar consignaciones',
++  MANAGE_INCIDENTS: 'Administrar incidencias',
++  MANAGE_INVENTORY: 'Administrar inventario',
++  MANAGE_REFUNDS: 'Administrar devoluciones',
++  MANAGE_RETURNS: 'Administrar retornos',
++  MANAGE_ROLES: 'Administrar roles',
++  MANAGE_SECURITY_SETTINGS: 'Administrar seguridad',
++  MANAGE_SHIPMENTS: 'Administrar envios',
++  MANAGE_TRANSFERS: 'Administrar transferencias',
++  MANAGE_USERS: 'Administrar usuarios',
++  REASSIGN_CUSTOMERS: 'Reasignar clientes',
++  REGISTER_PAYMENTS: 'Registrar pagos',
++  VIEW_CUSTOMER_ORDERS: 'Ver pedidos de cliente',
++  VIEW_CUSTOMERS: 'Ver clientes',
++  VIEW_INVENTORY: 'Ver inventario',
++  VIEW_PAYMENTS: 'Ver pagos',
++  VIEW_REPORTS: 'Ver reportes',
++  VIEW_SALES: 'Ver ventas',
++  VIEW_SECURITY_AUDIT: 'Ver auditoria de seguridad',
++  VOID_PAYMENT: 'Anular pago',
++};
++
+ export function formatPermissionCode(code: string): string {
+-  return code.toLowerCase();
++  const normalized = code.toUpperCase();
++  const knownLabel = PERMISSION_LABELS_ES[normalized];
++  if (knownLabel) return knownLabel;
++
++  return normalized
++    .split('_')
++    .filter(Boolean)
++    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
++    .join(' ');
+ }
+
+ export function inferPermissionGroup(permissionCode: string, permissionName = ''): string {
+@@ -62,7 +108,7 @@ export function matchesPermissionSearch(
+   const value = search.trim().toLowerCase();
+   if (!value) return true;
+
+-  return `${permission.name} ${permission.code} ${inferPermissionGroup(permission.code, permission.name)}`
++  return `${permission.name} ${permission.code} ${formatPermissionCode(permission.code)} ${inferPermissionGroup(permission.code, permission.name)}`
+     .toLowerCase()
+     .includes(value);
+ }
+@@ -77,7 +123,7 @@ export function sortPermissionsForDisplay<T extends { code: string; name: string
+       PERMISSION_GROUP_ORDER.indexOf(leftGroup) - PERMISSION_GROUP_ORDER.indexOf(rightGroup);
+     if (groupComparison !== 0) return groupComparison;
+
+-    return left.name.localeCompare(right.name, 'es');
++    return formatPermissionCode(left.code).localeCompare(formatPermissionCode(right.code), 'es');
+   });
+ }

@@ -34,7 +34,21 @@
     "liveWidgetVisible": "Visible in Live.",
     "liveWidgetHidden": "Hidden in Live.",
     "liveWidgetShow": "Show",
-    "liveWidgetHide": "Hide"
+    "liveWidgetHide": "Hide",
+    "subtitle": "Preferences, channels, and system controls",
+    "contextTitle": "System and configuration",
+    "rolesTileTitle": "Roles",
+    "rolesTileHelp": "Create roles and define which existing permissions each one includes.",
+    "channelsTileTitle": "Operational channels",
+    "channelsTileHelp": "Enable or disable Live, door sale, door hold, and consignment globally.",
+    "supportLogsTileTitle": "Support logs",
+    "supportLogsTileHelp": "Review technical logs for configuration, routes, users, and HTTP responses.",
+    "securityTileTitle": "Dev security",
+    "securityTileHelp": "Configure session expiration, failed attempts, and temporary lockout.",
+    "sessionsTileTitle": "Sessions and locks",
+    "sessionsTileHelp": "Unlock users and close active sessions from support.",
+    "securityAuditTileTitle": "Security audit",
+    "securityAuditTileHelp": "Review blocked access, revoked tokens, and permission events."
   },
   "live": {
     "title": "Live",

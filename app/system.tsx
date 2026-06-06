@@ -61,8 +61,8 @@ export default function SystemScreen() {
   return (
     <AppShell
       title={t('system.title')}
-      subtitle="Preferencias, canales y controles del sistema"
-      contextTitle="Sistema y configuracion"
+      subtitle={t('system.subtitle')}
+      contextTitle={t('system.contextTitle')}
       contextSubtitle={getSessionScopeLabel(user)}
       activeRoute="system"
       session={user}
@@ -152,40 +152,40 @@ export default function SystemScreen() {
 
       <View style={styles.grid}>
         <SystemTile
-          title="Roles"
-          description="Crea roles y define que permisos existentes incluye cada uno."
+          title={t('system.rolesTileTitle')}
+          description={t('system.rolesTileHelp')}
           onPress={() => router.push('/system-roles' as any)}
         />
         <SystemTile
-          title="Canales operativos"
-          description="Activa o apaga globalmente En vivo, Venta puerta, Apartado puerta y Consignación."
+          title={t('system.channelsTileTitle')}
+          description={t('system.channelsTileHelp')}
           onPress={() => router.push('/system-channels' as any)}
         />
         {hasRole(user, 'SUPPORT_TECH') ? (
           <SystemTile
-            title="Logs de soporte"
-            description="Consulta bitácora técnica de configuración, rutas, usuarios y respuestas HTTP."
+            title={t('system.supportLogsTileTitle')}
+            description={t('system.supportLogsTileHelp')}
             onPress={() => router.push('/system-logs' as any)}
           />
         ) : null}
         {hasRole(user, 'SUPPORT_TECH') ? (
           <SystemTile
-            title="Seguridad dev"
-            description="Parametriza cierre de sesión, intentos fallidos y bloqueo temporal."
+            title={t('system.securityTileTitle')}
+            description={t('system.securityTileHelp')}
             onPress={() => router.push('/system-security' as any)}
           />
         ) : null}
         {hasRole(user, 'SUPPORT_TECH') ? (
           <SystemTile
-            title="Sesiones y bloqueos"
-            description="Desbloquea usuarios y cierra sesiones activas desde soporte."
+            title={t('system.sessionsTileTitle')}
+            description={t('system.sessionsTileHelp')}
             onPress={() => router.push('/system-sessions' as any)}
           />
         ) : null}
         {hasPermission(user, 'VIEW_SECURITY_AUDIT') ? (
           <SystemTile
-            title="Auditoria de seguridad"
-            description="Consulta accesos bloqueados, tokens revocados y eventos de permisos."
+            title={t('system.securityAuditTileTitle')}
+            description={t('system.securityAuditTileHelp')}
             onPress={() => router.push('/system-security-audit' as any)}
           />
         ) : null}
