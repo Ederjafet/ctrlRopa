@@ -36,6 +36,10 @@ La navegacion principal ahora se agrupa desde `components/layout/appNavigation.t
 
 PRODUCT-D6.1 refuerza esta decision: las pantallas AppShell auditadas deben consumir `buildMainNavSections(session)` como unica fuente de navegacion. Las secciones e items agregan claves i18n para que el sidebar/drawer respete Espanol/Ingles y no quede mezclado con el idioma de la pantalla.
 
+## Nota PRODUCT-D6.2
+
+La navegacion traducible depende de la fuente global `i18next` + AsyncStorage (`app_language`). El shell comun (`Sidebar`, `TopBar`, logout y theme toggle) debe usar `useTranslation('common')` para evitar mezclas de idioma entre menu y contenido.
+
 Reglas aplicadas:
 
 - No se muestran categorias vacias.

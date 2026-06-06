@@ -658,6 +658,14 @@
       "devSecurity": "Seguridad dev",
       "sessionsLocks": "Sesiones y bloqueos",
       "uiKit": "UI Kit"
-    }
+    },
+    "noRole": "Sin rol"
+  },
+  "theme": {
+    "light": "Claro",
+    "dark": "Oscuro"
+  },
+  "topBar": {
+    "operationalPanel": "Panel operativo"
   }
 }

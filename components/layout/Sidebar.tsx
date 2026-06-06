@@ -26,7 +26,7 @@ type Props = {
 export default function Sidebar({ sections, activeRoute, onNavigate, session, onClose, onSignOut }: Props) {
   const { theme } = useAppTheme();
   const { t } = useTranslation('common');
-  const roleLabel = session?.roles?.map((role) => role.code).join(', ') || 'Sin rol';
+  const roleLabel = session?.roles?.map((role) => role.code).join(', ') || t('navigation.noRole');
   const normalizedActiveRoute = activeRoute?.replace(/^\//, '');
   const isActiveItem = (item: SidebarNavItemConfig) => {
     const normalizedItemRoute = item.route?.replace(/^\//, '');

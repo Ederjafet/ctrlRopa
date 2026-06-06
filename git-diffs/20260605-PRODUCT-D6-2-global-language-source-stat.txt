@@ -1,0 +1,8 @@
+﻿ components/layout/Sidebar.tsx                   |  2 +-
+ components/layout/TopBar.tsx                    | 11 ++++++++---
+ docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md |  4 ++++
+ docs/PRODUCT_D6_1_UNIFIED_NAVIGATION_I18N.md    |  4 ++++
+ locales/en/common.json                          | 10 +++++++++-
+ locales/es/common.json                          | 10 +++++++++-
+ services/i18n.ts                                | 25 +++++++++++++++++--------
+ 7 files changed, 52 insertions(+), 14 deletions(-)

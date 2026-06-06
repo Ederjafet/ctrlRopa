@@ -9,14 +9,21 @@ import esCommon from '@/locales/es/common.json';
 export const SUPPORTED_LANGUAGES = ['es', 'en'] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 const LANGUAGE_KEY = 'app_language';
-const canUseStorage = typeof window !== 'undefined';
+const canUseStorage =
+  typeof window !== 'undefined' ||
+  (typeof navigator !== 'undefined' && navigator.product === 'ReactNative');
+
+function normalizeLanguage(language?: string | null): SupportedLanguage | null {
+  const normalized = language?.toLowerCase();
+  return SUPPORTED_LANGUAGES.includes(normalized as SupportedLanguage)
+    ? (normalized as SupportedLanguage)
+    : null;
+}
 
 function resolveInitialLanguage(): SupportedLanguage {
-  const deviceLanguage = getLocales()[0]?.languageCode?.toLowerCase();
+  const deviceLanguage = normalizeLanguage(getLocales()[0]?.languageCode);
 
-  return SUPPORTED_LANGUAGES.includes(deviceLanguage as SupportedLanguage)
-    ? (deviceLanguage as SupportedLanguage)
-    : 'es';
+  return deviceLanguage ?? 'es';
 }
 
 void i18n.use(initReactI18next).init({
@@ -39,17 +46,19 @@ void i18n.use(initReactI18next).init({
 
 if (canUseStorage) {
   void AsyncStorage.getItem(LANGUAGE_KEY).then((storedLanguage) => {
-    if (SUPPORTED_LANGUAGES.includes(storedLanguage as SupportedLanguage)) {
-      void i18n.changeLanguage(storedLanguage as SupportedLanguage);
+    const resolvedLanguage = normalizeLanguage(storedLanguage);
+    if (resolvedLanguage) {
+      void i18n.changeLanguage(resolvedLanguage);
     }
   });
 }
 
 export async function changeAppLanguage(language: SupportedLanguage) {
+  await i18n.changeLanguage(language);
   if (canUseStorage) {
     await AsyncStorage.setItem(LANGUAGE_KEY, language);
   }
-  return i18n.changeLanguage(language);
+  return language;
 }
 
 export default i18n;
