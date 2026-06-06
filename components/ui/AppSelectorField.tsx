@@ -8,6 +8,7 @@ type Props = {
   placeholder: string;
   onPress: () => void;
   disabled?: boolean;
+  error?: string;
 };
 
 export default function AppSelectorField({
@@ -16,6 +17,7 @@ export default function AppSelectorField({
   placeholder,
   onPress,
   disabled = false,
+  error,
 }: Props) {
   const { theme } = useAppTheme();
 
@@ -30,7 +32,7 @@ export default function AppSelectorField({
         style={({ pressed }) => [
           styles.button,
           {
-            borderColor: theme.colors.inputBorder,
+            borderColor: error ? theme.colors.danger : theme.colors.inputBorder,
             borderRadius: theme.radius.md,
             padding: theme.spacing.md,
             minHeight: theme.density === 'COMPACT' ? 46 : 54,
@@ -46,6 +48,11 @@ export default function AppSelectorField({
           {value || placeholder}
         </AppText>
       </Pressable>
+      {error ? (
+        <AppText variant="caption" color={theme.colors.danger} style={styles.errorText}>
+          {error}
+        </AppText>
+      ) : null}
     </View>
   );
 }
@@ -56,5 +63,8 @@ const styles = StyleSheet.create({
   },
   button: {
     borderWidth: 1,
+  },
+  errorText: {
+    marginTop: 6,
   },
 });

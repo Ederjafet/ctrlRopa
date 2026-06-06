@@ -3,6 +3,8 @@
 > Nota LIVE-Z9D: `Cambiar por prenda preparada` usa directamente la prenda preparada visible y no abre el selector.
 > `Quitar prenda preparada` limpia solo la preparacion local, sin afectar prenda al aire, precio, cliente ni apartado.
 
+> Nota LIVE-Z9E: `Crear prenda rapida` mantiene `returnTo=/live` y ahora muestra validacion visible por campo cuando faltan datos obligatorios antes de generar prendas.
+
 ## Objetivo
 
 Integrar `/live` al layout profesional del producto usando `AppShell`, sidebar, TopBar y navegacion lateral responsive, sin cambiar reglas operativas profundas ni backend.

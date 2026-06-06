@@ -4,9 +4,10 @@ import AppText from './AppText';
 
 type Props = TextInputProps & {
   label?: string;
+  error?: string;
 };
 
-export default function AppInput({ label, style, ...rest }: Props) {
+export default function AppInput({ label, error, style, ...rest }: Props) {
   const { theme } = useAppTheme();
   const isReadonly = rest.editable === false;
 
@@ -22,7 +23,7 @@ export default function AppInput({ label, style, ...rest }: Props) {
         style={[
           styles.input,
           {
-            borderColor: theme.colors.inputBorder,
+            borderColor: error ? theme.colors.danger : theme.colors.inputBorder,
             borderRadius: theme.radius.md,
             padding: theme.spacing.md,
             minHeight: theme.density === 'COMPACT' ? 46 : 54,
@@ -39,6 +40,11 @@ export default function AppInput({ label, style, ...rest }: Props) {
         selectionColor={theme.colors.accent}
         {...rest}
       />
+      {error ? (
+        <AppText variant="caption" color={theme.colors.danger} style={styles.errorText}>
+          {error}
+        </AppText>
+      ) : null}
     </View>
   );
 }
@@ -52,5 +58,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 10,
+  },
+  errorText: {
+    marginTop: 6,
   },
 });
