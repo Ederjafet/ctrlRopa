@@ -8,42 +8,43 @@ import { useAppTheme } from '@/context/AppThemeContext';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 type ReportAccess = {
-  title: string;
-  description: string;
+  titleKey: string;
+  descriptionKey: string;
   route: string;
 };
 
 const reports: ReportAccess[] = [
   {
-    title: 'Diario tienda',
-    description: 'Resumen diario de ventas, apartados, pagos, efectivo y cancelaciones.',
+    titleKey: 'reports.dailyStoreTitle',
+    descriptionKey: 'reports.dailyStoreDescription',
     route: '/report-daily-store',
   },
   {
-    title: 'Entregas diarias',
-    description: 'Paquetes enviados, entregados, devueltos y pendientes por sucursal/fecha.',
+    titleKey: 'reports.dailyDeliveriesTitle',
+    descriptionKey: 'reports.dailyDeliveriesDescription',
     route: '/report-deliveries',
   },
   {
-    title: 'Depositos diarios',
-    description: 'Pagos recibidos, metodos, referencias y totales del dia.',
+    titleKey: 'reports.dailyDepositsTitle',
+    descriptionKey: 'reports.dailyDepositsDescription',
     route: '/report-deposits',
   },
   {
-    title: 'Cancelaciones diarias',
-    description: 'Ventas, reservas y devoluciones canceladas en la fecha.',
+    titleKey: 'reports.dailyCancellationsTitle',
+    descriptionKey: 'reports.dailyCancellationsDescription',
     route: '/report-cancellations',
   },
   {
-    title: 'Control Live',
-    description: 'Paquetes, piezas, saldos y liquidacion de operacion Live.',
+    titleKey: 'reports.liveControlTitle',
+    descriptionKey: 'reports.liveControlDescription',
     route: '/report-live',
   },
   {
-    title: 'Remisiones',
-    description: 'Detalle de prendas, clientes, pagos, paquetes y vendedores.',
+    titleKey: 'reports.remissionsTitle',
+    descriptionKey: 'reports.remissionsDescription',
     route: '/report-remissions',
   },
 ];
@@ -51,6 +52,7 @@ const reports: ReportAccess[] = [
 export default function ReportsScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
   const [session, setSession] = useState<UserSession | null>(null);
   const navSections = useMemo(() => buildMainNavSections(session), [session]);
 
@@ -60,27 +62,26 @@ export default function ReportsScreen() {
 
   return (
     <AppShell
-      title="Reportes"
-      subtitle="Consultas operativas por fecha y sucursal"
-      contextTitle="Centro de reportes"
+      title={t('reports.title')}
+      subtitle={t('reports.subtitle')}
+      contextTitle={t('reports.contextTitle')}
       contextSubtitle={getSessionScopeLabel(session)}
       activeRoute="reports"
       session={session}
       navSections={navSections}
     >
-      <AppInfoCard title="Reportes operativos">
+      <AppInfoCard title={t('reports.cardTitle')}>
         <AppText color={theme.colors.infoCardText}>
-          Consulta reportes por fecha y sucursal. Incluye operacion diaria, depositos, entregas,
-          cancelaciones, control Live y remisiones.
+          {t('reports.cardHelp')}
         </AppText>
       </AppInfoCard>
 
       <AppResponsiveGrid tabletColumns={2} desktopColumns={3}>
         {reports.map((report) => (
           <ActionTile
-            key={report.title}
-            title={report.title}
-            subtitle={report.description}
+            key={report.route}
+            title={t(report.titleKey)}
+            subtitle={t(report.descriptionKey)}
             icon="analytics"
             onPress={() => router.push(report.route as any)}
           />

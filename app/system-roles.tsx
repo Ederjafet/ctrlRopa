@@ -22,6 +22,7 @@ import {
 } from '@/services/userAdminService';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 
 type RoleForm = {
@@ -48,6 +49,7 @@ function toggleId(ids: number[], id: number) {
 
 export default function SystemRolesScreen() {
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
 
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [permissions, setPermissions] = useState<AdminPermission[]>([]);
@@ -75,9 +77,9 @@ export default function SystemRolesScreen() {
       setRoles(roleData);
       setPermissions(permissionData);
     } catch (error: any) {
-      const message = error?.message ?? 'No se pudieron cargar roles.';
+      const message = error?.message ?? t('systemRoles.loadError');
       setLoadError(message);
-      Alert.alert('Sistema', message);
+      Alert.alert(t('system.title'), message);
     } finally {
       setLoading(false);
     }
@@ -116,12 +118,12 @@ export default function SystemRolesScreen() {
 
   const save = async () => {
     if (!form.code.trim()) {
-      Alert.alert('Rol', 'Captura el código del rol.');
+      Alert.alert(t('systemRoles.title'), t('systemRoles.codeRequired'));
       return;
     }
 
     if (!form.name.trim()) {
-      Alert.alert('Rol', 'Captura el nombre del rol.');
+      Alert.alert(t('systemRoles.title'), t('systemRoles.nameRequired'));
       return;
     }
 
@@ -135,7 +137,7 @@ export default function SystemRolesScreen() {
       setModalVisible(false);
       await load();
     } catch (error: any) {
-      Alert.alert('Rol', error?.message ?? 'No se pudo guardar el rol.');
+      Alert.alert(t('systemRoles.title'), error?.message ?? t('systemRoles.saveError'));
     } finally {
       setSaving(false);
     }
@@ -155,31 +157,31 @@ export default function SystemRolesScreen() {
         <AppBackButton fallbackRoute="/system" />
 
         <AppText variant="title" bold>
-          Roles
+          {t('systemRoles.title')}
         </AppText>
 
         <AppCard>
           <AppText variant="subtitle" bold>
-            Roles del sistema
+            {t('systemRoles.cardTitle')}
           </AppText>
           <AppText color={theme.colors.mutedText}>
-            Los permisos son una lista tecnica fija. Aqui solo se asignan a roles.
+            {t('systemRoles.cardHelp')}
           </AppText>
         </AppCard>
 
-        <AppButton title="Nuevo rol" onPress={openNew} />
+        <AppButton title={t('systemRoles.newRole')} onPress={openNew} />
 
         {loadError ? (
           <AppCard>
             <AppText color={theme.colors.danger}>{loadError}</AppText>
-            <AppButton title="Reintentar" variant="secondary" onPress={load} />
+            <AppButton title={t('common.retry')} variant="secondary" onPress={load} />
           </AppCard>
         ) : roles.length === 0 ? (
           <AppCard>
             <AppText color={theme.colors.mutedText}>
-              No se cargaron roles. Revisa que el backend este encendido y vuelve a intentar.
+              {t('systemRoles.empty')}
             </AppText>
-            <AppButton title="Reintentar" variant="secondary" onPress={load} />
+            <AppButton title={t('common.retry')} variant="secondary" onPress={load} />
           </AppCard>
         ) : (
           roles.map((role) => (
@@ -191,11 +193,11 @@ export default function SystemRolesScreen() {
                     {formatPermissionCode(role.code)}
                   </AppText>
                   <AppText variant="caption" color={theme.colors.mutedText}>
-                    Permisos incluidos: {permissionIds(role).length}
+                    {t('systemRoles.includedPermissions', { count: permissionIds(role).length })}
                   </AppText>
                 </View>
                 <View style={styles.roleAction}>
-                  <AppButton title="Editar" variant="secondary" onPress={() => openEdit(role)} />
+                  <AppButton title={t('systemRoles.edit')} variant="secondary" onPress={() => openEdit(role)} />
                 </View>
               </View>
             </AppCard>
@@ -205,23 +207,23 @@ export default function SystemRolesScreen() {
 
       <AppBottomModal
         visible={modalVisible}
-        title={form.id ? 'Editar rol' : 'Nuevo rol'}
+        title={form.id ? t('systemRoles.editRole') : t('systemRoles.newRole')}
         onClose={() => setModalVisible(false)}
         maxHeight="92%"
         showCancelButton={false}
         footer={
           <View style={styles.modalActions}>
             <View style={styles.modalActionButton}>
-              <AppButton title="Cancelar" variant="secondary" onPress={() => setModalVisible(false)} />
+              <AppButton title={t('systemRoles.cancel')} variant="secondary" onPress={() => setModalVisible(false)} />
             </View>
             <View style={styles.modalActionButton}>
-              <AppButton title={saving ? 'Guardando...' : 'Guardar rol'} loading={saving} onPress={save} />
+              <AppButton title={saving ? t('common.saving') : t('systemRoles.saveRole')} loading={saving} onPress={save} />
             </View>
           </View>
         }
       >
         <AppInput
-          label="Código"
+          label={t('systemRoles.code')}
           placeholder="EJEMPLO_ROL"
           value={form.code}
           autoCapitalize="characters"
@@ -229,8 +231,8 @@ export default function SystemRolesScreen() {
         />
 
         <AppInput
-          label="Nombre"
-          placeholder="Nombre visible"
+          label={t('systemRoles.name')}
+          placeholder={t('systemRoles.visibleName')}
           value={form.name}
           onChangeText={(name) => setForm((current) => ({ ...current, name }))}
         />
@@ -240,18 +242,18 @@ export default function SystemRolesScreen() {
             Permisos existentes
           </AppText>
           <AppText color={theme.colors.mutedText}>
-            No se crean permisos aqui; solo se seleccionan los que ya existen en el sistema.
+            {t('systemRoles.existingPermissionsHelp')}
           </AppText>
 
           <AppInput
-            placeholder="Buscar permiso"
+            placeholder={t('systemRoles.searchPermission')}
             value={search}
             onChangeText={setSearch}
           />
 
           {filteredPermissions.length === 0 ? (
             <AppText color={theme.colors.mutedText} style={styles.emptyPermissions}>
-              No se encontraron permisos con ese filtro.
+              {t('systemRoles.noPermissionsFound')}
             </AppText>
           ) : (
             filteredPermissions.map((group) => (
@@ -282,10 +284,10 @@ export default function SystemRolesScreen() {
                       <View style={styles.permissionText}>
                         <AppText bold={selected}>{formatPermissionCode(permission.code)}</AppText>
                         <AppText variant="caption" color={theme.colors.mutedText}>
-                          Codigo interno: {permission.code}
+                          {t('systemRoles.internalCode', { code: permission.code })}
                         </AppText>
                         <AppText color={selected ? theme.colors.accent : theme.colors.mutedText} bold={selected}>
-                          {selected ? 'Incluido' : 'Agregar'}
+                          {selected ? t('systemRoles.included') : t('systemRoles.add')}
                         </AppText>
                         {dependencyWarnings.map((warning) => (
                           <AppText

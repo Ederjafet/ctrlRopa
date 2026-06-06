@@ -1,0 +1,12 @@
+﻿ app/reports.tsx                                    |  47 ++++-----
+ app/system-channels.tsx                            |  54 +++++-----
+ app/system-roles.tsx                               |  52 +++++-----
+ app/system-security-audit.tsx                      |  62 ++++++------
+ components/ui/AppBackButton.tsx                    |  10 +-
+ docs/PRODUCT_D6_1_UNIFIED_NAVIGATION_I18N.md       |   4 +
+ docs/PRODUCT_D6_2B_VISIBLE_I18N_HARDCODES.md       |  66 ++++++++++++
+ docs/PRODUCT_D6_2_GLOBAL_LANGUAGE_SOURCE.md        |   4 +
+ locales/en/common.json                             | 112 ++++++++++++++++++++-
+ locales/es/common.json                             | 112 ++++++++++++++++++++-
+ ...isible-i18n-hardcodes-report-20260606-171427.md |  50 +++++++++
+ 11 files changed, 464 insertions(+), 109 deletions(-)

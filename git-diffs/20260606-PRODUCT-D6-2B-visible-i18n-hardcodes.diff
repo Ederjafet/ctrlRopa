@@ -1,0 +1,1143 @@
+﻿diff --git a/app/reports.tsx b/app/reports.tsx
+index f94d881..39a94f6 100644
+--- a/app/reports.tsx
++++ b/app/reports.tsx
+@@ -8,42 +8,43 @@ import { useAppTheme } from '@/context/AppThemeContext';
+ import { getSession, UserSession } from '@/services/sessionStorage';
+ import { useRouter } from 'expo-router';
+ import { useEffect, useMemo, useState } from 'react';
++import { useTranslation } from 'react-i18next';
+
+ type ReportAccess = {
+-  title: string;
+-  description: string;
++  titleKey: string;
++  descriptionKey: string;
+   route: string;
+ };
+
+ const reports: ReportAccess[] = [
+   {
+-    title: 'Diario tienda',
+-    description: 'Resumen diario de ventas, apartados, pagos, efectivo y cancelaciones.',
++    titleKey: 'reports.dailyStoreTitle',
++    descriptionKey: 'reports.dailyStoreDescription',
+     route: '/report-daily-store',
+   },
+   {
+-    title: 'Entregas diarias',
+-    description: 'Paquetes enviados, entregados, devueltos y pendientes por sucursal/fecha.',
++    titleKey: 'reports.dailyDeliveriesTitle',
++    descriptionKey: 'reports.dailyDeliveriesDescription',
+     route: '/report-deliveries',
+   },
+   {
+-    title: 'Depositos diarios',
+-    description: 'Pagos recibidos, metodos, referencias y totales del dia.',
++    titleKey: 'reports.dailyDepositsTitle',
++    descriptionKey: 'reports.dailyDepositsDescription',
+     route: '/report-deposits',
+   },
+   {
+-    title: 'Cancelaciones diarias',
+-    description: 'Ventas, reservas y devoluciones canceladas en la fecha.',
++    titleKey: 'reports.dailyCancellationsTitle',
++    descriptionKey: 'reports.dailyCancellationsDescription',
+     route: '/report-cancellations',
+   },
+   {
+-    title: 'Control Live',
+-    description: 'Paquetes, piezas, saldos y liquidacion de operacion Live.',
++    titleKey: 'reports.liveControlTitle',
++    descriptionKey: 'reports.liveControlDescription',
+     route: '/report-live',
+   },
+   {
+-    title: 'Remisiones',
+-    description: 'Detalle de prendas, clientes, pagos, paquetes y vendedores.',
++    titleKey: 'reports.remissionsTitle',
++    descriptionKey: 'reports.remissionsDescription',
+     route: '/report-remissions',
+   },
+ ];
+@@ -51,6 +52,7 @@ const reports: ReportAccess[] = [
+ export default function ReportsScreen() {
+   const router = useRouter();
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+   const [session, setSession] = useState<UserSession | null>(null);
+   const navSections = useMemo(() => buildMainNavSections(session), [session]);
+
+@@ -60,27 +62,26 @@ export default function ReportsScreen() {
+
+   return (
+     <AppShell
+-      title="Reportes"
+-      subtitle="Consultas operativas por fecha y sucursal"
+-      contextTitle="Centro de reportes"
++      title={t('reports.title')}
++      subtitle={t('reports.subtitle')}
++      contextTitle={t('reports.contextTitle')}
+       contextSubtitle={getSessionScopeLabel(session)}
+       activeRoute="reports"
+       session={session}
+       navSections={navSections}
+     >
+-      <AppInfoCard title="Reportes operativos">
++      <AppInfoCard title={t('reports.cardTitle')}>
+         <AppText color={theme.colors.infoCardText}>
+-          Consulta reportes por fecha y sucursal. Incluye operacion diaria, depositos, entregas,
+-          cancelaciones, control Live y remisiones.
++          {t('reports.cardHelp')}
+         </AppText>
+       </AppInfoCard>
+
+       <AppResponsiveGrid tabletColumns={2} desktopColumns={3}>
+         {reports.map((report) => (
+           <ActionTile
+-            key={report.title}
+-            title={report.title}
+-            subtitle={report.description}
++            key={report.route}
++            title={t(report.titleKey)}
++            subtitle={t(report.descriptionKey)}
+             icon="analytics"
+             onPress={() => router.push(report.route as any)}
+           />
+diff --git a/app/system-channels.tsx b/app/system-channels.tsx
+index 80512f2..829fb9a 100644
+--- a/app/system-channels.tsx
++++ b/app/system-channels.tsx
+@@ -10,13 +10,14 @@ import {
+   updateSalesChannelGlobalEnabled,
+ } from '@/services/branchChannelService';
+ import { useEffect, useMemo, useState } from 'react';
++import { useTranslation } from 'react-i18next';
+ import { Alert, StyleSheet, Switch, View } from 'react-native';
+
+-const CHANNEL_DESCRIPTIONS: Record<string, string> = {
+-  LIVE: 'Live y reservas durante transmision.',
+-  DOOR_SALE: 'Venta directa en puerta.',
+-  DOOR_RESERVATION: 'Apartados generados desde puerta.',
+-  CONSIGNMENT: 'Consignaciones con terceros.',
++const CHANNEL_DESCRIPTION_KEYS: Record<string, string> = {
++  LIVE: 'systemChannels.liveDescription',
++  DOOR_SALE: 'systemChannels.doorSaleDescription',
++  DOOR_RESERVATION: 'systemChannels.doorReservationDescription',
++  CONSIGNMENT: 'systemChannels.consignmentDescription',
+ };
+
+ function sortChannels(channels: SalesChannel[]) {
+@@ -36,6 +37,7 @@ function sortChannels(channels: SalesChannel[]) {
+
+ export default function SystemChannelsScreen() {
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+   const [channels, setChannels] = useState<SalesChannel[]>([]);
+   const [originalChannels, setOriginalChannels] = useState<SalesChannel[]>([]);
+   const [loading, setLoading] = useState(true);
+@@ -52,18 +54,18 @@ export default function SystemChannelsScreen() {
+   }, [channels, originalChannels]);
+
+   const saveBlockedReason = useMemo(() => {
+-    if (loading) return 'Espera a que terminen de cargar los canales.';
+-    if (saving) return 'Se esta guardando la configuración.';
+-    if (!hasChanges) return 'No hay cambios pendientes por guardar.';
++    if (loading) return t('systemChannels.waitLoad');
++    if (saving) return t('systemChannels.saving');
++    if (!hasChanges) return t('systemChannels.noPendingSave');
+     return undefined;
+-  }, [loading, saving, hasChanges]);
++  }, [loading, saving, hasChanges, t]);
+
+   const discardBlockedReason = useMemo(() => {
+-    if (loading) return 'Espera a que terminen de cargar los canales.';
++    if (loading) return t('systemChannels.waitLoad');
+     if (saving) return 'Se esta guardando la configuración.';
+-    if (!hasChanges) return 'No hay cambios pendientes por descartar.';
++    if (!hasChanges) return t('systemChannels.noPendingDiscard');
+     return undefined;
+-  }, [loading, saving, hasChanges]);
++  }, [loading, saving, hasChanges, t]);
+
+   useEffect(() => {
+     loadChannels();
+@@ -79,7 +81,7 @@ export default function SystemChannelsScreen() {
+       setOriginalChannels(data.map((channel) => ({ ...channel })));
+     } catch (err) {
+       console.log(err);
+-      setError('No se pudieron cargar los canales operativos.');
++      setError(t('systemChannels.loadError'));
+     } finally {
+       setLoading(false);
+     }
+@@ -106,7 +108,7 @@ export default function SystemChannelsScreen() {
+     });
+
+     if (changedChannels.length === 0) {
+-      Alert.alert('Sin cambios', 'No hay cambios por guardar.');
++      Alert.alert(t('systemChannels.noChangesTitle'), t('systemChannels.noChangesMessage'));
+       return;
+     }
+
+@@ -120,10 +122,10 @@ export default function SystemChannelsScreen() {
+       );
+
+       await loadChannels();
+-      Alert.alert('Canales actualizados', 'La configuración global se guardo correctamente.');
++      Alert.alert(t('systemChannels.savedTitle'), t('systemChannels.savedMessage'));
+     } catch (err) {
+       console.log(err);
+-      Alert.alert('No se pudo guardar', 'Revisa tu conexión o permisos e intentalo nuevamente.');
++      Alert.alert(t('systemChannels.saveErrorTitle'), t('systemChannels.saveErrorMessage'));
+     } finally {
+       setSaving(false);
+     }
+@@ -134,15 +136,15 @@ export default function SystemChannelsScreen() {
+       <AppBackButton fallbackRoute="/system" />
+
+       <AppText variant="title" bold>
+-        Canales operativos
++        {t('systemChannels.title')}
+       </AppText>
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Regla global
++          {t('systemChannels.globalRuleTitle')}
+         </AppText>
+         <AppText color={theme.colors.mutedText}>
+-          Si Sistema apaga un canal, ninguna sucursal lo puede operar ni configurar aunque antes estuviera activo.
++          {t('systemChannels.globalRuleHelp')}
+         </AppText>
+       </AppCard>
+
+@@ -154,13 +156,13 @@ export default function SystemChannelsScreen() {
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Disponibilidad global
++          {t('systemChannels.availabilityTitle')}
+         </AppText>
+
+         {loading ? (
+-          <AppText color={theme.colors.mutedText}>Cargando canales...</AppText>
++          <AppText color={theme.colors.mutedText}>{t('systemChannels.loading')}</AppText>
+         ) : channels.length === 0 ? (
+-          <AppText color={theme.colors.mutedText}>No hay canales registrados.</AppText>
++          <AppText color={theme.colors.mutedText}>{t('systemChannels.empty')}</AppText>
+         ) : (
+           <View style={styles.channelList}>
+             {channels.map((channel) => {
+@@ -187,11 +189,11 @@ export default function SystemChannelsScreen() {
+                       {channel.code}
+                     </AppText>
+                     <AppText color={theme.colors.mutedText}>
+-                      {CHANNEL_DESCRIPTIONS[channel.code] ?? 'Canal operativo del sistema.'}
++                      {t(CHANNEL_DESCRIPTION_KEYS[channel.code] ?? 'systemChannels.defaultDescription')}
+                     </AppText>
+                     {inactive ? (
+                       <AppText variant="caption" color={theme.colors.danger}>
+-                        Canal inactivo en catalogo.
++                        {t('systemChannels.inactive')}
+                       </AppText>
+                     ) : null}
+                   </View>
+@@ -215,7 +217,7 @@ export default function SystemChannelsScreen() {
+
+       <View style={styles.actions}>
+         <AppButton
+-          title="Guardar cambios"
++          title={t('systemChannels.saveChanges')}
+           onPress={saveChanges}
+           loading={saving}
+           disabled={loading || saving || !hasChanges}
+@@ -223,7 +225,7 @@ export default function SystemChannelsScreen() {
+         />
+
+         <AppButton
+-          title="Descartar cambios"
++          title={t('systemChannels.discardChanges')}
+           variant="secondary"
+           onPress={resetChanges}
+           disabled={loading || saving || !hasChanges}
+diff --git a/app/system-roles.tsx b/app/system-roles.tsx
+index c837873..3998666 100644
+--- a/app/system-roles.tsx
++++ b/app/system-roles.tsx
+@@ -22,6 +22,7 @@ import {
+ } from '@/services/userAdminService';
+ import { useFocusEffect } from 'expo-router';
+ import { useCallback, useMemo, useState } from 'react';
++import { useTranslation } from 'react-i18next';
+ import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+
+ type RoleForm = {
+@@ -48,6 +49,7 @@ function toggleId(ids: number[], id: number) {
+
+ export default function SystemRolesScreen() {
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+
+   const [roles, setRoles] = useState<AdminRole[]>([]);
+   const [permissions, setPermissions] = useState<AdminPermission[]>([]);
+@@ -75,9 +77,9 @@ export default function SystemRolesScreen() {
+       setRoles(roleData);
+       setPermissions(permissionData);
+     } catch (error: any) {
+-      const message = error?.message ?? 'No se pudieron cargar roles.';
++      const message = error?.message ?? t('systemRoles.loadError');
+       setLoadError(message);
+-      Alert.alert('Sistema', message);
++      Alert.alert(t('system.title'), message);
+     } finally {
+       setLoading(false);
+     }
+@@ -116,12 +118,12 @@ export default function SystemRolesScreen() {
+
+   const save = async () => {
+     if (!form.code.trim()) {
+-      Alert.alert('Rol', 'Captura el código del rol.');
++      Alert.alert(t('systemRoles.title'), t('systemRoles.codeRequired'));
+       return;
+     }
+
+     if (!form.name.trim()) {
+-      Alert.alert('Rol', 'Captura el nombre del rol.');
++      Alert.alert(t('systemRoles.title'), t('systemRoles.nameRequired'));
+       return;
+     }
+
+@@ -135,7 +137,7 @@ export default function SystemRolesScreen() {
+       setModalVisible(false);
+       await load();
+     } catch (error: any) {
+-      Alert.alert('Rol', error?.message ?? 'No se pudo guardar el rol.');
++      Alert.alert(t('systemRoles.title'), error?.message ?? t('systemRoles.saveError'));
+     } finally {
+       setSaving(false);
+     }
+@@ -155,31 +157,31 @@ export default function SystemRolesScreen() {
+         <AppBackButton fallbackRoute="/system" />
+
+         <AppText variant="title" bold>
+-          Roles
++          {t('systemRoles.title')}
+         </AppText>
+
+         <AppCard>
+           <AppText variant="subtitle" bold>
+-            Roles del sistema
++            {t('systemRoles.cardTitle')}
+           </AppText>
+           <AppText color={theme.colors.mutedText}>
+-            Los permisos son una lista tecnica fija. Aqui solo se asignan a roles.
++            {t('systemRoles.cardHelp')}
+           </AppText>
+         </AppCard>
+
+-        <AppButton title="Nuevo rol" onPress={openNew} />
++        <AppButton title={t('systemRoles.newRole')} onPress={openNew} />
+
+         {loadError ? (
+           <AppCard>
+             <AppText color={theme.colors.danger}>{loadError}</AppText>
+-            <AppButton title="Reintentar" variant="secondary" onPress={load} />
++            <AppButton title={t('common.retry')} variant="secondary" onPress={load} />
+           </AppCard>
+         ) : roles.length === 0 ? (
+           <AppCard>
+             <AppText color={theme.colors.mutedText}>
+-              No se cargaron roles. Revisa que el backend este encendido y vuelve a intentar.
++              {t('systemRoles.empty')}
+             </AppText>
+-            <AppButton title="Reintentar" variant="secondary" onPress={load} />
++            <AppButton title={t('common.retry')} variant="secondary" onPress={load} />
+           </AppCard>
+         ) : (
+           roles.map((role) => (
+@@ -191,11 +193,11 @@ export default function SystemRolesScreen() {
+                     {formatPermissionCode(role.code)}
+                   </AppText>
+                   <AppText variant="caption" color={theme.colors.mutedText}>
+-                    Permisos incluidos: {permissionIds(role).length}
++                    {t('systemRoles.includedPermissions', { count: permissionIds(role).length })}
+                   </AppText>
+                 </View>
+                 <View style={styles.roleAction}>
+-                  <AppButton title="Editar" variant="secondary" onPress={() => openEdit(role)} />
++                  <AppButton title={t('systemRoles.edit')} variant="secondary" onPress={() => openEdit(role)} />
+                 </View>
+               </View>
+             </AppCard>
+@@ -205,23 +207,23 @@ export default function SystemRolesScreen() {
+
+       <AppBottomModal
+         visible={modalVisible}
+-        title={form.id ? 'Editar rol' : 'Nuevo rol'}
++        title={form.id ? t('systemRoles.editRole') : t('systemRoles.newRole')}
+         onClose={() => setModalVisible(false)}
+         maxHeight="92%"
+         showCancelButton={false}
+         footer={
+           <View style={styles.modalActions}>
+             <View style={styles.modalActionButton}>
+-              <AppButton title="Cancelar" variant="secondary" onPress={() => setModalVisible(false)} />
++              <AppButton title={t('systemRoles.cancel')} variant="secondary" onPress={() => setModalVisible(false)} />
+             </View>
+             <View style={styles.modalActionButton}>
+-              <AppButton title={saving ? 'Guardando...' : 'Guardar rol'} loading={saving} onPress={save} />
++              <AppButton title={saving ? t('common.saving') : t('systemRoles.saveRole')} loading={saving} onPress={save} />
+             </View>
+           </View>
+         }
+       >
+         <AppInput
+-          label="Código"
++          label={t('systemRoles.code')}
+           placeholder="EJEMPLO_ROL"
+           value={form.code}
+           autoCapitalize="characters"
+@@ -229,8 +231,8 @@ export default function SystemRolesScreen() {
+         />
+
+         <AppInput
+-          label="Nombre"
+-          placeholder="Nombre visible"
++          label={t('systemRoles.name')}
++          placeholder={t('systemRoles.visibleName')}
+           value={form.name}
+           onChangeText={(name) => setForm((current) => ({ ...current, name }))}
+         />
+@@ -240,18 +242,18 @@ export default function SystemRolesScreen() {
+             Permisos existentes
+           </AppText>
+           <AppText color={theme.colors.mutedText}>
+-            No se crean permisos aqui; solo se seleccionan los que ya existen en el sistema.
++            {t('systemRoles.existingPermissionsHelp')}
+           </AppText>
+
+           <AppInput
+-            placeholder="Buscar permiso"
++            placeholder={t('systemRoles.searchPermission')}
+             value={search}
+             onChangeText={setSearch}
+           />
+
+           {filteredPermissions.length === 0 ? (
+             <AppText color={theme.colors.mutedText} style={styles.emptyPermissions}>
+-              No se encontraron permisos con ese filtro.
++              {t('systemRoles.noPermissionsFound')}
+             </AppText>
+           ) : (
+             filteredPermissions.map((group) => (
+@@ -282,10 +284,10 @@ export default function SystemRolesScreen() {
+                       <View style={styles.permissionText}>
+                         <AppText bold={selected}>{formatPermissionCode(permission.code)}</AppText>
+                         <AppText variant="caption" color={theme.colors.mutedText}>
+-                          Codigo interno: {permission.code}
++                          {t('systemRoles.internalCode', { code: permission.code })}
+                         </AppText>
+                         <AppText color={selected ? theme.colors.accent : theme.colors.mutedText} bold={selected}>
+-                          {selected ? 'Incluido' : 'Agregar'}
++                          {selected ? t('systemRoles.included') : t('systemRoles.add')}
+                         </AppText>
+                         {dependencyWarnings.map((warning) => (
+                           <AppText
+diff --git a/app/system-security-audit.tsx b/app/system-security-audit.tsx
+index 11b8105..994a28c 100644
+--- a/app/system-security-audit.tsx
++++ b/app/system-security-audit.tsx
+@@ -22,6 +22,7 @@ import {
+ import { getSession } from '@/services/sessionStorage';
+ import { useRouter } from 'expo-router';
+ import { useCallback, useEffect, useMemo, useState } from 'react';
++import { useTranslation } from 'react-i18next';
+ import { ActivityIndicator, Alert, StyleSheet, TextInput, View } from 'react-native';
+
+ const DEFAULT_FILTERS: SecurityAuditEventFilters = {
+@@ -43,6 +44,7 @@ function formatDate(value?: string | null) {
+ export default function SystemSecurityAuditScreen() {
+   const router = useRouter();
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+   const [authorized, setAuthorized] = useState(false);
+   const [loading, setLoading] = useState(true);
+   const [alertsLoading, setAlertsLoading] = useState(true);
+@@ -74,13 +76,13 @@ export default function SystemSecurityAuditScreen() {
+       });
+     } catch (err: any) {
+       Alert.alert(
+-        'Auditoria de seguridad',
+-        err?.message || 'No se pudo cargar la auditoria.'
++        t('securityAudit.title'),
++        err?.message || t('securityAudit.loadError')
+       );
+     } finally {
+       setLoading(false);
+     }
+-  }, []);
++  }, [t]);
+
+   const loadSummary = useCallback(async (nextFilters: SecurityAuditEventFilters) => {
+     setSummaryLoading(true);
+@@ -95,11 +97,11 @@ export default function SystemSecurityAuditScreen() {
+       setSummary(data);
+     } catch (err: any) {
+       setSummary(null);
+-      setSummaryError(err?.message || 'No se pudo cargar el resumen.');
++      setSummaryError(err?.message || t('securityAudit.summaryError'));
+     } finally {
+       setSummaryLoading(false);
+     }
+-  }, []);
++  }, [t]);
+
+   const loadAlerts = useCallback(async (nextFilters: SecurityAuditEventFilters) => {
+     setAlertsLoading(true);
+@@ -113,11 +115,11 @@ export default function SystemSecurityAuditScreen() {
+       setAlerts(data);
+     } catch (err: any) {
+       setAlerts(null);
+-      setAlertsError(err?.message || 'No se pudieron cargar las alertas.');
++      setAlertsError(err?.message || t('securityAudit.alertsError'));
+     } finally {
+       setAlertsLoading(false);
+     }
+-  }, []);
++  }, [t]);
+
+   useEffect(() => {
+     getSession().then((session) => {
+@@ -155,7 +157,7 @@ export default function SystemSecurityAuditScreen() {
+
+   const downloadCsv = (filename: string, csv: string) => {
+     if (typeof document === 'undefined') {
+-      Alert.alert('Auditoria de seguridad', 'Exportacion disponible desde navegador web.');
++      Alert.alert(t('securityAudit.title'), t('securityAudit.exportBrowserOnly'));
+       return;
+     }
+
+@@ -174,7 +176,7 @@ export default function SystemSecurityAuditScreen() {
+       const csv = await exportSecurityAuditEventsCsv(filters);
+       downloadCsv('security-audit-events.csv', csv);
+     } catch (err: any) {
+-      Alert.alert('Auditoria de seguridad', err?.message || 'No se pudo exportar eventos.');
++      Alert.alert(t('securityAudit.title'), err?.message || t('securityAudit.exportEventsError'));
+     } finally {
+       setExporting(false);
+     }
+@@ -190,7 +192,7 @@ export default function SystemSecurityAuditScreen() {
+       });
+       downloadCsv('security-audit-alerts.csv', csv);
+     } catch (err: any) {
+-      Alert.alert('Auditoria de seguridad', err?.message || 'No se pudo exportar alertas.');
++      Alert.alert(t('securityAudit.title'), err?.message || t('securityAudit.exportAlertsError'));
+     } finally {
+       setExporting(false);
+     }
+@@ -210,15 +212,15 @@ export default function SystemSecurityAuditScreen() {
+       <AppBackButton fallbackRoute="/system" />
+
+       <AppText variant="title" bold>
+-        Auditoria de seguridad
++        {t('securityAudit.title')}
+       </AppText>
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Eventos bloqueados
++          {t('securityAudit.blockedEvents')}
+         </AppText>
+         <AppText color={theme.colors.mutedText}>
+-          Consulta eventos de acceso denegado, tokens revocados y bloqueos de seguridad.
++          {t('securityAudit.help')}
+         </AppText>
+       </AppCard>
+
+@@ -236,42 +238,42 @@ export default function SystemSecurityAuditScreen() {
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Filtros
++          {t('common.filters')}
+         </AppText>
+         <View style={styles.filterGrid}>
+           <AuditInput
+-            label="Tipo de evento"
++            label={t('securityAudit.eventType')}
+             value={filters.eventType}
+             placeholder="TOKEN_REVOKED"
+             onChangeText={(value) => updateFilter('eventType', value)}
+           />
+           <AuditInput
+-            label="Email"
++            label={t('securityAudit.email')}
+             value={filters.email}
+             placeholder="qa.soporte@local.test"
+             onChangeText={(value) => updateFilter('email', value)}
+           />
+           <AuditInput
+-            label="Status"
++            label={t('securityAudit.status')}
+             value={filters.statusCode}
+             placeholder="401"
+             keyboardType="number-pad"
+             onChangeText={(value) => updateFilter('statusCode', value)}
+           />
+           <AuditInput
+-            label="Ruta"
++            label={t('securityAudit.path')}
+             value={filters.path}
+             placeholder="/api/me"
+             onChangeText={(value) => updateFilter('path', value)}
+           />
+           <AuditInput
+-            label="Desde"
++            label={t('securityAudit.from')}
+             value={filters.dateFrom}
+             placeholder="2026-05-27T00:00:00"
+             onChangeText={(value) => updateFilter('dateFrom', value)}
+           />
+           <AuditInput
+-            label="Hasta"
++            label={t('securityAudit.to')}
+             value={filters.dateTo}
+             placeholder="2026-05-27T23:59:59"
+             onChangeText={(value) => updateFilter('dateTo', value)}
+@@ -280,21 +282,21 @@ export default function SystemSecurityAuditScreen() {
+
+         <View style={styles.actions}>
+           <AppButton
+-            title={loading ? 'Buscando...' : 'Buscar'}
++            title={loading ? t('securityAudit.searching') : t('common.search')}
+             onPress={search}
+             loading={loading}
+             disabled={loading}
+             style={styles.actionButton}
+           />
+           <AppButton
+-            title="Limpiar"
++            title={t('securityAudit.clear')}
+             variant="secondary"
+             onPress={clear}
+             disabled={loading}
+             style={styles.actionButton}
+           />
+           <AppButton
+-            title="Exportar eventos CSV"
++            title={t('securityAudit.exportEvents')}
+             variant="secondary"
+             onPress={exportEvents}
+             loading={exporting}
+@@ -302,7 +304,7 @@ export default function SystemSecurityAuditScreen() {
+             style={styles.exportButton}
+           />
+           <AppButton
+-            title="Exportar alertas CSV"
++            title={t('securityAudit.exportAlerts')}
+             variant="secondary"
+             onPress={exportAlerts}
+             loading={exporting}
+@@ -315,34 +317,34 @@ export default function SystemSecurityAuditScreen() {
+       <AppCard>
+         <View style={styles.listHeader}>
+           <AppText variant="subtitle" bold>
+-            Resultados
++            {t('securityAudit.results')}
+           </AppText>
+           <AppText color={theme.colors.mutedText}>
+-            {total} eventos
++            {t('securityAudit.eventsCount', { count: total })}
+           </AppText>
+         </View>
+
+         {loading ? (
+           <ActivityIndicator />
+         ) : events.length === 0 ? (
+-          <AppText color={theme.colors.mutedText}>No hay eventos con esos filtros.</AppText>
++          <AppText color={theme.colors.mutedText}>{t('securityAudit.noEvents')}</AppText>
+         ) : (
+           events.map((event) => <AuditEventRow key={event.id} event={event} />)
+         )}
+
+         <View style={styles.pagination}>
+           <AppButton
+-            title="Anterior"
++            title={t('securityAudit.previous')}
+             variant="secondary"
+             onPress={() => goToPage(page - 1)}
+             disabled={!hasPreviousPage || loading}
+             style={styles.pageButton}
+           />
+           <AppText color={theme.colors.mutedText}>
+-            Pagina {page + 1}
++            {t('securityAudit.page', { page: page + 1 })}
+           </AppText>
+           <AppButton
+-            title="Siguiente"
++            title={t('securityAudit.next')}
+             variant="secondary"
+             onPress={() => goToPage(page + 1)}
+             disabled={!hasNextPage || loading}
+diff --git a/components/ui/AppBackButton.tsx b/components/ui/AppBackButton.tsx
+index bf48f30..e4fd99f 100644
+--- a/components/ui/AppBackButton.tsx
++++ b/components/ui/AppBackButton.tsx
+@@ -1,5 +1,6 @@
+ import AppButton from '@/components/ui/AppButton';
+ import { useRouter } from 'expo-router';
++import { useTranslation } from 'react-i18next';
+ import { View } from 'react-native';
+
+ type Props = {
+@@ -12,12 +13,15 @@ type Props = {
+
+ export default function AppBackButton({
+   fallbackRoute,
+-  title = 'Volver',
++  title,
+   preferHistory = false,
+   onPress,
+   showMenuButton = true,
+ }: Props) {
+   const router = useRouter();
++  const { t } = useTranslation('common');
++  const backTitle = title ?? t('common.back');
++  const mainMenuTitle = t('common.mainMenu');
+
+   const handlePress = () => {
+     if (onPress) {
+@@ -42,14 +46,14 @@ export default function AppBackButton({
+   return (
+     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+       <AppButton
+-        title={fallbackRoute === '/' ? 'Menu principal' : title}
++        title={fallbackRoute === '/' ? mainMenuTitle : backTitle}
+         variant={fallbackRoute === '/' ? 'menu' : 'back'}
+         onPress={handlePress}
+         style={{ flexGrow: 1 }}
+       />
+       {shouldShowMenuButton ? (
+         <AppButton
+-          title="Menu principal"
++          title={mainMenuTitle}
+           variant="menu"
+           onPress={goToMenu}
+           style={{ flexGrow: 1 }}
+diff --git a/docs/PRODUCT_D6_1_UNIFIED_NAVIGATION_I18N.md b/docs/PRODUCT_D6_1_UNIFIED_NAVIGATION_I18N.md
+index e981bdd..6eed6ef 100644
+--- a/docs/PRODUCT_D6_1_UNIFIED_NAVIGATION_I18N.md
++++ b/docs/PRODUCT_D6_1_UNIFIED_NAVIGATION_I18N.md
+@@ -88,6 +88,10 @@ Esta rama no contiene el documento `docs/PRODUCT_D6_LEGACY_SCREENS_APPSHELL.md`,
+
+ PRODUCT-D6.2 completa la correccion de idioma del shell: `TopBar`, boton de tema y fallback de rol ahora consumen `useTranslation('common')`, y `services/i18n.ts` usa AsyncStorage como persistencia local global del idioma activo.
+
++## Nota PRODUCT-D6.2B
++
++La navegacion traducible se complementa con el cierre de hardcodes visibles en botones comunes y pantallas admin/reportes principales. La regla se mantiene: no traducir codigos tecnicos ni permisos internos, solo labels visibles.
++
+ ## Validacion manual esperada
+
+ 1. Entrar con `qa.admin@local.test`.
+diff --git a/docs/PRODUCT_D6_2B_VISIBLE_I18N_HARDCODES.md b/docs/PRODUCT_D6_2B_VISIBLE_I18N_HARDCODES.md
+new file mode 100644
+index 0000000..d24d2ac
+--- /dev/null
++++ b/docs/PRODUCT_D6_2B_VISIBLE_I18N_HARDCODES.md
+@@ -0,0 +1,66 @@
++# PRODUCT-D6.2B - Cierre de idioma visible y hardcodes
++
++Fecha: 2026-06-06
++
++## Objetivo
++
++Cerrar hardcodes visibles de idioma en pantallas principales antes de continuar con migraciones visuales legacy. La fase se enfoca en textos seguros: headers, botones comunes, helpers, filtros y secciones principales.
++
++No se modifica backend, AUTH/RBAC, pagos, caja, reportes backend, billing, IA, endpoints, permisos ni reglas LIVE.
++
++## Causa encontrada
++
++`/system` ya estaba conectado a i18n en esta rama, pero seguian existiendo hardcodes visibles en componentes y pantallas cercanas a AppShell:
++
++- `AppBackButton` mostraba `Volver` y `Menu principal` sin i18n.
++- `/reports` mantenia titulos, descripciones y ayuda en espanol.
++- `/system-roles` tenia textos principales, modal y acciones en espanol.
++- `/system-channels` tenia titulos, ayudas, errores, botones y descripciones en espanol.
++- `/system-security-audit` tenia encabezado, filtros, botones y alertas en espanol.
++
++## Pantallas corregidas
++
++| Pantalla / componente | Correccion |
++| --- | --- |
++| `components/ui/AppBackButton.tsx` | `Volver` y `Menu principal` usan `common.back` y `common.mainMenu`. |
++| `app/reports.tsx` | Hub de reportes usa claves `reports.*`. |
++| `app/system-roles.tsx` | Titulos, ayudas, modal, botones y labels principales usan `systemRoles.*`. |
++| `app/system-channels.tsx` | Titulos, ayudas, estados, alertas y botones usan `systemChannels.*`. |
++| `app/system-security-audit.tsx` | Encabezado, filtros, exportacion, paginacion y alertas principales usan `securityAudit.*`. |
++| `app/system.tsx` | Auditado; ya consumia `system.*`, `language.*` y `topBar/navigation/theme` desde D6.2. |
++
++## Textos movidos a i18n
++
++Se agregaron o reforzaron claves en:
++
++- `common.*`: `back`, `mainMenu`, `retry`, `loading`, `save`, `saving`, `filters`, `date`, `branch`, `search`.
++- `reports.*`: titulos y descripciones del hub de reportes.
++- `systemRoles.*`: rol, modal, permisos visibles y acciones principales.
++- `systemChannels.*`: reglas, disponibilidad, canales, errores y acciones.
++- `securityAudit.*`: auditoria, eventos bloqueados, filtros, exportacion y paginacion.
++
++## Pantallas pendientes para D6.3
++
++Las siguientes pantallas siguen siendo candidatas a migracion/traduccion mas profunda porque conservan layout legacy o muchos textos internos:
++
++- reportes detallados: `/report-daily-store`, `/report-deliveries`, `/report-deposits`, `/report-cancellations`, `/report-live`, `/report-remissions`;
++- `/appearance`;
++- `/users-form`;
++- pantallas legacy fuera de AppShell que usan `AppScreen` + `AppBackButton`.
++
++En esta fase se evita redisenarlas o reestructurarlas para no mezclar i18n con migracion visual.
++
++## Validacion manual esperada
++
++1. Entrar con `qa.admin@local.test`.
++2. Abrir `/system`.
++3. Seleccionar Espanol y confirmar pantalla, menu, logout y theme toggle en espanol.
++4. Seleccionar English y confirmar screen, menu, sign out y theme toggle en ingles.
++5. Abrir `/reports` y confirmar titulos/descripciones en el idioma activo.
++6. Abrir `/system-roles`, `/system-channels`, `/system-security-audit` y confirmar textos principales traducidos.
++7. Abrir una pantalla con `AppBackButton` y confirmar `Back/Main menu` o `Volver/Menu principal` segun idioma.
++8. Validar light/dark y drawer mobile.
++
++## Decision
++
++GO tecnico condicionado a corrida visual manual. La deuda restante queda acotada a D6.3: migracion/traduccion profunda de pantallas legacy.
+diff --git a/docs/PRODUCT_D6_2_GLOBAL_LANGUAGE_SOURCE.md b/docs/PRODUCT_D6_2_GLOBAL_LANGUAGE_SOURCE.md
+index 2dc65f9..7fe927b 100644
+--- a/docs/PRODUCT_D6_2_GLOBAL_LANGUAGE_SOURCE.md
++++ b/docs/PRODUCT_D6_2_GLOBAL_LANGUAGE_SOURCE.md
+@@ -82,6 +82,10 @@ El `Sidebar` ya traducia secciones, items, subtitulo de marca y logout desde D6.
+
+ Algunas pantallas fuera de AppShell o no preparadas por completo para i18n pueden conservar textos hardcodeados. Esta fase no migra esas pantallas ni rediseña legacy; el alcance es corregir la fuente global del shell y los controles comunes.
+
++## Nota PRODUCT-D6.2B
++
++PRODUCT-D6.2B cierra hardcodes visibles adicionales en `AppBackButton`, `/reports`, `/system-roles`, `/system-channels` y `/system-security-audit`. La migracion profunda de reportes detallados y pantallas legacy queda separada para D6.3.
++
+ ## Validacion manual esperada
+
+ 1. Entrar con `qa.admin@local.test`.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index 9cd0389..394ecfe 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -7,7 +7,17 @@
+   "common": {
+     "close": "Close",
+     "cancel": "Cancel",
+-    "understood": "Got it"
++    "understood": "Got it",
++    "back": "Back",
++    "mainMenu": "Main menu",
++    "retry": "Retry",
++    "loading": "Loading...",
++    "save": "Save",
++    "saving": "Saving...",
++    "filters": "Filters",
++    "date": "Date",
++    "branch": "Branch",
++    "search": "Search"
+   },
+   "system": {
+     "title": "System",
+@@ -667,5 +677,105 @@
+   },
+   "topBar": {
+     "operationalPanel": "Operational panel"
++  },
++  "reports": {
++    "title": "Reports",
++    "subtitle": "Operational queries by date and branch",
++    "contextTitle": "Reports center",
++    "cardTitle": "Operational reports",
++    "cardHelp": "Review reports by date and branch. Includes daily operation, deposits, deliveries, cancellations, Live control, and remissions.",
++    "dailyStoreTitle": "Daily store",
++    "dailyStoreDescription": "Daily summary of sales, holds, payments, cash, and cancellations.",
++    "dailyDeliveriesTitle": "Daily deliveries",
++    "dailyDeliveriesDescription": "Packages sent, delivered, returned, and pending by branch/date.",
++    "dailyDepositsTitle": "Daily deposits",
++    "dailyDepositsDescription": "Received payments, methods, references, and daily totals.",
++    "dailyCancellationsTitle": "Daily cancellations",
++    "dailyCancellationsDescription": "Sales, holds, and returns cancelled on the selected date.",
++    "liveControlTitle": "Live control",
++    "liveControlDescription": "Packages, pieces, balances, and Live operation settlement.",
++    "remissionsTitle": "Remissions",
++    "remissionsDescription": "Detail of items, customers, payments, packages, and sellers."
++  },
++  "systemRoles": {
++    "title": "Roles",
++    "cardTitle": "System roles",
++    "cardHelp": "Permissions are a fixed technical list. This screen only assigns them to roles.",
++    "newRole": "New role",
++    "editRole": "Edit role",
++    "includedPermissions": "Included permissions: {{count}}",
++    "empty": "No roles were loaded. Check that the backend is running and try again.",
++    "codeRequired": "Enter the role code.",
++    "nameRequired": "Enter the role name.",
++    "saveError": "Could not save the role.",
++    "loadError": "Could not load roles.",
++    "edit": "Edit",
++    "cancel": "Cancel",
++    "saveRole": "Save role",
++    "code": "Code",
++    "name": "Name",
++    "visibleName": "Visible name",
++    "existingPermissions": "Existing permissions",
++    "existingPermissionsHelp": "Permissions are not created here; only existing system permissions are selected.",
++    "searchPermission": "Search permission",
++    "noPermissionsFound": "No permissions found with that filter.",
++    "internalCode": "Internal code: {{code}}",
++    "included": "Included",
++    "add": "Add"
++  },
++  "systemChannels": {
++    "title": "Operational channels",
++    "globalRuleTitle": "Global rule",
++    "globalRuleHelp": "If System disables a channel, no branch can operate or configure it even if it was previously active.",
++    "availabilityTitle": "Global availability",
++    "loading": "Loading channels...",
++    "empty": "No channels registered.",
++    "saveChanges": "Save changes",
++    "discardChanges": "Discard changes",
++    "loadError": "Could not load operational channels.",
++    "noChangesTitle": "No changes",
++    "noChangesMessage": "There are no changes to save.",
++    "savedTitle": "Channels updated",
++    "savedMessage": "The global configuration was saved successfully.",
++    "saveErrorTitle": "Could not save",
++    "saveErrorMessage": "Check your connection or permissions and try again.",
++    "inactive": "Channel inactive in catalog.",
++    "defaultDescription": "Operational system channel.",
++    "liveDescription": "Live and holds during broadcast.",
++    "doorSaleDescription": "Direct door sale.",
++    "doorReservationDescription": "Door holds.",
++    "consignmentDescription": "Third-party consignments.",
++    "waitLoad": "Wait until channels finish loading.",
++    "saving": "Configuration is being saved.",
++    "noPendingSave": "There are no pending changes to save.",
++    "noPendingDiscard": "There are no pending changes to discard."
++  },
++  "securityAudit": {
++    "title": "Security audit",
++    "blockedEvents": "Blocked events",
++    "help": "Review denied access events, revoked tokens, and security blocks.",
++    "loadError": "Could not load the audit.",
++    "summaryError": "Could not load the summary.",
++    "alertsError": "Could not load alerts.",
++    "exportBrowserOnly": "Export is available from a web browser.",
++    "exportEventsError": "Could not export events.",
++    "exportAlertsError": "Could not export alerts.",
++    "eventType": "Event type",
++    "email": "Email",
++    "status": "Status",
++    "branch": "Branch",
++    "path": "Path",
++    "from": "From",
++    "to": "To",
++    "searching": "Searching...",
++    "clear": "Clear",
++    "exportEvents": "Export events CSV",
++    "exportAlerts": "Export alerts CSV",
++    "results": "Results",
++    "eventsCount": "{{count}} events",
++    "noEvents": "No events match those filters.",
++    "previous": "Previous",
++    "next": "Next",
++    "page": "Page {{page}}"
+   }
+ }
+diff --git a/locales/es/common.json b/locales/es/common.json
+index a683d26..893c526 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -7,7 +7,17 @@
+   "common": {
+     "close": "Cerrar",
+     "cancel": "Cancelar",
+-    "understood": "Entendido"
++    "understood": "Entendido",
++    "back": "Volver",
++    "mainMenu": "Menu principal",
++    "retry": "Reintentar",
++    "loading": "Cargando...",
++    "save": "Guardar",
++    "saving": "Guardando...",
++    "filters": "Filtros",
++    "date": "Fecha",
++    "branch": "Sucursal",
++    "search": "Buscar"
+   },
+   "system": {
+     "title": "Sistema",
+@@ -667,5 +677,105 @@
+   },
+   "topBar": {
+     "operationalPanel": "Panel operativo"
++  },
++  "reports": {
++    "title": "Reportes",
++    "subtitle": "Consultas operativas por fecha y sucursal",
++    "contextTitle": "Centro de reportes",
++    "cardTitle": "Reportes operativos",
++    "cardHelp": "Consulta reportes por fecha y sucursal. Incluye operacion diaria, depositos, entregas, cancelaciones, control Live y remisiones.",
++    "dailyStoreTitle": "Diario tienda",
++    "dailyStoreDescription": "Resumen diario de ventas, apartados, pagos, efectivo y cancelaciones.",
++    "dailyDeliveriesTitle": "Entregas diarias",
++    "dailyDeliveriesDescription": "Paquetes enviados, entregados, devueltos y pendientes por sucursal/fecha.",
++    "dailyDepositsTitle": "Depositos diarios",
++    "dailyDepositsDescription": "Pagos recibidos, metodos, referencias y totales del dia.",
++    "dailyCancellationsTitle": "Cancelaciones diarias",
++    "dailyCancellationsDescription": "Ventas, apartados y devoluciones canceladas en la fecha.",
++    "liveControlTitle": "Control Live",
++    "liveControlDescription": "Paquetes, piezas, saldos y liquidacion de operacion Live.",
++    "remissionsTitle": "Remisiones",
++    "remissionsDescription": "Detalle de prendas, clientes, pagos, paquetes y vendedores."
++  },
++  "systemRoles": {
++    "title": "Roles",
++    "cardTitle": "Roles del sistema",
++    "cardHelp": "Los permisos son una lista tecnica fija. Aqui solo se asignan a roles.",
++    "newRole": "Nuevo rol",
++    "editRole": "Editar rol",
++    "includedPermissions": "Permisos incluidos: {{count}}",
++    "empty": "No se cargaron roles. Revisa que el backend este encendido y vuelve a intentar.",
++    "codeRequired": "Captura el codigo del rol.",
++    "nameRequired": "Captura el nombre del rol.",
++    "saveError": "No se pudo guardar el rol.",
++    "loadError": "No se pudieron cargar roles.",
++    "edit": "Editar",
++    "cancel": "Cancelar",
++    "saveRole": "Guardar rol",
++    "code": "Codigo",
++    "name": "Nombre",
++    "visibleName": "Nombre visible",
++    "existingPermissions": "Permisos existentes",
++    "existingPermissionsHelp": "No se crean permisos aqui; solo se seleccionan los que ya existen en el sistema.",
++    "searchPermission": "Buscar permiso",
++    "noPermissionsFound": "No se encontraron permisos con ese filtro.",
++    "internalCode": "Codigo interno: {{code}}",
++    "included": "Incluido",
++    "add": "Agregar"
++  },
++  "systemChannels": {
++    "title": "Canales operativos",
++    "globalRuleTitle": "Regla global",
++    "globalRuleHelp": "Si Sistema apaga un canal, ninguna sucursal lo puede operar ni configurar aunque antes estuviera activo.",
++    "availabilityTitle": "Disponibilidad global",
++    "loading": "Cargando canales...",
++    "empty": "No hay canales registrados.",
++    "saveChanges": "Guardar cambios",
++    "discardChanges": "Descartar cambios",
++    "loadError": "No se pudieron cargar los canales operativos.",
++    "noChangesTitle": "Sin cambios",
++    "noChangesMessage": "No hay cambios por guardar.",
++    "savedTitle": "Canales actualizados",
++    "savedMessage": "La configuracion global se guardo correctamente.",
++    "saveErrorTitle": "No se pudo guardar",
++    "saveErrorMessage": "Revisa tu conexion o permisos e intentalo nuevamente.",
++    "inactive": "Canal inactivo en catalogo.",
++    "defaultDescription": "Canal operativo del sistema.",
++    "liveDescription": "Live y apartados durante transmision.",
++    "doorSaleDescription": "Venta directa en puerta.",
++    "doorReservationDescription": "Apartados generados desde puerta.",
++    "consignmentDescription": "Consignaciones con terceros.",
++    "waitLoad": "Espera a que terminen de cargar los canales.",
++    "saving": "Se esta guardando la configuracion.",
++    "noPendingSave": "No hay cambios pendientes por guardar.",
++    "noPendingDiscard": "No hay cambios pendientes por descartar."
++  },
++  "securityAudit": {
++    "title": "Auditoria de seguridad",
++    "blockedEvents": "Eventos bloqueados",
++    "help": "Consulta eventos de acceso denegado, tokens revocados y bloqueos de seguridad.",
++    "loadError": "No se pudo cargar la auditoria.",
++    "summaryError": "No se pudo cargar el resumen.",
++    "alertsError": "No se pudieron cargar las alertas.",
++    "exportBrowserOnly": "Exportacion disponible desde navegador web.",
++    "exportEventsError": "No se pudo exportar eventos.",
++    "exportAlertsError": "No se pudo exportar alertas.",
++    "eventType": "Tipo de evento",
++    "email": "Email",
++    "status": "Status",
++    "branch": "Sucursal",
++    "path": "Ruta",
++    "from": "Desde",
++    "to": "Hasta",
++    "searching": "Buscando...",
++    "clear": "Limpiar",
++    "exportEvents": "Exportar eventos CSV",
++    "exportAlerts": "Exportar alertas CSV",
++    "results": "Resultados",
++    "eventsCount": "{{count}} eventos",
++    "noEvents": "No hay eventos con esos filtros.",
++    "previous": "Anterior",
++    "next": "Siguiente",
++    "page": "Pagina {{page}}"
+   }
+ }
+diff --git a/qa-reports/PRODUCT-D6-2B-visible-i18n-hardcodes-report-20260606-171427.md b/qa-reports/PRODUCT-D6-2B-visible-i18n-hardcodes-report-20260606-171427.md
+new file mode 100644
+index 0000000..a9d3513
+--- /dev/null
++++ b/qa-reports/PRODUCT-D6-2B-visible-i18n-hardcodes-report-20260606-171427.md
+@@ -0,0 +1,50 @@
++# PRODUCT-D6.2B - Visible i18n hardcodes report
++
++Fecha: 2026-06-06 17:14
++
++## Objetivo
++
++Auditar y corregir hardcodes visibles para evitar mezcla de espanol/ingles en pantallas principales, especialmente `/system` y administracion/reportes cercanos al AppShell.
++
++## Causa encontrada
++
++`/system` ya estaba preparado con i18n, pero componentes comunes y pantallas admin/reportes seguian exponiendo textos hardcodeados. El caso mas transversal era `AppBackButton`, que afectaba pantallas legacy con `Volver` y `Menu principal`.
++
++## Correcciones aplicadas
++
++- `AppBackButton`: usa `common.back` y `common.mainMenu`.
++- `/reports`: hub traducible con `reports.*`.
++- `/system-roles`: titulos, ayudas, modal, botones, labels y permisos visibles principales traducibles.
++- `/system-channels`: titulos, ayudas, descripciones de canales, alertas y botones traducibles.
++- `/system-security-audit`: encabezado, filtros, exportacion y paginacion principales traducibles.
++- Locales ES/EN ampliados sin cambiar claves internas tecnicas.
++
++## Pantallas auditadas
++
++- `/system`
++- `/reports`
++- `/system-roles`
++- `/system-channels`
++- `/system-security-audit`
++- `components/ui/AppBackButton`
++- `components/layout/*`
++
++Tambien se revisaron pantallas de reportes detallados, `appearance`, `users-form`, `customers`, `reservations`, `items-create` y `live`; las migraciones profundas quedan para D6.3 si conservan layout legacy o volumen alto de hardcodes.
++
++## Validaciones tecnicas
++
++- `npx.cmd tsc --noEmit`: OK.
++- `npm.cmd run lint`: OK con warnings heredados, sin errores.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
++- `./mvnw.cmd test`: OK, 73 tests, 0 failures, 0 errors.
++- `./mvnw.cmd -q -DskipTests package`: OK.
++- `git --no-pager diff --check`: OK, sin errores.
++- `git --no-pager diff --cached --check`: OK, sin errores.
++
++## Warnings
++
++Lint conserva warnings heredados en legacy: BOM, dependencias de hooks, variables no usadas y `Array<T>`. Las pantallas tocadas mantienen patrones existentes de carga; no se cambia logica funcional.
++
++## GO/NO-GO
++
++GO tecnico. Validaciones completas OK; listo para commit.

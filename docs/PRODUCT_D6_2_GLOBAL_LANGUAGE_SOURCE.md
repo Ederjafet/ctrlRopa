@@ -82,6 +82,10 @@ El `Sidebar` ya traducia secciones, items, subtitulo de marca y logout desde D6.
 
 Algunas pantallas fuera de AppShell o no preparadas por completo para i18n pueden conservar textos hardcodeados. Esta fase no migra esas pantallas ni rediseña legacy; el alcance es corregir la fuente global del shell y los controles comunes.
 
+## Nota PRODUCT-D6.2B
+
+PRODUCT-D6.2B cierra hardcodes visibles adicionales en `AppBackButton`, `/reports`, `/system-roles`, `/system-channels` y `/system-security-audit`. La migracion profunda de reportes detallados y pantallas legacy queda separada para D6.3.
+
 ## Validacion manual esperada
 
 1. Entrar con `qa.admin@local.test`.
