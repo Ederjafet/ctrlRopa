@@ -1,0 +1,11 @@
+﻿ app/index.tsx                                   | 102 +-----------------------
+ app/live.tsx                                    |  63 +--------------
+ app/reservation-detail.tsx                      |  81 ++++---------------
+ app/ui-kit.tsx                                  |  55 +------------
+ components/layout/Sidebar.tsx                   |  28 +++++--
+ components/layout/SidebarNavItem.tsx            |  13 ++-
+ components/layout/appNavigation.ts              |  64 ++++++++-------
+ docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md |   4 +
+ locales/en/common.json                          |  41 ++++++++++
+ locales/es/common.json                          |  41 ++++++++++
+ 10 files changed, 176 insertions(+), 316 deletions(-)

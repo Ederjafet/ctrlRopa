@@ -5,10 +5,12 @@ import { useAppTheme } from '@/context/AppThemeContext';
 import { UserSession } from '@/services/sessionStorage';
 import { designTokens } from '@/theme/designTokens';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 export type SidebarSection = {
   title?: string;
+  titleKey?: string;
   items: SidebarNavItemConfig[];
 };
 
@@ -23,7 +25,21 @@ type Props = {
 
 export default function Sidebar({ sections, activeRoute, onNavigate, session, onClose, onSignOut }: Props) {
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
   const roleLabel = session?.roles?.map((role) => role.code).join(', ') || 'Sin rol';
+  const normalizedActiveRoute = activeRoute?.replace(/^\//, '');
+  const isActiveItem = (item: SidebarNavItemConfig) => {
+    const normalizedItemRoute = item.route?.replace(/^\//, '');
+    const aliases = item.activeFor ?? [];
+
+    return (
+      activeRoute === item.key ||
+      activeRoute === item.route ||
+      normalizedActiveRoute === item.key ||
+      normalizedActiveRoute === normalizedItemRoute ||
+      aliases.some((alias) => alias === activeRoute || alias.replace(/^\//, '') === normalizedActiveRoute)
+    );
+  };
 
   return (
     <View
@@ -62,14 +78,14 @@ export default function Sidebar({ sections, activeRoute, onNavigate, session, on
             Ctrl Ropa
           </AppText>
           <AppText variant="caption" color={theme.colors.mutedText}>
-            Operacion y control
+            {t('navigation.brandHelp')}
           </AppText>
         </View>
         {onClose ? (
           <Pressable
             onPress={onClose}
             accessibilityRole="button"
-            accessibilityLabel="Cerrar menu"
+            accessibilityLabel={t('navigation.closeMenu')}
             style={({ pressed }) => [
               styles.closeButton,
               {
@@ -91,21 +107,21 @@ export default function Sidebar({ sections, activeRoute, onNavigate, session, on
       >
         {sections.map((section, index) => (
           <View key={`${section.title ?? 'section'}-${index}`} style={styles.section}>
-            {section.title ? (
+            {section.title || section.titleKey ? (
               <AppText
                 variant="caption"
                 color={theme.colors.mutedText}
                 bold
                 style={styles.sectionLabel}
               >
-                {section.title}
+                {section.titleKey ? t(section.titleKey) : section.title}
               </AppText>
             ) : null}
             {section.items.map((item) => (
               <SidebarNavItem
                 key={item.key}
                 item={item}
-                active={activeRoute === item.key || activeRoute === item.route}
+                active={isActiveItem(item)}
                 onPress={onNavigate}
               />
             ))}
@@ -149,7 +165,7 @@ export default function Sidebar({ sections, activeRoute, onNavigate, session, on
           >
             <MaterialIcons name="logout" size={18} color={theme.colors.danger} />
             <AppText color={theme.colors.danger} bold>
-              Cerrar sesion
+              {t('navigation.signOut')}
             </AppText>
           </Pressable>
         </View>

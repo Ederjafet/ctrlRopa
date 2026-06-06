@@ -1,7 +1,7 @@
 import QRScannerModal from '@/components/qr/QRScannerModal';
 import AuthorizationRequestPanel from '@/components/live/AuthorizationRequestPanel';
 import AppShell from '@/components/layout/AppShell';
-import { SidebarSection } from '@/components/layout/Sidebar';
+import { buildMainNavSections } from '@/components/layout/appNavigation';
 import LiveDesktopLayout from '@/components/live/LiveDesktopLayout';
 import LiveMobileLayout from '@/components/live/LiveMobileLayout';
 import LiveTabletLayout from '@/components/live/LiveTabletLayout';
@@ -23,12 +23,7 @@ import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
-import {
-  canAccess,
-  canAccessByPermission,
-  hasEffectivePermission,
-  isAdmin,
-} from '@/services/accessControl';
+import { hasEffectivePermission } from '@/services/accessControl';
 import { ApiError } from '@/services/apiClient';
 import { Customer, getCustomersByBranch } from '@/services/customerService';
 import { getItemsByBranch, Item } from '@/services/itemService';
@@ -226,58 +221,6 @@ function getItemStatusLabel(status: string | null | undefined, t: (key: string) 
     default:
       return t('live.itemStatusUnknown');
   }
-}
-
-function buildLiveNavSections(session: UserSession | null): SidebarSection[] {
-  const liveAllowed = canViewLive(session);
-  const customersAllowed = canAccessByPermission(session, 'VIEW_CUSTOMERS');
-  const reservationsAllowed =
-    canAccess(session, 'DOOR_RESERVATION', 'DO_DOOR_RESERVATION') || liveAllowed;
-  const usersAllowed = canAccessByPermission(session, 'MANAGE_USERS') || isAdmin(session);
-  const systemAllowed =
-    canAccessByPermission(session, 'MANAGE_ROLES') ||
-    canAccessByPermission(session, 'MANAGE_BRANCH_CHANNELS') ||
-    isAdmin(session);
-  const reportsAllowed = canAccessByPermission(session, 'VIEW_REPORTS') || isAdmin(session);
-  const appearanceAllowed = isAdmin(session);
-
-  const primaryItems = [
-    { key: 'home', label: 'Inicio', route: '/', icon: 'space-dashboard' as const },
-    liveAllowed ? { key: 'live', label: 'LIVE', route: '/live', icon: 'live-tv' as const } : null,
-    customersAllowed
-      ? { key: 'customers', label: 'Clientes', route: '/customers', icon: 'groups' as const }
-      : null,
-    reservationsAllowed
-      ? { key: 'reservations', label: 'Reservas', route: '/reservations', icon: 'bookmark' as const }
-      : null,
-  ].filter(Boolean);
-
-  const controlItems = [
-    usersAllowed
-      ? { key: 'users', label: 'Usuarios', route: '/users', icon: 'manage-accounts' as const }
-      : null,
-    systemAllowed
-      ? { key: 'system', label: 'Sistema', route: '/system', icon: 'settings' as const }
-      : null,
-    reportsAllowed
-      ? { key: 'reports', label: 'Reportes', route: '/reports', icon: 'analytics' as const }
-      : null,
-    appearanceAllowed
-      ? { key: 'appearance', label: 'Configuracion', route: '/appearance', icon: 'palette' as const }
-      : null,
-  ].filter(Boolean);
-
-  const developmentItems = [
-    appearanceAllowed
-      ? { key: 'ui-kit', label: 'UI Kit', route: '/ui-kit', icon: 'dashboard-customize' as const }
-      : null,
-  ].filter(Boolean);
-
-  return [
-    { title: 'Operacion', items: primaryItems },
-    { title: 'Control', items: controlItems },
-    { title: 'Desarrollo', items: developmentItems },
-  ].filter((section) => section.items.length > 0) as SidebarSection[];
 }
 
 function activeItemFromLive(live: Live | null): Item | null {
@@ -3701,7 +3644,7 @@ export default function LiveScreen() {
   };
   const preparedItem =
     selectedItem && activeItem?.id !== selectedItem.id ? selectedItem : null;
-  const navSections = useMemo(() => buildLiveNavSections(session), [session]);
+  const navSections = useMemo(() => buildMainNavSections(session), [session]);
   const liveShellSubtitle = isTablet
     ? t('live.tabletHeaderHelp')
     : isDesktop
