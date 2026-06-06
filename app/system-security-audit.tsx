@@ -22,6 +22,7 @@ import {
 import { getSession } from '@/services/sessionStorage';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, StyleSheet, TextInput, View } from 'react-native';
 
 const DEFAULT_FILTERS: SecurityAuditEventFilters = {
@@ -43,6 +44,7 @@ function formatDate(value?: string | null) {
 export default function SystemSecurityAuditScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
   const [authorized, setAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [alertsLoading, setAlertsLoading] = useState(true);
@@ -74,13 +76,13 @@ export default function SystemSecurityAuditScreen() {
       });
     } catch (err: any) {
       Alert.alert(
-        'Auditoria de seguridad',
-        err?.message || 'No se pudo cargar la auditoria.'
+        t('securityAudit.title'),
+        err?.message || t('securityAudit.loadError')
       );
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const loadSummary = useCallback(async (nextFilters: SecurityAuditEventFilters) => {
     setSummaryLoading(true);
@@ -95,11 +97,11 @@ export default function SystemSecurityAuditScreen() {
       setSummary(data);
     } catch (err: any) {
       setSummary(null);
-      setSummaryError(err?.message || 'No se pudo cargar el resumen.');
+      setSummaryError(err?.message || t('securityAudit.summaryError'));
     } finally {
       setSummaryLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const loadAlerts = useCallback(async (nextFilters: SecurityAuditEventFilters) => {
     setAlertsLoading(true);
@@ -113,11 +115,11 @@ export default function SystemSecurityAuditScreen() {
       setAlerts(data);
     } catch (err: any) {
       setAlerts(null);
-      setAlertsError(err?.message || 'No se pudieron cargar las alertas.');
+      setAlertsError(err?.message || t('securityAudit.alertsError'));
     } finally {
       setAlertsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     getSession().then((session) => {
@@ -155,7 +157,7 @@ export default function SystemSecurityAuditScreen() {
 
   const downloadCsv = (filename: string, csv: string) => {
     if (typeof document === 'undefined') {
-      Alert.alert('Auditoria de seguridad', 'Exportacion disponible desde navegador web.');
+      Alert.alert(t('securityAudit.title'), t('securityAudit.exportBrowserOnly'));
       return;
     }
 
@@ -174,7 +176,7 @@ export default function SystemSecurityAuditScreen() {
       const csv = await exportSecurityAuditEventsCsv(filters);
       downloadCsv('security-audit-events.csv', csv);
     } catch (err: any) {
-      Alert.alert('Auditoria de seguridad', err?.message || 'No se pudo exportar eventos.');
+      Alert.alert(t('securityAudit.title'), err?.message || t('securityAudit.exportEventsError'));
     } finally {
       setExporting(false);
     }
@@ -190,7 +192,7 @@ export default function SystemSecurityAuditScreen() {
       });
       downloadCsv('security-audit-alerts.csv', csv);
     } catch (err: any) {
-      Alert.alert('Auditoria de seguridad', err?.message || 'No se pudo exportar alertas.');
+      Alert.alert(t('securityAudit.title'), err?.message || t('securityAudit.exportAlertsError'));
     } finally {
       setExporting(false);
     }
@@ -210,15 +212,15 @@ export default function SystemSecurityAuditScreen() {
       <AppBackButton fallbackRoute="/system" />
 
       <AppText variant="title" bold>
-        Auditoria de seguridad
+        {t('securityAudit.title')}
       </AppText>
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Eventos bloqueados
+          {t('securityAudit.blockedEvents')}
         </AppText>
         <AppText color={theme.colors.mutedText}>
-          Consulta eventos de acceso denegado, tokens revocados y bloqueos de seguridad.
+          {t('securityAudit.help')}
         </AppText>
       </AppCard>
 
@@ -236,42 +238,42 @@ export default function SystemSecurityAuditScreen() {
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Filtros
+          {t('common.filters')}
         </AppText>
         <View style={styles.filterGrid}>
           <AuditInput
-            label="Tipo de evento"
+            label={t('securityAudit.eventType')}
             value={filters.eventType}
             placeholder="TOKEN_REVOKED"
             onChangeText={(value) => updateFilter('eventType', value)}
           />
           <AuditInput
-            label="Email"
+            label={t('securityAudit.email')}
             value={filters.email}
             placeholder="qa.soporte@local.test"
             onChangeText={(value) => updateFilter('email', value)}
           />
           <AuditInput
-            label="Status"
+            label={t('securityAudit.status')}
             value={filters.statusCode}
             placeholder="401"
             keyboardType="number-pad"
             onChangeText={(value) => updateFilter('statusCode', value)}
           />
           <AuditInput
-            label="Ruta"
+            label={t('securityAudit.path')}
             value={filters.path}
             placeholder="/api/me"
             onChangeText={(value) => updateFilter('path', value)}
           />
           <AuditInput
-            label="Desde"
+            label={t('securityAudit.from')}
             value={filters.dateFrom}
             placeholder="2026-05-27T00:00:00"
             onChangeText={(value) => updateFilter('dateFrom', value)}
           />
           <AuditInput
-            label="Hasta"
+            label={t('securityAudit.to')}
             value={filters.dateTo}
             placeholder="2026-05-27T23:59:59"
             onChangeText={(value) => updateFilter('dateTo', value)}
@@ -280,21 +282,21 @@ export default function SystemSecurityAuditScreen() {
 
         <View style={styles.actions}>
           <AppButton
-            title={loading ? 'Buscando...' : 'Buscar'}
+            title={loading ? t('securityAudit.searching') : t('common.search')}
             onPress={search}
             loading={loading}
             disabled={loading}
             style={styles.actionButton}
           />
           <AppButton
-            title="Limpiar"
+            title={t('securityAudit.clear')}
             variant="secondary"
             onPress={clear}
             disabled={loading}
             style={styles.actionButton}
           />
           <AppButton
-            title="Exportar eventos CSV"
+            title={t('securityAudit.exportEvents')}
             variant="secondary"
             onPress={exportEvents}
             loading={exporting}
@@ -302,7 +304,7 @@ export default function SystemSecurityAuditScreen() {
             style={styles.exportButton}
           />
           <AppButton
-            title="Exportar alertas CSV"
+            title={t('securityAudit.exportAlerts')}
             variant="secondary"
             onPress={exportAlerts}
             loading={exporting}
@@ -315,34 +317,34 @@ export default function SystemSecurityAuditScreen() {
       <AppCard>
         <View style={styles.listHeader}>
           <AppText variant="subtitle" bold>
-            Resultados
+            {t('securityAudit.results')}
           </AppText>
           <AppText color={theme.colors.mutedText}>
-            {total} eventos
+            {t('securityAudit.eventsCount', { count: total })}
           </AppText>
         </View>
 
         {loading ? (
           <ActivityIndicator />
         ) : events.length === 0 ? (
-          <AppText color={theme.colors.mutedText}>No hay eventos con esos filtros.</AppText>
+          <AppText color={theme.colors.mutedText}>{t('securityAudit.noEvents')}</AppText>
         ) : (
           events.map((event) => <AuditEventRow key={event.id} event={event} />)
         )}
 
         <View style={styles.pagination}>
           <AppButton
-            title="Anterior"
+            title={t('securityAudit.previous')}
             variant="secondary"
             onPress={() => goToPage(page - 1)}
             disabled={!hasPreviousPage || loading}
             style={styles.pageButton}
           />
           <AppText color={theme.colors.mutedText}>
-            Pagina {page + 1}
+            {t('securityAudit.page', { page: page + 1 })}
           </AppText>
           <AppButton
-            title="Siguiente"
+            title={t('securityAudit.next')}
             variant="secondary"
             onPress={() => goToPage(page + 1)}
             disabled={!hasNextPage || loading}

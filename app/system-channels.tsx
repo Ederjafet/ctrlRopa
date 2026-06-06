@@ -10,13 +10,14 @@ import {
   updateSalesChannelGlobalEnabled,
 } from '@/services/branchChannelService';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, Switch, View } from 'react-native';
 
-const CHANNEL_DESCRIPTIONS: Record<string, string> = {
-  LIVE: 'Live y reservas durante transmision.',
-  DOOR_SALE: 'Venta directa en puerta.',
-  DOOR_RESERVATION: 'Apartados generados desde puerta.',
-  CONSIGNMENT: 'Consignaciones con terceros.',
+const CHANNEL_DESCRIPTION_KEYS: Record<string, string> = {
+  LIVE: 'systemChannels.liveDescription',
+  DOOR_SALE: 'systemChannels.doorSaleDescription',
+  DOOR_RESERVATION: 'systemChannels.doorReservationDescription',
+  CONSIGNMENT: 'systemChannels.consignmentDescription',
 };
 
 function sortChannels(channels: SalesChannel[]) {
@@ -36,6 +37,7 @@ function sortChannels(channels: SalesChannel[]) {
 
 export default function SystemChannelsScreen() {
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
   const [channels, setChannels] = useState<SalesChannel[]>([]);
   const [originalChannels, setOriginalChannels] = useState<SalesChannel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,18 +54,18 @@ export default function SystemChannelsScreen() {
   }, [channels, originalChannels]);
 
   const saveBlockedReason = useMemo(() => {
-    if (loading) return 'Espera a que terminen de cargar los canales.';
-    if (saving) return 'Se esta guardando la configuración.';
-    if (!hasChanges) return 'No hay cambios pendientes por guardar.';
+    if (loading) return t('systemChannels.waitLoad');
+    if (saving) return t('systemChannels.saving');
+    if (!hasChanges) return t('systemChannels.noPendingSave');
     return undefined;
-  }, [loading, saving, hasChanges]);
+  }, [loading, saving, hasChanges, t]);
 
   const discardBlockedReason = useMemo(() => {
-    if (loading) return 'Espera a que terminen de cargar los canales.';
+    if (loading) return t('systemChannels.waitLoad');
     if (saving) return 'Se esta guardando la configuración.';
-    if (!hasChanges) return 'No hay cambios pendientes por descartar.';
+    if (!hasChanges) return t('systemChannels.noPendingDiscard');
     return undefined;
-  }, [loading, saving, hasChanges]);
+  }, [loading, saving, hasChanges, t]);
 
   useEffect(() => {
     loadChannels();
@@ -79,7 +81,7 @@ export default function SystemChannelsScreen() {
       setOriginalChannels(data.map((channel) => ({ ...channel })));
     } catch (err) {
       console.log(err);
-      setError('No se pudieron cargar los canales operativos.');
+      setError(t('systemChannels.loadError'));
     } finally {
       setLoading(false);
     }
@@ -106,7 +108,7 @@ export default function SystemChannelsScreen() {
     });
 
     if (changedChannels.length === 0) {
-      Alert.alert('Sin cambios', 'No hay cambios por guardar.');
+      Alert.alert(t('systemChannels.noChangesTitle'), t('systemChannels.noChangesMessage'));
       return;
     }
 
@@ -120,10 +122,10 @@ export default function SystemChannelsScreen() {
       );
 
       await loadChannels();
-      Alert.alert('Canales actualizados', 'La configuración global se guardo correctamente.');
+      Alert.alert(t('systemChannels.savedTitle'), t('systemChannels.savedMessage'));
     } catch (err) {
       console.log(err);
-      Alert.alert('No se pudo guardar', 'Revisa tu conexión o permisos e intentalo nuevamente.');
+      Alert.alert(t('systemChannels.saveErrorTitle'), t('systemChannels.saveErrorMessage'));
     } finally {
       setSaving(false);
     }
@@ -134,15 +136,15 @@ export default function SystemChannelsScreen() {
       <AppBackButton fallbackRoute="/system" />
 
       <AppText variant="title" bold>
-        Canales operativos
+        {t('systemChannels.title')}
       </AppText>
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Regla global
+          {t('systemChannels.globalRuleTitle')}
         </AppText>
         <AppText color={theme.colors.mutedText}>
-          Si Sistema apaga un canal, ninguna sucursal lo puede operar ni configurar aunque antes estuviera activo.
+          {t('systemChannels.globalRuleHelp')}
         </AppText>
       </AppCard>
 
@@ -154,13 +156,13 @@ export default function SystemChannelsScreen() {
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Disponibilidad global
+          {t('systemChannels.availabilityTitle')}
         </AppText>
 
         {loading ? (
-          <AppText color={theme.colors.mutedText}>Cargando canales...</AppText>
+          <AppText color={theme.colors.mutedText}>{t('systemChannels.loading')}</AppText>
         ) : channels.length === 0 ? (
-          <AppText color={theme.colors.mutedText}>No hay canales registrados.</AppText>
+          <AppText color={theme.colors.mutedText}>{t('systemChannels.empty')}</AppText>
         ) : (
           <View style={styles.channelList}>
             {channels.map((channel) => {
@@ -187,11 +189,11 @@ export default function SystemChannelsScreen() {
                       {channel.code}
                     </AppText>
                     <AppText color={theme.colors.mutedText}>
-                      {CHANNEL_DESCRIPTIONS[channel.code] ?? 'Canal operativo del sistema.'}
+                      {t(CHANNEL_DESCRIPTION_KEYS[channel.code] ?? 'systemChannels.defaultDescription')}
                     </AppText>
                     {inactive ? (
                       <AppText variant="caption" color={theme.colors.danger}>
-                        Canal inactivo en catalogo.
+                        {t('systemChannels.inactive')}
                       </AppText>
                     ) : null}
                   </View>
@@ -215,7 +217,7 @@ export default function SystemChannelsScreen() {
 
       <View style={styles.actions}>
         <AppButton
-          title="Guardar cambios"
+          title={t('systemChannels.saveChanges')}
           onPress={saveChanges}
           loading={saving}
           disabled={loading || saving || !hasChanges}
@@ -223,7 +225,7 @@ export default function SystemChannelsScreen() {
         />
 
         <AppButton
-          title="Descartar cambios"
+          title={t('systemChannels.discardChanges')}
           variant="secondary"
           onPress={resetChanges}
           disabled={loading || saving || !hasChanges}

@@ -88,6 +88,10 @@ Esta rama no contiene el documento `docs/PRODUCT_D6_LEGACY_SCREENS_APPSHELL.md`,
 
 PRODUCT-D6.2 completa la correccion de idioma del shell: `TopBar`, boton de tema y fallback de rol ahora consumen `useTranslation('common')`, y `services/i18n.ts` usa AsyncStorage como persistencia local global del idioma activo.
 
+## Nota PRODUCT-D6.2B
+
+La navegacion traducible se complementa con el cierre de hardcodes visibles en botones comunes y pantallas admin/reportes principales. La regla se mantiene: no traducir codigos tecnicos ni permisos internos, solo labels visibles.
+
 ## Validacion manual esperada
 
 1. Entrar con `qa.admin@local.test`.
