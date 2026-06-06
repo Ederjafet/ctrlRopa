@@ -6,6 +6,7 @@ import { UserSession } from '@/services/sessionStorage';
 import { designTokens } from '@/theme/designTokens';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 type Props = {
@@ -27,8 +28,10 @@ export default function TopBar({
 }: Props) {
   const { theme, toggleThemeMode } = useAppTheme();
   const { isPhone, isWideDesktop } = useResponsiveLayout();
-  const roleLabel = session?.roles?.map((role) => role.code).join(', ') || 'Sin rol';
+  const { t } = useTranslation('common');
+  const roleLabel = session?.roles?.map((role) => role.code).join(', ') || t('navigation.noRole');
   const showCompactRole = Boolean(session && !isWideDesktop);
+  const nextThemeLabel = theme.isDark ? t('theme.light') : t('theme.dark');
 
   return (
     <View
@@ -61,7 +64,7 @@ export default function TopBar({
       ) : null}
       <View style={styles.titleBlock}>
         <AppText variant="caption" color={theme.colors.accent} bold style={styles.eyebrow}>
-          Panel operativo
+          {t('topBar.operationalPanel')}
         </AppText>
         <AppText variant="title" bold style={styles.title}>
           {title}
@@ -75,6 +78,8 @@ export default function TopBar({
       <View style={[styles.actionBlock, isPhone ? styles.actionBlockCompact : null]}>
         <Pressable
           onPress={toggleThemeMode}
+          accessibilityRole="button"
+          accessibilityLabel={nextThemeLabel}
           style={({ pressed }) => [
             styles.themeButton,
             {
@@ -92,7 +97,7 @@ export default function TopBar({
           />
           {!isPhone ? (
             <AppText variant="caption" color={theme.colors.neutralButtonText} bold>
-              {theme.isDark ? 'Claro' : 'Oscuro'}
+              {nextThemeLabel}
             </AppText>
           ) : null}
         </Pressable>

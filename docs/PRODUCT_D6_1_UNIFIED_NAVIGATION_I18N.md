@@ -84,6 +84,10 @@ Esto permite marcar correctamente rutas como:
 
 Esta rama no contiene el documento `docs/PRODUCT_D6_LEGACY_SCREENS_APPSHELL.md`, y aun existen pantallas legacy fuera de AppShell en el arbol `app/`. Esas pantallas quedan fuera del alcance de D6.1 y deben cerrarse en una fase de migracion visual legacy o rebase/merge con el trabajo D6 si ya existe en otra rama.
 
+## Nota PRODUCT-D6.2
+
+PRODUCT-D6.2 completa la correccion de idioma del shell: `TopBar`, boton de tema y fallback de rol ahora consumen `useTranslation('common')`, y `services/i18n.ts` usa AsyncStorage como persistencia local global del idioma activo.
+
 ## Validacion manual esperada
 
 1. Entrar con `qa.admin@local.test`.

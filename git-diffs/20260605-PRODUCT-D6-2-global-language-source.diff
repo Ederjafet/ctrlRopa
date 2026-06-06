@@ -1,0 +1,188 @@
+﻿diff --git a/components/layout/Sidebar.tsx b/components/layout/Sidebar.tsx
+index 7cf62c4..2c4266e 100644
+--- a/components/layout/Sidebar.tsx
++++ b/components/layout/Sidebar.tsx
+@@ -26,7 +26,7 @@ type Props = {
+ export default function Sidebar({ sections, activeRoute, onNavigate, session, onClose, onSignOut }: Props) {
+   const { theme } = useAppTheme();
+   const { t } = useTranslation('common');
+-  const roleLabel = session?.roles?.map((role) => role.code).join(', ') || 'Sin rol';
++  const roleLabel = session?.roles?.map((role) => role.code).join(', ') || t('navigation.noRole');
+   const normalizedActiveRoute = activeRoute?.replace(/^\//, '');
+   const isActiveItem = (item: SidebarNavItemConfig) => {
+     const normalizedItemRoute = item.route?.replace(/^\//, '');
+diff --git a/components/layout/TopBar.tsx b/components/layout/TopBar.tsx
+index a3edbf3..dd07642 100644
+--- a/components/layout/TopBar.tsx
++++ b/components/layout/TopBar.tsx
+@@ -6,6 +6,7 @@ import { UserSession } from '@/services/sessionStorage';
+ import { designTokens } from '@/theme/designTokens';
+ import { MaterialIcons } from '@expo/vector-icons';
+ import { ReactNode } from 'react';
++import { useTranslation } from 'react-i18next';
+ import { Pressable, StyleSheet, View } from 'react-native';
+
+ type Props = {
+@@ -27,8 +28,10 @@ export default function TopBar({
+ }: Props) {
+   const { theme, toggleThemeMode } = useAppTheme();
+   const { isPhone, isWideDesktop } = useResponsiveLayout();
+-  const roleLabel = session?.roles?.map((role) => role.code).join(', ') || 'Sin rol';
++  const { t } = useTranslation('common');
++  const roleLabel = session?.roles?.map((role) => role.code).join(', ') || t('navigation.noRole');
+   const showCompactRole = Boolean(session && !isWideDesktop);
++  const nextThemeLabel = theme.isDark ? t('theme.light') : t('theme.dark');
+
+   return (
+     <View
+@@ -61,7 +64,7 @@ export default function TopBar({
+       ) : null}
+       <View style={styles.titleBlock}>
+         <AppText variant="caption" color={theme.colors.accent} bold style={styles.eyebrow}>
+-          Panel operativo
++          {t('topBar.operationalPanel')}
+         </AppText>
+         <AppText variant="title" bold style={styles.title}>
+           {title}
+@@ -75,6 +78,8 @@ export default function TopBar({
+       <View style={[styles.actionBlock, isPhone ? styles.actionBlockCompact : null]}>
+         <Pressable
+           onPress={toggleThemeMode}
++          accessibilityRole="button"
++          accessibilityLabel={nextThemeLabel}
+           style={({ pressed }) => [
+             styles.themeButton,
+             {
+@@ -92,7 +97,7 @@ export default function TopBar({
+           />
+           {!isPhone ? (
+             <AppText variant="caption" color={theme.colors.neutralButtonText} bold>
+-              {theme.isDark ? 'Claro' : 'Oscuro'}
++              {nextThemeLabel}
+             </AppText>
+           ) : null}
+         </Pressable>
+diff --git a/docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md b/docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md
+index 37425b8..95f85bf 100644
+--- a/docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md
++++ b/docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md
+@@ -36,6 +36,10 @@ La navegacion principal ahora se agrupa desde `components/layout/appNavigation.t
+
+ PRODUCT-D6.1 refuerza esta decision: las pantallas AppShell auditadas deben consumir `buildMainNavSections(session)` como unica fuente de navegacion. Las secciones e items agregan claves i18n para que el sidebar/drawer respete Espanol/Ingles y no quede mezclado con el idioma de la pantalla.
+
++## Nota PRODUCT-D6.2
++
++La navegacion traducible depende de la fuente global `i18next` + AsyncStorage (`app_language`). El shell comun (`Sidebar`, `TopBar`, logout y theme toggle) debe usar `useTranslation('common')` para evitar mezclas de idioma entre menu y contenido.
++
+ Reglas aplicadas:
+
+ - No se muestran categorias vacias.
+diff --git a/docs/PRODUCT_D6_1_UNIFIED_NAVIGATION_I18N.md b/docs/PRODUCT_D6_1_UNIFIED_NAVIGATION_I18N.md
+index b2f649b..e981bdd 100644
+--- a/docs/PRODUCT_D6_1_UNIFIED_NAVIGATION_I18N.md
++++ b/docs/PRODUCT_D6_1_UNIFIED_NAVIGATION_I18N.md
+@@ -84,6 +84,10 @@ Esto permite marcar correctamente rutas como:
+
+ Esta rama no contiene el documento `docs/PRODUCT_D6_LEGACY_SCREENS_APPSHELL.md`, y aun existen pantallas legacy fuera de AppShell en el arbol `app/`. Esas pantallas quedan fuera del alcance de D6.1 y deben cerrarse en una fase de migracion visual legacy o rebase/merge con el trabajo D6 si ya existe en otra rama.
+
++## Nota PRODUCT-D6.2
++
++PRODUCT-D6.2 completa la correccion de idioma del shell: `TopBar`, boton de tema y fallback de rol ahora consumen `useTranslation('common')`, y `services/i18n.ts` usa AsyncStorage como persistencia local global del idioma activo.
++
+ ## Validacion manual esperada
+
+ 1. Entrar con `qa.admin@local.test`.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index 5d47eee..9cd0389 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -658,6 +658,14 @@
+       "devSecurity": "Dev security",
+       "sessionsLocks": "Sessions and locks",
+       "uiKit": "UI Kit"
+-    }
++    },
++    "noRole": "No role"
++  },
++  "theme": {
++    "light": "Light",
++    "dark": "Dark"
++  },
++  "topBar": {
++    "operationalPanel": "Operational panel"
+   }
+ }
+diff --git a/locales/es/common.json b/locales/es/common.json
+index 78108f4..a683d26 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -658,6 +658,14 @@
+       "devSecurity": "Seguridad dev",
+       "sessionsLocks": "Sesiones y bloqueos",
+       "uiKit": "UI Kit"
+-    }
++    },
++    "noRole": "Sin rol"
++  },
++  "theme": {
++    "light": "Claro",
++    "dark": "Oscuro"
++  },
++  "topBar": {
++    "operationalPanel": "Panel operativo"
+   }
+ }
+diff --git a/services/i18n.ts b/services/i18n.ts
+index 871afa9..1bdb82a 100644
+--- a/services/i18n.ts
++++ b/services/i18n.ts
+@@ -9,14 +9,21 @@ import esCommon from '@/locales/es/common.json';
+ export const SUPPORTED_LANGUAGES = ['es', 'en'] as const;
+ export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
+ const LANGUAGE_KEY = 'app_language';
+-const canUseStorage = typeof window !== 'undefined';
++const canUseStorage =
++  typeof window !== 'undefined' ||
++  (typeof navigator !== 'undefined' && navigator.product === 'ReactNative');
++
++function normalizeLanguage(language?: string | null): SupportedLanguage | null {
++  const normalized = language?.toLowerCase();
++  return SUPPORTED_LANGUAGES.includes(normalized as SupportedLanguage)
++    ? (normalized as SupportedLanguage)
++    : null;
++}
+
+ function resolveInitialLanguage(): SupportedLanguage {
+-  const deviceLanguage = getLocales()[0]?.languageCode?.toLowerCase();
++  const deviceLanguage = normalizeLanguage(getLocales()[0]?.languageCode);
+
+-  return SUPPORTED_LANGUAGES.includes(deviceLanguage as SupportedLanguage)
+-    ? (deviceLanguage as SupportedLanguage)
+-    : 'es';
++  return deviceLanguage ?? 'es';
+ }
+
+ void i18n.use(initReactI18next).init({
+@@ -39,17 +46,19 @@ void i18n.use(initReactI18next).init({
+
+ if (canUseStorage) {
+   void AsyncStorage.getItem(LANGUAGE_KEY).then((storedLanguage) => {
+-    if (SUPPORTED_LANGUAGES.includes(storedLanguage as SupportedLanguage)) {
+-      void i18n.changeLanguage(storedLanguage as SupportedLanguage);
++    const resolvedLanguage = normalizeLanguage(storedLanguage);
++    if (resolvedLanguage) {
++      void i18n.changeLanguage(resolvedLanguage);
+     }
+   });
+ }
+
+ export async function changeAppLanguage(language: SupportedLanguage) {
++  await i18n.changeLanguage(language);
+   if (canUseStorage) {
+     await AsyncStorage.setItem(LANGUAGE_KEY, language);
+   }
+-  return i18n.changeLanguage(language);
++  return language;
+ }
+
+ export default i18n;
