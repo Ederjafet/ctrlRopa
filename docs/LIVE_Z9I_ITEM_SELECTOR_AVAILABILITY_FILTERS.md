@@ -114,3 +114,7 @@ Textos nuevos:
 GO tecnico si pasan lint, TypeScript, export web, Maven test/package y `git diff --check`.
 
 GO visual pendiente de corrida manual con inventario que contenga prendas disponibles, apartadas y vendidas.
+
+## Continuidad LIVE-Z9I.1
+
+LIVE-Z9I.1 no cambia filtros ni reglas de disponibilidad. Solo ajusta el layout responsive de acciones en las tarjetas `Prenda preparada para cambio` y `Prenda al aire ahora`, mostrando botones en fila en tablet/desktop y apilados en mobile.

@@ -1,0 +1,336 @@
+﻿diff --git a/app/live.tsx b/app/live.tsx
+index b1fb8c4..f625db1 100644
+--- a/app/live.tsx
++++ b/app/live.tsx
+@@ -2874,52 +2874,58 @@ export default function LiveScreen() {
+
+           {options.showOnAirAction ? (
+             <View style={styles.preparedItemActions}>
+-              <AppButton
+-                title={
+-                  isOnAir
+-                    ? t('live.productAlreadyOnAir')
+-                    : t('live.markSelectedProductOnAir')
+-                }
+-                variant={isOnAir ? 'neutral' : 'primary'}
+-                onPress={handleSetSelectedItemActive}
+-                loading={isSavingActiveItem}
+-                disabled={
+-                  isSavingActiveItem ||
+-                  !operatorFlowEnabled ||
+-                  !maySetActiveItem ||
+-                  isOnAir ||
+-                  !availability.canGoOnAir
+-                }
+-                disabledReason={
+-                  !maySetActiveItem
+-                    ? t('live.liveOperatePermissionError')
+-                    : !operatorFlowEnabled
+-                      ? t('live.selectOpenLiveReason')
+-                      : isOnAir
+-                        ? t('live.productAlreadyOnAir')
+-                        : !availability.canGoOnAir
+-                          ? availability.reason
+-                        : undefined
+-                }
+-              />
+-              {isPreparedForChange ? (
+-                <>
++              <View style={[styles.liveItemActionRow, isPhone ? styles.liveItemActionStack : null]}>
++                <View style={styles.liveItemActionColumn}>
+                   <AppButton
+-                    title={t('live.removePreparedItem')}
+-                    variant="neutral"
+-                    onPress={handleRemovePreparedItem}
+-                    disabled={isSavingActiveItem}
++                    title={
++                      isOnAir
++                        ? t('live.productAlreadyOnAir')
++                        : t('live.markSelectedProductOnAir')
++                    }
++                    variant={isOnAir ? 'neutral' : 'primary'}
++                    onPress={handleSetSelectedItemActive}
++                    loading={isSavingActiveItem}
++                    disabled={
++                      isSavingActiveItem ||
++                      !operatorFlowEnabled ||
++                      !maySetActiveItem ||
++                      isOnAir ||
++                      !availability.canGoOnAir
++                    }
++                    disabledReason={
++                      !maySetActiveItem
++                        ? t('live.liveOperatePermissionError')
++                        : !operatorFlowEnabled
++                          ? t('live.selectOpenLiveReason')
++                          : isOnAir
++                            ? t('live.productAlreadyOnAir')
++                            : !availability.canGoOnAir
++                              ? availability.reason
++                              : undefined
++                    }
+                   />
+-                  <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+-                    {t('live.removePreparedItemHelp')}
+-                  </AppText>
+-                </>
++                </View>
++                {isPreparedForChange ? (
++                  <View style={styles.liveItemActionColumn}>
++                    <AppButton
++                      title={t('live.removePreparedItem')}
++                      variant="neutral"
++                      onPress={handleRemovePreparedItem}
++                      disabled={isSavingActiveItem}
++                    />
++                  </View>
++                ) : null}
++              </View>
++              {isPreparedForChange ? (
++                <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
++                  {t('live.removePreparedItemHelp')}
++                </AppText>
+               ) : null}
+             </View>
+           ) : null}
+           {options.highlighted && isOnAir && options.showActiveActions !== false ? (
+-            <View style={styles.buttonRow}>
+-              <View style={styles.buttonFill}>
++            <View style={[styles.liveItemActionRow, isPhone ? styles.liveItemActionStack : null]}>
++              <View style={styles.liveItemActionColumn}>
+                 <AppButton
+                   title={t('live.clearProductOnAir')}
+                   variant="neutral"
+@@ -2938,7 +2944,7 @@ export default function LiveScreen() {
+                   {t('live.clearProductOnAirHelp')}
+                 </AppText>
+               </View>
+-              <View style={styles.buttonFill}>
++              <View style={styles.liveItemActionColumn}>
+                 <AppButton
+                   title={t('live.changeItemOnAir')}
+                   variant="secondary"
+@@ -6012,6 +6018,19 @@ const styles = StyleSheet.create({
+   preparedItemActions: {
+     gap: 8,
+   },
++  liveItemActionColumn: {
++    flex: 1,
++    minWidth: 180,
++  },
++  liveItemActionRow: {
++    alignItems: 'flex-start',
++    flexDirection: 'row',
++    gap: 10,
++    marginTop: 8,
++  },
++  liveItemActionStack: {
++    flexDirection: 'column',
++  },
+   buttonRow: {
+     flexDirection: 'row',
+     flexWrap: 'wrap',
+diff --git a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+index 3dffd34..5a38d3d 100644
+--- a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
++++ b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+@@ -476,3 +476,7 @@ LIVE-Z9H agrega boton `Actualizar`, indicador de ultima actualizacion, refresh a
+ # Nota LIVE-Z9I - Filtros de disponibilidad en prendas
+
+ LIVE-Z9I agrega filtros `Disponibles`, `Apartadas`, `Vendidas / no disponibles` y `Todas` en el selector `Buscar prenda`. El filtro por defecto es `Disponibles`; las prendas bloqueadas siguen mostrando motivo cuando se revisan en `Todas` y la validacion operativa existente impide ponerlas al aire o prepararlas cuando no son validas.
++
++# Nota LIVE-Z9I.1 - Acciones responsive en tarjetas
++
++LIVE-Z9I.1 ajusta solo presentacion: las acciones de `Prenda preparada para cambio` y `Prenda al aire ahora` se muestran en fila en tablet/desktop y apiladas en mobile. No cambia permisos, reglas LIVE, filtros ni endpoints.
+diff --git a/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md b/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md
+index 462a462..62493f1 100644
+--- a/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md
++++ b/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md
+@@ -94,3 +94,7 @@ Los bloqueos operativos de LIVE se alinean con `AppActionDialog` en modo context
+ ## Continuidad LIVE-Z9I
+
+ LIVE-Z9I agrega filtros de disponibilidad en el selector `Buscar prenda`. Al preparar una prenda para cambio, el selector abre por defecto en `Disponibles`, pero permite revisar `Apartadas`, `Vendidas / no disponibles` o `Todas` sin cambiar la regla que bloquea prendas no operables.
++
++## Continuidad LIVE-Z9I.1
++
++LIVE-Z9I.1 conserva el flujo de prenda preparada y solo mejora la disposicion visual de sus acciones: en tablet/desktop `Poner esta prenda al aire` y `Quitar prenda preparada` quedan en la misma linea; en mobile siguen apiladas.
+diff --git a/docs/LIVE_Z9I_1_CARD_ACTION_LAYOUT.md b/docs/LIVE_Z9I_1_CARD_ACTION_LAYOUT.md
+new file mode 100644
+index 0000000..097ce82
+--- /dev/null
++++ b/docs/LIVE_Z9I_1_CARD_ACTION_LAYOUT.md
+@@ -0,0 +1,95 @@
++# LIVE-Z9I.1 - Ajuste responsive de acciones en tarjetas LIVE
++
++Fecha: 2026-06-07
++Rama: `feature/live-z9i-1-card-action-layout`
++
++## Objetivo
++
++LIVE-Z9I.1 ajusta el layout de acciones en tarjetas LIVE para que los botones se muestren en la misma linea cuando hay espacio suficiente y se apilen en mobile.
++
++No se modifican backend, endpoints, AUTH/RBAC, permisos, filtros de disponibilidad ni reglas operativas LIVE.
++
++## Problema visual detectado
++
++En desktop/tablet, la tarjeta `Prenda preparada para cambio` mostraba acciones apiladas aunque habia espacio horizontal:
++
++- `Poner esta prenda al aire`;
++- `Quitar prenda preparada`.
++
++Esto hacia que la tarjeta creciera de alto y se viera menos profesional.
++
++## Tarjetas revisadas
++
++- `Prenda preparada para cambio`.
++- `Prenda al aire ahora`.
++
++Ambas viven en `app/live.tsx` dentro del render de tarjetas operativas LIVE.
++
++## Ajuste aplicado
++
++Se agrega un layout especifico para acciones de tarjetas de prenda:
++
++- tablet/desktop: acciones en fila;
++- phone/mobile: acciones en columna;
++- gap consistente;
++- columnas flexibles;
++- altura de botones consistente por reutilizar `AppButton`;
++- helper text debajo de la fila cuando aplica.
++
++## Comportamiento desktop/tablet
++
++`Prenda preparada para cambio`:
++
++```text
++[PONER ESTA PRENDA AL AIRE] [QUITAR PRENDA PREPARADA]
++```
++
++`Prenda al aire ahora`:
++
++```text
++[RETIRAR PRENDA DEL AIRE] [CAMBIAR POR PRENDA PREPARADA]
++```
++
++## Comportamiento mobile
++
++En mobile las acciones se apilan:
++
++```text
++[PONER ESTA PRENDA AL AIRE]
++[QUITAR PRENDA PREPARADA]
++```
++
++Esto mantiene el area tactil clara y evita botones comprimidos.
++
++## Sin cambios funcionales
++
++No se cambio:
++
++- poner prenda al aire;
++- quitar prenda preparada;
++- cambiar por prenda preparada;
++- retirar prenda del aire;
++- filtros de disponibilidad LIVE-Z9I;
++- selector de prendas;
++- permisos;
++- i18n;
++- light/dark;
++- presets visuales.
++
++## Validacion manual esperada
++
++1. Entrar con `qa.admin`.
++2. Abrir `/live`.
++3. Preparar una prenda.
++4. Confirmar que en desktop/tablet los botones de `Prenda preparada para cambio` aparecen en una sola linea.
++5. Reducir ancho o abrir mobile.
++6. Confirmar que esos botones se apilan correctamente.
++7. Revisar `Prenda al aire ahora` con acciones disponibles.
++8. Confirmar fila en desktop/tablet y columna en mobile.
++9. Validar light/dark.
++
++## GO/NO-GO
++
++GO tecnico si pasan lint, TypeScript, export web, Maven test/package y `git diff --check`.
++
++GO visual pendiente de corrida manual responsive.
+diff --git a/docs/LIVE_Z9I_ITEM_SELECTOR_AVAILABILITY_FILTERS.md b/docs/LIVE_Z9I_ITEM_SELECTOR_AVAILABILITY_FILTERS.md
+index abcd6c7..3f8c25f 100644
+--- a/docs/LIVE_Z9I_ITEM_SELECTOR_AVAILABILITY_FILTERS.md
++++ b/docs/LIVE_Z9I_ITEM_SELECTOR_AVAILABILITY_FILTERS.md
+@@ -114,3 +114,7 @@ Textos nuevos:
+ GO tecnico si pasan lint, TypeScript, export web, Maven test/package y `git diff --check`.
+
+ GO visual pendiente de corrida manual con inventario que contenga prendas disponibles, apartadas y vendidas.
++
++## Continuidad LIVE-Z9I.1
++
++LIVE-Z9I.1 no cambia filtros ni reglas de disponibilidad. Solo ajusta el layout responsive de acciones en las tarjetas `Prenda preparada para cambio` y `Prenda al aire ahora`, mostrando botones en fila en tablet/desktop y apilados en mobile.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index ce06dd4..da064c2 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -355,3 +355,17 @@ Agregar a la corrida manual de LIVE:
+ - confirmar que la busqueda conserva el filtro activo;
+ - intentar seleccionar una vendida/no disponible y confirmar bloqueo claro;
+ - validar light/dark y mobile/tablet.
++
++## Nota LIVE-Z9I.1
++
++Agregar a la corrida manual de LIVE:
++
++- entrar con `qa.admin`;
++- abrir `/live`;
++- preparar una prenda;
++- confirmar que en desktop/tablet `Poner esta prenda al aire` y `Quitar prenda preparada` aparecen en una sola linea;
++- reducir ancho o abrir mobile;
++- confirmar que esos botones se apilan correctamente;
++- revisar `Prenda al aire ahora`;
++- confirmar que sus acciones tambien quedan en fila con espacio suficiente y apiladas en mobile;
++- validar light/dark.
+diff --git a/qa-reports/LIVE-Z9I-1-card-action-layout-report-20260607-133536.md b/qa-reports/LIVE-Z9I-1-card-action-layout-report-20260607-133536.md
+new file mode 100644
+index 0000000..a52c40c
+--- /dev/null
++++ b/qa-reports/LIVE-Z9I-1-card-action-layout-report-20260607-133536.md
+@@ -0,0 +1,39 @@
++# LIVE-Z9I.1 - QA report
++
++Fecha: 2026-06-07 13:35:36
++Rama: `feature/live-z9i-1-card-action-layout`
++
++## Alcance validado
++
++- Tarjeta `Prenda preparada para cambio`.
++- Tarjeta `Prenda al aire ahora`.
++- Acciones en fila para tablet/desktop.
++- Acciones apiladas para phone/mobile.
++- Sin cambios funcionales en handlers, permisos, filtros de disponibilidad o reglas LIVE.
++
++## Validaciones ejecutadas
++
++| Validacion | Resultado | Nota |
++| --- | --- | --- |
++| `npm.cmd run lint` | PASS | 0 errores, 53 warnings existentes del repo. |
++| `npx.cmd tsc --noEmit` | PASS | Sin errores TypeScript. |
++| `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export` | PASS | Export web generado con 73 rutas estaticas, incluyendo `/live`. |
++| `backend/control-ropa/.mvnw.cmd test` | PASS | 73 tests, 0 fallas, 0 errores. |
++| `backend/control-ropa/.mvnw.cmd -q -DskipTests package` | PASS | Package generado sin errores. |
++| `git --no-pager diff --check` | PASS | Sin whitespace errors. |
++
++## Validacion manual esperada
++
++1. Entrar con `qa.admin`.
++2. Abrir `/live`.
++3. Preparar una prenda.
++4. Confirmar que en desktop/tablet `Poner esta prenda al aire` y `Quitar prenda preparada` aparecen en una sola linea.
++5. Reducir ancho o abrir mobile.
++6. Confirmar que los botones se apilan correctamente.
++7. Revisar `Prenda al aire ahora`.
++8. Confirmar que sus acciones aparecen en fila con espacio suficiente y apiladas en mobile.
++9. Validar light/dark.
++
++## Resultado
++
++GO tecnico para commit si el diff staged queda dentro de alcance.

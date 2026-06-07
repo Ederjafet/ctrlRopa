@@ -94,3 +94,7 @@ Los bloqueos operativos de LIVE se alinean con `AppActionDialog` en modo context
 ## Continuidad LIVE-Z9I
 
 LIVE-Z9I agrega filtros de disponibilidad en el selector `Buscar prenda`. Al preparar una prenda para cambio, el selector abre por defecto en `Disponibles`, pero permite revisar `Apartadas`, `Vendidas / no disponibles` o `Todas` sin cambiar la regla que bloquea prendas no operables.
+
+## Continuidad LIVE-Z9I.1
+
+LIVE-Z9I.1 conserva el flujo de prenda preparada y solo mejora la disposicion visual de sus acciones: en tablet/desktop `Poner esta prenda al aire` y `Quitar prenda preparada` quedan en la misma linea; en mobile siguen apiladas.
