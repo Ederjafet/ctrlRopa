@@ -72,6 +72,10 @@ No se modificaron:
 11. Entrar con `qa.sinpermisos@local.test` y confirmar bloqueo.
 12. Validar light/dark y mobile/tablet.
 
+## Continuidad LIVE-Z9H
+
+LIVE-Z9H agrega refresh controlado para que el vendedor con flujo de apartados no tenga que salir y volver a entrar cuando Admin cambia el estado del live o la prenda al aire. El vendedor conserva sus capacidades reales, con boton `Actualizar`, ultima actualizacion visible, refresh al foco y polling de 15 segundos sin consultar pagos/caja.
+
 ## GO/NO-GO
 
 GO tecnico si pasan lint, TypeScript, export web, Maven test/package y `git diff --check`.

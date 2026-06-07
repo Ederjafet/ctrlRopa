@@ -1,0 +1,9 @@
+﻿ app/live.tsx                                       | 335 +++++++++++++++------
+ docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md        |   4 +
+ docs/LIVE_Z9G_SELLER_CAPABILITIES.md               |   4 +
+ docs/LIVE_Z9H_VIEW_REFRESH.md                      |  77 +++++
+ docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md              |  13 +
+ locales/en/common.json                             |   8 +
+ locales/es/common.json                             |   8 +
+ ...LIVE-Z9H-view-refresh-report-20260606-213135.md |  72 +++++
+ 8 files changed, 424 insertions(+), 97 deletions(-)

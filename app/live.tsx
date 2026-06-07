@@ -36,7 +36,6 @@ import {
   activateLive,
   closeLive,
   createLive,
-  getLiveById,
   getLiveEvents,
   getLivesByBranch,
   getLiveStatusLabel,
@@ -77,6 +76,7 @@ import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   FlatList,
   Pressable,
   StyleSheet,
@@ -124,7 +124,7 @@ type LiveNoticeModalProps = {
 };
 
 const LIVE_MINIMAL_OPERATIONAL_MODE = true;
-const LIVE_ACTIVE_ITEM_POLL_MS = 5000;
+const LIVE_VIEW_REFRESH_POLL_MS = 15000;
 
 function isForbiddenError(error: unknown) {
   return error instanceof ApiError && error.status === 403;
@@ -172,6 +172,16 @@ function formatLiveDateTime(value?: string | null) {
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+  });
+}
+
+function formatLiveRefreshTime(value: Date | null) {
+  if (!value) return '';
+
+  return value.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
   });
 }
 
@@ -443,6 +453,9 @@ export default function LiveScreen() {
   const [customerLoadIssue, setCustomerLoadIssue] = useState<string | null>(null);
   const [itemLoadIssue, setItemLoadIssue] = useState<string | null>(null);
   const [reservationLoadIssue, setReservationLoadIssue] = useState<string | null>(null);
+  const [isRefreshingLiveView, setIsRefreshingLiveView] = useState(false);
+  const [lastLiveRefreshAt, setLastLiveRefreshAt] = useState<Date | null>(null);
+  const [liveRefreshIssue, setLiveRefreshIssue] = useState<string | null>(null);
 
   const [lives, setLives] = useState<Live[]>([]);
   const [selectedLive, setSelectedLive] = useState<Live | null>(null);
@@ -474,18 +487,13 @@ export default function LiveScreen() {
   const [activeItem, setActiveItem] = useState<Item | null>(null);
   const [priceText, setPriceText] = useState('');
   const [scanInput, setScanInput] = useState('');
-  const activeItemRef = useRef<Item | null>(null);
-  const activeLivePollInFlightRef = useRef(false);
+  const liveViewRefreshInFlightRef = useRef(false);
   const setActiveItemForReservation = useCallback((item: Item | null) => {
     setActiveItem(item);
     setPriceText(
       item?.price !== null && item?.price !== undefined ? String(item.price) : ''
     );
   }, []);
-
-  useEffect(() => {
-    activeItemRef.current = activeItem;
-  }, [activeItem]);
 
   const [customerSearch, setCustomerSearch] = useState('');
   const [itemSearch, setItemSearch] = useState('');
@@ -663,6 +671,8 @@ export default function LiveScreen() {
         hasEffectivePermission(currentSession, 'VIEW_PAYMENTS')
       );
       await updateLiveEvents(contextLiveId);
+      setLiveRefreshIssue(null);
+      setLastLiveRefreshAt(new Date());
 
       const pendingItemIds = await consumePendingQuickItems('live');
       const createdItems = pendingItemIds
@@ -767,89 +777,6 @@ export default function LiveScreen() {
   const selectedLiveIsOperable = isLiveOperable(selectedLive);
   const operatorLiveIsActive = selectedLiveStatus === 'ACTIVE';
   const operatorFlowEnabled = !isOperatorFocusedView || operatorLiveIsActive;
-
-  useEffect(() => {
-    if (!selectedLive?.id || selectedLiveStatus !== 'ACTIVE') return undefined;
-
-    let cancelled = false;
-
-    const pollActiveLive = async () => {
-      if (activeLivePollInFlightRef.current) return;
-
-      activeLivePollInFlightRef.current = true;
-
-      try {
-        const refreshedLive = await getLiveById(selectedLive.id);
-        if (cancelled) return;
-
-        setLives((currentLives) => {
-          const exists = currentLives.some((live) => live.id === refreshedLive.id);
-
-          return exists
-            ? currentLives.map((live) =>
-                live.id === refreshedLive.id ? refreshedLive : live
-              )
-            : [refreshedLive, ...currentLives];
-        });
-
-        setSelectedLive((currentLive) =>
-          currentLive?.id === refreshedLive.id ? refreshedLive : currentLive
-        );
-
-        const refreshedStatus = normalizeStatus(refreshedLive.status);
-        const refreshedActiveItem =
-          refreshedStatus === 'CLOSED' ? null : activeItemFromLive(refreshedLive);
-        const currentActiveItem = activeItemRef.current;
-        const activeItemChanged =
-          currentActiveItem?.id !== refreshedActiveItem?.id ||
-          currentActiveItem?.code !== refreshedActiveItem?.code ||
-          currentActiveItem?.price !== refreshedActiveItem?.price ||
-          currentActiveItem?.status !== refreshedActiveItem?.status;
-
-        if (refreshedStatus === 'CLOSED' || activeItemChanged) {
-          setActiveItemForReservation(refreshedActiveItem);
-        }
-
-        if (isSupervisorView && session) {
-          const [reservationResult, eventResult] = await Promise.allSettled([
-            getReservationsByBranch(session.branchId),
-            getLiveEvents(refreshedLive.id),
-          ]);
-
-          if (cancelled) return;
-
-          if (reservationResult.status === 'fulfilled') {
-            setBranchReservations(reservationResult.value);
-            setRecentReservations(
-              mapLiveReservations(reservationResult.value, refreshedLive.id)
-            );
-          }
-
-          if (eventResult.status === 'fulfilled') {
-            setLiveEvents(eventResult.value);
-            setLiveEventsLiveId(refreshedLive.id);
-          }
-        }
-      } catch {
-        // Keep the current on-air item on transient polling failures.
-      } finally {
-        activeLivePollInFlightRef.current = false;
-      }
-    };
-
-    const interval = setInterval(pollActiveLive, LIVE_ACTIVE_ITEM_POLL_MS);
-
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [
-    isSupervisorView,
-    selectedLive?.id,
-    selectedLiveStatus,
-    session,
-    setActiveItemForReservation,
-  ]);
 
   const hasValidReservationPrice =
     !!priceText.trim() && !Number.isNaN(Number(priceText)) && Number(priceText) > 0;
@@ -1459,16 +1386,19 @@ export default function LiveScreen() {
     }
   };
 
-  const updateRecentReservations = async (
+  const updateRecentReservations = useCallback(async (
     reservations: Reservation[],
     liveId?: number | null,
-    canLoadPayments = canViewPayments
+    canLoadPayments = canViewPayments,
+    options: { clearPaymentsWhenSkipped?: boolean } = {}
   ) => {
     const mappedReservations = mapLiveReservations(reservations, liveId);
     setRecentReservations(mappedReservations);
 
     if (!canLoadPayments) {
-      setPaidByReservationId({});
+      if (options.clearPaymentsWhenSkipped !== false) {
+        setPaidByReservationId({});
+      }
       return;
     }
 
@@ -1488,9 +1418,9 @@ export default function LiveScreen() {
     );
 
     setPaidByReservationId(Object.fromEntries(entries));
-  };
+  }, [canViewPayments]);
 
-  const updateLiveEvents = async (liveId?: number | null) => {
+  const updateLiveEvents = useCallback(async (liveId?: number | null) => {
     if (!liveId) {
       setLiveEvents([]);
       setLiveEventsLiveId(null);
@@ -1507,7 +1437,173 @@ export default function LiveScreen() {
     } finally {
       setIsLoadingClosedLiveEvents(false);
     }
-  };
+  }, []);
+
+  const refreshLiveViewData = useCallback(async (
+    options: { showSuccess?: boolean; showError?: boolean } = {}
+  ) => {
+    if (liveViewRefreshInFlightRef.current) {
+      return false;
+    }
+
+    liveViewRefreshInFlightRef.current = true;
+    setIsRefreshingLiveView(true);
+
+    try {
+      const currentSession = await getSession();
+
+      if (!currentSession) {
+        router.replace('/login');
+        return false;
+      }
+
+      if (!canViewLive(currentSession)) {
+        return false;
+      }
+
+      setSession(currentSession);
+
+      const liveData = await getLivesByBranch(currentSession.branchId);
+      const savedLiveId = await getSelectedLiveId(
+        currentSession.branchId,
+        currentSession.userId
+      );
+      const refreshedSelectedLive = selectedLive
+        ? liveData.find((live) => live.id === selectedLive.id)
+        : null;
+      const savedLive = savedLiveId
+        ? liveData.find((live) => live.id === savedLiveId && live.status !== 'CLOSED')
+        : null;
+      const nextSelectedLive =
+        refreshedSelectedLive && refreshedSelectedLive.status !== 'CLOSED'
+          ? refreshedSelectedLive
+          : savedLive ??
+            liveData.find((live) => live.status === 'ACTIVE') ??
+            liveData.find((live) => live.status === 'OPEN') ??
+            null;
+      const latestClosedLive = liveData
+        .filter((live) => normalizeStatus(live.status) === 'CLOSED')
+        .sort((a, b) => {
+          const timeDiff = getLiveTimestamp(b) - getLiveTimestamp(a);
+          if (timeDiff !== 0) return timeDiff;
+          return b.id - a.id;
+        })[0];
+      const contextLiveId = nextSelectedLive?.id ?? latestClosedLive?.id;
+
+      setLives(liveData);
+      setSelectedLive(nextSelectedLive);
+      if (!nextSelectedLive) {
+        setSelectedClosedLiveSource('auto');
+      }
+      setActiveItemForReservation(activeItemFromLive(nextSelectedLive));
+      setLiveLoadIssue(null);
+
+      const [reservationResult, eventResult] = await Promise.allSettled([
+        getReservationsByBranch(currentSession.branchId),
+        contextLiveId ? getLiveEvents(contextLiveId) : Promise.resolve([]),
+      ]);
+
+      if (reservationResult.status === 'fulfilled') {
+        setReservationLoadIssue(null);
+        setBranchReservations(reservationResult.value);
+        await updateRecentReservations(
+          reservationResult.value,
+          nextSelectedLive?.id,
+          false,
+          { clearPaymentsWhenSkipped: false }
+        );
+      } else {
+        setReservationLoadIssue(
+          resolveLoadIssue(
+            reservationResult.reason,
+            t('live.reservationLoadError'),
+            t('live.reservationPermissionError')
+          )
+        );
+      }
+
+      if (eventResult.status === 'fulfilled') {
+        setLiveEvents(eventResult.value);
+        setLiveEventsLiveId(contextLiveId ?? null);
+      }
+
+      setLiveRefreshIssue(null);
+      setLastLiveRefreshAt(new Date());
+
+      if (options.showSuccess) {
+        setLiveNotice({
+          title: t('live.liveRefreshSuccessTitle'),
+          message: t('live.liveRefreshSuccessMessage'),
+          tone: 'success',
+        });
+      }
+
+      return true;
+    } catch (error) {
+      const message = resolveLoadIssue(
+        error,
+        t('live.liveRefreshError'),
+        t('live.accessDenied')
+      );
+      setLiveRefreshIssue(message);
+
+      if (options.showError) {
+        setLiveNotice({
+          title: t('live.liveRefreshErrorTitle'),
+          message,
+          tone: 'warning',
+        });
+      }
+
+      return false;
+    } finally {
+      liveViewRefreshInFlightRef.current = false;
+      setIsRefreshingLiveView(false);
+    }
+  }, [
+    router,
+    selectedLive,
+    setActiveItemForReservation,
+    t,
+    updateRecentReservations,
+  ]);
+
+  const handleRefreshLiveView = useCallback(() => {
+    void refreshLiveViewData({ showSuccess: true, showError: true });
+  }, [refreshLiveViewData]);
+
+  const shouldAutoRefreshLiveView =
+    isAllowed === true &&
+    liveCapabilities.canViewLive &&
+    (liveActorContext.actor === 'SELLER' || liveActorContext.actor === 'SUPERVISOR');
+
+  useEffect(() => {
+    if (!shouldAutoRefreshLiveView) return undefined;
+
+    const interval = setInterval(() => {
+      if (AppState.currentState !== 'active') return;
+
+      void refreshLiveViewData();
+    }, LIVE_VIEW_REFRESH_POLL_MS);
+
+    return () => clearInterval(interval);
+  }, [refreshLiveViewData, shouldAutoRefreshLiveView]);
+
+  useEffect(() => {
+    if (!shouldAutoRefreshLiveView) return undefined;
+
+    let previousState = AppState.currentState;
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      const wasHidden = previousState === 'inactive' || previousState === 'background';
+      previousState = nextState;
+
+      if (wasHidden && nextState === 'active') {
+        void refreshLiveViewData();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [refreshLiveViewData, shouldAutoRefreshLiveView]);
 
   const handleUpdateReservationOperationalStatus = async (
     reservationId: number,
@@ -3732,6 +3828,13 @@ export default function LiveScreen() {
   const liveShellContextSubtitle = selectedLive
     ? operatorHeaderMeta.join(' · ')
     : t('live.noActiveTransmission');
+  const liveRefreshStatusLabel = lastLiveRefreshAt
+    ? t('live.lastUpdatedAt', { time: formatLiveRefreshTime(lastLiveRefreshAt) })
+    : t('live.noRecentUpdate');
+  const shouldShowLiveRefreshControls =
+    isAllowed === true &&
+    liveCapabilities.canViewLive &&
+    liveActorContext.actor !== 'NO_ACCESS';
 
   if (isAllowed === null || isLoading) {
     return (
@@ -3769,6 +3872,29 @@ export default function LiveScreen() {
           <AppInfoCard title={t('live.reservationLoadIssueTitle')}>
             <AppText>{reservationLoadIssue}</AppText>
           </AppInfoCard>
+        ) : null}
+        {shouldShowLiveRefreshControls ? (
+          <AppCard style={styles.liveRefreshCard}>
+            <View style={styles.liveRefreshRow}>
+              <View style={styles.liveRefreshText}>
+                <AppText variant="caption" color={theme.colors.mutedText} bold>
+                  {liveRefreshStatusLabel}
+                </AppText>
+                {liveRefreshIssue ? (
+                  <AppText variant="caption" color={theme.colors.warning}>
+                    {liveRefreshIssue}
+                  </AppText>
+                ) : null}
+              </View>
+              <AppButton
+                title={isRefreshingLiveView ? t('live.refreshing') : t('live.refresh')}
+                variant="neutral"
+                onPress={handleRefreshLiveView}
+                loading={isRefreshingLiveView}
+                disabled={isRefreshingLiveView}
+              />
+            </View>
+          </AppCard>
         ) : null}
 
         {isOperatorFocusedView ? (
@@ -5890,6 +6016,21 @@ const styles = StyleSheet.create({
   },
   liveButtonGrid: {
     marginTop: 8,
+  },
+  liveRefreshCard: {
+    marginBottom: 10,
+  },
+  liveRefreshRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
+  liveRefreshText: {
+    flex: 1,
+    gap: 3,
+    minWidth: 180,
   },
   livePulse: {
     height: 9,

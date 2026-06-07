@@ -468,3 +468,7 @@ LIVE-Z9F agrega un patron de dialogo accionable para validaciones bloqueantes de
 # Nota LIVE-Z9F.1 - Panel contextual operativo
 
 LIVE-Z9F.1 extiende el patron para que LIVE use paneles contextuales accionables en bloqueos de apartado. El operador permanece en la seccion de captura, ve que informacion falta y puede ejecutar la accion siguiente sin pasar por un modal centrado.
+
+# Nota LIVE-Z9H - Refresh vendedor/supervisor
+
+LIVE-Z9H agrega boton `Actualizar`, indicador de ultima actualizacion, refresh al volver a foco y polling controlado de 15 segundos para `SELLER` y `SUPERVISOR`. No implementa WebSocket/SSE, no toca backend y no consulta pagos/caja durante el polling.

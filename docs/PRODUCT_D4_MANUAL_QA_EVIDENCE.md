@@ -196,3 +196,16 @@ Agregar a la corrida manual de LIVE con `qa.vendedor.centro@local.test`:
 - confirmar que no ve cancelar apartado si no tiene `CANCEL_RESERVATION`;
 - confirmar que `Cerrar como venta LIVE` solo aparece si conserva permiso real de venta operativa;
 - repetir validacion en light/dark y mobile/tablet.
+
+## Nota LIVE-Z9H
+
+Agregar a la corrida manual de LIVE:
+
+- dejar `qa.vendedor.centro@local.test` dentro de `/live` mientras Admin inicia o cambia el LIVE;
+- confirmar boton `Actualizar`;
+- confirmar indicador `Ultima actualizacion`;
+- confirmar que prenda al aire, precio y apartados recientes se refrescan sin salir/entrar;
+- repetir con `qa.supervisor.centro@local.test`;
+- ocultar y volver a enfocar la ventana para confirmar refresh al foco;
+- confirmar que no hay polling util para `qa.sinpermisos@local.test`;
+- confirmar light/dark y mobile/tablet.
