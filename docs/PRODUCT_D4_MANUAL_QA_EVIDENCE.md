@@ -308,3 +308,18 @@ Agregar a la corrida manual de sistema visual:
 - abrir `/live` o `/customers` y confirmar tema aplicado;
 - volver a `/ui-kit` y restaurar plantilla;
 - validar light/dark y mobile/tablet.
+
+## Nota PRODUCT-C2.5
+
+Agregar a la corrida manual de sistema visual:
+
+- abrir `/ui-kit`;
+- confirmar que la vista principal muestra solo plantilla visual, colores de marca, paleta sugerida, legibilidad, preview, aplicar/restaurar y opciones avanzadas;
+- confirmar que `tints`, `shades` y `tones` ya no ocupan espacio en la pantalla principal;
+- cambiar principal, secundario y acento y confirmar que claros/oscuros/desaturados aparecen dentro del modal `Cambiar color`;
+- confirmar que armonia aparece como sugerencia avanzada, no como limitante del flujo principal;
+- revisar que `Identidad visual local` se muestre en avanzado como `Editor avanzado de tokens locales`;
+- revisar que `Design tokens` solo aparezca en avanzado como diagnostico tecnico;
+- aplicar paleta localmente;
+- restaurar plantilla;
+- validar light/dark y mobile/tablet.

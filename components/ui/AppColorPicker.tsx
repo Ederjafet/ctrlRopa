@@ -56,19 +56,22 @@ export default function AppColorPicker({
 
   const normalizedDraft = normalizeHexColor(draftColor);
   const draftIsValid = isValidHexColor(draftColor);
-  const variations = useMemo(() => {
+  const tints = useMemo(() => {
     const base = normalizeHexColor(draftColor);
-    return [
-      ...generateTints(base, 4),
-      base,
-      ...generateShades(base, 4),
-      ...generateTones(base, 3),
-    ];
+    return generateTints(base, 5);
   }, [draftColor]);
-  const swatches = useMemo(() => {
-    const merged = [...suggestedColors, ...variations].map((color) => normalizeHexColor(color));
-    return Array.from(new Set(merged));
-  }, [suggestedColors, variations]);
+  const shades = useMemo(() => {
+    const base = normalizeHexColor(draftColor);
+    return generateShades(base, 5);
+  }, [draftColor]);
+  const tones = useMemo(() => {
+    const base = normalizeHexColor(draftColor);
+    return generateTones(base, 5);
+  }, [draftColor]);
+  const swatches = useMemo(
+    () => Array.from(new Set(suggestedColors.map((color) => normalizeHexColor(color)))),
+    [suggestedColors],
+  );
 
   const apply = () => {
     if (!draftIsValid) return;
@@ -124,7 +127,7 @@ export default function AppColorPicker({
             <View style={styles.section}>
               <AppText bold>{t('paletteGenerator.suggestedSwatches')}</AppText>
               <View style={styles.swatchGrid}>
-                {suggestedColors.map((color) => (
+                {swatches.map((color) => (
                   <ColorTile
                     key={color}
                     color={normalizeHexColor(color)}
@@ -137,16 +140,24 @@ export default function AppColorPicker({
 
             <View style={styles.section}>
               <AppText bold>{t('paletteGenerator.colorVariations')}</AppText>
-              <View style={styles.swatchGrid}>
-                {swatches.map((color) => (
-                  <ColorTile
-                    key={color}
-                    color={color}
-                    selected={color === normalizedDraft}
-                    onPress={() => setDraftColor(color)}
-                  />
-                ))}
-              </View>
+              <VariationRow
+                title={t('paletteGenerator.tints')}
+                colors={tints}
+                selectedColor={normalizedDraft}
+                onPick={setDraftColor}
+              />
+              <VariationRow
+                title={t('paletteGenerator.shades')}
+                colors={shades}
+                selectedColor={normalizedDraft}
+                onPick={setDraftColor}
+              />
+              <VariationRow
+                title={t('paletteGenerator.tones')}
+                colors={tones}
+                selectedColor={normalizedDraft}
+                onPick={setDraftColor}
+              />
             </View>
           </ScrollView>
 
@@ -204,6 +215,38 @@ function ColorTile({
         },
       ]}
     />
+  );
+}
+
+function VariationRow({
+  colors,
+  onPick,
+  selectedColor,
+  title,
+}: {
+  colors: string[];
+  onPick: (color: string) => void;
+  selectedColor: string;
+  title: string;
+}) {
+  const { theme } = useAppTheme();
+
+  return (
+    <View style={styles.variationRow}>
+      <AppText variant="caption" color={theme.colors.mutedText}>
+        {title}
+      </AppText>
+      <View style={styles.swatchGrid}>
+        {colors.map((color) => (
+          <ColorTile
+            key={color}
+            color={color}
+            selected={color === selectedColor}
+            onPress={() => onPick(color)}
+          />
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -268,5 +311,8 @@ const styles = StyleSheet.create({
   textBlock: {
     flex: 1,
     minWidth: 0,
+  },
+  variationRow: {
+    gap: 8,
   },
 });

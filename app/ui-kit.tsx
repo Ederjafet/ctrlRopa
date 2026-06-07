@@ -114,13 +114,13 @@ export default function UiKitPreview() {
     const surfaceContrast = getContrastRatio(theme.colors.textPrimary, editorValues.surface);
 
     if (backgroundContrast !== null && backgroundContrast < 3) {
-      warnings.push('El fondo puede tener bajo contraste con el texto principal.');
+      warnings.push(t('paletteGenerator.backgroundContrastWarning'));
     }
     if (surfaceContrast !== null && surfaceContrast < 3) {
-      warnings.push('La superficie/cards puede tener bajo contraste con el texto principal.');
+      warnings.push(t('paletteGenerator.surfaceContrastWarning'));
     }
     return warnings;
-  }, [editorValues.background, editorValues.surface, theme.colors.textPrimary]);
+  }, [editorValues.background, editorValues.surface, t, theme.colors.textPrimary]);
   const generatedPalette = useMemo(
     () => generateSemanticPalette(normalizeHexColor(brandColors.primary), paletteHarmony, activeScheme, brandColors),
     [activeScheme, brandColors, paletteHarmony],
@@ -344,7 +344,7 @@ export default function UiKitPreview() {
           <View style={styles.previewTextBlock}>
             <AppText bold>{t('paletteGenerator.activeTemplate')}</AppText>
             <AppText variant="caption" color={theme.colors.mutedText}>
-              {t('paletteGenerator.localConfigHelp')}
+              {t('paletteGenerator.templateActiveHelp')}
             </AppText>
           </View>
           <StatusBadge
@@ -463,20 +463,26 @@ export default function UiKitPreview() {
         subtitle={t('paletteGenerator.advancedOptionsHelp')}
       />
       <SectionHeader
-        title={t('paletteGenerator.controlledEditorTitle')}
-        subtitle={t('paletteGenerator.controlledEditorSubtitle')}
+        title={t('paletteGenerator.advancedLocalTokensTitle')}
+        subtitle={t('paletteGenerator.advancedLocalTokensHelp')}
       />
       <AppCard variant="elevated" style={styles.previewCard}>
         <View style={styles.themePreviewHeader}>
           <View style={styles.previewTextBlock}>
-            <AppText bold>Identidad visual local</AppText>
+            <AppText bold>{t('paletteGenerator.advancedLocalTokensTitle')}</AppText>
             <AppText variant="caption" color={theme.colors.mutedText}>
-              Editando modo {activeScheme === 'dark' ? 'oscuro' : 'claro'} sobre{' '}
-              {activePreset.label}. No modifica backend ni tenant.
+              {t('paletteGenerator.advancedLocalTokensModeHelp', {
+                scheme: activeScheme === 'dark' ? t('theme.dark') : t('theme.light'),
+                template: activePreset.label,
+              })}
             </AppText>
           </View>
           <StatusBadge
-            label={customVisualIdentity?.presetId === visualPresetId ? 'Personalizada' : 'Base'}
+            label={
+              customVisualIdentity?.presetId === visualPresetId
+                ? t('paletteGenerator.customStatus')
+                : t('paletteGenerator.baseStatus')
+            }
             tone={customVisualIdentity?.presetId === visualPresetId ? 'warning' : 'info'}
           />
         </View>
@@ -518,9 +524,9 @@ export default function UiKitPreview() {
 
         <View style={styles.segmentedRow}>
           <View style={styles.previewTextBlock}>
-            <AppText bold>Radio visual</AppText>
+            <AppText bold>{t('paletteGenerator.visualRadius')}</AppText>
             <AppText variant="caption" color={theme.colors.mutedText}>
-              Ajusta la suavidad global sin editar componentes individuales.
+              {t('paletteGenerator.visualRadiusHelp')}
             </AppText>
           </View>
           {(['standard', 'soft', 'compact'] as const).map((radius) => (
@@ -535,9 +541,9 @@ export default function UiKitPreview() {
 
         <View style={styles.segmentedRow}>
           <View style={styles.previewTextBlock}>
-            <AppText bold>Densidad visual</AppText>
+            <AppText bold>{t('paletteGenerator.visualDensity')}</AppText>
             <AppText variant="caption" color={theme.colors.mutedText}>
-              Controla spacing global soportado por el tema.
+              {t('paletteGenerator.visualDensityHelp')}
             </AppText>
           </View>
           {(['NORMAL', 'COMPACT'] as const).map((density) => (
@@ -553,7 +559,7 @@ export default function UiKitPreview() {
         {contrastWarnings.length > 0 ? (
           <AppCard variant="warning" style={styles.compactNotice}>
             <AppText bold color={theme.colors.warning}>
-              Revisar contraste
+              {t('paletteGenerator.reviewContrast')}
             </AppText>
             {contrastWarnings.map((warning) => (
               <AppText key={warning} variant="caption" color={theme.colors.textSecondary}>
@@ -565,23 +571,22 @@ export default function UiKitPreview() {
 
         <View style={styles.buttonRow}>
           <AppButton
-            title="Aplicar cambios localmente"
+            title={t('paletteGenerator.applyLocalChanges')}
             variant="primary"
             disabled={hasEditorErrors}
-            disabledReason="Corrige los colores invalidos antes de aplicar."
+            disabledReason={t('paletteGenerator.invalidColorsFeedback')}
             onPress={applyVisualIdentityChanges}
           />
         </View>
 
         <AppText variant="caption" color={theme.colors.mutedText}>
-          Esta personalizacion se guarda localmente en esta fase. La persistencia por cliente/tenant
-          queda pendiente.
+          {t('paletteGenerator.localTenantPendingHelp')}
         </AppText>
       </AppCard>
 
       <SectionHeader
-        title="Preview de identidad"
-        subtitle="Referencia en vivo de botones, cards, badges, inputs y estado reservado."
+        title={t('paletteGenerator.advancedPreviewTitle')}
+        subtitle={t('paletteGenerator.advancedPreviewHelp')}
       />
       <AppResponsiveGrid tabletColumns={2} desktopColumns={3}>
         <AppCard variant="selected" style={styles.previewCard}>
@@ -622,7 +627,10 @@ export default function UiKitPreview() {
         </AppCard>
       </AppResponsiveGrid>
 
-      <SectionHeader title="Design tokens" subtitle="Colores, radios, sombras y spacing base" />
+      <SectionHeader
+        title={t('paletteGenerator.designTokensTitle')}
+        subtitle={t('paletteGenerator.designTokensHelp')}
+      />
       <AppResponsiveGrid tabletColumns={2} desktopColumns={4}>
         {Object.entries(designTokens.colors).slice(0, 12).map(([name, color]) => (
           <AppCard key={name} style={styles.tokenCard}>
@@ -636,8 +644,8 @@ export default function UiKitPreview() {
       </AppResponsiveGrid>
 
       <SectionHeader
-        title="Tokens semanticos del tema activo"
-        subtitle="Superficies, texto, inputs y estados usados por AppShell, LIVE y detalle"
+        title={t('paletteGenerator.semanticTokensTitle')}
+        subtitle={t('paletteGenerator.semanticTokensHelp')}
       />
       <AppResponsiveGrid tabletColumns={2} desktopColumns={4}>
         {[

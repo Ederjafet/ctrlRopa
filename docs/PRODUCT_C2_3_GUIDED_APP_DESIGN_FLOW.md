@@ -147,3 +147,13 @@ La experiencia visible ahora permite configurar:
 El cambio evita que el selector nativo de Windows/navegador sea la experiencia principal. La seleccion se realiza con `AppColorPicker`, un panel propio con HEX, swatches, variaciones, aplicar, cancelar y restaurar color original.
 
 La paleta sugerida respeta los colores definidos por el usuario y completa los tokens restantes con reglas semanticas seguras.
+
+---
+
+## Continuidad PRODUCT-C2.5 - Flujo final simplificado
+
+Fecha: 2026-06-07
+
+PRODUCT-C2.5 reduce aun mas la carga tecnica del flujo guiado. La vista principal queda centrada en plantilla, colores de marca, paleta sugerida, legibilidad, preview y acciones de aplicar/restaurar.
+
+Las variaciones de color se muestran dentro del selector propio, la armonia queda como opcion avanzada y los tokens internos dejan de aparecer como una tarea esperada para usuario final.

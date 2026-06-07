@@ -1,0 +1,18 @@
+﻿ app/ui-kit.tsx                                     |  56 ++++----
+ components/ui/AppColorPicker.tsx                   |  90 +++++++++---
+ components/ui/PaletteGeneratorCard.tsx             | 156 ++++++++------------
+ ...PRODUCT_C2_2_SIMPLIFIED_VISUAL_IDENTITY_FLOW.md |  10 ++
+ docs/PRODUCT_C2_3_GUIDED_APP_DESIGN_FLOW.md        |  10 ++
+ docs/PRODUCT_C2_4_CUSTOM_BRAND_COLOR_PICKER.md     |  17 +++
+ docs/PRODUCT_C2_5_BRAND_EDITOR_SIMPLIFICATION.md   | 160 +++++++++++++++++++++
+ docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md            |  10 ++
+ docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md              |  15 ++
+ locales/en/common.json                             |  55 +++++--
+ locales/es/common.json                             |  55 +++++--
+ locales/fr/common.json                             |  55 +++++--
+ locales/ja/common.json                             |  55 +++++--
+ locales/ko/common.json                             |  55 +++++--
+ locales/pt-BR/common.json                          |  55 +++++--
+ locales/zh/common.json                             |  55 +++++--
+ ...editor-simplification-report-20260607-110459.md |  76 ++++++++++
+ 17 files changed, 737 insertions(+), 248 deletions(-)

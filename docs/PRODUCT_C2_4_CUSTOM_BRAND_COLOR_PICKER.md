@@ -156,3 +156,20 @@ Las traducciones nuevas son base tecnica y requieren revision humana/nativa ante
 - No se agregan fuentes externas.
 - El picker nativo queda fuera de la experiencia principal.
 - La validacion de contraste sigue siendo basica y no reemplaza auditoria completa de accesibilidad.
+
+---
+
+## Continuidad PRODUCT-C2.5 - Simplificacion final
+
+Fecha: 2026-06-07
+
+PRODUCT-C2.5 conserva el selector propio y los tres colores de marca, pero simplifica la primera vista de `/ui-kit`.
+
+Cambios principales:
+
+- `tints`, `shades` y `tones` se mueven al modal `AppColorPicker`;
+- el selector de armonia queda en opciones avanzadas;
+- la armonia se explica como sugerencia automatica, no como limitante;
+- `Identidad visual local` se renombra a `Editor avanzado de tokens locales`;
+- `Design tokens` queda como diagnostico tecnico dentro de avanzado;
+- el bloque visible de contraste se reduce a `Legibilidad`.

@@ -375,3 +375,13 @@ Fecha: 2026-06-07
 PRODUCT-C2.4 agrega un selector propio de color para `/ui-kit` y evita que la experiencia principal dependa del picker nativo de navegador/Windows. El flujo de diseno visual soporta color principal, secundario y acento, con preview y contraste antes de aplicar localmente.
 
 QA debe validar que el panel propio respete light/dark, presets, responsive y que los tres colores se reflejen en sidebar, cards, botones, chips/acento, badges y estados sin perder legibilidad.
+
+---
+
+## Continuidad PRODUCT-C2.5 - Editor de marca simplificado
+
+Fecha: 2026-06-07
+
+PRODUCT-C2.5 simplifica la superficie principal de `/ui-kit`: plantillas, colores de marca, paleta sugerida, legibilidad, preview y acciones finales. Las variaciones de color se abren desde el picker propio y los tokens quedan como diagnostico avanzado.
+
+QA debe confirmar que la vista inicial ya no se perciba como laboratorio tecnico y que el modo avanzado conserve las herramientas internas.

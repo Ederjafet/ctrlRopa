@@ -191,3 +191,13 @@ Fecha: 2026-06-07
 PRODUCT-C2.4 conserva la pantalla simplificada y reemplaza la experiencia principal de color nativo por un selector propio de la aplicacion. El flujo visible cambia de un solo color base a `Colores de marca`, con principal, secundario y acento.
 
 Las escalas, armonias detalladas, tokens tecnicos y datos RGB/HSL siguen en modo avanzado para no saturar la experiencia inicial.
+
+---
+
+## Continuidad PRODUCT-C2.5 - Menos laboratorio
+
+Fecha: 2026-06-07
+
+PRODUCT-C2.5 completa la simplificacion moviendo escalas largas al modal de color, dejando armonia como sugerencia avanzada y renombrando la identidad local como editor avanzado de tokens locales.
+
+La vista principal ya no intenta explicar tokens tecnicos al usuario final.
