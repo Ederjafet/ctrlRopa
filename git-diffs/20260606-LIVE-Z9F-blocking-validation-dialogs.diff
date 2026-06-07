@@ -1,0 +1,731 @@
+﻿diff --git a/app/items-create.tsx b/app/items-create.tsx
+index 5c539b1..20d31c9 100644
+--- a/app/items-create.tsx
++++ b/app/items-create.tsx
+@@ -1,4 +1,5 @@
+ import AppShellPage from '@/components/layout/AppShellPage';
++import AppActionDialog from '@/components/ui/AppActionDialog';
+ import AppBottomModal from '@/components/ui/AppBottomModal';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+@@ -26,9 +27,9 @@ import {
+ import { getSession } from '@/services/sessionStorage';
+
+ import { useLocalSearchParams, useRouter } from 'expo-router';
+-import { useEffect, useState } from 'react';
++import { useEffect, useRef, useState } from 'react';
+ import { useTranslation } from 'react-i18next';
+-import { Alert, FlatList, StyleSheet, View } from 'react-native';
++import { Alert, FlatList, StyleSheet, TextInput, View } from 'react-native';
+
+ type CatalogOption = {
+   id: number;
+@@ -48,6 +49,13 @@ type FormErrors = Partial<
+   Record<'productType' | 'size' | 'price' | 'quantity', string>
+ >;
+
++type FormErrorKey = keyof FormErrors;
++
++type ValidationDialogState = {
++  details: string[];
++  firstField?: FormErrorKey;
++};
++
+ const mapBatchToOption = (batch: Batch): CatalogOption => ({
+   id: batch.id,
+   code: batch.folio,
+@@ -82,6 +90,8 @@ export default function ItemsCreateScreen() {
+   const { returnTo, batchId, batchFolio } = useLocalSearchParams();
+   const { theme } = useAppTheme();
+   const { t } = useTranslation('common');
++  const priceInputRef = useRef<TextInput>(null);
++  const quantityInputRef = useRef<TextInput>(null);
+
+   const returnRoute = typeof returnTo === 'string' ? returnTo : '/items';
+   const preselectedBatchId = typeof batchId === 'string' ? Number(batchId) : null;
+@@ -117,7 +127,8 @@ export default function ItemsCreateScreen() {
+   const [isSaving, setIsSaving] = useState(false);
+   const [successMessage, setSuccessMessage] = useState('');
+   const [formErrors, setFormErrors] = useState<FormErrors>({});
+-  const [validationSummary, setValidationSummary] = useState<string[]>([]);
++  const [validationDialog, setValidationDialog] =
++    useState<ValidationDialogState | null>(null);
+
+   const [selector, setSelector] = useState<SelectorConfig | null>(null);
+   const [selectorSearch, setSelectorSearch] = useState('');
+@@ -185,7 +196,6 @@ export default function ItemsCreateScreen() {
+     setQuantity('1');
+     setComments('');
+     setFormErrors({});
+-    setValidationSummary([]);
+   };
+
+   const openSelector = (config: SelectorConfig) => {
+@@ -198,48 +208,96 @@ export default function ItemsCreateScreen() {
+     setSelectorSearch('');
+   };
+
++  const openProductTypeSelector = () => {
++    openSelector({
++      title: 'Seleccionar tipo de prenda',
++      options: productTypes,
++      onSelect: (option) => {
++        setSelectedProductType(option);
++        setFormErrors((current) => ({ ...current, productType: undefined }));
++      },
++    });
++  };
++
++  const openSizeSelector = () => {
++    openSelector({
++      title: 'Seleccionar talla',
++      options: sizes,
++      onSelect: (option) => {
++        setSelectedSize(option);
++        setFormErrors((current) => ({ ...current, size: undefined }));
++      },
++    });
++  };
++
+   const validateForm = () => {
+     const nextErrors: FormErrors = {};
++    const details: string[] = [];
++    let firstField: FormErrorKey | undefined;
++
++    const addError = (field: FormErrorKey, message: string) => {
++      nextErrors[field] = message;
++      details.push(message);
++      firstField = firstField ?? field;
++    };
+
+     if (!selectedProductType) {
+-      nextErrors.productType = t('itemsCreate.requiredField');
++      addError('productType', t('itemsCreate.selectItemType'));
+     }
+
+     if (!selectedSize) {
+-      nextErrors.size = t('itemsCreate.selectSize');
++      addError('size', t('itemsCreate.selectSize'));
+     }
+
+     const qty = Number(quantity);
+     if (!qty || qty <= 0 || !Number.isInteger(qty)) {
+-      nextErrors.quantity = t('itemsCreate.validQuantity');
++      addError('quantity', t('itemsCreate.validQuantity'));
+     }
+
+     const parsedPrice = price.trim() ? Number(price) : null;
+     if (requiresPrice && !price.trim()) {
+-      nextErrors.price = t('itemsCreate.validPrice');
++      addError('price', t('itemsCreate.validPrice'));
+     } else if (parsedPrice !== null && (Number.isNaN(parsedPrice) || parsedPrice < 0)) {
+-      nextErrors.price = t('itemsCreate.validPrice');
++      addError('price', t('itemsCreate.validPrice'));
+     } else if (requiresPrice && (!parsedPrice || parsedPrice <= 0)) {
+-      nextErrors.price = t('itemsCreate.validPrice');
++      addError('price', t('itemsCreate.validPrice'));
+     }
+
+-    const details = Object.values(nextErrors).filter((message): message is string => !!message);
+     setFormErrors(nextErrors);
+-    setValidationSummary(details);
+
+     if (details.length > 0) {
+-      Alert.alert(
+-        t('itemsCreate.validationTitle'),
+-        `${t('itemsCreate.validationMessage')}\n\n${details
+-          .map((detail) => `- ${detail}`)
+-          .join('\n')}`
+-      );
++      setValidationDialog({ details, firstField });
+       return false;
+     }
+
++    setValidationDialog(null);
+     return true;
+   };
+
++  const goToFirstInvalidField = () => {
++    const field = validationDialog?.firstField;
++    setValidationDialog(null);
++
++    if (field === 'productType') {
++      openProductTypeSelector();
++      return;
++    }
++
++    if (field === 'size') {
++      openSizeSelector();
++      return;
++    }
++
++    if (field === 'price') {
++      priceInputRef.current?.focus();
++      return;
++    }
++
++    if (field === 'quantity') {
++      quantityInputRef.current?.focus();
++    }
++  };
++
+   const handleCreate = async () => {
+     if (!validateForm()) {
+       return;
+@@ -286,7 +344,6 @@ export default function ItemsCreateScreen() {
+       setIsSaving(true);
+       setSuccessMessage('');
+       setFormErrors({});
+-      setValidationSummary([]);
+
+       const createdItemIds: number[] = [];
+
+@@ -373,22 +430,6 @@ export default function ItemsCreateScreen() {
+           </AppCard>
+         ) : null}
+
+-        {validationSummary.length > 0 ? (
+-          <AppCard variant="danger" style={styles.validationCard}>
+-            <AppText bold>{t('itemsCreate.validationTitle')}</AppText>
+-            <AppText color={theme.colors.textSecondary}>
+-              {t('itemsCreate.validationMessage')}
+-            </AppText>
+-            <View style={styles.validationList}>
+-              {validationSummary.map((message) => (
+-                <AppText key={message} variant="caption" color={theme.colors.danger}>
+-                  - {message}
+-                </AppText>
+-              ))}
+-            </View>
+-          </AppCard>
+-        ) : null}
+-
+         <AppCard>
+           <AppResponsiveGrid>
+           <AppSelectorField
+@@ -414,17 +455,7 @@ export default function ItemsCreateScreen() {
+             value={selectedProductType?.name}
+             placeholder="Seleccionar tipo"
+             error={formErrors.productType}
+-            onPress={() =>
+-              openSelector({
+-                title: 'Seleccionar tipo de prenda',
+-                options: productTypes,
+-                onSelect: (option) => {
+-                  setSelectedProductType(option);
+-                  setFormErrors((current) => ({ ...current, productType: undefined }));
+-                  setValidationSummary([]);
+-                },
+-              })
+-            }
++            onPress={openProductTypeSelector}
+           />
+
+           <AppSelectorField
+@@ -446,17 +477,7 @@ export default function ItemsCreateScreen() {
+             value={selectedSize?.name}
+             placeholder="Seleccionar talla"
+             error={formErrors.size}
+-            onPress={() =>
+-              openSelector({
+-                title: 'Seleccionar talla',
+-                options: sizes,
+-                onSelect: (option) => {
+-                  setSelectedSize(option);
+-                  setFormErrors((current) => ({ ...current, size: undefined }));
+-                  setValidationSummary([]);
+-                },
+-              })
+-            }
++            onPress={openSizeSelector}
+           />
+
+           <AppSelectorField
+@@ -478,12 +499,12 @@ export default function ItemsCreateScreen() {
+         <AppCard>
+           <AppResponsiveGrid>
+           <AppInput
++            ref={priceInputRef}
+             label={requiresPrice ? 'Precio *' : 'Precio sugerido'}
+             value={price}
+             onChangeText={(value) => {
+               setPrice(value);
+               setFormErrors((current) => ({ ...current, price: undefined }));
+-              setValidationSummary([]);
+             }}
+             keyboardType="numeric"
+             placeholder={requiresPrice ? 'Obligatorio' : 'Opcional'}
+@@ -491,12 +512,12 @@ export default function ItemsCreateScreen() {
+           />
+
+           <AppInput
++            ref={quantityInputRef}
+             label="Cantidad *"
+             value={quantity}
+             onChangeText={(value) => {
+               setQuantity(value);
+               setFormErrors((current) => ({ ...current, quantity: undefined }));
+-              setValidationSummary([]);
+             }}
+             keyboardType="numeric"
+             placeholder="Ej. 1"
+@@ -517,6 +538,27 @@ export default function ItemsCreateScreen() {
+           onPress={handleCreate}
+           loading={isSaving}
+         />
++      <AppActionDialog
++        visible={!!validationDialog}
++        title={t('itemsCreate.validationTitle')}
++        message={t('itemsCreate.validationMessage')}
++        details={validationDialog?.details ?? []}
++        variant="warning"
++        onClose={() => setValidationDialog(null)}
++        primaryAction={{
++          label: t('common.understood'),
++          onPress: () => setValidationDialog(null),
++        }}
++        secondaryAction={
++          validationDialog?.firstField
++            ? {
++                label: t('itemsCreate.goToFirstField'),
++                onPress: goToFirstInvalidField,
++                variant: 'secondary',
++              }
++            : undefined
++        }
++      />
+       <AppBottomModal
+         visible={!!selector}
+         title={selector?.title ?? ''}
+@@ -575,13 +617,6 @@ const styles = StyleSheet.create({
+     padding: 12,
+     marginBottom: 10,
+   },
+-  validationCard: {
+-    gap: 8,
+-  },
+-  validationList: {
+-    gap: 4,
+-    marginTop: 4,
+-  },
+   selectorList: {
+     maxHeight: 360,
+   },
+diff --git a/components/ui/AppActionDialog.tsx b/components/ui/AppActionDialog.tsx
+new file mode 100644
+index 0000000..9b1b63a
+--- /dev/null
++++ b/components/ui/AppActionDialog.tsx
+@@ -0,0 +1,180 @@
++import { useAppTheme } from '@/context/AppThemeContext';
++import { ReactNode } from 'react';
++import { Modal, Pressable, StyleSheet, View } from 'react-native';
++import AppButton from './AppButton';
++import AppText from './AppText';
++
++type DialogVariant = 'info' | 'warning' | 'danger' | 'success';
++
++type DialogAction = {
++  label: string;
++  onPress: () => void;
++  variant?: 'primary' | 'secondary' | 'danger' | 'neutral' | 'ghost';
++};
++
++type Props = {
++  visible: boolean;
++  title: string;
++  message: string;
++  details?: string[];
++  variant?: DialogVariant;
++  primaryAction: DialogAction;
++  secondaryAction?: DialogAction;
++  onClose: () => void;
++  children?: ReactNode;
++};
++
++export default function AppActionDialog({
++  visible,
++  title,
++  message,
++  details = [],
++  variant = 'info',
++  primaryAction,
++  secondaryAction,
++  onClose,
++  children,
++}: Props) {
++  const { theme } = useAppTheme();
++  const toneColor =
++    variant === 'danger'
++      ? theme.colors.danger
++      : variant === 'warning'
++        ? theme.colors.warning
++        : variant === 'success'
++          ? theme.colors.success
++          : theme.colors.info;
++
++  const toneBackground =
++    variant === 'danger'
++      ? theme.colors.dangerBackground
++      : variant === 'warning'
++        ? theme.isDark
++          ? theme.colors.surfaceAlt
++          : theme.colors.warningBackground
++        : variant === 'success'
++          ? theme.colors.successBackground
++          : theme.colors.infoSoft;
++
++  return (
++    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
++      <View style={[styles.backdrop, { backgroundColor: theme.colors.backdrop }]}>
++        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
++        <View
++          style={[
++            styles.dialog,
++            {
++              backgroundColor: theme.colors.modalBackground,
++              borderColor: theme.colors.border,
++              borderRadius: theme.radius.xl,
++              padding: theme.spacing.lg,
++              shadowColor: theme.colors.shadow,
++            },
++          ]}
++        >
++          <View
++            style={[
++              styles.toneBar,
++              {
++                backgroundColor: toneBackground,
++                borderColor: toneColor,
++                borderRadius: theme.radius.lg,
++                padding: theme.spacing.md,
++              },
++            ]}
++          >
++            <AppText variant="subtitle" bold color={toneColor}>
++              {title}
++            </AppText>
++            <AppText color={theme.colors.textSecondary}>{message}</AppText>
++          </View>
++
++          {details.length > 0 ? (
++            <View style={styles.details}>
++              {details.map((detail) => (
++                <View key={detail} style={styles.detailRow}>
++                  <View style={[styles.bullet, { backgroundColor: toneColor }]} />
++                  <AppText style={styles.detailText}>{detail}</AppText>
++                </View>
++              ))}
++            </View>
++          ) : null}
++
++          {children ? <View style={styles.children}>{children}</View> : null}
++
++          <View style={styles.actions}>
++            {secondaryAction ? (
++              <View style={styles.action}>
++                <AppButton
++                  title={secondaryAction.label}
++                  variant={secondaryAction.variant ?? 'secondary'}
++                  onPress={secondaryAction.onPress}
++                />
++              </View>
++            ) : null}
++            <View style={styles.action}>
++              <AppButton
++                title={primaryAction.label}
++                variant={primaryAction.variant ?? 'primary'}
++                onPress={primaryAction.onPress}
++              />
++            </View>
++          </View>
++        </View>
++      </View>
++    </Modal>
++  );
++}
++
++const styles = StyleSheet.create({
++  action: {
++    flex: 1,
++    minWidth: 140,
++  },
++  actions: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 10,
++    marginTop: 18,
++  },
++  backdrop: {
++    alignItems: 'center',
++    flex: 1,
++    justifyContent: 'center',
++    padding: 18,
++  },
++  bullet: {
++    borderRadius: 4,
++    height: 8,
++    marginTop: 7,
++    width: 8,
++  },
++  children: {
++    marginTop: 12,
++  },
++  detailRow: {
++    alignItems: 'flex-start',
++    flexDirection: 'row',
++    gap: 10,
++  },
++  detailText: {
++    flex: 1,
++  },
++  details: {
++    gap: 8,
++    marginTop: 16,
++  },
++  dialog: {
++    borderWidth: 1,
++    elevation: 8,
++    maxWidth: 520,
++    shadowOffset: { width: 0, height: 18 },
++    shadowOpacity: 0.18,
++    shadowRadius: 28,
++    width: '100%',
++  },
++  toneBar: {
++    borderWidth: 1,
++    gap: 6,
++  },
++});
+diff --git a/components/ui/AppInput.tsx b/components/ui/AppInput.tsx
+index 75e02c4..1662ca7 100644
+--- a/components/ui/AppInput.tsx
++++ b/components/ui/AppInput.tsx
+@@ -1,4 +1,5 @@
+ import { useAppTheme } from '@/context/AppThemeContext';
++import { forwardRef, Ref } from 'react';
+ import { StyleSheet, TextInput, TextInputProps, View } from 'react-native';
+ import AppText from './AppText';
+
+@@ -7,7 +8,7 @@ type Props = TextInputProps & {
+   error?: string;
+ };
+
+-export default function AppInput({ label, error, style, ...rest }: Props) {
++function AppInput({ label, error, style, ...rest }: Props, ref: Ref<TextInput>) {
+   const { theme } = useAppTheme();
+   const isReadonly = rest.editable === false;
+
+@@ -20,6 +21,7 @@ export default function AppInput({ label, error, style, ...rest }: Props) {
+       ) : null}
+
+       <TextInput
++        ref={ref}
+         style={[
+           styles.input,
+           {
+@@ -49,6 +51,8 @@ export default function AppInput({ label, error, style, ...rest }: Props) {
+   );
+ }
+
++export default forwardRef<TextInput, Props>(AppInput);
++
+ const styles = StyleSheet.create({
+   container: {
+     marginBottom: 12,
+diff --git a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+index 29d53a4..321cec2 100644
+--- a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
++++ b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+@@ -458,3 +458,7 @@ LIVE-Z9B alinea el copy visible de `/live` para usar `Apartado` como termino ope
+ Tambien corrige que, despues de apartar la prenda al aire, la prenda preparada para cambio permanezca visible y pueda usarse con `Cambiar por prenda preparada`.
+
+ No se cambiaron backend, permisos, capacidades ni contratos de API.
++
++# Nota LIVE-Z9F - Validaciones guiadas
++
++LIVE-Z9F agrega un patron de dialogo accionable para validaciones bloqueantes de `Crear prenda rapida` desde LIVE. El objetivo es explicar que informacion falta y ofrecer una accion concreta para corregirla, sin cambiar backend, permisos, capacidades ni reglas LIVE.
+diff --git a/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md b/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md
+index 91c7e19..9b2e9a0 100644
+--- a/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md
++++ b/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md
+@@ -82,3 +82,7 @@ GO si las validaciones tecnicas pasan y el flujo manual confirma que el boton de
+ ## Continuidad LIVE-Z9E
+
+ LIVE-Z9E mejora la validacion de `Crear prenda rapida` cuando abre `/items-create?returnTo=/live`, mostrando errores visibles por campo antes de volver al flujo LIVE para preparar o poner al aire la prenda creada.
++
++## Continuidad LIVE-Z9F
++
++LIVE-Z9F agrega un dialogo accionable para validaciones bloqueantes de alta rapida de prendas. El flujo de prenda preparada no cambia; solo mejora la orientacion cuando falta informacion antes de crear la prenda.
+diff --git a/docs/LIVE_Z9E_QUICK_ITEM_VALIDATION.md b/docs/LIVE_Z9E_QUICK_ITEM_VALIDATION.md
+index 19bba43..f17b7fb 100644
+--- a/docs/LIVE_Z9E_QUICK_ITEM_VALIDATION.md
++++ b/docs/LIVE_Z9E_QUICK_ITEM_VALIDATION.md
+@@ -67,3 +67,14 @@ No se modifico:
+ ## GO/NO-GO
+
+ GO si pasan validaciones tecnicas y la corrida manual confirma que los errores son visibles, persistentes y especificos por campo.
++
++## Continuidad LIVE-Z9F
++
++LIVE-Z9F reemplaza el feedback principal de campos faltantes por un dialogo accionable:
++
++- `Falta informacion para generar la prenda`;
++- lista de campos pendientes;
++- boton `Entendido`;
++- boton `Ir al primer campo`.
++
++Los helpers inline por campo se mantienen. El resumen rojo superior deja de ser el feedback principal para evitar ruido visual duplicado.
+diff --git a/docs/LIVE_Z9F_BLOCKING_VALIDATION_DIALOGS.md b/docs/LIVE_Z9F_BLOCKING_VALIDATION_DIALOGS.md
+new file mode 100644
+index 0000000..0a291d1
+--- /dev/null
++++ b/docs/LIVE_Z9F_BLOCKING_VALIDATION_DIALOGS.md
+@@ -0,0 +1,80 @@
++# LIVE-Z9F - Validaciones bloqueantes con dialogo accionable
++
++## Objetivo
++
++Estandarizar las validaciones bloqueantes de alta rapida de prendas desde LIVE para que el usuario entienda que informacion falta, por que no puede continuar y cual es el siguiente paso.
++
++## Problema detectado
++
++LIVE-Z9E ya marcaba campos y mostraba errores inline en `/items-create?returnTo=/live`, pero el feedback principal seguia siendo una alerta nativa y un resumen visual. En pruebas manuales eso podia sentirse como un error tecnico o como si el sistema simplemente rechazara la accion.
++
++## Patron aplicado
++
++Se agrega `AppActionDialog` como dialogo reusable para validaciones bloqueantes:
++
++- titulo claro;
++- mensaje de ayuda;
++- lista de detalles;
++- accion principal para cerrar;
++- accion secundaria opcional;
++- tono visual `info`, `warning`, `danger` o `success`;
++- soporte light/dark y presets mediante tokens del tema.
++
++## Caso cubierto
++
++En `app/items-create.tsx`, al presionar `Generar prendas` con campos obligatorios faltantes o invalidos:
++
++- no se envia request invalido;
++- no se limpia el formulario;
++- se muestran helpers por campo;
++- aparece el dialogo `Falta informacion para generar la prenda`;
++- se listan los campos faltantes;
++- `Entendido` cierra el dialogo;
++- `Ir al primer campo` abre el selector de tipo/talla o enfoca precio/cantidad.
++
++Campos validados:
++
++- tipo de prenda;
++- talla;
++- precio cuando el flujo lo requiere, por ejemplo `returnTo=/live`;
++- cantidad.
++
++## Relacion con LIVE
++
++El patron sigue la misma filosofia usada en LIVE para acciones bloqueadas: explicar que falta y dar una accion concreta, en lugar de dejar al usuario sin orientacion.
++
++No se reescriben otros casos de LIVE en esta fase porque ya tienen mensajes especificos o implican flujos operativos distintos.
++
++## Sin cambios fuera de alcance
++
++No se modifica:
++
++- backend;
++- endpoints;
++- contratos de API;
++- AUTH/RBAC;
++- pagos/caja/reportes/billing/IA;
++- reglas LIVE profundas;
++- persistencia backend;
++- permisos o capacidades.
++
++## Validacion manual esperada
++
++1. Entrar a `/live`.
++2. Presionar `Crear prenda rapida`.
++3. Llegar a `/items-create?returnTo=%2Flive`.
++4. Dejar `Talla` vacia.
++5. Dejar `Precio` vacio o invalido.
++6. Presionar `Generar prendas`.
++7. Confirmar que aparece el dialogo accionable.
++8. Confirmar que el dialogo lista lo que falta.
++9. Confirmar que `Entendido` cierra el dialogo.
++10. Confirmar que `Ir al primer campo` abre el selector o enfoca el campo correspondiente.
++11. Confirmar que los helpers inline siguen visibles.
++12. Completar datos validos y generar la prenda.
++13. Confirmar que el regreso/flujo con LIVE se mantiene.
++14. Validar light/dark, presets visuales y mobile/drawer.
++
++## GO/NO-GO
++
++GO si las validaciones tecnicas pasan y la corrida manual confirma que el bloqueo se entiende como guia operativa, no como error tecnico.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index bc13beb..8851b9c 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -117,10 +117,21 @@ La corrida manual desde LIVE debe agregar el caso `Crear prenda rapida`:
+ - abrir `/items-create?returnTo=/live`;
+ - dejar un campo obligatorio vacio, especialmente `Talla`;
+ - presionar `Generar prendas`;
+-- confirmar que aparece resumen de validacion y error visible por campo;
++- confirmar que aparece dialogo accionable de validacion y error visible por campo;
++- confirmar botones `Entendido` e `Ir al primer campo`;
+ - completar datos validos;
+ - confirmar que la creacion correcta mantiene el regreso a LIVE.
+
++## Nota LIVE-Z9F
++
++La corrida manual debe validar que el bloqueo de alta rapida de prendas se muestra como guia operativa, no como error tecnico:
++
++- titulo `Falta informacion para generar la prenda`;
++- detalle de campos faltantes;
++- formulario conserva valores capturados;
++- helpers inline permanecen visibles;
++- `Ir al primer campo` abre el selector o enfoca el primer campo invalido.
++
+ ## Nota PRODUCT-D6.4
+
+ La siguiente corrida manual debe confirmar AppShell/sidebar/drawer y ausencia de navegacion legacy en:
+diff --git a/locales/en/common.json b/locales/en/common.json
+index 3f722fc..0b86e93 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -621,12 +621,14 @@
+     "reservationSettledHelp": "Reservation settled. New regular payments are no longer allowed from this screen."
+   },
+   "itemsCreate": {
+-    "validationTitle": "Could not create item",
++    "validationTitle": "Missing information to create item",
+     "validationMessage": "Complete the required fields to continue.",
+     "requiredField": "This field is required.",
++    "selectItemType": "Select an item type.",
+     "selectSize": "Select a size.",
+     "validPrice": "Enter a valid price.",
+     "validQuantity": "Enter a valid quantity.",
++    "goToFirstField": "Go to first field",
+     "liveReturnHelp": "After creating the item, you can return to LIVE to prepare it or put it on air."
+   },
+   "operationalScreens": {
+diff --git a/locales/es/common.json b/locales/es/common.json
+index f746174..b5cf6e6 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -621,12 +621,14 @@
+     "reservationSettledHelp": "Reserva liquidada. Ya no se permiten nuevos abonos normales desde esta pantalla."
+   },
+   "itemsCreate": {
+-    "validationTitle": "No se pudo generar la prenda",
++    "validationTitle": "Falta informacion para generar la prenda",
+     "validationMessage": "Completa los campos obligatorios para continuar.",
+     "requiredField": "Este campo es obligatorio.",
++    "selectItemType": "Selecciona un tipo de prenda.",
+     "selectSize": "Selecciona una talla.",
+     "validPrice": "Ingresa un precio valido.",
+     "validQuantity": "Ingresa una cantidad valida.",
++    "goToFirstField": "Ir al primer campo",
+     "liveReturnHelp": "Al generar la prenda, podras volver al LIVE para prepararla o ponerla al aire."
+   },
+   "operationalScreens": {

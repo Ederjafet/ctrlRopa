@@ -621,12 +621,14 @@
     "reservationSettledHelp": "Reservation settled. New regular payments are no longer allowed from this screen."
   },
   "itemsCreate": {
-    "validationTitle": "Could not create item",
+    "validationTitle": "Missing information to create item",
     "validationMessage": "Complete the required fields to continue.",
     "requiredField": "This field is required.",
+    "selectItemType": "Select an item type.",
     "selectSize": "Select a size.",
     "validPrice": "Enter a valid price.",
     "validQuantity": "Enter a valid quantity.",
+    "goToFirstField": "Go to first field",
     "liveReturnHelp": "After creating the item, you can return to LIVE to prepare it or put it on air."
   },
   "operationalScreens": {

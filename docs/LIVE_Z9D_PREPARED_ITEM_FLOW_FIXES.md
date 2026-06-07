@@ -82,3 +82,7 @@ GO si las validaciones tecnicas pasan y el flujo manual confirma que el boton de
 ## Continuidad LIVE-Z9E
 
 LIVE-Z9E mejora la validacion de `Crear prenda rapida` cuando abre `/items-create?returnTo=/live`, mostrando errores visibles por campo antes de volver al flujo LIVE para preparar o poner al aire la prenda creada.
+
+## Continuidad LIVE-Z9F
+
+LIVE-Z9F agrega un dialogo accionable para validaciones bloqueantes de alta rapida de prendas. El flujo de prenda preparada no cambia; solo mejora la orientacion cuando falta informacion antes de crear la prenda.

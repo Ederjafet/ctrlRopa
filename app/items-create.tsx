@@ -1,4 +1,5 @@
 import AppShellPage from '@/components/layout/AppShellPage';
+import AppActionDialog from '@/components/ui/AppActionDialog';
 import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
@@ -26,9 +27,9 @@ import {
 import { getSession } from '@/services/sessionStorage';
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, FlatList, StyleSheet, View } from 'react-native';
+import { Alert, FlatList, StyleSheet, TextInput, View } from 'react-native';
 
 type CatalogOption = {
   id: number;
@@ -47,6 +48,13 @@ type SelectorConfig = {
 type FormErrors = Partial<
   Record<'productType' | 'size' | 'price' | 'quantity', string>
 >;
+
+type FormErrorKey = keyof FormErrors;
+
+type ValidationDialogState = {
+  details: string[];
+  firstField?: FormErrorKey;
+};
 
 const mapBatchToOption = (batch: Batch): CatalogOption => ({
   id: batch.id,
@@ -82,6 +90,8 @@ export default function ItemsCreateScreen() {
   const { returnTo, batchId, batchFolio } = useLocalSearchParams();
   const { theme } = useAppTheme();
   const { t } = useTranslation('common');
+  const priceInputRef = useRef<TextInput>(null);
+  const quantityInputRef = useRef<TextInput>(null);
 
   const returnRoute = typeof returnTo === 'string' ? returnTo : '/items';
   const preselectedBatchId = typeof batchId === 'string' ? Number(batchId) : null;
@@ -117,7 +127,8 @@ export default function ItemsCreateScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [formErrors, setFormErrors] = useState<FormErrors>({});
-  const [validationSummary, setValidationSummary] = useState<string[]>([]);
+  const [validationDialog, setValidationDialog] =
+    useState<ValidationDialogState | null>(null);
 
   const [selector, setSelector] = useState<SelectorConfig | null>(null);
   const [selectorSearch, setSelectorSearch] = useState('');
@@ -185,7 +196,6 @@ export default function ItemsCreateScreen() {
     setQuantity('1');
     setComments('');
     setFormErrors({});
-    setValidationSummary([]);
   };
 
   const openSelector = (config: SelectorConfig) => {
@@ -198,46 +208,94 @@ export default function ItemsCreateScreen() {
     setSelectorSearch('');
   };
 
+  const openProductTypeSelector = () => {
+    openSelector({
+      title: 'Seleccionar tipo de prenda',
+      options: productTypes,
+      onSelect: (option) => {
+        setSelectedProductType(option);
+        setFormErrors((current) => ({ ...current, productType: undefined }));
+      },
+    });
+  };
+
+  const openSizeSelector = () => {
+    openSelector({
+      title: 'Seleccionar talla',
+      options: sizes,
+      onSelect: (option) => {
+        setSelectedSize(option);
+        setFormErrors((current) => ({ ...current, size: undefined }));
+      },
+    });
+  };
+
   const validateForm = () => {
     const nextErrors: FormErrors = {};
+    const details: string[] = [];
+    let firstField: FormErrorKey | undefined;
+
+    const addError = (field: FormErrorKey, message: string) => {
+      nextErrors[field] = message;
+      details.push(message);
+      firstField = firstField ?? field;
+    };
 
     if (!selectedProductType) {
-      nextErrors.productType = t('itemsCreate.requiredField');
+      addError('productType', t('itemsCreate.selectItemType'));
     }
 
     if (!selectedSize) {
-      nextErrors.size = t('itemsCreate.selectSize');
+      addError('size', t('itemsCreate.selectSize'));
     }
 
     const qty = Number(quantity);
     if (!qty || qty <= 0 || !Number.isInteger(qty)) {
-      nextErrors.quantity = t('itemsCreate.validQuantity');
+      addError('quantity', t('itemsCreate.validQuantity'));
     }
 
     const parsedPrice = price.trim() ? Number(price) : null;
     if (requiresPrice && !price.trim()) {
-      nextErrors.price = t('itemsCreate.validPrice');
+      addError('price', t('itemsCreate.validPrice'));
     } else if (parsedPrice !== null && (Number.isNaN(parsedPrice) || parsedPrice < 0)) {
-      nextErrors.price = t('itemsCreate.validPrice');
+      addError('price', t('itemsCreate.validPrice'));
     } else if (requiresPrice && (!parsedPrice || parsedPrice <= 0)) {
-      nextErrors.price = t('itemsCreate.validPrice');
+      addError('price', t('itemsCreate.validPrice'));
     }
 
-    const details = Object.values(nextErrors).filter((message): message is string => !!message);
     setFormErrors(nextErrors);
-    setValidationSummary(details);
 
     if (details.length > 0) {
-      Alert.alert(
-        t('itemsCreate.validationTitle'),
-        `${t('itemsCreate.validationMessage')}\n\n${details
-          .map((detail) => `- ${detail}`)
-          .join('\n')}`
-      );
+      setValidationDialog({ details, firstField });
       return false;
     }
 
+    setValidationDialog(null);
     return true;
+  };
+
+  const goToFirstInvalidField = () => {
+    const field = validationDialog?.firstField;
+    setValidationDialog(null);
+
+    if (field === 'productType') {
+      openProductTypeSelector();
+      return;
+    }
+
+    if (field === 'size') {
+      openSizeSelector();
+      return;
+    }
+
+    if (field === 'price') {
+      priceInputRef.current?.focus();
+      return;
+    }
+
+    if (field === 'quantity') {
+      quantityInputRef.current?.focus();
+    }
   };
 
   const handleCreate = async () => {
@@ -286,7 +344,6 @@ export default function ItemsCreateScreen() {
       setIsSaving(true);
       setSuccessMessage('');
       setFormErrors({});
-      setValidationSummary([]);
 
       const createdItemIds: number[] = [];
 
@@ -373,22 +430,6 @@ export default function ItemsCreateScreen() {
           </AppCard>
         ) : null}
 
-        {validationSummary.length > 0 ? (
-          <AppCard variant="danger" style={styles.validationCard}>
-            <AppText bold>{t('itemsCreate.validationTitle')}</AppText>
-            <AppText color={theme.colors.textSecondary}>
-              {t('itemsCreate.validationMessage')}
-            </AppText>
-            <View style={styles.validationList}>
-              {validationSummary.map((message) => (
-                <AppText key={message} variant="caption" color={theme.colors.danger}>
-                  - {message}
-                </AppText>
-              ))}
-            </View>
-          </AppCard>
-        ) : null}
-
         <AppCard>
           <AppResponsiveGrid>
           <AppSelectorField
@@ -414,17 +455,7 @@ export default function ItemsCreateScreen() {
             value={selectedProductType?.name}
             placeholder="Seleccionar tipo"
             error={formErrors.productType}
-            onPress={() =>
-              openSelector({
-                title: 'Seleccionar tipo de prenda',
-                options: productTypes,
-                onSelect: (option) => {
-                  setSelectedProductType(option);
-                  setFormErrors((current) => ({ ...current, productType: undefined }));
-                  setValidationSummary([]);
-                },
-              })
-            }
+            onPress={openProductTypeSelector}
           />
 
           <AppSelectorField
@@ -446,17 +477,7 @@ export default function ItemsCreateScreen() {
             value={selectedSize?.name}
             placeholder="Seleccionar talla"
             error={formErrors.size}
-            onPress={() =>
-              openSelector({
-                title: 'Seleccionar talla',
-                options: sizes,
-                onSelect: (option) => {
-                  setSelectedSize(option);
-                  setFormErrors((current) => ({ ...current, size: undefined }));
-                  setValidationSummary([]);
-                },
-              })
-            }
+            onPress={openSizeSelector}
           />
 
           <AppSelectorField
@@ -478,12 +499,12 @@ export default function ItemsCreateScreen() {
         <AppCard>
           <AppResponsiveGrid>
           <AppInput
+            ref={priceInputRef}
             label={requiresPrice ? 'Precio *' : 'Precio sugerido'}
             value={price}
             onChangeText={(value) => {
               setPrice(value);
               setFormErrors((current) => ({ ...current, price: undefined }));
-              setValidationSummary([]);
             }}
             keyboardType="numeric"
             placeholder={requiresPrice ? 'Obligatorio' : 'Opcional'}
@@ -491,12 +512,12 @@ export default function ItemsCreateScreen() {
           />
 
           <AppInput
+            ref={quantityInputRef}
             label="Cantidad *"
             value={quantity}
             onChangeText={(value) => {
               setQuantity(value);
               setFormErrors((current) => ({ ...current, quantity: undefined }));
-              setValidationSummary([]);
             }}
             keyboardType="numeric"
             placeholder="Ej. 1"
@@ -517,6 +538,27 @@ export default function ItemsCreateScreen() {
           onPress={handleCreate}
           loading={isSaving}
         />
+      <AppActionDialog
+        visible={!!validationDialog}
+        title={t('itemsCreate.validationTitle')}
+        message={t('itemsCreate.validationMessage')}
+        details={validationDialog?.details ?? []}
+        variant="warning"
+        onClose={() => setValidationDialog(null)}
+        primaryAction={{
+          label: t('common.understood'),
+          onPress: () => setValidationDialog(null),
+        }}
+        secondaryAction={
+          validationDialog?.firstField
+            ? {
+                label: t('itemsCreate.goToFirstField'),
+                onPress: goToFirstInvalidField,
+                variant: 'secondary',
+              }
+            : undefined
+        }
+      />
       <AppBottomModal
         visible={!!selector}
         title={selector?.title ?? ''}
@@ -574,13 +616,6 @@ const styles = StyleSheet.create({
   successBox: {
     padding: 12,
     marginBottom: 10,
-  },
-  validationCard: {
-    gap: 8,
-  },
-  validationList: {
-    gap: 4,
-    marginTop: 4,
   },
   selectorList: {
     maxHeight: 360,
