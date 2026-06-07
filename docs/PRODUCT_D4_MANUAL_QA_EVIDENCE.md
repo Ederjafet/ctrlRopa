@@ -117,9 +117,20 @@ La corrida manual desde LIVE debe agregar el caso `Crear prenda rapida`:
 - abrir `/items-create?returnTo=/live`;
 - dejar un campo obligatorio vacio, especialmente `Talla`;
 - presionar `Generar prendas`;
-- confirmar que aparece resumen de validacion y error visible por campo;
+- confirmar que aparece dialogo accionable de validacion y error visible por campo;
+- confirmar botones `Entendido` e `Ir al primer campo`;
 - completar datos validos;
 - confirmar que la creacion correcta mantiene el regreso a LIVE.
+
+## Nota LIVE-Z9F
+
+La corrida manual debe validar que el bloqueo de alta rapida de prendas se muestra como guia operativa, no como error tecnico:
+
+- titulo `Falta informacion para generar la prenda`;
+- detalle de campos faltantes;
+- formulario conserva valores capturados;
+- helpers inline permanecen visibles;
+- `Ir al primer campo` abre el selector o enfoca el primer campo invalido.
 
 ## Nota PRODUCT-D6.4
 

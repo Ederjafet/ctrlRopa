@@ -621,12 +621,14 @@
     "reservationSettledHelp": "Reserva liquidada. Ya no se permiten nuevos abonos normales desde esta pantalla."
   },
   "itemsCreate": {
-    "validationTitle": "No se pudo generar la prenda",
+    "validationTitle": "Falta informacion para generar la prenda",
     "validationMessage": "Completa los campos obligatorios para continuar.",
     "requiredField": "Este campo es obligatorio.",
+    "selectItemType": "Selecciona un tipo de prenda.",
     "selectSize": "Selecciona una talla.",
     "validPrice": "Ingresa un precio valido.",
     "validQuantity": "Ingresa una cantidad valida.",
+    "goToFirstField": "Ir al primer campo",
     "liveReturnHelp": "Al generar la prenda, podras volver al LIVE para prepararla o ponerla al aire."
   },
   "operationalScreens": {

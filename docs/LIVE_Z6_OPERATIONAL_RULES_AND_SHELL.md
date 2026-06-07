@@ -458,3 +458,7 @@ LIVE-Z9B alinea el copy visible de `/live` para usar `Apartado` como termino ope
 Tambien corrige que, despues de apartar la prenda al aire, la prenda preparada para cambio permanezca visible y pueda usarse con `Cambiar por prenda preparada`.
 
 No se cambiaron backend, permisos, capacidades ni contratos de API.
+
+# Nota LIVE-Z9F - Validaciones guiadas
+
+LIVE-Z9F agrega un patron de dialogo accionable para validaciones bloqueantes de `Crear prenda rapida` desde LIVE. El objetivo es explicar que informacion falta y ofrecer una accion concreta para corregirla, sin cambiar backend, permisos, capacidades ni reglas LIVE.

@@ -1,4 +1,5 @@
 import { useAppTheme } from '@/context/AppThemeContext';
+import { forwardRef, Ref } from 'react';
 import { StyleSheet, TextInput, TextInputProps, View } from 'react-native';
 import AppText from './AppText';
 
@@ -7,7 +8,7 @@ type Props = TextInputProps & {
   error?: string;
 };
 
-export default function AppInput({ label, error, style, ...rest }: Props) {
+function AppInput({ label, error, style, ...rest }: Props, ref: Ref<TextInput>) {
   const { theme } = useAppTheme();
   const isReadonly = rest.editable === false;
 
@@ -20,6 +21,7 @@ export default function AppInput({ label, error, style, ...rest }: Props) {
       ) : null}
 
       <TextInput
+        ref={ref}
         style={[
           styles.input,
           {
@@ -48,6 +50,8 @@ export default function AppInput({ label, error, style, ...rest }: Props) {
     </View>
   );
 }
+
+export default forwardRef<TextInput, Props>(AppInput);
 
 const styles = StyleSheet.create({
   container: {

@@ -67,3 +67,14 @@ No se modifico:
 ## GO/NO-GO
 
 GO si pasan validaciones tecnicas y la corrida manual confirma que los errores son visibles, persistentes y especificos por campo.
+
+## Continuidad LIVE-Z9F
+
+LIVE-Z9F reemplaza el feedback principal de campos faltantes por un dialogo accionable:
+
+- `Falta informacion para generar la prenda`;
+- lista de campos pendientes;
+- boton `Entendido`;
+- boton `Ir al primer campo`.
+
+Los helpers inline por campo se mantienen. El resumen rojo superior deja de ser el feedback principal para evitar ruido visual duplicado.
