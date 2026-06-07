@@ -120,3 +120,15 @@ La corrida manual desde LIVE debe agregar el caso `Crear prenda rapida`:
 - confirmar que aparece resumen de validacion y error visible por campo;
 - completar datos validos;
 - confirmar que la creacion correcta mantiene el regreso a LIVE.
+
+## Nota PRODUCT-D6.4
+
+La siguiente corrida manual debe confirmar AppShell/sidebar/drawer y ausencia de navegacion legacy en:
+
+- `/door-sale`;
+- `/door-reservation`;
+- `/items`;
+- `/items-create?returnTo=%2Flive`;
+- `/batches`.
+
+Validar tambien active state correcto, idioma Espanol/English, light/dark, presets visuales y responsive desktop/tablet/mobile.

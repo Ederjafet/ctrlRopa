@@ -40,6 +40,10 @@ PRODUCT-D6.1 refuerza esta decision: las pantallas AppShell auditadas deben cons
 
 La navegacion traducible depende de la fuente global `i18next` + AsyncStorage (`app_language`). El shell comun (`Sidebar`, `TopBar`, logout y theme toggle) debe usar `useTranslation('common')` para evitar mezclas de idioma entre menu y contenido.
 
+## Nota PRODUCT-D6.4
+
+Las rutas operativas expuestas desde D5 en el menu (`/door-sale`, `/door-reservation`, `/items`, `/items-create`, `/batches`) fueron migradas en PRODUCT-D6.4 a `AppShellPage`, manteniendo los mismos permisos/canales documentados en esta matriz.
+
 Reglas aplicadas:
 
 - No se muestran categorias vacias.
