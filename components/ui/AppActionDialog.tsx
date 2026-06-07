@@ -1,10 +1,12 @@
 import { useAppTheme } from '@/context/AppThemeContext';
 import { ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import AppButton from './AppButton';
 import AppText from './AppText';
 
 type DialogVariant = 'info' | 'warning' | 'danger' | 'success';
+type DialogMode = 'modal' | 'contextual' | 'inline';
+type ActionLayout = 'default' | 'primaryRight' | 'primaryLeft';
 
 type DialogAction = {
   label: string;
@@ -14,28 +16,40 @@ type DialogAction = {
 
 type Props = {
   visible: boolean;
+  mode?: DialogMode;
   title: string;
   message: string;
   details?: string[];
   variant?: DialogVariant;
   primaryAction: DialogAction;
   secondaryAction?: DialogAction;
+  actionLayout?: ActionLayout;
   onClose: () => void;
   children?: ReactNode;
+  style?: StyleProp<ViewStyle>;
 };
 
 export default function AppActionDialog({
   visible,
+  mode = 'modal',
   title,
   message,
   details = [],
   variant = 'info',
   primaryAction,
   secondaryAction,
+  actionLayout = 'default',
   onClose,
   children,
+  style,
 }: Props) {
   const { theme } = useAppTheme();
+  const resolvedActionLayout =
+    actionLayout === 'default'
+      ? mode === 'contextual'
+        ? 'primaryLeft'
+        : 'primaryRight'
+      : actionLayout;
   const toneColor =
     variant === 'danger'
       ? theme.colors.danger
@@ -56,71 +70,92 @@ export default function AppActionDialog({
           ? theme.colors.successBackground
           : theme.colors.infoSoft;
 
+  if (!visible) {
+    return null;
+  }
+
+  const primaryButton = (
+    <View key="primary" style={styles.action}>
+      <AppButton
+        title={primaryAction.label}
+        variant={primaryAction.variant ?? 'primary'}
+        onPress={primaryAction.onPress}
+      />
+    </View>
+  );
+  const secondaryButton = secondaryAction ? (
+    <View key="secondary" style={styles.action}>
+      <AppButton
+        title={secondaryAction.label}
+        variant={secondaryAction.variant ?? 'secondary'}
+        onPress={secondaryAction.onPress}
+      />
+    </View>
+  ) : null;
+  const actions =
+    resolvedActionLayout === 'primaryLeft'
+      ? [primaryButton, secondaryButton]
+      : [secondaryButton, primaryButton];
+
+  const content = (
+    <View
+      style={[
+        styles.dialogBase,
+        mode === 'modal' ? styles.dialog : styles.contextualPanel,
+        {
+          backgroundColor:
+            mode === 'inline' ? toneBackground : theme.colors.modalBackground,
+          borderColor: mode === 'modal' ? theme.colors.border : toneColor,
+          borderRadius: theme.radius.xl,
+          padding: theme.spacing.lg,
+          shadowColor: theme.colors.shadow,
+        },
+        style,
+      ]}
+    >
+      <View
+        style={[
+          styles.toneBar,
+          {
+            backgroundColor: toneBackground,
+            borderColor: toneColor,
+            borderRadius: theme.radius.lg,
+            padding: theme.spacing.md,
+          },
+        ]}
+      >
+        <AppText variant="subtitle" bold color={toneColor}>
+          {title}
+        </AppText>
+        <AppText color={theme.colors.textSecondary}>{message}</AppText>
+      </View>
+
+      {details.length > 0 ? (
+        <View style={styles.details}>
+          {details.map((detail) => (
+            <View key={detail} style={styles.detailRow}>
+              <View style={[styles.bullet, { backgroundColor: toneColor }]} />
+              <AppText style={styles.detailText}>{detail}</AppText>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {children ? <View style={styles.children}>{children}</View> : null}
+
+      <View style={styles.actions}>{actions}</View>
+    </View>
+  );
+
+  if (mode !== 'modal') {
+    return content;
+  }
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={[styles.backdrop, { backgroundColor: theme.colors.backdrop }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View
-          style={[
-            styles.dialog,
-            {
-              backgroundColor: theme.colors.modalBackground,
-              borderColor: theme.colors.border,
-              borderRadius: theme.radius.xl,
-              padding: theme.spacing.lg,
-              shadowColor: theme.colors.shadow,
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.toneBar,
-              {
-                backgroundColor: toneBackground,
-                borderColor: toneColor,
-                borderRadius: theme.radius.lg,
-                padding: theme.spacing.md,
-              },
-            ]}
-          >
-            <AppText variant="subtitle" bold color={toneColor}>
-              {title}
-            </AppText>
-            <AppText color={theme.colors.textSecondary}>{message}</AppText>
-          </View>
-
-          {details.length > 0 ? (
-            <View style={styles.details}>
-              {details.map((detail) => (
-                <View key={detail} style={styles.detailRow}>
-                  <View style={[styles.bullet, { backgroundColor: toneColor }]} />
-                  <AppText style={styles.detailText}>{detail}</AppText>
-                </View>
-              ))}
-            </View>
-          ) : null}
-
-          {children ? <View style={styles.children}>{children}</View> : null}
-
-          <View style={styles.actions}>
-            {secondaryAction ? (
-              <View style={styles.action}>
-                <AppButton
-                  title={secondaryAction.label}
-                  variant={secondaryAction.variant ?? 'secondary'}
-                  onPress={secondaryAction.onPress}
-                />
-              </View>
-            ) : null}
-            <View style={styles.action}>
-              <AppButton
-                title={primaryAction.label}
-                variant={primaryAction.variant ?? 'primary'}
-                onPress={primaryAction.onPress}
-              />
-            </View>
-          </View>
-        </View>
+        {content}
       </View>
     </Modal>
   );
@@ -164,14 +199,20 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 16,
   },
-  dialog: {
+  contextualPanel: {
     borderWidth: 1,
+    width: '100%',
+  },
+  dialog: {
     elevation: 8,
     maxWidth: 520,
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.18,
     shadowRadius: 28,
     width: '100%',
+  },
+  dialogBase: {
+    borderWidth: 1,
   },
   toneBar: {
     borderWidth: 1,
