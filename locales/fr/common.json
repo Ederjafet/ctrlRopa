@@ -1208,7 +1208,7 @@
     "brandColorSecondary": "Couleur secondaire",
     "brandColorSecondaryHelp": "Utilisee pour le contraste, les fonds forts ou les boutons secondaires.",
     "brandColorAccent": "Couleur accent",
-    "brandColorAccentHelp": "Utilisee pour mettre en valeur des elements, des etats ou des appels a l attention.",
+    "brandColorAccentHelp": "C est la troisieme couleur de votre marque. Elle sert a mettre en valeur les details, les chips, les appels a l attention et les elements importants.",
     "changeColor": "Changer la couleur",
     "chooseColor": "Choisir une couleur",
     "chooseColorHelp": "Selectionnez une nuance, ajustez le HEX ou utilisez une variation claire, foncee ou desaturee.",
@@ -1243,7 +1243,16 @@
     "designTokensTitle": "Design tokens",
     "designTokensHelp": "Les tokens sont des variables internes utilisees par les composants de l application. Ils sont affiches pour diagnostic et ajustements techniques.",
     "semanticTokensTitle": "Tokens semantiques du theme actif",
-    "semanticTokensHelp": "Surfaces, texte, champs et etats utilises par AppShell, LIVE et les ecrans de detail."
+    "semanticTokensHelp": "Surfaces, texte, champs et etats utilises par AppShell, LIVE et les ecrans de detail.",
+    "harmonySecondaryAccentHelp": "L harmonie aide a suggerer des couleurs secondaire et accent.",
+    "harmonyAccentHelp": "Votre couleur secondaire est respectee. L harmonie aide seulement a suggerer la couleur d accent.",
+    "swatchesTab": "Nuances",
+    "chooseBrandColor": {
+      "primary": "Choisir la couleur principale",
+      "secondary": "Choisir la couleur secondaire",
+      "accent": "Choisir la couleur d accent"
+    },
+    "harmonySecondaryHelp": "Votre couleur d accent est respectee. L harmonie aide seulement a suggerer la couleur secondaire."
   },
   "usersForm": {
     "newTitle": "Nouveau",

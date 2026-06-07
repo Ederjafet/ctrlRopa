@@ -14,6 +14,7 @@ import AppInput from './AppInput';
 import AppText from './AppText';
 
 type Props = {
+  colorName?: string;
   visible: boolean;
   title?: string;
   value: string;
@@ -22,6 +23,8 @@ type Props = {
   onApply: (value: string) => void;
   onCancel: () => void;
 };
+
+type PickerSection = 'swatches' | 'tints' | 'shades' | 'tones';
 
 const DEFAULT_SWATCHES = [
   '#2563EB',
@@ -36,6 +39,7 @@ const DEFAULT_SWATCHES = [
 ];
 
 export default function AppColorPicker({
+  colorName,
   visible,
   title,
   value,
@@ -47,10 +51,12 @@ export default function AppColorPicker({
   const { theme } = useAppTheme();
   const { t } = useTranslation();
   const [draftColor, setDraftColor] = useState(normalizeHexColor(value));
+  const [activeSection, setActiveSection] = useState<PickerSection>('swatches');
 
   useEffect(() => {
     if (visible) {
       setDraftColor(normalizeHexColor(value));
+      setActiveSection('swatches');
     }
   }, [value, visible]);
 
@@ -72,6 +78,22 @@ export default function AppColorPicker({
     () => Array.from(new Set(suggestedColors.map((color) => normalizeHexColor(color)))),
     [suggestedColors],
   );
+  const colorSections = useMemo(
+    () => ({
+      swatches,
+      tints: dedupeColors(tints),
+      shades: dedupeColors(shades),
+      tones: dedupeColors(tones),
+    }),
+    [shades, swatches, tints, tones],
+  );
+  const activeColors = colorSections[activeSection];
+  const tabs: { key: PickerSection; label: string }[] = [
+    { key: 'swatches', label: t('paletteGenerator.swatchesTab') },
+    { key: 'tints', label: t('paletteGenerator.tints') },
+    { key: 'shades', label: t('paletteGenerator.shades') },
+    { key: 'tones', label: t('paletteGenerator.tones') },
+  ];
 
   const apply = () => {
     if (!draftIsValid) return;
@@ -98,6 +120,11 @@ export default function AppColorPicker({
               <AppText variant="subtitle" bold>
                 {title ?? t('paletteGenerator.chooseColor')}
               </AppText>
+              {colorName ? (
+                <AppText variant="caption" bold color={theme.colors.textSecondary}>
+                  {colorName}
+                </AppText>
+              ) : null}
               <AppText variant="caption" color={theme.colors.mutedText}>
                 {t('paletteGenerator.chooseColorHelp')}
               </AppText>
@@ -113,7 +140,7 @@ export default function AppColorPicker({
             />
           </View>
 
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent}>
+          <View style={styles.body}>
             <AppInput
               label="HEX"
               value={draftColor}
@@ -124,42 +151,46 @@ export default function AppColorPicker({
               error={draftColor && !draftIsValid ? t('paletteGenerator.invalidHex') : undefined}
             />
 
-            <View style={styles.section}>
-              <AppText bold>{t('paletteGenerator.suggestedSwatches')}</AppText>
+            <View style={styles.tabRow}>
+              {tabs.map((tab) => {
+                const selected = activeSection === tab.key;
+                return (
+                  <Pressable
+                    key={tab.key}
+                    onPress={() => setActiveSection(tab.key)}
+                    style={[
+                      styles.tab,
+                      {
+                        backgroundColor: selected ? theme.colors.primaryButtonBackground : theme.colors.surfaceMuted,
+                        borderColor: selected ? theme.colors.primaryButtonBackground : theme.colors.borderSubtle,
+                      },
+                    ]}
+                  >
+                    <AppText
+                      variant="caption"
+                      bold={selected}
+                      color={selected ? theme.colors.primaryButtonText : theme.colors.textSecondary}
+                    >
+                      {tab.label}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.swatchScroll}>
               <View style={styles.swatchGrid}>
-                {swatches.map((color) => (
+                {activeColors.map((color, index) => (
                   <ColorTile
-                    key={color}
-                    color={normalizeHexColor(color)}
-                    selected={normalizeHexColor(color) === normalizedDraft}
-                    onPress={() => setDraftColor(normalizeHexColor(color))}
+                    key={`${activeSection}-${color}-${index}`}
+                    color={color}
+                    selected={color === normalizedDraft}
+                    onPress={() => setDraftColor(color)}
                   />
                 ))}
               </View>
-            </View>
-
-            <View style={styles.section}>
-              <AppText bold>{t('paletteGenerator.colorVariations')}</AppText>
-              <VariationRow
-                title={t('paletteGenerator.tints')}
-                colors={tints}
-                selectedColor={normalizedDraft}
-                onPick={setDraftColor}
-              />
-              <VariationRow
-                title={t('paletteGenerator.shades')}
-                colors={shades}
-                selectedColor={normalizedDraft}
-                onPick={setDraftColor}
-              />
-              <VariationRow
-                title={t('paletteGenerator.tones')}
-                colors={tones}
-                selectedColor={normalizedDraft}
-                onPick={setDraftColor}
-              />
-            </View>
-          </ScrollView>
+            </ScrollView>
+          </View>
 
           <View style={styles.actions}>
             {originalValue ? (
@@ -218,36 +249,8 @@ function ColorTile({
   );
 }
 
-function VariationRow({
-  colors,
-  onPick,
-  selectedColor,
-  title,
-}: {
-  colors: string[];
-  onPick: (color: string) => void;
-  selectedColor: string;
-  title: string;
-}) {
-  const { theme } = useAppTheme();
-
-  return (
-    <View style={styles.variationRow}>
-      <AppText variant="caption" color={theme.colors.mutedText}>
-        {title}
-      </AppText>
-      <View style={styles.swatchGrid}>
-        {colors.map((color) => (
-          <ColorTile
-            key={color}
-            color={color}
-            selected={color === selectedColor}
-            onPress={() => onPick(color)}
-          />
-        ))}
-      </View>
-    </View>
-  );
+function dedupeColors(colors: string[]) {
+  return Array.from(new Set(colors.map((color) => normalizeHexColor(color))));
 }
 
 const styles = StyleSheet.create({
@@ -267,6 +270,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 16,
   },
+  body: {
+    gap: 12,
+    paddingTop: 14,
+  },
   headerRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -277,26 +284,19 @@ const styles = StyleSheet.create({
   largePreview: {
     borderRadius: 18,
     borderWidth: 1,
-    height: 92,
-    width: 140,
+    height: 76,
+    width: 112,
   },
   panel: {
     borderWidth: 1,
     elevation: 8,
-    maxHeight: '88%',
-    maxWidth: 620,
+    maxHeight: '86%',
+    maxWidth: 560,
     padding: 18,
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.18,
     shadowRadius: 28,
     width: '100%',
-  },
-  scrollContent: {
-    gap: 16,
-    paddingTop: 16,
-  },
-  section: {
-    gap: 10,
   },
   swatch: {
     borderRadius: 12,
@@ -308,11 +308,22 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
   },
+  swatchScroll: {
+    paddingBottom: 2,
+  },
+  tab: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  tabRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
   textBlock: {
     flex: 1,
     minWidth: 0,
-  },
-  variationRow: {
-    gap: 8,
   },
 });

@@ -1131,9 +1131,9 @@
       "triadic": "Triadic",
       "tetradic": "Tetradic"
     },
-    "tints": "Light variants",
-    "shades": "Dark variants",
-    "tones": "Desaturated variants",
+    "tints": "Light",
+    "shades": "Dark",
+    "tones": "Desaturated",
     "suggestedPalette": "Suggested palette",
     "suggestedPaletteHelp": "Tap a token to load it into the editor or apply the full palette locally.",
     "appPaletteTitle": "Suggested palette for the application",
@@ -1213,7 +1213,7 @@
     "brandColorSecondary": "Secondary color",
     "brandColorSecondaryHelp": "Used for contrast, strong backgrounds, or secondary buttons.",
     "brandColorAccent": "Accent color",
-    "brandColorAccentHelp": "Used to highlight elements, states, or calls to attention.",
+    "brandColorAccentHelp": "This is the third color of your brand. It is used to highlight details, chips, calls to attention, and featured elements.",
     "changeColor": "Change color",
     "chooseColor": "Choose color",
     "chooseColorHelp": "Select a swatch, adjust the HEX value, or use a light, dark, or desaturated variation.",
@@ -1243,7 +1243,16 @@
     "designTokensTitle": "Design tokens",
     "designTokensHelp": "Tokens are internal variables used by application components. They are shown for diagnostics and technical adjustments.",
     "semanticTokensTitle": "Semantic tokens of the active theme",
-    "semanticTokensHelp": "Surfaces, text, inputs, and states used by AppShell, LIVE, and detail screens."
+    "semanticTokensHelp": "Surfaces, text, inputs, and states used by AppShell, LIVE, and detail screens.",
+    "harmonySecondaryAccentHelp": "Harmony helps suggest secondary and accent colors.",
+    "harmonyAccentHelp": "Your secondary color is respected. Harmony only helps suggest the accent color.",
+    "swatchesTab": "Swatches",
+    "chooseBrandColor": {
+      "primary": "Choose main color",
+      "secondary": "Choose secondary color",
+      "accent": "Choose accent color"
+    },
+    "harmonySecondaryHelp": "Your accent color is respected. Harmony only helps suggest the secondary color."
   },
   "usersForm": {
     "newTitle": "New user",

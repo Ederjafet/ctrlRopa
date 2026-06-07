@@ -157,3 +157,11 @@ Fecha: 2026-06-07
 PRODUCT-C2.5 reduce aun mas la carga tecnica del flujo guiado. La vista principal queda centrada en plantilla, colores de marca, paleta sugerida, legibilidad, preview y acciones de aplicar/restaurar.
 
 Las variaciones de color se muestran dentro del selector propio, la armonia queda como opcion avanzada y los tokens internos dejan de aparecer como una tarea esperada para usuario final.
+
+---
+
+## Continuidad PRODUCT-C2.6 - Colores faltantes
+
+Fecha: 2026-06-07
+
+PRODUCT-C2.6 ajusta la guia de colores para explicar que la armonia solo ayuda a completar colores faltantes. Si la marca ya tiene principal, secundario y acento, esos colores se respetan y el usuario ve `Usando colores de marca definidos`.

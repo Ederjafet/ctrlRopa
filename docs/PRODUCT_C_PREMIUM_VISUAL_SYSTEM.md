@@ -385,3 +385,11 @@ Fecha: 2026-06-07
 PRODUCT-C2.5 simplifica la superficie principal de `/ui-kit`: plantillas, colores de marca, paleta sugerida, legibilidad, preview y acciones finales. Las variaciones de color se abren desde el picker propio y los tokens quedan como diagnostico avanzado.
 
 QA debe confirmar que la vista inicial ya no se perciba como laboratorio tecnico y que el modo avanzado conserve las herramientas internas.
+
+---
+
+## Continuidad PRODUCT-C2.6 - Selector compacto y armonia no limitante
+
+Fecha: 2026-06-07
+
+PRODUCT-C2.6 mejora el picker propio y la explicacion de armonia. El sistema visual respeta colores de marca definidos y usa armonia solo para sugerir faltantes. El modal de color usa pestañas compactas y keys compuestas para evitar duplicados.

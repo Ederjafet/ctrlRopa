@@ -1208,7 +1208,7 @@
     "brandColorSecondary": "Cor secundaria",
     "brandColorSecondaryHelp": "Usada para contraste, fundos fortes ou botoes secundarios.",
     "brandColorAccent": "Cor de acento",
-    "brandColorAccentHelp": "Usada para destacar elementos, estados ou chamadas de atencao.",
+    "brandColorAccentHelp": "E a terceira cor da sua marca. Ela e usada para destacar detalhes, chips, chamadas de atencao e elementos em destaque.",
     "changeColor": "Alterar cor",
     "chooseColor": "Escolher cor",
     "chooseColorHelp": "Selecione uma amostra, ajuste o HEX ou use uma variacao clara, escura ou dessaturada.",
@@ -1243,7 +1243,16 @@
     "designTokensTitle": "Design tokens",
     "designTokensHelp": "Tokens sao variaveis internas usadas pelos componentes do aplicativo. Sao exibidos para diagnostico e ajustes tecnicos.",
     "semanticTokensTitle": "Tokens semanticos do tema ativo",
-    "semanticTokensHelp": "Superficies, texto, inputs e estados usados por AppShell, LIVE e telas de detalhe."
+    "semanticTokensHelp": "Superficies, texto, inputs e estados usados por AppShell, LIVE e telas de detalhe.",
+    "harmonySecondaryAccentHelp": "A harmonia ajuda a sugerir cores secundaria e de acento.",
+    "harmonyAccentHelp": "Sua cor secundaria e respeitada. A harmonia so ajuda a sugerir a cor de acento.",
+    "swatchesTab": "Amostras",
+    "chooseBrandColor": {
+      "primary": "Escolher cor principal",
+      "secondary": "Escolher cor secundaria",
+      "accent": "Escolher cor de acento"
+    },
+    "harmonySecondaryHelp": "Sua cor de acento e respeitada. A harmonia so ajuda a sugerir a cor secundaria."
   },
   "usersForm": {
     "newTitle": "Novo",
