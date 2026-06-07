@@ -319,3 +319,11 @@ PRODUCT-D6.6 extiende el AppShell premium a rutas visibles de clientes, apartado
 Fecha: 2026-06-06
 
 PRODUCT-I18N-A agrega soporte base para `pt-BR`, `fr`, `ja`, `zh` y `ko` sin incorporar fuentes externas ni cambiar tokens visuales. La validacion visual debe revisar que AppShell, sidebar, botones, cards y theme toggle soporten textos largos y scripts asiaticos en light/dark y presets existentes. Las traducciones nuevas requieren revision humana/nativa antes de release internacional.
+
+---
+
+## Continuidad PRODUCT-I18N-B - Limpieza visual multi-idioma
+
+Fecha: 2026-06-06
+
+PRODUCT-I18N-B reduce mezclas visibles de idioma en LIVE, AppShell, sistema y formularios cercanos. No agrega fuentes ni cambia tokens; la revision visual debe enfocarse en overflow, legibilidad de scripts asiaticos, textos largos en frances/portugues y consistencia light/dark. La revision nativa sigue siendo requisito antes de release internacional.

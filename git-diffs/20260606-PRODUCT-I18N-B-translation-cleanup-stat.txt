@@ -1,0 +1,11 @@
+ docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md            |    8 +
+ docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md              |   11 +
+ docs/PRODUCT_I18N_A_MULTILANGUAGE_BASE.md          |    4 +
+ docs/PRODUCT_I18N_B_TRANSLATION_CLEANUP.md         |  152 ++
+ locales/fr/common.json                             | 1770 +++++++++----------
+ locales/ja/common.json                             | 1776 ++++++++++----------
+ locales/ko/common.json                             | 1776 ++++++++++----------
+ locales/pt-BR/common.json                          | 1770 +++++++++----------
+ locales/zh/common.json                             | 1776 ++++++++++----------
+ ...B-translation-cleanup-report-20260606-224429.md |   90 +
+ 10 files changed, 4699 insertions(+), 4434 deletions(-)

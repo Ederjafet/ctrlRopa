@@ -223,3 +223,14 @@ Agregar a la corrida manual multi-idioma:
 - confirmar light/dark y persistencia al refrescar navegador.
 
 Las traducciones nuevas son base tecnica y deben pasar por revision humana/nativa antes de release internacional.
+
+## Nota PRODUCT-I18N-B
+
+Agregar a la corrida manual de limpieza de idioma:
+
+- cambiar a japones, chino simplificado y coreano desde `/system`;
+- abrir `/live` y confirmar que el flujo principal no mezcla ingles/espanol en botones, helpers, precio, cliente, apartado, prenda al aire y prenda preparada;
+- repetir revision en frances y portugues Brasil para navegacion, AppShell y LIVE;
+- confirmar que `LIVE`, `QR`, `URL` y placeholders `{{...}}` se conservan como terminos tecnicos cuando aplica;
+- confirmar que pagos/caja no se consideran parte de esta fase;
+- validar light/dark.
