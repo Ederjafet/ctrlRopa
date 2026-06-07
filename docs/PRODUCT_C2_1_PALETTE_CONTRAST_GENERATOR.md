@@ -188,3 +188,20 @@ No se instalaron dependencias externas.
 - No se incluyen fuentes externas.
 - La revision de contraste es basica, no reemplaza auditoria completa de accesibilidad.
 - Las traducciones nuevas requieren revision nativa.
+
+---
+
+## Continuidad PRODUCT-C2.2 - Flujo simplificado
+
+Fecha: 2026-06-06
+
+PRODUCT-C2.2 conserva el generador de paletas, armonias, contraste y preview de PRODUCT-C2.1, pero reorganiza `/ui-kit` como un flujo guiado:
+
+1. Plantilla visual.
+2. Color base.
+3. Paleta sugerida.
+4. Contraste principal.
+5. Vista previa.
+6. Aplicar o restaurar.
+
+Las secciones largas de tokens, escalas completas, componentes, templates, variantes y ratios tecnicos quedan disponibles en detalles avanzados. El cambio no elimina capacidades; reduce la carga visual inicial para QA y clientes.

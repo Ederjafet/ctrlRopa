@@ -26,6 +26,7 @@ import AppText from './AppText';
 
 type Props = {
   activeScheme: 'light' | 'dark';
+  advancedMode?: boolean;
   baseColor: string;
   harmony: HarmonyType;
   onApplyPalette: (palette: SemanticPalette) => void;
@@ -43,6 +44,7 @@ const DARK_TEXT = '#0F172A';
 
 export default function PaletteGeneratorCard({
   activeScheme,
+  advancedMode = false,
   baseColor,
   harmony,
   onApplyPalette,
@@ -127,6 +129,9 @@ export default function PaletteGeneratorCard({
   }, [activeScheme, palette, t]);
 
   const hasLowContrast = contrastRows.some((row) => row.status === 'low');
+  const visibleContrastRows = advancedMode
+    ? contrastRows
+    : contrastRows.filter((row) => ['button', 'background', 'danger'].includes(row.key));
   const tokenEntries = Object.entries(palette) as [EditableVisualTokenKey, string][];
 
   const webColorInput =
@@ -188,32 +193,36 @@ export default function PaletteGeneratorCard({
             />
           </View>
 
-          <View style={styles.colorMetaRow}>
-            <MetaPill label="HEX" value={normalizedBase} />
-            <MetaPill
-              label="RGB"
-              value={baseRgb ? `${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}` : '-'}
-            />
-            <MetaPill
-              label="HSL"
-              value={baseHsl ? `${Math.round(baseHsl.h)}, ${baseHsl.s}%, ${baseHsl.l}%` : '-'}
-            />
-          </View>
+          {advancedMode ? (
+            <>
+              <View style={styles.colorMetaRow}>
+                <MetaPill label="HEX" value={normalizedBase} />
+                <MetaPill
+                  label="RGB"
+                  value={baseRgb ? `${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}` : '-'}
+                />
+                <MetaPill
+                  label="HSL"
+                  value={baseHsl ? `${Math.round(baseHsl.h)}, ${baseHsl.s}%, ${baseHsl.l}%` : '-'}
+                />
+              </View>
 
-          <AppText variant="caption" color={theme.colors.mutedText}>
-            {t('paletteGenerator.quickSwatches')}
-          </AppText>
-          <View style={styles.swatchRow}>
-            {QUICK_SWATCHES.map((color) => (
-              <ColorSwatch
-                key={color}
-                color={color}
-                label={color}
-                onPress={() => onBaseColorChange(color)}
-                selected={normalizedBase === color}
-              />
-            ))}
-          </View>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                {t('paletteGenerator.quickSwatches')}
+              </AppText>
+              <View style={styles.swatchRow}>
+                {QUICK_SWATCHES.map((color) => (
+                  <ColorSwatch
+                    key={color}
+                    color={color}
+                    label={color}
+                    onPress={() => onBaseColorChange(color)}
+                    selected={normalizedBase === color}
+                  />
+                ))}
+              </View>
+            </>
+          ) : null}
         </View>
 
         <View style={styles.controlColumn}>
@@ -229,20 +238,28 @@ export default function PaletteGeneratorCard({
               />
             ))}
           </View>
-          <AppText variant="caption" color={theme.colors.mutedText}>
-            {t('paletteGenerator.harmonyHelp')}
-          </AppText>
-          <View style={styles.swatchRow}>
-            {harmonyColors.map((color) => (
-              <ColorSwatch key={color} color={color} label={color} onPress={() => onBaseColorChange(color)} />
-            ))}
-          </View>
+          {advancedMode ? (
+            <>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                {t('paletteGenerator.harmonyHelp')}
+              </AppText>
+              <View style={styles.swatchRow}>
+                {harmonyColors.map((color) => (
+                  <ColorSwatch key={color} color={color} label={color} onPress={() => onBaseColorChange(color)} />
+                ))}
+              </View>
+            </>
+          ) : null}
         </View>
       </View>
 
-      <VariationBlock title={t('paletteGenerator.tints')} colors={tints} onPick={onBaseColorChange} />
-      <VariationBlock title={t('paletteGenerator.shades')} colors={shades} onPick={onBaseColorChange} />
-      <VariationBlock title={t('paletteGenerator.tones')} colors={tones} onPick={onBaseColorChange} />
+      {advancedMode ? (
+        <>
+          <VariationBlock title={t('paletteGenerator.tints')} colors={tints} onPick={onBaseColorChange} />
+          <VariationBlock title={t('paletteGenerator.shades')} colors={shades} onPick={onBaseColorChange} />
+          <VariationBlock title={t('paletteGenerator.tones')} colors={tones} onPick={onBaseColorChange} />
+        </>
+      ) : null}
 
       <View style={styles.sectionBlock}>
         <View style={styles.headerRow}>
@@ -283,9 +300,11 @@ export default function PaletteGeneratorCard({
 
       <View style={styles.generatorGrid}>
         <View style={styles.controlColumn}>
-          <AppText bold>{t('paletteGenerator.contrastTitle')}</AppText>
+          <AppText bold>
+            {advancedMode ? t('paletteGenerator.contrastTitle') : t('paletteGenerator.mainContrast')}
+          </AppText>
           <AppText variant="caption" color={theme.colors.mutedText}>
-            {t('paletteGenerator.contrastHelp')}
+            {advancedMode ? t('paletteGenerator.contrastHelp') : t('paletteGenerator.mainContrastHelp')}
           </AppText>
           {hasLowContrast ? (
             <View
@@ -306,7 +325,7 @@ export default function PaletteGeneratorCard({
             </View>
           ) : null}
           <View style={styles.contrastList}>
-            {contrastRows.map((row) => (
+            {visibleContrastRows.map((row) => (
               <ContrastRow
                 key={row.key}
                 label={row.label}

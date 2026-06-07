@@ -66,6 +66,7 @@ export default function UiKitPreview() {
   const [editorDensity, setEditorDensity] = useState<'NORMAL' | 'COMPACT'>('NORMAL');
   const [paletteBaseColor, setPaletteBaseColor] = useState('#2563EB');
   const [paletteHarmony, setPaletteHarmony] = useState<HarmonyType>('complementary');
+  const [showAdvancedDetails, setShowAdvancedDetails] = useState(false);
   const [identityFeedback, setIdentityFeedback] = useState<string | null>(null);
   const { t } = useTranslation();
 
@@ -185,7 +186,7 @@ export default function UiKitPreview() {
 
   const applyVisualIdentityChanges = async () => {
     if (hasEditorErrors) {
-      setIdentityFeedback('Corrige los colores invalidos antes de aplicar.');
+      setIdentityFeedback(t('paletteGenerator.invalidColorsFeedback'));
       return;
     }
 
@@ -198,12 +199,12 @@ export default function UiKitPreview() {
       radius: editorRadius,
       density: editorDensity,
     });
-    setIdentityFeedback('Personalizacion aplicada localmente.');
+    setIdentityFeedback(t('paletteGenerator.manualAppliedFeedback'));
   };
 
   const restoreActivePreset = async () => {
     await resetCustomVisualIdentity();
-    setIdentityFeedback('Plantilla restaurada a sus tokens base.');
+    setIdentityFeedback(t('paletteGenerator.restoreFeedback'));
   };
 
   if (loading) {
@@ -250,20 +251,44 @@ export default function UiKitPreview() {
       navSections={navSections}
     >
       <SectionHeader
-        title="Datos de ejemplo para preview visual"
-        subtitle="Estos datos solo viven en /ui-kit; no se usan en pantallas reales."
+        title={t('paletteGenerator.flowTitle')}
+        subtitle={t('paletteGenerator.flowSubtitle')}
       />
+      <AppCard variant="info" style={styles.guidedFlowCard}>
+        {[
+          t('paletteGenerator.flowSteps.template'),
+          t('paletteGenerator.flowSteps.baseColor'),
+          t('paletteGenerator.flowSteps.palette'),
+          t('paletteGenerator.flowSteps.contrast'),
+          t('paletteGenerator.flowSteps.preview'),
+          t('paletteGenerator.flowSteps.apply'),
+        ].map((step, index) => (
+          <View key={step} style={styles.flowStep}>
+            <View
+              style={[
+                styles.flowStepIndex,
+                {
+                  backgroundColor: theme.colors.primaryButtonBackground,
+                },
+              ]}
+            >
+              <AppText variant="caption" bold color={theme.colors.primaryButtonText}>
+                {String(index + 1)}
+              </AppText>
+            </View>
+            <AppText variant="caption" bold>
+              {step}
+            </AppText>
+          </View>
+        ))}
+      </AppCard>
 
-      <SectionHeader
-        title="Identidad visual"
-        subtitle="Selector local de plantilla visual. Persistencia por cliente/tenant queda pendiente."
-      />
       <View style={styles.previewCard}>
         <View style={styles.themePreviewHeader}>
           <View style={styles.previewTextBlock}>
-            <AppText bold>Plantilla visual activa</AppText>
+            <AppText bold>{t('paletteGenerator.activeTemplate')}</AppText>
             <AppText variant="caption" color={theme.colors.mutedText}>
-              Esta configuracion se guarda localmente en esta fase.
+              {t('paletteGenerator.localConfigHelp')}
             </AppText>
           </View>
           <StatusBadge
@@ -287,11 +312,17 @@ export default function UiKitPreview() {
                       {preset.description}
                     </AppText>
                   </View>
-                  {preset.id === visualPresetId ? <StatusBadge label="Activo" tone="success" /> : null}
+                  {preset.id === visualPresetId ? (
+                    <StatusBadge label={t('paletteGenerator.templateActive')} tone="success" />
+                  ) : null}
                 </View>
                 <PresetMiniPreview colors={preset.colors[theme.isDark ? 'dark' : 'light']} />
                 <AppButton
-                  title={preset.id === visualPresetId ? 'Plantilla activa' : 'Usar plantilla'}
+                  title={
+                    preset.id === visualPresetId
+                      ? t('paletteGenerator.activeTemplateButton')
+                      : t('paletteGenerator.useTemplate')
+                  }
                   variant={preset.id === visualPresetId ? 'neutral' : 'secondary'}
                   onPress={() => setVisualPresetId(preset.id)}
                 />
@@ -306,6 +337,7 @@ export default function UiKitPreview() {
       />
       <PaletteGeneratorCard
         activeScheme={activeScheme}
+        advancedMode={showAdvancedDetails}
         baseColor={paletteBaseColor}
         harmony={paletteHarmony}
         onApplyPalette={applyGeneratedPalette}
@@ -317,6 +349,33 @@ export default function UiKitPreview() {
         onTokenChange={updateEditorToken}
       />
 
+      {identityFeedback ? (
+        <AppCard variant={hasEditorErrors ? 'danger' : 'info'} style={styles.compactNotice}>
+          <AppText color={hasEditorErrors ? theme.colors.danger : theme.colors.info}>
+            {identityFeedback}
+          </AppText>
+        </AppCard>
+      ) : null}
+
+      <View style={styles.buttonRow}>
+        <AppButton
+          title={t('paletteGenerator.restoreTemplate')}
+          variant="neutral"
+          onPress={restoreActivePreset}
+        />
+        <AppButton
+          title={
+            showAdvancedDetails
+              ? t('paletteGenerator.hideTechnicalDetails')
+              : t('paletteGenerator.showTechnicalDetails')
+          }
+          variant="secondary"
+          onPress={() => setShowAdvancedDetails((current) => !current)}
+        />
+      </View>
+
+      {showAdvancedDetails ? (
+        <>
       <SectionHeader
         title={t('paletteGenerator.controlledEditorTitle')}
         subtitle={t('paletteGenerator.controlledEditorSubtitle')}
@@ -418,14 +477,6 @@ export default function UiKitPreview() {
           </AppCard>
         ) : null}
 
-        {identityFeedback ? (
-          <AppCard variant={hasEditorErrors ? 'danger' : 'info'} style={styles.compactNotice}>
-            <AppText color={hasEditorErrors ? theme.colors.danger : theme.colors.info}>
-              {identityFeedback}
-            </AppText>
-          </AppCard>
-        ) : null}
-
         <View style={styles.buttonRow}>
           <AppButton
             title="Aplicar cambios localmente"
@@ -434,7 +485,6 @@ export default function UiKitPreview() {
             disabledReason="Corrige los colores invalidos antes de aplicar."
             onPress={applyVisualIdentityChanges}
           />
-          <AppButton title="Restaurar plantilla" variant="neutral" onPress={restoreActivePreset} />
         </View>
 
         <AppText variant="caption" color={theme.colors.mutedText}>
@@ -829,6 +879,8 @@ export default function UiKitPreview() {
           />
         ))}
       </AppResponsiveGrid>
+        </>
+      ) : null}
     </AppShell>
   );
 }
@@ -891,6 +943,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     height: 18,
     width: 18,
+  },
+  flowStep: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: designTokens.spacing.xs,
+  },
+  flowStepIndex: {
+    alignItems: 'center',
+    borderRadius: designTokens.radius.full,
+    height: 24,
+    justifyContent: 'center',
+    width: 24,
+  },
+  guidedFlowCard: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: designTokens.spacing.sm,
   },
   inlineList: {
     alignItems: 'flex-start',
