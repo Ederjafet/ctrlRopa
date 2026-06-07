@@ -144,3 +144,9 @@ No se cambio layout ni logica del sidebar.
 - Las traducciones siguen siendo base tecnica y requieren revision humana/nativa antes de release internacional.
 - No se traducen codigos tecnicos, permisos, rutas, IDs ni estados backend cuando son datos.
 - No se tocan pagos/caja en esta fase.
+
+## Continuidad PRODUCT-C2.1
+
+PRODUCT-C2.1 agrega claves `paletteGenerator.*` para el generador visual de paletas en los siete idiomas soportados. Se mantienen prestamos tecnicos controlados como `HEX`, `RGB`, `HSL`, `WCAG` y `UI Kit`, porque funcionan como siglas/terminos tecnicos universales dentro de una herramienta visual.
+
+Los terminos operativos del generador si se traducen: color base, armonia, contraste, texto recomendado, paleta sugerida, aplicar localmente y preview.

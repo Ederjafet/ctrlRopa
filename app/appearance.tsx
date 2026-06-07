@@ -310,6 +310,20 @@ export default function AppearanceScreen() {
         <LogoPreview title={t('appearance.printPreview')} url={form.printLogoUrl || form.logoUrl || ''} />
       </AppCard>
 
+      <AppCard variant="info">
+        <AppText variant="subtitle" bold>
+          {t('paletteGenerator.appearanceCardTitle')}
+        </AppText>
+        <AppText color={theme.colors.mutedText} style={styles.sectionHint}>
+          {t('paletteGenerator.appearanceCardHelp')}
+        </AppText>
+        <AppButton
+          title={t('paletteGenerator.openGenerator')}
+          variant="secondary"
+          onPress={() => router.push('/ui-kit')}
+        />
+      </AppCard>
+
       <AppCard>
         <AppText variant="subtitle" bold>
           {t('appearance.infoCards')}

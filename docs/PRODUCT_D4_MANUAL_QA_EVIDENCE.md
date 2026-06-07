@@ -245,3 +245,19 @@ Agregar a la corrida manual:
 - revisar que `UI Kit`/`UIキット` no se vea roto en sidebar ni en modo oscuro;
 - confirmar que `LIVE`, `QR`, `URL`, `API`, `ID` y `CSV` se mantienen como prestamos tecnicos cuando aparezcan;
 - confirmar que no aparecen claves crudas `live.*`, `navigation.*`, `system.*`, `common.*` en los flujos principales.
+
+## Nota PRODUCT-C2.1
+
+Agregar a la corrida manual de sistema visual:
+
+- entrar con `qa.admin`;
+- abrir `/ui-kit`;
+- elegir un color base en el generador visual;
+- revisar tints, shades, tones y armonias;
+- confirmar que el panel de contraste muestra ratio y estado;
+- aplicar la paleta localmente;
+- confirmar que preview, editor HEX y tema aplicado cambian;
+- abrir `/live` y `/customers` para validar que la identidad local se refleja en pantallas reales;
+- cambiar light/dark y revisar contraste;
+- volver a `/ui-kit` y restaurar plantilla;
+- abrir `/appearance` y confirmar que aparece acceso al generador avanzado sin romper campos de branding.

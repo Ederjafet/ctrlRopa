@@ -335,3 +335,13 @@ PRODUCT-I18N-B reduce mezclas visibles de idioma en LIVE, AppShell, sistema y fo
 Fecha: 2026-06-06
 
 PRODUCT-I18N-B.1 define un glosario visual para terminos tecnicos que pueden mantenerse como prestamos (`LIVE`, `QR`, `URL`, `UI Kit`, `API`, `ID`, `CSV`) y corrige claves crudas de LIVE. La revision visual debe asegurar que esos prestamos no rompan jerarquia, contraste, sidebar, dark mode ni responsive.
+
+---
+
+## Continuidad PRODUCT-C2.1 - Generador visual de paletas
+
+Fecha: 2026-06-06
+
+PRODUCT-C2.1 agrega en `/ui-kit` un generador visual de paletas con color base, armonias, tints, shades, tones, contraste basico y mini preview real de UI. La aplicacion sigue sin persistencia backend por tenant: las paletas se aplican localmente usando los overrides de PRODUCT-C2.
+
+La validacion visual debe revisar que las paletas aplicadas conserven legibilidad en AppShell, LIVE, clientes, light/dark y responsive. Si el panel marca bajo contraste, QA debe tratarlo como advertencia antes de aceptar la combinacion.

@@ -15,13 +15,16 @@ import AppText from '@/components/ui/AppText';
 import EmptyState from '@/components/ui/EmptyState';
 import EntitySummaryCard from '@/components/ui/EntitySummaryCard';
 import MetricCard from '@/components/ui/MetricCard';
+import PaletteGeneratorCard from '@/components/ui/PaletteGeneratorCard';
 import SectionHeader from '@/components/ui/SectionHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { isAdmin, isNoAccess } from '@/services/accessControl';
 import { ensureSessionActive, getSession, UserSession } from '@/services/sessionStorage';
+import { HarmonyType, SemanticPalette } from '@/theme/colorUtils';
 import { designTokens, viewVariants } from '@/theme/designTokens';
 import {
+  DesignPresetColors,
   EditableVisualTokenKey,
   ThemeScheme,
   editableVisualTokenKeys,
@@ -31,6 +34,7 @@ import {
 } from '@/theme/designPresets';
 import { Redirect } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 export default function UiKitPreview() {
@@ -60,7 +64,10 @@ export default function UiKitPreview() {
   });
   const [editorRadius, setEditorRadius] = useState<'standard' | 'soft' | 'compact'>('soft');
   const [editorDensity, setEditorDensity] = useState<'NORMAL' | 'COMPACT'>('NORMAL');
+  const [paletteBaseColor, setPaletteBaseColor] = useState('#2563EB');
+  const [paletteHarmony, setPaletteHarmony] = useState<HarmonyType>('complementary');
   const [identityFeedback, setIdentityFeedback] = useState<string | null>(null);
+  const { t } = useTranslation();
 
   const activePreset = useMemo(
     () => designPresets.find((preset) => preset.id === visualPresetId) ?? designPresets[0],
@@ -144,6 +151,7 @@ export default function UiKitPreview() {
     );
 
     setEditorValues(nextValues);
+    setPaletteBaseColor(nextValues.primary);
     setEditorRadius(customVisualIdentity?.radius ?? activePreset.radius);
     setEditorDensity(customVisualIdentity?.density ?? activePreset.density);
     setIdentityFeedback(null);
@@ -152,6 +160,27 @@ export default function UiKitPreview() {
   const updateEditorToken = (key: EditableVisualTokenKey, value: string) => {
     setEditorValues((current) => ({ ...current, [key]: value.trim() }));
     setIdentityFeedback(null);
+  };
+
+  const applyGeneratedPalette = async (palette: SemanticPalette) => {
+    const nextValues = {
+      ...editorValues,
+      ...palette,
+    };
+
+    setEditorValues(nextValues);
+    setPaletteBaseColor(palette.primary);
+
+    await setCustomVisualIdentity({
+      presetId: visualPresetId,
+      colors: {
+        ...(customVisualIdentity?.colors ?? {}),
+        [activeScheme]: nextValues,
+      },
+      radius: editorRadius,
+      density: editorDensity,
+    });
+    setIdentityFeedback(t('paletteGenerator.appliedFeedback'));
   };
 
   const applyVisualIdentityChanges = async () => {
@@ -260,16 +289,7 @@ export default function UiKitPreview() {
                   </View>
                   {preset.id === visualPresetId ? <StatusBadge label="Activo" tone="success" /> : null}
                 </View>
-                <View style={styles.presetSwatches}>
-                  {[
-                    preset.colors[theme.isDark ? 'dark' : 'light'].primary,
-                    preset.colors[theme.isDark ? 'dark' : 'light'].accent,
-                    preset.colors[theme.isDark ? 'dark' : 'light'].success,
-                    preset.colors[theme.isDark ? 'dark' : 'light'].danger,
-                  ].map((color) => (
-                    <View key={color} style={[styles.presetSwatch, { backgroundColor: color }]} />
-                  ))}
-                </View>
+                <PresetMiniPreview colors={preset.colors[theme.isDark ? 'dark' : 'light']} />
                 <AppButton
                   title={preset.id === visualPresetId ? 'Plantilla activa' : 'Usar plantilla'}
                   variant={preset.id === visualPresetId ? 'neutral' : 'secondary'}
@@ -281,8 +301,25 @@ export default function UiKitPreview() {
       </View>
 
       <SectionHeader
-        title="Editor controlado"
-        subtitle="Personaliza tokens semanticos principales de la plantilla activa."
+        title={t('paletteGenerator.sectionTitle')}
+        subtitle={t('paletteGenerator.sectionSubtitle')}
+      />
+      <PaletteGeneratorCard
+        activeScheme={activeScheme}
+        baseColor={paletteBaseColor}
+        harmony={paletteHarmony}
+        onApplyPalette={applyGeneratedPalette}
+        onBaseColorChange={(value) => {
+          setPaletteBaseColor(value);
+          setIdentityFeedback(null);
+        }}
+        onHarmonyChange={setPaletteHarmony}
+        onTokenChange={updateEditorToken}
+      />
+
+      <SectionHeader
+        title={t('paletteGenerator.controlledEditorTitle')}
+        subtitle={t('paletteGenerator.controlledEditorSubtitle')}
       />
       <AppCard variant="elevated" style={styles.previewCard}>
         <View style={styles.themePreviewHeader}>
@@ -315,7 +352,7 @@ export default function UiKitPreview() {
                   ]}
                 />
                 <AppText variant="caption" color={theme.colors.textSecondary} style={styles.editorLabel}>
-                  {visualTokenLabels[key]}
+                  {t(`paletteGenerator.tokens.${key}`, visualTokenLabels[key])}
                 </AppText>
               </View>
               <AppInput
@@ -796,6 +833,36 @@ export default function UiKitPreview() {
   );
 }
 
+function PresetMiniPreview({ colors }: { colors: DesignPresetColors }) {
+  return (
+    <View style={[styles.presetMiniCanvas, { backgroundColor: colors.background }]}>
+      <View style={[styles.presetMiniSidebar, { backgroundColor: colors.primary }]}>
+        <View style={[styles.presetMiniLine, { backgroundColor: colors.textOnPrimary }]} />
+        <View style={[styles.presetMiniLineShort, { backgroundColor: colors.textOnPrimary }]} />
+      </View>
+      <View style={styles.presetMiniContent}>
+        <View
+          style={[
+            styles.presetMiniCard,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <View style={[styles.presetMiniHeading, { backgroundColor: colors.textPrimary }]} />
+          <View style={[styles.presetMiniSubline, { backgroundColor: colors.textMuted }]} />
+          <View style={styles.presetMiniControls}>
+            <View style={[styles.presetMiniButton, { backgroundColor: colors.primary }]} />
+            <View style={[styles.presetMiniBadge, { backgroundColor: colors.success }]} />
+            <View style={[styles.presetMiniBadge, { backgroundColor: colors.danger }]} />
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   buttonRow: {
     alignItems: 'center',
@@ -837,6 +904,65 @@ const styles = StyleSheet.create({
   },
   previewCard: {
     gap: designTokens.spacing.sm,
+  },
+  presetMiniBadge: {
+    borderRadius: 999,
+    height: 14,
+    width: 34,
+  },
+  presetMiniButton: {
+    borderRadius: 8,
+    height: 22,
+    width: 74,
+  },
+  presetMiniCanvas: {
+    borderRadius: 14,
+    flexDirection: 'row',
+    minHeight: 116,
+    overflow: 'hidden',
+  },
+  presetMiniCard: {
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 8,
+    padding: 10,
+  },
+  presetMiniContent: {
+    flex: 1,
+    padding: 10,
+  },
+  presetMiniControls: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+  },
+  presetMiniHeading: {
+    borderRadius: 999,
+    height: 8,
+    width: '72%',
+  },
+  presetMiniLine: {
+    borderRadius: 999,
+    height: 7,
+    opacity: 0.92,
+  },
+  presetMiniLineShort: {
+    borderRadius: 999,
+    height: 7,
+    opacity: 0.68,
+    width: '62%',
+  },
+  presetMiniSidebar: {
+    gap: 8,
+    padding: 10,
+    width: 58,
+  },
+  presetMiniSubline: {
+    borderRadius: 999,
+    height: 7,
+    opacity: 0.72,
+    width: '52%',
   },
   previewTextBlock: {
     flex: 1,
