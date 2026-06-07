@@ -98,3 +98,7 @@ No se agregan fuentes externas ni assets de fuentes. La validacion visual espera
 - No se traducen codigos tecnicos, permisos, rutas ni estados backend cuando son datos.
 - No se implementa deteccion regional avanzada para variantes adicionales como `fr-CA`, `ko-KR` o `ja-JP`; i18n puede caer al codigo base cuando aplica.
 - La revision nativa queda como requisito antes de publicar una version internacional.
+
+## Continuidad PRODUCT-I18N-B
+
+PRODUCT-I18N-B corrige mezclas visibles detectadas en QA, especialmente en `/live` con idiomas asiaticos activos. La fase reduce valores heredados de ingles/espanol en `live.*`, `operationalScreens.*`, pantallas de sistema y formularios cercanos al AppShell, manteniendo estructura completa de claves y sin tocar pagos/caja.
