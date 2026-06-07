@@ -1,7 +1,6 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import {
@@ -62,7 +61,7 @@ export default function SystemChannelsScreen() {
 
   const discardBlockedReason = useMemo(() => {
     if (loading) return t('systemChannels.waitLoad');
-    if (saving) return 'Se esta guardando la configuración.';
+    if (saving) return t('systemChannels.saving');
     if (!hasChanges) return t('systemChannels.noPendingDiscard');
     return undefined;
   }, [loading, saving, hasChanges, t]);
@@ -132,13 +131,11 @@ export default function SystemChannelsScreen() {
   };
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute="/system" />
-
-      <AppText variant="title" bold>
-        {t('systemChannels.title')}
-      </AppText>
-
+    <AppShellPage
+      title={t('systemChannels.title')}
+      subtitle={t('systemChannels.globalRuleHelp')}
+      activeRoute="system-channels"
+    >
       <AppCard>
         <AppText variant="subtitle" bold>
           {t('systemChannels.globalRuleTitle')}
@@ -233,7 +230,7 @@ export default function SystemChannelsScreen() {
           style={{ marginTop: 10 }}
         />
       </View>
-    </AppScreen>
+    </AppShellPage>
   );
 }
 

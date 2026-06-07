@@ -1,10 +1,9 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
-import AppScreen from '@/components/ui/AppScreen';
 import AppSelectorField from '@/components/ui/AppSelectorField';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
@@ -27,6 +26,7 @@ import {
 } from '@/services/userAdminService';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -103,6 +103,7 @@ export default function UsersFormScreen() {
   const userId = parseId(id);
   const isEdit = userId !== null;
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
 
   const [form, setForm] = useState<FormState>(initialForm);
   const [branches, setBranches] = useState<AdminBranch[]>([]);
@@ -158,11 +159,11 @@ export default function UsersFormScreen() {
         }));
       }
     } catch (error: any) {
-      Alert.alert('No se pudo cargar el formulario', error?.message ?? 'Intenta nuevamente.');
+      Alert.alert(t('usersForm.loadErrorTitle'), error?.message ?? t('usersForm.retryHelp'));
     } finally {
       setIsLoading(false);
     }
-  }, [userId]);
+  }, [t, userId]);
 
   useEffect(() => {
     loadData();
@@ -174,8 +175,8 @@ export default function UsersFormScreen() {
   );
 
   const selectedAssignedBranches = useMemo(
-    () => selectedNames(branches, mergeIds(form.branchIds, form.branchId), 'Seleccionar sucursales'),
-    [branches, form.branchId, form.branchIds]
+    () => selectedNames(branches, mergeIds(form.branchIds, form.branchId), t('usersForm.selectBranches')),
+    [branches, form.branchId, form.branchIds, t]
   );
 
   const draftPermissionCodes = useMemo(
@@ -229,27 +230,27 @@ export default function UsersFormScreen() {
 
   const validate = () => {
     if (!form.name.trim()) {
-      Alert.alert('Falta nombre', 'Captura el nombre del usuario.');
+      Alert.alert(t('usersForm.missingNameTitle'), t('usersForm.missingNameMessage'));
       return false;
     }
 
     if (!form.email.trim()) {
-      Alert.alert('Falta correo', 'Captura el correo del usuario.');
+      Alert.alert(t('usersForm.missingEmailTitle'), t('usersForm.missingEmailMessage'));
       return false;
     }
 
     if (!form.branchId) {
-      Alert.alert('Falta sucursal', 'Selecciona una sucursal.');
+      Alert.alert(t('usersForm.missingBranchTitle'), t('usersForm.missingBranchMessage'));
       return false;
     }
 
     if (form.roleIds.length === 0) {
-      Alert.alert('Falta rol', 'Selecciona al menos un rol para el usuario.');
+      Alert.alert(t('usersForm.missingRoleTitle'), t('usersForm.missingRoleMessage'));
       return false;
     }
 
     if (!isEdit && !form.password.trim()) {
-      Alert.alert('Falta contraseña', 'Captura una contraseña inicial para el usuario.');
+      Alert.alert(t('usersForm.missingPasswordTitle'), t('usersForm.missingPasswordMessage'));
       return false;
     }
 
@@ -283,7 +284,7 @@ export default function UsersFormScreen() {
 
       router.replace('/users' as any);
     } catch (error: any) {
-      Alert.alert('No se pudo guardar', error?.message ?? 'Revisa los datos e intenta nuevamente.');
+      Alert.alert(t('usersForm.saveErrorTitle'), error?.message ?? t('usersForm.retryHelp'));
     } finally {
       setIsSaving(false);
     }
@@ -291,35 +292,37 @@ export default function UsersFormScreen() {
 
   if (isLoading) {
     return (
-      <AppScreen scroll={false}>
+      <AppShellPage
+        title={isEdit ? t('usersForm.editTitle') : t('usersForm.newTitle')}
+        subtitle={t('usersForm.subtitle')}
+        activeRoute="users"
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   return (
     <>
-      <AppScreen>
-        <AppBackButton fallbackRoute="/users" preferHistory={false} />
-
-        <AppText variant="title" bold>
-          {isEdit ? 'Editar usuario' : 'Nuevo usuario'}
-        </AppText>
-
+      <AppShellPage
+        title={isEdit ? t('usersForm.editTitle') : t('usersForm.newTitle')}
+        subtitle={t('usersForm.subtitle')}
+        activeRoute="users"
+      >
         <AppCard>
           <AppText variant="subtitle" bold>
-            Datos generales
+            {t('usersForm.generalData')}
           </AppText>
 
           <AppInput
-            label="Nombre"
+            label={t('usersForm.name')}
             value={form.name}
             onChangeText={(name) => setForm((current) => ({ ...current, name }))}
-            placeholder="Nombre completo"
+            placeholder={t('usersForm.fullName')}
           />
 
           <AppInput
-            label="Correo electrónico"
+            label={t('usersForm.email')}
             value={form.email}
             onChangeText={(email) => setForm((current) => ({ ...current, email }))}
             placeholder="correo@ejemplo.com"
@@ -328,26 +331,26 @@ export default function UsersFormScreen() {
           />
 
           <AppInput
-            label="Teléfono"
+            label={t('usersForm.phone')}
             value={form.phone}
             onChangeText={(phone) => setForm((current) => ({ ...current, phone }))}
-            placeholder="Opcional"
+            placeholder={t('usersForm.optional')}
             keyboardType="phone-pad"
           />
 
           <AppInput
-            label={isEdit ? 'Nueva contraseña (opcional)' : 'Contraseña inicial'}
+            label={isEdit ? t('usersForm.newPasswordOptional') : t('usersForm.initialPassword')}
             value={form.password}
             onChangeText={(password) => setForm((current) => ({ ...current, password }))}
-            placeholder={isEdit ? 'Dejar vacío para no cambiar' : 'Contraseña'}
+            placeholder={isEdit ? t('usersForm.leaveEmptyPassword') : t('usersForm.password')}
             secureTextEntry
           />
 
           <View style={styles.switchRow}>
             <View style={styles.switchText}>
-              <AppText>Forzar cambio en siguiente login</AppText>
+              <AppText>{t('usersForm.forcePasswordChange')}</AppText>
               <AppText variant="caption" color={theme.colors.mutedText}>
-                Recomendado cuando soporte asigna o resetea una contraseña.
+                {t('usersForm.forcePasswordChangeHelp')}
               </AppText>
             </View>
             <Switch
@@ -361,51 +364,51 @@ export default function UsersFormScreen() {
           </View>
 
           <AppSelectorField
-            label="Sucursal principal"
-            value={selectedBranch ? `${selectedBranch.code} · ${selectedBranch.name}` : null}
-            placeholder="Seleccionar sucursal"
+            label={t('usersForm.primaryBranch')}
+            value={selectedBranch ? `${selectedBranch.code} Â· ${selectedBranch.name}` : null}
+            placeholder={t('usersForm.selectBranch')}
             onPress={() => setBranchModalVisible(true)}
           />
 
           <AppSelectorField
-            label="Sucursales asignadas"
+            label={t('usersForm.assignedBranches')}
             value={selectedAssignedBranches}
-            placeholder="Seleccionar sucursales"
+            placeholder={t('usersForm.selectBranches')}
             onPress={() => setAssignedBranchesModalVisible(true)}
           />
 
           <AppText color={theme.colors.mutedText} variant="caption">
-            La sucursal principal se usa por defecto. Las asignadas permiten ver dashboard y operar varias sucursales.
+            {t('usersForm.branchHelp')}
           </AppText>
         </AppCard>
 
         <AppCard>
           <AppText variant="subtitle" bold>
-            Acceso
+            {t('usersForm.access')}
           </AppText>
 
           <AppSelectorField
-            label="Roles"
-            value={selectedNames(roles, form.roleIds, 'Seleccionar roles')}
-            placeholder="Seleccionar roles"
+            label={t('usersForm.roles')}
+            value={selectedNames(roles, form.roleIds, t('usersForm.selectRoles'))}
+            placeholder={t('usersForm.selectRoles')}
             onPress={openRolesModal}
           />
 
           <AppSelectorField
-            label="Permisos directos adicionales"
-            value={selectedNames(permissions, form.permissionIds, 'Sin permisos adicionales')}
-            placeholder="Seleccionar permisos directos"
+            label={t('usersForm.directPermissions')}
+            value={selectedNames(permissions, form.permissionIds, t('usersForm.noDirectPermissions'))}
+            placeholder={t('usersForm.selectDirectPermissions')}
             onPress={openPermissionsModal}
           />
 
           <AppText color={theme.colors.mutedText} variant="caption">
-            Los roles definen las capacidades base. Los permisos adicionales solo refinan acciones específicas.
+            {t('usersForm.accessHelp')}
           </AppText>
         </AppCard>
 
         <AppCard>
           <AppText variant="subtitle" bold>
-            Estado
+            {t('usersForm.status')}
           </AppText>
 
           <View style={styles.statusRow}>
@@ -423,7 +426,7 @@ export default function UsersFormScreen() {
                 },
               ]}
             >
-              <AppText bold={form.status === 'ACTIVE'}>Activo</AppText>
+              <AppText bold={form.status === 'ACTIVE'}>{t('usersForm.active')}</AppText>
             </Pressable>
 
             <Pressable
@@ -440,24 +443,24 @@ export default function UsersFormScreen() {
                 },
               ]}
             >
-              <AppText bold={form.status === 'INACTIVE'}>Inactivo</AppText>
+              <AppText bold={form.status === 'INACTIVE'}>{t('usersForm.inactive')}</AppText>
             </Pressable>
           </View>
         </AppCard>
 
-        <AppButton title="Guardar" loading={isSaving} onPress={save} />
-      </AppScreen>
+        <AppButton title={t('common.save')} loading={isSaving} onPress={save} />
+      </AppShellPage>
 
       <AppBottomModal
         visible={branchModalVisible}
-        title="Seleccionar sucursal"
+        title={t('usersForm.selectBranch')}
         onClose={() => setBranchModalVisible(false)}
       >
         {branches.map((branch) => (
           <AppOptionRow
             key={branch.id}
-            title={`${branch.code} · ${branch.name}`}
-            subtitle={branch.status === 'INACTIVE' ? 'Inactiva' : 'Activa'}
+            title={`${branch.code} Â· ${branch.name}`}
+            subtitle={branch.status === 'INACTIVE' ? t('usersForm.inactive') : t('usersForm.active')}
             onPress={() => {
               setForm((current) => ({
                 ...current,
@@ -472,11 +475,11 @@ export default function UsersFormScreen() {
 
       <AppBottomModal
         visible={assignedBranchesModalVisible}
-        title="Sucursales asignadas"
+        title={t('usersForm.assignedBranches')}
         onClose={() => setAssignedBranchesModalVisible(false)}
       >
         <AppText color={theme.colors.mutedText} style={styles.modalDescription}>
-          La sucursal principal siempre queda asignada. Agrega otras cuando el usuario atienda mas de una sucursal.
+          {t('usersForm.assignedBranchesHelp')}
         </AppText>
 
         {branches.map((branch) => {
@@ -486,7 +489,7 @@ export default function UsersFormScreen() {
             <AppOptionRow
               key={branch.id}
               title={`${branch.code} - ${branch.name}`}
-              subtitle={isPrimary ? 'Principal' : branch.status === 'INACTIVE' ? 'Inactiva' : 'Asignable'}
+              subtitle={isPrimary ? t('usersForm.primary') : branch.status === 'INACTIVE' ? t('usersForm.inactive') : t('usersForm.assignable')}
               onPress={() =>
                 setForm((current) => ({
                   ...current,
@@ -495,30 +498,30 @@ export default function UsersFormScreen() {
               }
             >
               <AppText color={selected ? theme.colors.accent : theme.colors.mutedText} bold={selected}>
-                {selected ? 'Asignada' : 'Tocar para asignar'}
+                {selected ? t('usersForm.assigned') : t('usersForm.tapToAssign')}
               </AppText>
             </AppOptionRow>
           );
         })}
 
         <View style={styles.modalActions}>
-          <AppButton title="Listo" onPress={() => setAssignedBranchesModalVisible(false)} />
+          <AppButton title={t('common.close')} onPress={() => setAssignedBranchesModalVisible(false)} />
         </View>
       </AppBottomModal>
 
       <AppBottomModal
         visible={rolesModalVisible}
-        title="Seleccionar roles"
+        title={t('usersForm.selectRoles')}
         onClose={cancelRolesModal}
         maxHeight="88%"
         showCancelButton={false}
         footer={
           <View style={styles.modalFooterActions}>
             <View style={styles.modalFooterButton}>
-              <AppButton title="Cancelar" variant="secondary" onPress={cancelRolesModal} />
+              <AppButton title={t('common.cancel')} variant="secondary" onPress={cancelRolesModal} />
             </View>
             <View style={styles.modalFooterButton}>
-              <AppButton title="Guardar" onPress={saveRolesModal} />
+              <AppButton title={t('common.save')} onPress={saveRolesModal} />
             </View>
           </View>
         }
@@ -535,7 +538,7 @@ export default function UsersFormScreen() {
               }
             >
               <AppText color={selected ? theme.colors.accent : theme.colors.mutedText} bold={selected}>
-                {selected ? 'Seleccionado' : 'Agregar'}
+                {selected ? t('usersForm.selected') : t('usersForm.add')}
               </AppText>
             </AppOptionRow>
           );
@@ -545,34 +548,34 @@ export default function UsersFormScreen() {
 
       <AppBottomModal
         visible={permissionsModalVisible}
-        title="Permisos directos adicionales"
+        title={t('usersForm.directPermissions')}
         onClose={cancelPermissionsModal}
         maxHeight="88%"
         showCancelButton={false}
         footer={
           <View style={styles.modalFooterActions}>
             <View style={styles.modalFooterButton}>
-              <AppButton title="Cancelar" variant="secondary" onPress={cancelPermissionsModal} />
+              <AppButton title={t('common.cancel')} variant="secondary" onPress={cancelPermissionsModal} />
             </View>
             <View style={styles.modalFooterButton}>
-              <AppButton title="Guardar permisos" onPress={savePermissionsModal} />
+              <AppButton title={t('usersForm.savePermissions')} onPress={savePermissionsModal} />
             </View>
           </View>
         }
       >
         <AppText color={theme.colors.mutedText} style={styles.modalDescription}>
-          Estos permisos se agregan directamente al usuario y se suman a los heredados por sus roles.
+          {t('usersForm.directPermissionsHelp')}
         </AppText>
 
         <AppInput
-          placeholder="Buscar por permiso, codigo o grupo"
+          placeholder={t('usersForm.searchPermissions')}
           value={permissionSearch}
           onChangeText={setPermissionSearch}
         />
 
         {groupedPermissionOptions.length === 0 ? (
           <AppText color={theme.colors.mutedText} style={styles.emptyPermissions}>
-            No se encontraron permisos con ese filtro.
+            {t('usersForm.noPermissionsFound')}
           </AppText>
         ) : (
           groupedPermissionOptions.map((group) => (
@@ -590,14 +593,14 @@ export default function UsersFormScreen() {
                   <AppOptionRow
                     key={permission.id}
                     title={formatPermissionCode(permission.code)}
-                    subtitle={`Codigo interno: ${permission.code}`}
+                    subtitle={t('systemRoles.internalCode', { code: permission.code })}
                     onPress={() =>
                       setDraftPermissionIds((current) => toggleId(current, permission.id))
                     }
                   >
                     <View style={styles.permissionStatusRow}>
                       <AppText color={selected ? theme.colors.accent : theme.colors.mutedText} bold={selected}>
-                        {selected ? 'Incluido' : 'Agregar'}
+                        {selected ? t('systemRoles.included') : t('usersForm.add')}
                       </AppText>
                     </View>
                     {dependencyWarnings.map((warning) => (

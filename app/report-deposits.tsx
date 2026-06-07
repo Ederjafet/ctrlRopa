@@ -1,14 +1,14 @@
-﻿import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppDateField from '@/components/ui/AppDateField';
 import AppInput from '@/components/ui/AppInput';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { Branch, getActiveBranches } from '@/services/branchAdminService';
-import { getSession } from '@/services/sessionStorage';
+import { getSession, UserSession } from '@/services/sessionStorage';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 import { DailyDepositsReport, getDailyDepositsReport } from '@/services/reportService';
 
@@ -94,7 +94,9 @@ function BranchSelector({
 
 export default function ReportDepositsScreen() {
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
 
+  const [session, setSession] = useState<UserSession | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState<number | null>(null);
   const [date, setDate] = useState(todayIsoDate());
@@ -118,6 +120,7 @@ export default function ReportDepositsScreen() {
 
       if (!currentSession) return;
 
+      setSession(currentSession);
       setBranches(branchData);
       setSelectedBranchId(currentSession.branchId);
     } catch (err: any) {
@@ -170,34 +173,38 @@ export default function ReportDepositsScreen() {
 
   if (initialLoading) {
     return (
-      <AppScreen>
+      <AppShellPage
+        title={t('reports.dailyDepositsTitle')}
+        subtitle={t('reports.dailyDepositsDescription')}
+        activeRoute="report-deposits"
+        session={session}
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute="/reports" />
-
-      <AppText variant="title" bold>
-        Depositos diarios
-      </AppText>
-
+    <AppShellPage
+      title={t('reports.dailyDepositsTitle')}
+      subtitle={t('reports.dailyDepositsDescription')}
+      activeRoute="report-deposits"
+      session={session}
+    >
       <AppCard>
         <AppText variant="subtitle" bold>
-          Filtros
+          {t('common.filters')}
         </AppText>
 
         <View style={sharedStyles.filters}>
           <AppDateField
-            label="Fecha"
+            label={t('common.date')}
             value={date}
             onChange={setDate}
           />
 
           <AppText variant="subtitle" bold>
-            Sucursal
+            {t('common.branch')}
           </AppText>
 
           <BranchSelector
@@ -207,7 +214,7 @@ export default function ReportDepositsScreen() {
           />
 
           <AppButton
-            title={loading ? 'Consultando...' : 'Consultar'}
+            title={loading ? t('reports.querying') : t('reports.query')}
             onPress={loadReport}
             loading={loading}
             disabled={loading}
@@ -282,11 +289,11 @@ export default function ReportDepositsScreen() {
       ) : (
         <AppCard>
           <AppText color={theme.colors.mutedText}>
-            Selecciona fecha y sucursal, luego consulta el reporte.
+            {t('reports.selectDateBranchHint')}
           </AppText>
         </AppCard>
       )}
-    </AppScreen>
+    </AppShellPage>
   );
 }
 
@@ -329,4 +336,3 @@ const sharedStyles = StyleSheet.create({
     minWidth: 145,
   },
 });
-

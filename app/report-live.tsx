@@ -1,16 +1,16 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppDateField from '@/components/ui/AppDateField';
 import AppInput from '@/components/ui/AppInput';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { Branch, getActiveBranches } from '@/services/branchAdminService';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
-import { LiveControlLine, LiveControlReport, getLiveControlReport } from '@/services/reportService';
+import { LiveControlReport, getLiveControlReport } from '@/services/reportService';
 
 function todayIsoDate() {
   const now = new Date();
@@ -26,7 +26,7 @@ function formatMoney(value?: number | null) {
 }
 
 function formatDateTime(value?: string | null) {
-  if (!value) return '—';
+  if (!value) return 'â€”';
   return new Date(value).toLocaleString();
 }
 
@@ -94,6 +94,7 @@ function BranchSelector({
 
 export default function ReportLiveScreen() {
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
 
   const [session, setSession] = useState<UserSession | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -172,34 +173,38 @@ export default function ReportLiveScreen() {
 
   if (initialLoading) {
     return (
-      <AppScreen>
+      <AppShellPage
+        title={t('reports.liveControlTitle')}
+        subtitle={t('reports.liveControlDescription')}
+        activeRoute="report-live"
+        session={session}
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute="/reports" />
-
-      <AppText variant="title" bold>
-        Control Live
-      </AppText>
-
+    <AppShellPage
+      title={t('reports.liveControlTitle')}
+      subtitle={t('reports.liveControlDescription')}
+      activeRoute="report-live"
+      session={session}
+    >
       <AppCard>
         <AppText variant="subtitle" bold>
-          Filtros
+          {t('common.filters')}
         </AppText>
 
         <View style={sharedStyles.filters}>
           <AppDateField
-            label="Fecha"
+            label={t('common.date')}
             value={date}
             onChange={setDate}
           />
 
           <AppText variant="subtitle" bold>
-            Sucursal
+            {t('common.branch')}
           </AppText>
 
           <BranchSelector
@@ -209,7 +214,7 @@ export default function ReportLiveScreen() {
           />
 
           <AppButton
-            title={loading ? 'Consultando...' : 'Consultar'}
+            title={loading ? t('reports.querying') : t('reports.query')}
             onPress={loadReport}
             loading={loading}
             disabled={loading}
@@ -221,7 +226,7 @@ export default function ReportLiveScreen() {
         <>
           <AppCard>
             <AppText variant="subtitle" bold>
-              Resumen · {report.branchName || report.branchCode || 'Sucursal'} · {report.date}
+              Resumen Â· {report.branchName || report.branchCode || 'Sucursal'} Â· {report.date}
             </AppText>
 
             <View style={sharedStyles.summaryGrid}>
@@ -236,7 +241,7 @@ export default function ReportLiveScreen() {
           </AppCard>
 
           <AppInput
-            label="Buscar en líneas"
+            label="Buscar en lÃ­neas"
             placeholder="Cliente, folio, estado, referencia..."
             value={search}
             onChangeText={setSearch}
@@ -249,7 +254,7 @@ export default function ReportLiveScreen() {
 
             {filteredLines.length === 0 ? (
               <AppText color={theme.colors.mutedText}>
-                No hay líneas para mostrar.
+                No hay lÃ­neas para mostrar.
               </AppText>
             ) : (
               filteredLines.map((line: any, index: number) => (
@@ -262,18 +267,18 @@ export default function ReportLiveScreen() {
                 >
                   <View style={sharedStyles.headerRow}>
                     <View style={sharedStyles.headerText}>
-                      <AppText bold>{line.packageFolio || `Paquete #${line.packageId || '—'}`}</AppText>
+                      <AppText bold>{line.packageFolio || `Paquete #${line.packageId || 'â€”'}`}</AppText>
                       <AppText color={theme.colors.mutedText}>
-                        {line.customerName || 'Cliente sin nombre'} · {line.pieces ?? 0} piezas
+                        {line.customerName || 'Cliente sin nombre'} Â· {line.pieces ?? 0} piezas
                       </AppText>
                     </View>
                     <AppText bold>{formatMoney(line.total)}</AppText>
                   </View>
                   <View style={sharedStyles.meta}>
-                    <AppText color={theme.colors.mutedText}>Pagado: {formatMoney(line.paid)} · Pendiente: {formatMoney(line.pending)}</AppText>
-                    <AppText color={theme.colors.mutedText}>Pago: {line.paymentStatus || '—'} · Paquete: {line.packageStatus || '—'} · Pedido: {line.orderStatus || '—'}</AppText>
+                    <AppText color={theme.colors.mutedText}>Pagado: {formatMoney(line.paid)} Â· Pendiente: {formatMoney(line.pending)}</AppText>
+                    <AppText color={theme.colors.mutedText}>Pago: {line.paymentStatus || 'â€”'} Â· Paquete: {line.packageStatus || 'â€”'} Â· Pedido: {line.orderStatus || 'â€”'}</AppText>
                     <AppText variant="caption" color={theme.colors.mutedText}>
-                      Creado: {formatDateTime(line.createdAt)} · Liquidado: {formatDateTime(line.settledAt)}
+                      Creado: {formatDateTime(line.createdAt)} Â· Liquidado: {formatDateTime(line.settledAt)}
                     </AppText>
                   </View>
                 </View>
@@ -284,11 +289,11 @@ export default function ReportLiveScreen() {
       ) : (
         <AppCard>
           <AppText color={theme.colors.mutedText}>
-            Selecciona fecha y sucursal, luego consulta el reporte.
+            {t('reports.selectDateBranchHint')}
           </AppText>
         </AppCard>
       )}
-    </AppScreen>
+    </AppShellPage>
   );
 }
 

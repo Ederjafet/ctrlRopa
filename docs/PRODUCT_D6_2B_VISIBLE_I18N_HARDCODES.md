@@ -50,6 +50,12 @@ Las siguientes pantallas siguen siendo candidatas a migracion/traduccion mas pro
 
 En esta fase se evita redisenarlas o reestructurarlas para no mezclar i18n con migracion visual.
 
+## Actualizacion PRODUCT-D6.3
+
+PRODUCT-D6.3 migro las pantallas listadas a `AppShellPage`/`AppShell`, retiro la navegacion legacy `Volver` / `Menu principal` como barra superior y amplio i18n visible en `appearance`, `users-form`, reportes detallados y auditoria de seguridad.
+
+La deuda restante queda acotada a estados/codigos retornados por backend y a pantallas fuera del listado D6.3 que QA pueda identificar posteriormente.
+
 ## Validacion manual esperada
 
 1. Entrar con `qa.admin@local.test`.
