@@ -81,6 +81,10 @@ PRODUCT-D6.4 extiende la misma estrategia de `AppShellPage` a pantallas operativ
 
 Las rutas de caja (`cash-closures`, `cash-closure-detail`) se documentan como legacy pendiente, pero no se migran en D6.4 porque caja queda explicitamente fuera de alcance.
 
+## Nota PRODUCT-D6.5
+
+PRODUCT-D6.5 complementa esta migracion con una auditoria automatica de rutas `app/*.tsx` y migra `/system-security` y `/system-sessions`, que QA observo con layout legacy.
+
 ## Riesgos pendientes
 
 - Algunas tablas de reportes muestran estados/codigos que vienen del backend; se mantienen como datos tecnicos.

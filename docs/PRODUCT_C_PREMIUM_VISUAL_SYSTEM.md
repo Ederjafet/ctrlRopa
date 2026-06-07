@@ -295,3 +295,11 @@ PRODUCT-D6.4 extiende el sistema visual premium a pantallas operativas legacy:
 - `/batches`
 
 La fase no cambia tokens ni reglas de negocio. Aplica `AppShellPage`, sidebar/drawer, active state e i18n principal para que venta puerta, apartado puerta, inventario, alta de prendas y lotes ya no se vean como pantallas aisladas.
+
+---
+
+## Continuidad PRODUCT-D6.5 - Auditoria legacy
+
+Fecha: 2026-06-06
+
+PRODUCT-D6.5 audita automaticamente rutas `app/*.tsx`, migra `/system-security` y `/system-sessions` a `AppShellPage`, y deja inventario documentado de rutas legacy restantes para priorizacion posterior.

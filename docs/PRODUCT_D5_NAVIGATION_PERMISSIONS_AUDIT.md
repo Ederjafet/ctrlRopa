@@ -44,6 +44,10 @@ La navegacion traducible depende de la fuente global `i18next` + AsyncStorage (`
 
 Las rutas operativas expuestas desde D5 en el menu (`/door-sale`, `/door-reservation`, `/items`, `/items-create`, `/batches`) fueron migradas en PRODUCT-D6.4 a `AppShellPage`, manteniendo los mismos permisos/canales documentados en esta matriz.
 
+## Nota PRODUCT-D6.5
+
+Las rutas de Seguridad expuestas desde D5 (`/system-security` y `/system-sessions`) fueron migradas en PRODUCT-D6.5 a `AppShellPage`, manteniendo visibilidad ADMIN y active state de la navegacion categorizada.
+
 Reglas aplicadas:
 
 - No se muestran categorias vacias.

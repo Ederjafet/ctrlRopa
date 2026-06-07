@@ -132,3 +132,12 @@ La siguiente corrida manual debe confirmar AppShell/sidebar/drawer y ausencia de
 - `/batches`.
 
 Validar tambien active state correcto, idioma Espanol/English, light/dark, presets visuales y responsive desktop/tablet/mobile.
+
+## Nota PRODUCT-D6.5
+
+Agregar a la corrida manual:
+
+- `/system-security`;
+- `/system-sessions`.
+
+Confirmar AppShell/sidebar/drawer, active state correcto, ausencia de `Menu principal` legacy, idioma Espanol/English, light/dark y mobile/drawer.

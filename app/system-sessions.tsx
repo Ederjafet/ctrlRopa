@@ -1,7 +1,6 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import {
@@ -14,6 +13,7 @@ import {
   UserLoginSecurityLine,
 } from '@/services/securitySessionsService';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 
 function formatDate(value?: string | null) {
@@ -27,6 +27,7 @@ function isLocked(line: UserLoginSecurityLine) {
 
 export default function SystemSessionsScreen() {
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
   const [users, setUsers] = useState<UserLoginSecurityLine[]>([]);
   const [sessions, setSessions] = useState<ApiSessionLine[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +45,7 @@ export default function SystemSessionsScreen() {
       setUsers(data.users ?? []);
       setSessions(data.sessions ?? []);
     } catch (err: any) {
-      Alert.alert('Sesiónes y bloqueos', err?.message || 'No se pudo cargar la información.');
+      Alert.alert(t('securitySessions.loadErrorTitle'), err?.message || t('securitySessions.loadErrorMessage'));
     } finally {
       setLoading(false);
     }
@@ -57,7 +58,7 @@ export default function SystemSessionsScreen() {
       await unlockSecurityUser(userId);
       await loadState();
     } catch (err: any) {
-      Alert.alert('No se pudo desbloquear', err?.message || 'Intenta de nuevo.');
+      Alert.alert(t('securitySessions.unlockErrorTitle'), err?.message || t('securitySessions.actionErrorMessage'));
     } finally {
       setWorkingUserId(null);
     }
@@ -70,7 +71,7 @@ export default function SystemSessionsScreen() {
       await revokeSecurityUserSessions(userId);
       await loadState();
     } catch (err: any) {
-      Alert.alert('No se pudieron revocar sesiónes', err?.message || 'Intenta de nuevo.');
+      Alert.alert(t('securitySessions.revokeUserErrorTitle'), err?.message || t('securitySessions.actionErrorMessage'));
     } finally {
       setWorkingUserId(null);
     }
@@ -83,7 +84,7 @@ export default function SystemSessionsScreen() {
       await revokeSecuritySession(sessionId);
       await loadState();
     } catch (err: any) {
-      Alert.alert('No se pudo cerrar la sesión', err?.message || 'Intenta de nuevo.');
+      Alert.alert(t('securitySessions.revokeSessionErrorTitle'), err?.message || t('securitySessions.actionErrorMessage'));
     } finally {
       setWorkingUserId(null);
     }
@@ -96,38 +97,37 @@ export default function SystemSessionsScreen() {
       await revokeAllSecuritySessions();
       await loadState();
     } catch (err: any) {
-      Alert.alert('No se pudieron cerrar las sesiónes', err?.message || 'Intenta de nuevo.');
+      Alert.alert(t('securitySessions.revokeAllErrorTitle'), err?.message || t('securitySessions.actionErrorMessage'));
     } finally {
       setWorkingUserId(null);
     }
   };
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute="/system" />
-
-      <AppText variant="title" bold>
-        Sesiónes y bloqueos
-      </AppText>
+    <AppShellPage
+      title={t('securitySessions.title')}
+      subtitle={t('securitySessions.subtitle')}
+      activeRoute="system-sessions"
+    >
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Estado de seguridad
+          {t('securitySessions.statusTitle')}
         </AppText>
         <AppText color={theme.colors.mutedText}>
-          Vista de soporte para desbloquear usuarios y cerrar sesiónes activas.
+          {t('securitySessions.statusHelp')}
         </AppText>
       </AppCard>
 
       <AppButton
-        title={loading ? 'Actualizando...' : 'Actualizar'}
+        title={loading ? t('securitySessions.refreshing') : t('securitySessions.refresh')}
         onPress={loadState}
         loading={loading}
         disabled={loading}
       />
 
       <AppButton
-        title="Cerrar todas las sesiónes"
+        title={t('securitySessions.closeAll')}
         variant="danger"
         onPress={revokeAllSessions}
         loading={workingUserId === 0}
@@ -136,13 +136,13 @@ export default function SystemSessionsScreen() {
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Usuarios con actividad de login ({users.length})
+          {t('securitySessions.usersWithLoginActivity', { count: users.length })}
         </AppText>
 
         {loading ? (
           <ActivityIndicator />
         ) : users.length === 0 ? (
-          <AppText color={theme.colors.mutedText}>No hay bloqueos ni intentos recientes.</AppText>
+          <AppText color={theme.colors.mutedText}>{t('securitySessions.noLoginActivity')}</AppText>
         ) : (
           users.map((line) => (
             <View key={line.userId} style={[styles.row, { borderBottomColor: theme.colors.border }]}>
@@ -152,19 +152,21 @@ export default function SystemSessionsScreen() {
                   <AppText color={theme.colors.mutedText}>{line.email}</AppText>
                 </View>
                 <AppText bold color={isLocked(line) ? theme.colors.danger : theme.colors.mutedText}>
-                  {isLocked(line) ? 'Bloqueado' : `${line.failedLoginAttempts} fallos`}
+                  {isLocked(line)
+                    ? t('securitySessions.locked')
+                    : t('securitySessions.failedAttempts', { count: line.failedLoginAttempts })}
                 </AppText>
               </View>
 
-              <AppText color={theme.colors.mutedText}>Sucursal: {line.branchName || '-'}</AppText>
-              <AppText color={theme.colors.mutedText}>Bloqueado hasta: {formatDate(line.lockedUntil)}</AppText>
-              <AppText color={theme.colors.mutedText}>Ultimo fallo: {formatDate(line.lastFailedLoginAt)}</AppText>
-              <AppText color={theme.colors.mutedText}>Ultimo acceso: {formatDate(line.lastSuccessLoginAt)}</AppText>
-              <AppText color={theme.colors.mutedText}>IP ultimo acceso: {line.lastLoginIp || '-'}</AppText>
+              <AppText color={theme.colors.mutedText}>{t('securitySessions.branch')}: {line.branchName || '-'}</AppText>
+              <AppText color={theme.colors.mutedText}>{t('securitySessions.lockedUntil')}: {formatDate(line.lockedUntil)}</AppText>
+              <AppText color={theme.colors.mutedText}>{t('securitySessions.lastFailed')}: {formatDate(line.lastFailedLoginAt)}</AppText>
+              <AppText color={theme.colors.mutedText}>{t('securitySessions.lastSuccess')}: {formatDate(line.lastSuccessLoginAt)}</AppText>
+              <AppText color={theme.colors.mutedText}>{t('securitySessions.lastLoginIp')}: {line.lastLoginIp || '-'}</AppText>
 
               <View style={styles.inlineActions}>
                 <AppButton
-                  title="Desbloquear"
+                  title={t('securitySessions.unlock')}
                   variant="secondary"
                   onPress={() => unlockUser(line.userId)}
                   loading={workingUserId === line.userId}
@@ -172,7 +174,7 @@ export default function SystemSessionsScreen() {
                   style={styles.smallAction}
                 />
                 <AppButton
-                  title="Cerrar sesiónes"
+                  title={t('securitySessions.closeSessions')}
                   variant="danger"
                   onPress={() => revokeSessions(line.userId)}
                   disabled={workingUserId !== null}
@@ -186,13 +188,13 @@ export default function SystemSessionsScreen() {
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Sesiónes activas ({sessions.length})
+          {t('securitySessions.activeSessions', { count: sessions.length })}
         </AppText>
 
         {loading ? (
           <ActivityIndicator />
         ) : sessions.length === 0 ? (
-          <AppText color={theme.colors.mutedText}>No hay sesiónes activas.</AppText>
+          <AppText color={theme.colors.mutedText}>{t('securitySessions.noActiveSessions')}</AppText>
         ) : (
           sessions.map((line) => (
             <View key={line.id} style={[styles.row, { borderBottomColor: theme.colors.border }]}>
@@ -202,7 +204,7 @@ export default function SystemSessionsScreen() {
                   <AppText color={theme.colors.mutedText}>{line.email}</AppText>
                 </View>
                 <AppButton
-                  title="Cerrar"
+                  title={t('securitySessions.close')}
                   variant="danger"
                   onPress={() => revokeSession(line.id)}
                   loading={workingUserId === line.id * -1}
@@ -210,17 +212,17 @@ export default function SystemSessionsScreen() {
                   style={styles.closeAction}
                 />
               </View>
-              <AppText color={theme.colors.mutedText}>Sucursal: {line.branchName || '-'}</AppText>
-              <AppText color={theme.colors.mutedText}>Ultima actividad: {formatDate(line.lastSeenAt)}</AppText>
-              <AppText color={theme.colors.mutedText}>Expira: {formatDate(line.expiresAt)}</AppText>
-              <AppText color={theme.colors.mutedText}>Expira maximo: {formatDate(line.absoluteExpiresAt)}</AppText>
-              <AppText color={theme.colors.mutedText}>IP: {line.ipAddress || '-'}</AppText>
-              <AppText color={theme.colors.mutedText}>Dispositivo: {line.userAgent || '-'}</AppText>
+              <AppText color={theme.colors.mutedText}>{t('securitySessions.branch')}: {line.branchName || '-'}</AppText>
+              <AppText color={theme.colors.mutedText}>{t('securitySessions.lastActivity')}: {formatDate(line.lastSeenAt)}</AppText>
+              <AppText color={theme.colors.mutedText}>{t('securitySessions.expires')}: {formatDate(line.expiresAt)}</AppText>
+              <AppText color={theme.colors.mutedText}>{t('securitySessions.absoluteExpires')}: {formatDate(line.absoluteExpiresAt)}</AppText>
+              <AppText color={theme.colors.mutedText}>{t('securitySessions.ip')}: {line.ipAddress || '-'}</AppText>
+              <AppText color={theme.colors.mutedText}>{t('securitySessions.device')}: {line.userAgent || '-'}</AppText>
             </View>
           ))
         )}
       </AppCard>
-    </AppScreen>
+    </AppShellPage>
   );
 }
 

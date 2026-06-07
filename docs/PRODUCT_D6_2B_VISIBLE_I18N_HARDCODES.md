@@ -56,6 +56,10 @@ PRODUCT-D6.3 migro las pantallas listadas a `AppShellPage`/`AppShell`, retiro la
 
 La deuda restante queda acotada a estados/codigos retornados por backend y a pantallas fuera del listado D6.3 que QA pueda identificar posteriormente.
 
+## Actualizacion PRODUCT-D6.5
+
+PRODUCT-D6.5 agrega i18n visible para `/system-security` y `/system-sessions` mediante `securitySettings.*` y `securitySessions.*`, junto con la migracion de ambas rutas a `AppShellPage`.
+
 ## Validacion manual esperada
 
 1. Entrar con `qa.admin@local.test`.

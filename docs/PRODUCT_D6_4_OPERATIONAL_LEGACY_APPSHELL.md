@@ -62,6 +62,15 @@ No se traducen codigos tecnicos, estados backend ni datos retornados por API.
 - `cash-closures` y `cash-closure-detail` quedan pendientes porque D6.4 excluye caja.
 - Rutas no encontradas: `/inventory`, `/checkout`, `/sales`, `/pos`, `/cash`.
 
+## Nota PRODUCT-D6.5
+
+PRODUCT-D6.5 ejecuto una auditoria automatica sobre `app/*.tsx` y migro dos rutas legacy adicionales observadas por QA:
+
+- `/system-security`
+- `/system-sessions`
+
+El inventario completo de rutas legacy restantes queda documentado en `docs/PRODUCT_D6_5_LEGACY_ROUTE_AUDIT.md`.
+
 ## Riesgos pendientes
 
 - Algunas alertas historicas y textos secundarios de flujo operativo siguen hardcodeados; no se tocaron para evitar cambios funcionales fuera de la migracion visual.

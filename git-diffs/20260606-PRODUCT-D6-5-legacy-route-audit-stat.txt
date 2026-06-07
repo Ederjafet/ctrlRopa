@@ -1,0 +1,13 @@
+﻿ app/system-security.tsx                            |  79 ++++++------
+ app/system-sessions.tsx                            |  76 +++++------
+ docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md            |   8 ++
+ docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md              |   9 ++
+ docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md    |   4 +
+ docs/PRODUCT_D6_2B_VISIBLE_I18N_HARDCODES.md       |   4 +
+ docs/PRODUCT_D6_3_LEGACY_PREMIUM_MIGRATION.md      |   4 +
+ docs/PRODUCT_D6_4_OPERATIONAL_LEGACY_APPSHELL.md   |   9 ++
+ docs/PRODUCT_D6_5_LEGACY_ROUTE_AUDIT.md            | 139 +++++++++++++++++++++
+ locales/en/common.json                             |  71 +++++++++++
+ locales/es/common.json                             |  71 +++++++++++
+ ...-5-legacy-route-audit-report-20260606-184543.md |  85 +++++++++++++
+ 12 files changed, 482 insertions(+), 77 deletions(-)

@@ -1,0 +1,953 @@
+﻿diff --git a/app/system-security.tsx b/app/system-security.tsx
+index ea3c5fb..c54ffa5 100644
+--- a/app/system-security.tsx
++++ b/app/system-security.tsx
+@@ -1,8 +1,7 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import {
+@@ -11,6 +10,7 @@ import {
+   updateSecuritySettings,
+ } from '@/services/securitySettingsService';
+ import { useEffect, useMemo, useState } from 'react';
++import { useTranslation } from 'react-i18next';
+ import { Alert, StyleSheet, Switch, View } from 'react-native';
+
+ type FormState = {
+@@ -49,6 +49,7 @@ function toNumber(value: string) {
+
+ export default function SystemSecurityScreen() {
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+   const [form, setForm] = useState<FormState>({
+     sessionTimeoutMinutes: '30',
+     maxLoginAttempts: '5',
+@@ -74,23 +75,23 @@ export default function SystemSecurityScreen() {
+     const historyCount = toNumber(form.passwordHistoryCount);
+     const absoluteHours = toNumber(form.absoluteSessionTimeoutHours);
+
+-    if (timeout < 5 || timeout > 720) return 'El cierre de sesión debe estar entre 5 y 720 minutos.';
+-    if (attempts < 3 || attempts > 20) return 'Los intentos de login deben estar entre 3 y 20.';
+-    if (lockout < 1 || lockout > 1440) return 'El bloqueo temporal debe estar entre 1 y 1440 minutos.';
+-    if (passwordMinLength < 6 || passwordMinLength > 64) return 'La longitud minima de contraseña debe estar entre 6 y 64.';
+-    if (expirationDays < 0 || expirationDays > 365) return 'La expiracion de contraseña debe estar entre 0 y 365 dias.';
+-    if (historyCount < 0 || historyCount > 20) return 'El historial de contraseñas debe estar entre 0 y 20.';
+-    if (absoluteHours < 0 || absoluteHours > 720) return 'La sesión maxima absoluta debe estar entre 0 y 720 horas.';
++    if (timeout < 5 || timeout > 720) return t('securitySettings.validationSessionTimeout');
++    if (attempts < 3 || attempts > 20) return t('securitySettings.validationMaxAttempts');
++    if (lockout < 1 || lockout > 1440) return t('securitySettings.validationLockout');
++    if (passwordMinLength < 6 || passwordMinLength > 64) return t('securitySettings.validationPasswordMin');
++    if (expirationDays < 0 || expirationDays > 365) return t('securitySettings.validationExpiration');
++    if (historyCount < 0 || historyCount > 20) return t('securitySettings.validationHistory');
++    if (absoluteHours < 0 || absoluteHours > 720) return t('securitySettings.validationAbsolute');
+
+     return null;
+-  }, [form]);
++  }, [form, t]);
+
+   const saveBlockedReason = useMemo(() => {
+-    if (loading) return 'Espera a que termine de cargar la configuración.';
+-    if (saving) return 'Se estan guardando los parametros.';
++    if (loading) return t('securitySettings.waitLoading');
++    if (saving) return t('securitySettings.savingReason');
+     if (validationMessage) return validationMessage;
+     return undefined;
+-  }, [loading, saving, validationMessage]);
++  }, [loading, saving, validationMessage, t]);
+
+   useEffect(() => {
+     loadSettings();
+@@ -103,7 +104,7 @@ export default function SystemSecurityScreen() {
+       const settings = await getSecuritySettings();
+       setForm(toForm(settings));
+     } catch (err: any) {
+-      Alert.alert('Seguridad dev', err?.message || 'No se pudo cargar la configuración.');
++      Alert.alert(t('securitySettings.loadErrorTitle'), err?.message || t('securitySettings.loadErrorMessage'));
+     } finally {
+       setLoading(false);
+     }
+@@ -125,7 +126,7 @@ export default function SystemSecurityScreen() {
+
+   const save = async () => {
+     if (validationMessage) {
+-      Alert.alert('Revisa los valores', validationMessage);
++      Alert.alert(t('securitySettings.validationTitle'), validationMessage);
+       return;
+     }
+
+@@ -147,35 +148,33 @@ export default function SystemSecurityScreen() {
+       });
+
+       setForm(toForm(settings));
+-      Alert.alert('Seguridad actualizada', 'Los parametros se guardaron correctamente.');
++      Alert.alert(t('securitySettings.savedTitle'), t('securitySettings.savedMessage'));
+     } catch (err: any) {
+-      Alert.alert('No se pudo guardar', err?.message || 'Revisa tu conexión o permisos.');
++      Alert.alert(t('securitySettings.saveErrorTitle'), err?.message || t('securitySettings.saveErrorMessage'));
+     } finally {
+       setSaving(false);
+     }
+   };
+
+   return (
+-    <AppScreen>
+-      <AppBackButton fallbackRoute="/system" />
+-
+-      <AppText variant="title" bold>
+-        Seguridad dev
+-      </AppText>
++    <AppShellPage
++      title={t('securitySettings.title')}
++      subtitle={t('securitySettings.subtitle')}
++      activeRoute="system-security"
++    >
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Parametros operativos
++          {t('securitySettings.parametersTitle')}
+         </AppText>
+         <AppText color={theme.colors.mutedText}>
+-          Solo soporte tecnico puede modificar estos valores. Aplican al cierre por
+-          inactividad y al bloqueo temporal por intentos fallidos.
++          {t('securitySettings.parametersHelp')}
+         </AppText>
+       </AppCard>
+
+       <AppCard>
+         <AppInput
+-          label="Cerrar sesión por inactividad (minutos)"
++          label={t('securitySettings.sessionTimeout')}
+           value={form.sessionTimeoutMinutes}
+           onChangeText={(value) => updateField('sessionTimeoutMinutes', value)}
+           keyboardType="number-pad"
+@@ -183,7 +182,7 @@ export default function SystemSecurityScreen() {
+         />
+
+         <AppInput
+-          label="Longitud minima de contraseña"
++          label={t('securitySettings.passwordMinLength')}
+           value={form.passwordMinLength}
+           onChangeText={(value) => updateField('passwordMinLength', value)}
+           keyboardType="number-pad"
+@@ -191,7 +190,7 @@ export default function SystemSecurityScreen() {
+         />
+
+         <AppInput
+-          label="Expirar contraseña cada (dias, 0 desactiva)"
++          label={t('securitySettings.passwordExpirationDays')}
+           value={form.passwordExpirationDays}
+           onChangeText={(value) => updateField('passwordExpirationDays', value)}
+           keyboardType="number-pad"
+@@ -199,7 +198,7 @@ export default function SystemSecurityScreen() {
+         />
+
+         <AppInput
+-          label="No reutilizar ultimas contraseñas"
++          label={t('securitySettings.passwordHistoryCount')}
+           value={form.passwordHistoryCount}
+           onChangeText={(value) => updateField('passwordHistoryCount', value)}
+           keyboardType="number-pad"
+@@ -207,32 +206,32 @@ export default function SystemSecurityScreen() {
+         />
+
+         <PolicySwitch
+-          label="Requerir mayuscula"
++          label={t('securitySettings.requireUppercase')}
+           value={form.passwordRequireUppercase}
+           onValueChange={() => toggleField('passwordRequireUppercase')}
+           disabled={loading || saving}
+         />
+         <PolicySwitch
+-          label="Requerir minuscula"
++          label={t('securitySettings.requireLowercase')}
+           value={form.passwordRequireLowercase}
+           onValueChange={() => toggleField('passwordRequireLowercase')}
+           disabled={loading || saving}
+         />
+         <PolicySwitch
+-          label="Requerir numero"
++          label={t('securitySettings.requireNumber')}
+           value={form.passwordRequireNumber}
+           onValueChange={() => toggleField('passwordRequireNumber')}
+           disabled={loading || saving}
+         />
+         <PolicySwitch
+-          label="Requerir simbolo"
++          label={t('securitySettings.requireSymbol')}
+           value={form.passwordRequireSymbol}
+           onValueChange={() => toggleField('passwordRequireSymbol')}
+           disabled={loading || saving}
+         />
+
+         <AppInput
+-          label="Intentos fallidos antes de bloquear"
++          label={t('securitySettings.maxLoginAttempts')}
+           value={form.maxLoginAttempts}
+           onChangeText={(value) => updateField('maxLoginAttempts', value)}
+           keyboardType="number-pad"
+@@ -240,7 +239,7 @@ export default function SystemSecurityScreen() {
+         />
+
+         <AppInput
+-          label="Tiempo de bloqueo temporal (minutos)"
++          label={t('securitySettings.loginLockoutMinutes')}
+           value={form.loginLockoutMinutes}
+           onChangeText={(value) => updateField('loginLockoutMinutes', value)}
+           keyboardType="number-pad"
+@@ -248,7 +247,7 @@ export default function SystemSecurityScreen() {
+         />
+
+         <AppInput
+-          label="Sesión maxima absoluta (horas, 0 desactiva)"
++          label={t('securitySettings.absoluteSessionTimeout')}
+           value={form.absoluteSessionTimeoutHours}
+           onChangeText={(value) => updateField('absoluteSessionTimeoutHours', value)}
+           keyboardType="number-pad"
+@@ -262,21 +261,21 @@ export default function SystemSecurityScreen() {
+
+       <View style={styles.actions}>
+         <AppButton
+-          title={saving ? 'Guardando...' : 'Guardar parametros'}
++          title={saving ? t('securitySettings.saving') : t('securitySettings.save')}
+           onPress={save}
+           loading={saving}
+           disabled={loading || saving || Boolean(validationMessage)}
+           disabledReason={saveBlockedReason}
+         />
+         <AppButton
+-          title="Recargar"
++          title={t('securitySettings.reload')}
+           variant="secondary"
+           onPress={loadSettings}
+           disabled={loading || saving}
+           style={styles.secondaryAction}
+         />
+       </View>
+-    </AppScreen>
++    </AppShellPage>
+   );
+ }
+
+diff --git a/app/system-sessions.tsx b/app/system-sessions.tsx
+index 2e0f2a2..80c607a 100644
+--- a/app/system-sessions.tsx
++++ b/app/system-sessions.tsx
+@@ -1,7 +1,6 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import {
+@@ -14,6 +13,7 @@ import {
+   UserLoginSecurityLine,
+ } from '@/services/securitySessionsService';
+ import { useEffect, useState } from 'react';
++import { useTranslation } from 'react-i18next';
+ import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+
+ function formatDate(value?: string | null) {
+@@ -27,6 +27,7 @@ function isLocked(line: UserLoginSecurityLine) {
+
+ export default function SystemSessionsScreen() {
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+   const [users, setUsers] = useState<UserLoginSecurityLine[]>([]);
+   const [sessions, setSessions] = useState<ApiSessionLine[]>([]);
+   const [loading, setLoading] = useState(true);
+@@ -44,7 +45,7 @@ export default function SystemSessionsScreen() {
+       setUsers(data.users ?? []);
+       setSessions(data.sessions ?? []);
+     } catch (err: any) {
+-      Alert.alert('Sesiónes y bloqueos', err?.message || 'No se pudo cargar la información.');
++      Alert.alert(t('securitySessions.loadErrorTitle'), err?.message || t('securitySessions.loadErrorMessage'));
+     } finally {
+       setLoading(false);
+     }
+@@ -57,7 +58,7 @@ export default function SystemSessionsScreen() {
+       await unlockSecurityUser(userId);
+       await loadState();
+     } catch (err: any) {
+-      Alert.alert('No se pudo desbloquear', err?.message || 'Intenta de nuevo.');
++      Alert.alert(t('securitySessions.unlockErrorTitle'), err?.message || t('securitySessions.actionErrorMessage'));
+     } finally {
+       setWorkingUserId(null);
+     }
+@@ -70,7 +71,7 @@ export default function SystemSessionsScreen() {
+       await revokeSecurityUserSessions(userId);
+       await loadState();
+     } catch (err: any) {
+-      Alert.alert('No se pudieron revocar sesiónes', err?.message || 'Intenta de nuevo.');
++      Alert.alert(t('securitySessions.revokeUserErrorTitle'), err?.message || t('securitySessions.actionErrorMessage'));
+     } finally {
+       setWorkingUserId(null);
+     }
+@@ -83,7 +84,7 @@ export default function SystemSessionsScreen() {
+       await revokeSecuritySession(sessionId);
+       await loadState();
+     } catch (err: any) {
+-      Alert.alert('No se pudo cerrar la sesión', err?.message || 'Intenta de nuevo.');
++      Alert.alert(t('securitySessions.revokeSessionErrorTitle'), err?.message || t('securitySessions.actionErrorMessage'));
+     } finally {
+       setWorkingUserId(null);
+     }
+@@ -96,38 +97,37 @@ export default function SystemSessionsScreen() {
+       await revokeAllSecuritySessions();
+       await loadState();
+     } catch (err: any) {
+-      Alert.alert('No se pudieron cerrar las sesiónes', err?.message || 'Intenta de nuevo.');
++      Alert.alert(t('securitySessions.revokeAllErrorTitle'), err?.message || t('securitySessions.actionErrorMessage'));
+     } finally {
+       setWorkingUserId(null);
+     }
+   };
+
+   return (
+-    <AppScreen>
+-      <AppBackButton fallbackRoute="/system" />
+-
+-      <AppText variant="title" bold>
+-        Sesiónes y bloqueos
+-      </AppText>
++    <AppShellPage
++      title={t('securitySessions.title')}
++      subtitle={t('securitySessions.subtitle')}
++      activeRoute="system-sessions"
++    >
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Estado de seguridad
++          {t('securitySessions.statusTitle')}
+         </AppText>
+         <AppText color={theme.colors.mutedText}>
+-          Vista de soporte para desbloquear usuarios y cerrar sesiónes activas.
++          {t('securitySessions.statusHelp')}
+         </AppText>
+       </AppCard>
+
+       <AppButton
+-        title={loading ? 'Actualizando...' : 'Actualizar'}
++        title={loading ? t('securitySessions.refreshing') : t('securitySessions.refresh')}
+         onPress={loadState}
+         loading={loading}
+         disabled={loading}
+       />
+
+       <AppButton
+-        title="Cerrar todas las sesiónes"
++        title={t('securitySessions.closeAll')}
+         variant="danger"
+         onPress={revokeAllSessions}
+         loading={workingUserId === 0}
+@@ -136,13 +136,13 @@ export default function SystemSessionsScreen() {
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Usuarios con actividad de login ({users.length})
++          {t('securitySessions.usersWithLoginActivity', { count: users.length })}
+         </AppText>
+
+         {loading ? (
+           <ActivityIndicator />
+         ) : users.length === 0 ? (
+-          <AppText color={theme.colors.mutedText}>No hay bloqueos ni intentos recientes.</AppText>
++          <AppText color={theme.colors.mutedText}>{t('securitySessions.noLoginActivity')}</AppText>
+         ) : (
+           users.map((line) => (
+             <View key={line.userId} style={[styles.row, { borderBottomColor: theme.colors.border }]}>
+@@ -152,19 +152,21 @@ export default function SystemSessionsScreen() {
+                   <AppText color={theme.colors.mutedText}>{line.email}</AppText>
+                 </View>
+                 <AppText bold color={isLocked(line) ? theme.colors.danger : theme.colors.mutedText}>
+-                  {isLocked(line) ? 'Bloqueado' : `${line.failedLoginAttempts} fallos`}
++                  {isLocked(line)
++                    ? t('securitySessions.locked')
++                    : t('securitySessions.failedAttempts', { count: line.failedLoginAttempts })}
+                 </AppText>
+               </View>
+
+-              <AppText color={theme.colors.mutedText}>Sucursal: {line.branchName || '-'}</AppText>
+-              <AppText color={theme.colors.mutedText}>Bloqueado hasta: {formatDate(line.lockedUntil)}</AppText>
+-              <AppText color={theme.colors.mutedText}>Ultimo fallo: {formatDate(line.lastFailedLoginAt)}</AppText>
+-              <AppText color={theme.colors.mutedText}>Ultimo acceso: {formatDate(line.lastSuccessLoginAt)}</AppText>
+-              <AppText color={theme.colors.mutedText}>IP ultimo acceso: {line.lastLoginIp || '-'}</AppText>
++              <AppText color={theme.colors.mutedText}>{t('securitySessions.branch')}: {line.branchName || '-'}</AppText>
++              <AppText color={theme.colors.mutedText}>{t('securitySessions.lockedUntil')}: {formatDate(line.lockedUntil)}</AppText>
++              <AppText color={theme.colors.mutedText}>{t('securitySessions.lastFailed')}: {formatDate(line.lastFailedLoginAt)}</AppText>
++              <AppText color={theme.colors.mutedText}>{t('securitySessions.lastSuccess')}: {formatDate(line.lastSuccessLoginAt)}</AppText>
++              <AppText color={theme.colors.mutedText}>{t('securitySessions.lastLoginIp')}: {line.lastLoginIp || '-'}</AppText>
+
+               <View style={styles.inlineActions}>
+                 <AppButton
+-                  title="Desbloquear"
++                  title={t('securitySessions.unlock')}
+                   variant="secondary"
+                   onPress={() => unlockUser(line.userId)}
+                   loading={workingUserId === line.userId}
+@@ -172,7 +174,7 @@ export default function SystemSessionsScreen() {
+                   style={styles.smallAction}
+                 />
+                 <AppButton
+-                  title="Cerrar sesiónes"
++                  title={t('securitySessions.closeSessions')}
+                   variant="danger"
+                   onPress={() => revokeSessions(line.userId)}
+                   disabled={workingUserId !== null}
+@@ -186,13 +188,13 @@ export default function SystemSessionsScreen() {
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Sesiónes activas ({sessions.length})
++          {t('securitySessions.activeSessions', { count: sessions.length })}
+         </AppText>
+
+         {loading ? (
+           <ActivityIndicator />
+         ) : sessions.length === 0 ? (
+-          <AppText color={theme.colors.mutedText}>No hay sesiónes activas.</AppText>
++          <AppText color={theme.colors.mutedText}>{t('securitySessions.noActiveSessions')}</AppText>
+         ) : (
+           sessions.map((line) => (
+             <View key={line.id} style={[styles.row, { borderBottomColor: theme.colors.border }]}>
+@@ -202,7 +204,7 @@ export default function SystemSessionsScreen() {
+                   <AppText color={theme.colors.mutedText}>{line.email}</AppText>
+                 </View>
+                 <AppButton
+-                  title="Cerrar"
++                  title={t('securitySessions.close')}
+                   variant="danger"
+                   onPress={() => revokeSession(line.id)}
+                   loading={workingUserId === line.id * -1}
+@@ -210,17 +212,17 @@ export default function SystemSessionsScreen() {
+                   style={styles.closeAction}
+                 />
+               </View>
+-              <AppText color={theme.colors.mutedText}>Sucursal: {line.branchName || '-'}</AppText>
+-              <AppText color={theme.colors.mutedText}>Ultima actividad: {formatDate(line.lastSeenAt)}</AppText>
+-              <AppText color={theme.colors.mutedText}>Expira: {formatDate(line.expiresAt)}</AppText>
+-              <AppText color={theme.colors.mutedText}>Expira maximo: {formatDate(line.absoluteExpiresAt)}</AppText>
+-              <AppText color={theme.colors.mutedText}>IP: {line.ipAddress || '-'}</AppText>
+-              <AppText color={theme.colors.mutedText}>Dispositivo: {line.userAgent || '-'}</AppText>
++              <AppText color={theme.colors.mutedText}>{t('securitySessions.branch')}: {line.branchName || '-'}</AppText>
++              <AppText color={theme.colors.mutedText}>{t('securitySessions.lastActivity')}: {formatDate(line.lastSeenAt)}</AppText>
++              <AppText color={theme.colors.mutedText}>{t('securitySessions.expires')}: {formatDate(line.expiresAt)}</AppText>
++              <AppText color={theme.colors.mutedText}>{t('securitySessions.absoluteExpires')}: {formatDate(line.absoluteExpiresAt)}</AppText>
++              <AppText color={theme.colors.mutedText}>{t('securitySessions.ip')}: {line.ipAddress || '-'}</AppText>
++              <AppText color={theme.colors.mutedText}>{t('securitySessions.device')}: {line.userAgent || '-'}</AppText>
+             </View>
+           ))
+         )}
+       </AppCard>
+-    </AppScreen>
++    </AppShellPage>
+   );
+ }
+
+diff --git a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+index 71c2aa2..7ab72ef 100644
+--- a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
++++ b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+@@ -295,3 +295,11 @@ PRODUCT-D6.4 extiende el sistema visual premium a pantallas operativas legacy:
+ - `/batches`
+
+ La fase no cambia tokens ni reglas de negocio. Aplica `AppShellPage`, sidebar/drawer, active state e i18n principal para que venta puerta, apartado puerta, inventario, alta de prendas y lotes ya no se vean como pantallas aisladas.
++
++---
++
++## Continuidad PRODUCT-D6.5 - Auditoria legacy
++
++Fecha: 2026-06-06
++
++PRODUCT-D6.5 audita automaticamente rutas `app/*.tsx`, migra `/system-security` y `/system-sessions` a `AppShellPage`, y deja inventario documentado de rutas legacy restantes para priorizacion posterior.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index fcae6cd..45ff7e8 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -132,3 +132,12 @@ La siguiente corrida manual debe confirmar AppShell/sidebar/drawer y ausencia de
+ - `/batches`.
+
+ Validar tambien active state correcto, idioma Espanol/English, light/dark, presets visuales y responsive desktop/tablet/mobile.
++
++## Nota PRODUCT-D6.5
++
++Agregar a la corrida manual:
++
++- `/system-security`;
++- `/system-sessions`.
++
++Confirmar AppShell/sidebar/drawer, active state correcto, ausencia de `Menu principal` legacy, idioma Espanol/English, light/dark y mobile/drawer.
+diff --git a/docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md b/docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md
+index ec09627..7f036a9 100644
+--- a/docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md
++++ b/docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md
+@@ -44,6 +44,10 @@ La navegacion traducible depende de la fuente global `i18next` + AsyncStorage (`
+
+ Las rutas operativas expuestas desde D5 en el menu (`/door-sale`, `/door-reservation`, `/items`, `/items-create`, `/batches`) fueron migradas en PRODUCT-D6.4 a `AppShellPage`, manteniendo los mismos permisos/canales documentados en esta matriz.
+
++## Nota PRODUCT-D6.5
++
++Las rutas de Seguridad expuestas desde D5 (`/system-security` y `/system-sessions`) fueron migradas en PRODUCT-D6.5 a `AppShellPage`, manteniendo visibilidad ADMIN y active state de la navegacion categorizada.
++
+ Reglas aplicadas:
+
+ - No se muestran categorias vacias.
+diff --git a/docs/PRODUCT_D6_2B_VISIBLE_I18N_HARDCODES.md b/docs/PRODUCT_D6_2B_VISIBLE_I18N_HARDCODES.md
+index 794e723..18e4fd6 100644
+--- a/docs/PRODUCT_D6_2B_VISIBLE_I18N_HARDCODES.md
++++ b/docs/PRODUCT_D6_2B_VISIBLE_I18N_HARDCODES.md
+@@ -56,6 +56,10 @@ PRODUCT-D6.3 migro las pantallas listadas a `AppShellPage`/`AppShell`, retiro la
+
+ La deuda restante queda acotada a estados/codigos retornados por backend y a pantallas fuera del listado D6.3 que QA pueda identificar posteriormente.
+
++## Actualizacion PRODUCT-D6.5
++
++PRODUCT-D6.5 agrega i18n visible para `/system-security` y `/system-sessions` mediante `securitySettings.*` y `securitySessions.*`, junto con la migracion de ambas rutas a `AppShellPage`.
++
+ ## Validacion manual esperada
+
+ 1. Entrar con `qa.admin@local.test`.
+diff --git a/docs/PRODUCT_D6_3_LEGACY_PREMIUM_MIGRATION.md b/docs/PRODUCT_D6_3_LEGACY_PREMIUM_MIGRATION.md
+index 78cf0f3..91b45ca 100644
+--- a/docs/PRODUCT_D6_3_LEGACY_PREMIUM_MIGRATION.md
++++ b/docs/PRODUCT_D6_3_LEGACY_PREMIUM_MIGRATION.md
+@@ -81,6 +81,10 @@ PRODUCT-D6.4 extiende la misma estrategia de `AppShellPage` a pantallas operativ
+
+ Las rutas de caja (`cash-closures`, `cash-closure-detail`) se documentan como legacy pendiente, pero no se migran en D6.4 porque caja queda explicitamente fuera de alcance.
+
++## Nota PRODUCT-D6.5
++
++PRODUCT-D6.5 complementa esta migracion con una auditoria automatica de rutas `app/*.tsx` y migra `/system-security` y `/system-sessions`, que QA observo con layout legacy.
++
+ ## Riesgos pendientes
+
+ - Algunas tablas de reportes muestran estados/codigos que vienen del backend; se mantienen como datos tecnicos.
+diff --git a/docs/PRODUCT_D6_4_OPERATIONAL_LEGACY_APPSHELL.md b/docs/PRODUCT_D6_4_OPERATIONAL_LEGACY_APPSHELL.md
+index b908e63..5f99c72 100644
+--- a/docs/PRODUCT_D6_4_OPERATIONAL_LEGACY_APPSHELL.md
++++ b/docs/PRODUCT_D6_4_OPERATIONAL_LEGACY_APPSHELL.md
+@@ -62,6 +62,15 @@ No se traducen codigos tecnicos, estados backend ni datos retornados por API.
+ - `cash-closures` y `cash-closure-detail` quedan pendientes porque D6.4 excluye caja.
+ - Rutas no encontradas: `/inventory`, `/checkout`, `/sales`, `/pos`, `/cash`.
+
++## Nota PRODUCT-D6.5
++
++PRODUCT-D6.5 ejecuto una auditoria automatica sobre `app/*.tsx` y migro dos rutas legacy adicionales observadas por QA:
++
++- `/system-security`
++- `/system-sessions`
++
++El inventario completo de rutas legacy restantes queda documentado en `docs/PRODUCT_D6_5_LEGACY_ROUTE_AUDIT.md`.
++
+ ## Riesgos pendientes
+
+ - Algunas alertas historicas y textos secundarios de flujo operativo siguen hardcodeados; no se tocaron para evitar cambios funcionales fuera de la migracion visual.
+diff --git a/docs/PRODUCT_D6_5_LEGACY_ROUTE_AUDIT.md b/docs/PRODUCT_D6_5_LEGACY_ROUTE_AUDIT.md
+new file mode 100644
+index 0000000..c05e1d0
+--- /dev/null
++++ b/docs/PRODUCT_D6_5_LEGACY_ROUTE_AUDIT.md
+@@ -0,0 +1,139 @@
++# PRODUCT-D6.5 - Auditoria automatica y migracion final de pantallas legacy
++
++Fecha: 2026-06-06
++
++## Objetivo
++
++Auditar automaticamente rutas `app/*.tsx`, detectar patrones legacy y migrar rutas seguras a `AppShellPage` sin cambiar backend, AUTH/RBAC funcional, pagos, caja, reportes backend, billing, IA, endpoints, reglas LIVE ni contratos API.
++
++## Auditoria automatica
++
++Comandos usados:
++
++- `rg --files app -g "*.tsx"`
++- `rg "AppScreen|AppBackButton|Menu principal|Menú principal|build.*Nav|navigationItems" app components -g "*.tsx" -g "*.ts"`
++- conteo PowerShell de rutas top-level `app/*.tsx` con patrones legacy.
++
++Resultado:
++
++- Rutas top-level auditadas: 68
++- Rutas con patron legacy antes de D6.5: 46
++- Rutas migradas en D6.5: 2
++- Rutas con patron legacy despues de D6.5: 44
++
++## Patrones legacy encontrados
++
++- Import o uso de `AppScreen`.
++- Import o uso de `AppBackButton`.
++- Texto `Menu principal`.
++- Pantallas sin `AppShell` / `AppShellPage`.
++- Rutas hijas con navegacion contextual antigua.
++
++## Rutas migradas
++
++| Ruta | Archivo | Active route | Motivo |
++| --- | --- | --- | --- |
++| `/system-security` | `app/system-security.tsx` | `system-security` | Observada por QA con layout legacy y ya existe en navegacion de Seguridad |
++| `/system-sessions` | `app/system-sessions.tsx` | `system-sessions` | Observada por QA con layout legacy y ya existe en navegacion de Seguridad |
++
++Cambios aplicados:
++
++- Se reemplazo `AppScreen` por `AppShellPage`.
++- Se retiro `AppBackButton` como barra superior legacy.
++- Se eliminaron titulos locales duplicados.
++- Se conectaron titulos, subtitulos, labels, botones y mensajes principales a i18n ES/EN.
++- Se conservaron servicios, formularios, switches, validaciones, acciones y permisos.
++
++## Rutas legacy restantes
++
++Rutas detectadas con patrones legacy despues de D6.5:
++
++- `access-denied.tsx`
++- `batch-detail.tsx`
++- `batch-form.tsx`
++- `branches-form.tsx`
++- `branches.tsx`
++- `cash-closure-detail.tsx`
++- `cash-closures.tsx`
++- `catalog-form.tsx`
++- `catalog-list.tsx`
++- `catalogs.tsx`
++- `change-password.tsx`
++- `channels.tsx`
++- `consignee-form.tsx`
++- `consignees.tsx`
++- `consignment-detail.tsx`
++- `consignments.tsx`
++- `customer-addresses-create.tsx`
++- `customer-order-detail.tsx`
++- `customer-orders.tsx`
++- `customer-package-detail.tsx`
++- `customer-packages.tsx`
++- `customers-create.tsx`
++- `customers.tsx`
++- `dashboard.tsx`
++- `incident-detail.tsx`
++- `incidents.tsx`
++- `login.tsx`
++- `modal.tsx`
++- `movement-history.tsx`
++- `payments.tsx`
++- `refund-create.tsx`
++- `refund-detail.tsx`
++- `refunds.tsx`
++- `reservation-detail.tsx`
++- `reservations.tsx`
++- `return-create.tsx`
++- `return-detail.tsx`
++- `returns.tsx`
++- `shipment-detail.tsx`
++- `shipments.tsx`
++- `system-logs.tsx`
++- `transfer-detail.tsx`
++- `transfers.tsx`
++- `users.tsx`
++
++## Rutas no migradas y motivo
++
++| Grupo | Rutas | Motivo |
++| --- | --- | --- |
++| Auth / sistema base | `login`, `access-denied`, `change-password`, `modal`, `(tabs)` | Pantallas especiales; requieren criterio UX propio |
++| Caja / pagos | `cash-*`, `payments` | Caja y pagos estan explicitamente fuera de alcance |
++| Rutas hijas de inventario | `batch-form`, `batch-detail`, `items/[id]` | Requieren fase dedicada para navegacion contextual |
++| Clientes / paquetes / pedidos | `customers-create`, `customers/[id]`, `customer-*` | Dominio funcional amplio; no migrar sin QA de flujo |
++| Consignaciones / envios / devoluciones / reembolsos / transferencias | `consignments`, `shipments`, `returns`, `refunds`, `transfers` y detalles/forms | Flujos operativos adicionales no incluidos en D6.5 |
++| Catalogos / sucursales / canales | `catalog*`, `branches*`, `channels` | Admin catalogos legacy; requiere fase de catalogos |
++| Observabilidad no navegada | `system-logs` | No esta en menu principal; documentada para fase posterior |
++| Pantallas ya AppShell con loading legacy | `customers`, `reservations`, `users`, `reservation-detail` | Usan AppShell en vista principal; los patrones restantes estan en estados de carga o navegacion contextual |
++
++## i18n agregado
++
++Se agregaron claves:
++
++- `securitySettings.*`
++- `securitySessions.*`
++
++No se traducen codigos tecnicos, datos retornados por backend ni identificadores internos.
++
++## Validacion manual esperada
++
++1. Entrar con `qa.admin@local.test`.
++2. Abrir `/system-security`.
++3. Confirmar AppShell/sidebar/drawer y active state `Seguridad dev`.
++4. Confirmar que no aparece `Menu principal` ni barra superior `Volver`.
++5. Cambiar Espanol/English y confirmar textos principales.
++6. Validar light/dark y presets.
++7. Abrir `/system-sessions`.
++8. Confirmar AppShell/sidebar/drawer y active state `Sesiones y bloqueos`.
++9. Confirmar acciones de recarga/cierre/desbloqueo sin cambios funcionales.
++10. Validar mobile/drawer.
++
++## Riesgos pendientes
++
++- La auditoria confirma que aun existen rutas legacy fuera del menu principal o fuera de este alcance.
++- Caja/pagos requieren una fase separada por sensibilidad funcional.
++- Flujos de envios, devoluciones, reembolsos, transferencias, consignaciones y catalogos requieren priorizacion de negocio antes de migracion visual.
++
++## GO/NO-GO
++
++GO tecnico condicionado a validaciones automaticas completas y a corrida visual manual de `/system-security` y `/system-sessions`.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index a20a17b..3f722fc 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -916,6 +916,77 @@
+     "noData": "No data.",
+     "noEmail": "No email"
+   },
++  "securitySettings": {
++    "title": "Dev security",
++    "subtitle": "Operational security, session, and login lockout settings",
++    "parametersTitle": "Operational parameters",
++    "parametersHelp": "Only technical support should modify these values. They apply to inactivity logout and temporary lockout after failed attempts.",
++    "sessionTimeout": "Logout after inactivity (minutes)",
++    "passwordMinLength": "Minimum password length",
++    "passwordExpirationDays": "Expire password every (days, 0 disables)",
++    "passwordHistoryCount": "Do not reuse recent passwords",
++    "requireUppercase": "Require uppercase",
++    "requireLowercase": "Require lowercase",
++    "requireNumber": "Require number",
++    "requireSymbol": "Require symbol",
++    "maxLoginAttempts": "Failed attempts before lockout",
++    "loginLockoutMinutes": "Temporary lockout time (minutes)",
++    "absoluteSessionTimeout": "Absolute session maximum (hours, 0 disables)",
++    "saving": "Saving...",
++    "save": "Save parameters",
++    "reload": "Reload",
++    "waitLoading": "Wait until settings finish loading.",
++    "savingReason": "The parameters are being saved.",
++    "validationTitle": "Review the values",
++    "loadErrorTitle": "Dev security",
++    "loadErrorMessage": "Could not load the configuration.",
++    "savedTitle": "Security updated",
++    "savedMessage": "The parameters were saved successfully.",
++    "saveErrorTitle": "Could not save",
++    "saveErrorMessage": "Check your connection or permissions.",
++    "validationSessionTimeout": "Inactivity logout must be between 5 and 720 minutes.",
++    "validationMaxAttempts": "Login attempts must be between 3 and 20.",
++    "validationLockout": "Temporary lockout must be between 1 and 1440 minutes.",
++    "validationPasswordMin": "Minimum password length must be between 6 and 64.",
++    "validationExpiration": "Password expiration must be between 0 and 365 days.",
++    "validationHistory": "Password history must be between 0 and 20.",
++    "validationAbsolute": "Absolute session maximum must be between 0 and 720 hours."
++  },
++  "securitySessions": {
++    "title": "Sessions and locks",
++    "subtitle": "Support view for active sessions, locked users, and login attempts",
++    "statusTitle": "Security status",
++    "statusHelp": "Support view to unlock users and close active sessions.",
++    "refreshing": "Refreshing...",
++    "refresh": "Refresh",
++    "closeAll": "Close all sessions",
++    "usersWithLoginActivity": "Users with login activity ({{count}})",
++    "noLoginActivity": "No recent lockouts or attempts.",
++    "locked": "Locked",
++    "failedAttempts": "{{count}} failures",
++    "branch": "Branch",
++    "lockedUntil": "Locked until",
++    "lastFailed": "Last failure",
++    "lastSuccess": "Last access",
++    "lastLoginIp": "Last access IP",
++    "unlock": "Unlock",
++    "closeSessions": "Close sessions",
++    "activeSessions": "Active sessions ({{count}})",
++    "noActiveSessions": "No active sessions.",
++    "close": "Close",
++    "lastActivity": "Last activity",
++    "expires": "Expires",
++    "absoluteExpires": "Absolute expiry",
++    "ip": "IP",
++    "device": "Device",
++    "loadErrorTitle": "Sessions and locks",
++    "loadErrorMessage": "Could not load the information.",
++    "unlockErrorTitle": "Could not unlock",
++    "actionErrorMessage": "Try again.",
++    "revokeUserErrorTitle": "Could not revoke sessions",
++    "revokeSessionErrorTitle": "Could not close the session",
++    "revokeAllErrorTitle": "Could not close all sessions"
++  },
+   "appearance": {
+     "subtitle": "Visual identity, branding, and operational preferences",
+     "invalidColorTitle": "Invalid color",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index 6f99f1f..f746174 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -916,6 +916,77 @@
+     "noData": "Sin datos.",
+     "noEmail": "Sin email"
+   },
++  "securitySettings": {
++    "title": "Seguridad dev",
++    "subtitle": "Parametros operativos de seguridad, sesiones y bloqueo de login",
++    "parametersTitle": "Parametros operativos",
++    "parametersHelp": "Solo soporte tecnico puede modificar estos valores. Aplican al cierre por inactividad y al bloqueo temporal por intentos fallidos.",
++    "sessionTimeout": "Cerrar sesion por inactividad (minutos)",
++    "passwordMinLength": "Longitud minima de contrasena",
++    "passwordExpirationDays": "Expirar contrasena cada (dias, 0 desactiva)",
++    "passwordHistoryCount": "No reutilizar ultimas contrasenas",
++    "requireUppercase": "Requerir mayuscula",
++    "requireLowercase": "Requerir minuscula",
++    "requireNumber": "Requerir numero",
++    "requireSymbol": "Requerir simbolo",
++    "maxLoginAttempts": "Intentos fallidos antes de bloquear",
++    "loginLockoutMinutes": "Tiempo de bloqueo temporal (minutos)",
++    "absoluteSessionTimeout": "Sesion maxima absoluta (horas, 0 desactiva)",
++    "saving": "Guardando...",
++    "save": "Guardar parametros",
++    "reload": "Recargar",
++    "waitLoading": "Espera a que termine de cargar la configuracion.",
++    "savingReason": "Se estan guardando los parametros.",
++    "validationTitle": "Revisa los valores",
++    "loadErrorTitle": "Seguridad dev",
++    "loadErrorMessage": "No se pudo cargar la configuracion.",
++    "savedTitle": "Seguridad actualizada",
++    "savedMessage": "Los parametros se guardaron correctamente.",
++    "saveErrorTitle": "No se pudo guardar",
++    "saveErrorMessage": "Revisa tu conexion o permisos.",
++    "validationSessionTimeout": "El cierre de sesion debe estar entre 5 y 720 minutos.",
++    "validationMaxAttempts": "Los intentos de login deben estar entre 3 y 20.",
++    "validationLockout": "El bloqueo temporal debe estar entre 1 y 1440 minutos.",
++    "validationPasswordMin": "La longitud minima de contrasena debe estar entre 6 y 64.",
++    "validationExpiration": "La expiracion de contrasena debe estar entre 0 y 365 dias.",
++    "validationHistory": "El historial de contrasenas debe estar entre 0 y 20.",
++    "validationAbsolute": "La sesion maxima absoluta debe estar entre 0 y 720 horas."
++  },
++  "securitySessions": {
++    "title": "Sesiones y bloqueos",
++    "subtitle": "Soporte para sesiones activas, usuarios bloqueados e intentos de login",
++    "statusTitle": "Estado de seguridad",
++    "statusHelp": "Vista de soporte para desbloquear usuarios y cerrar sesiones activas.",
++    "refreshing": "Actualizando...",
++    "refresh": "Actualizar",
++    "closeAll": "Cerrar todas las sesiones",
++    "usersWithLoginActivity": "Usuarios con actividad de login ({{count}})",
++    "noLoginActivity": "No hay bloqueos ni intentos recientes.",
++    "locked": "Bloqueado",
++    "failedAttempts": "{{count}} fallos",
++    "branch": "Sucursal",
++    "lockedUntil": "Bloqueado hasta",
++    "lastFailed": "Ultimo fallo",
++    "lastSuccess": "Ultimo acceso",
++    "lastLoginIp": "IP ultimo acceso",
++    "unlock": "Desbloquear",
++    "closeSessions": "Cerrar sesiones",
++    "activeSessions": "Sesiones activas ({{count}})",
++    "noActiveSessions": "No hay sesiones activas.",
++    "close": "Cerrar",
++    "lastActivity": "Ultima actividad",
++    "expires": "Expira",
++    "absoluteExpires": "Expira maximo",
++    "ip": "IP",
++    "device": "Dispositivo",
++    "loadErrorTitle": "Sesiones y bloqueos",
++    "loadErrorMessage": "No se pudo cargar la informacion.",
++    "unlockErrorTitle": "No se pudo desbloquear",
++    "actionErrorMessage": "Intenta de nuevo.",
++    "revokeUserErrorTitle": "No se pudieron revocar sesiones",
++    "revokeSessionErrorTitle": "No se pudo cerrar la sesion",
++    "revokeAllErrorTitle": "No se pudieron cerrar las sesiones"
++  },
+   "appearance": {
+     "subtitle": "Identidad visual, branding y preferencias operativas",
+     "invalidColorTitle": "Color invalido",
+diff --git a/qa-reports/PRODUCT-D6-5-legacy-route-audit-report-20260606-184543.md b/qa-reports/PRODUCT-D6-5-legacy-route-audit-report-20260606-184543.md
+new file mode 100644
+index 0000000..e940207
+--- /dev/null
++++ b/qa-reports/PRODUCT-D6-5-legacy-route-audit-report-20260606-184543.md
+@@ -0,0 +1,85 @@
++# PRODUCT-D6.5 - Legacy Route Audit Report
++
++Fecha/hora: 2026-06-06 18:45:43
++
++## Objetivo
++
++Auditar rutas `app/*.tsx`, detectar layout legacy y migrar rutas seguras a `AppShellPage`, sin tocar backend, AUTH/RBAC funcional, pagos, caja, reportes backend, billing, IA, endpoints ni reglas LIVE.
++
++## Resultado de auditoria
++
++- Rutas top-level auditadas: 68
++- Rutas con patron legacy antes de D6.5: 46
++- Rutas migradas en D6.5: 2
++- Rutas con patron legacy despues de D6.5: 44
++
++Patrones detectados:
++
++- `AppScreen`
++- `AppBackButton`
++- `Menu principal`
++- ausencia de `AppShell` / `AppShellPage`
++
++## Rutas migradas
++
++- `/system-security` (`app/system-security.tsx`)
++- `/system-sessions` (`app/system-sessions.tsx`)
++
++Cambios:
++
++- `AppShellPage` como layout principal.
++- Active routes:
++  - `system-security`
++  - `system-sessions`
++- Eliminacion de `AppBackButton` como navegacion superior legacy.
++- i18n ES/EN para titulos, subtitulos, labels, acciones y mensajes principales.
++- Sin cambios en servicios, formularios, switches, validaciones ni permisos.
++
++## Rutas no migradas
++
++Se documentan como pendientes o excluidas:
++
++- Caja/pagos: `cash-*`, `payments`.
++- Auth/especiales: `login`, `access-denied`, `change-password`, `modal`, `(tabs)`.
++- Rutas hijas o contextuales: `batch-*`, `items/[id]`, `customers/[id]`, `customer-*`.
++- Flujos funcionales amplios: `shipments`, `returns`, `refunds`, `transfers`, `consignments`, `catalogs`, `branches`, `channels`, `incidents`.
++- `system-logs`: documentada como observabilidad no navegada.
++
++## Validaciones tecnicas
++
++- `git branch --show-current`: OK, `feature/product-d6-5-legacy-route-audit`
++- `git status`: OK inicial limpio
++- `git --no-pager diff --check`: OK inicial y OK final sin errores
++- `npm.cmd run lint`: OK, 0 errores, 53 warnings heredados/estructurales
++- `npx.cmd tsc --noEmit`: OK
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK
++- `./mvnw.cmd test`: OK, 73 tests, 0 failures, 0 errors
++- `./mvnw.cmd -q -DskipTests package`: OK
++
++Warnings relevantes:
++
++- Lint mantiene warnings existentes de hooks, BOM y tipos en rutas fuera de alcance.
++- En rutas migradas quedan warnings de dependencias de hooks; no se modificaron para evitar cambios funcionales en la carga de datos.
++- Maven registra warnings conocidos de MySQL 5.7 y Mockito/dynamic agent, sin afectar el resultado.
++
++## Riesgos
++
++- El conteo de legacy sigue alto porque muchas rutas pertenecen a dominios no incluidos en D6.5.
++- Caja/pagos no se migran por exclusion explicita.
++- Flujos como envios, devoluciones, reembolsos, transferencias, consignaciones y catalogos requieren fase propia para no mezclar visual con logica funcional.
++
++## Validacion manual esperada
++
++1. Entrar con `qa.admin@local.test`.
++2. Abrir `/system-security`.
++3. Confirmar AppShell/sidebar/drawer.
++4. Confirmar que no aparece `Menu principal` ni barra superior `Volver`.
++5. Confirmar idioma Espanol/English.
++6. Confirmar light/dark y presets.
++7. Abrir `/system-sessions`.
++8. Confirmar AppShell/sidebar/drawer, active state e i18n.
++9. Validar mobile/drawer.
++
++## GO/NO-GO
++
++GO tecnico. GO visual queda sujeto a validacion manual en navegador/AnyDesk.
