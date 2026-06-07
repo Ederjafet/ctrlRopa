@@ -1,7 +1,6 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { hasPermission } from '@/services/accessControl';
@@ -200,21 +199,22 @@ export default function SystemSecurityAuditScreen() {
 
   if (!authorized) {
     return (
-      <AppScreen>
-        <AppBackButton fallbackRoute="/system" />
+      <AppShellPage
+        title={t('securityAudit.title')}
+        subtitle={t('securityAudit.help')}
+        activeRoute="system-security-audit"
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute="/system" />
-
-      <AppText variant="title" bold>
-        {t('securityAudit.title')}
-      </AppText>
-
+    <AppShellPage
+      title={t('securityAudit.title')}
+      subtitle={t('securityAudit.help')}
+      activeRoute="system-security-audit"
+    >
       <AppCard>
         <AppText variant="subtitle" bold>
           {t('securityAudit.blockedEvents')}
@@ -352,7 +352,7 @@ export default function SystemSecurityAuditScreen() {
           />
         </View>
       </AppCard>
-    </AppScreen>
+    </AppShellPage>
   );
 }
 
@@ -366,6 +366,7 @@ function SecurityAuditAlertsPanel({
   error: string | null;
 }) {
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
   const lines = alerts?.alerts ?? [];
 
   return (
@@ -373,10 +374,10 @@ function SecurityAuditAlertsPanel({
       <View style={styles.listHeader}>
         <View>
           <AppText variant="subtitle" bold>
-            Alertas recientes
+            {t('securityAudit.alertsRecent')}
           </AppText>
           <AppText color={theme.colors.mutedText}>
-            Patrones criticos detectados en los ultimos 60 minutos.
+            {t('securityAudit.alertsHelp')}
           </AppText>
         </View>
         {loading ? <ActivityIndicator /> : null}
@@ -389,7 +390,7 @@ function SecurityAuditAlertsPanel({
       ) : null}
 
       {!loading && !error && lines.length === 0 ? (
-        <AppText color={theme.colors.mutedText}>Sin alertas criticas.</AppText>
+        <AppText color={theme.colors.mutedText}>{t('securityAudit.noCriticalAlerts')}</AppText>
       ) : (
         <View style={styles.alertGrid}>
           {lines.map((alert, index) => (
@@ -403,6 +404,7 @@ function SecurityAuditAlertsPanel({
 
 function SecurityAuditAlertCard({ alert }: { alert: SecurityAuditAlertLine }) {
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
   const color = alert.severity === 'CRITICAL' || alert.severity === 'HIGH'
     ? theme.colors.danger
     : alert.severity === 'MEDIUM'
@@ -417,11 +419,11 @@ function SecurityAuditAlertCard({ alert }: { alert: SecurityAuditAlertLine }) {
       </View>
       <AppText bold>{alert.alertType}</AppText>
       <AppText color={theme.colors.mutedText}>{alert.description}</AppText>
-      {alert.email ? <AuditDetail label="Email" value={alert.email} /> : null}
-      {alert.path ? <AuditDetail label="Ruta" value={alert.path} /> : null}
+      {alert.email ? <AuditDetail label={t('securityAudit.email')} value={alert.email} /> : null}
+      {alert.path ? <AuditDetail label={t('securityAudit.path')} value={alert.path} /> : null}
       <View style={styles.detailGrid}>
-        <AuditDetail label="Company" value={alert.companyId} />
-        <AuditDetail label="Branch" value={alert.branchId} />
+        <AuditDetail label={t('securityAudit.company')} value={alert.companyId} />
+        <AuditDetail label={t('securityAudit.branch')} value={alert.branchId} />
       </View>
       <AppText variant="caption" color={theme.colors.mutedText}>
         {formatDate(alert.firstSeen)} - {formatDate(alert.lastSeen)}
@@ -440,16 +442,17 @@ function SecurityAuditSummaryDashboard({
   error: string | null;
 }) {
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
 
   return (
     <AppCard>
       <View style={styles.listHeader}>
         <View>
           <AppText variant="subtitle" bold>
-            Resumen de seguridad
+            {t('securityAudit.summaryTitle')}
           </AppText>
           <AppText color={theme.colors.mutedText}>
-            Vista rapida de bloqueos, usuarios y rutas frecuentes.
+            {t('securityAudit.summaryHelp')}
           </AppText>
         </View>
         {loading ? <ActivityIndicator /> : null}
@@ -462,27 +465,27 @@ function SecurityAuditSummaryDashboard({
       ) : null}
 
       <View style={styles.metricGrid}>
-        <AuditMetricCard label="Total eventos" value={summary?.totalEvents ?? 0} />
-        <AuditMetricCard label="Total 401" value={summary?.total401 ?? 0} tone="danger" />
-        <AuditMetricCard label="Total 403" value={summary?.total403 ?? 0} tone="warning" />
+        <AuditMetricCard label={t('securityAudit.metricTotalEvents')} value={summary?.totalEvents ?? 0} />
+        <AuditMetricCard label={t('securityAudit.metricTotal401')} value={summary?.total401 ?? 0} tone="danger" />
+        <AuditMetricCard label={t('securityAudit.metricTotal403')} value={summary?.total403 ?? 0} tone="warning" />
       </View>
 
       <View style={styles.summaryGrid}>
-        <AuditSummarySection title="Eventos por tipo" items={summary?.byEventType ?? []} />
-        <AuditSummarySection title="Eventos por status" items={summary?.byStatusCode ?? []} />
-        <AuditSummarySection title="Top usuarios" items={summary?.topEmails ?? []} />
-        <AuditSummarySection title="Top endpoints" items={summary?.topPaths ?? []} />
+        <AuditSummarySection title={t('securityAudit.byEventType')} items={summary?.byEventType ?? []} />
+        <AuditSummarySection title={t('securityAudit.byStatusCode')} items={summary?.byStatusCode ?? []} />
+        <AuditSummarySection title={t('securityAudit.topUsers')} items={summary?.topEmails ?? []} />
+        <AuditSummarySection title={t('securityAudit.topEndpoints')} items={summary?.topPaths ?? []} />
       </View>
 
       <View style={styles.criticalSection}>
-        <AppText bold>Eventos criticos recientes</AppText>
+        <AppText bold>{t('securityAudit.recentCriticalEvents')}</AppText>
         {summary?.recentCriticalEvents?.length ? (
           summary.recentCriticalEvents.map((event) => (
             <CriticalEventRow key={event.id} event={event} />
           ))
         ) : (
           <AppText color={theme.colors.mutedText}>
-            No hay eventos criticos recientes con estos filtros.
+            {t('securityAudit.noRecentCriticalEvents')}
           </AppText>
         )}
       </View>
@@ -526,12 +529,13 @@ function AuditSummarySection({
   items: SecurityAuditCountLine[];
 }) {
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
 
   return (
     <View style={[styles.summarySection, { borderColor: theme.colors.border }]}>
       <AppText bold>{title}</AppText>
       {items.length === 0 ? (
-        <AppText color={theme.colors.mutedText}>Sin datos.</AppText>
+        <AppText color={theme.colors.mutedText}>{t('securityAudit.noData')}</AppText>
       ) : (
         items.map((item) => (
           <View key={`${title}-${item.key}`} style={styles.summaryLine}>
@@ -546,6 +550,7 @@ function AuditSummarySection({
 
 function CriticalEventRow({ event }: { event: SecurityAuditCriticalEventLine }) {
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
 
   return (
     <View style={[styles.criticalRow, { borderBottomColor: theme.colors.border }]}>
@@ -561,7 +566,7 @@ function CriticalEventRow({ event }: { event: SecurityAuditCriticalEventLine }) 
         </AppText>
       </View>
       <AppText color={theme.colors.mutedText}>
-        {event.email || 'Sin email'} - {event.httpMethod || '-'} {event.path || '-'}
+        {event.email || t('securityAudit.noEmail')} - {event.httpMethod || '-'} {event.path || '-'}
       </AppText>
       {event.reason ? <AppText>{event.reason}</AppText> : null}
     </View>
@@ -611,6 +616,7 @@ function AuditInput({
 
 function AuditEventRow({ event }: { event: SecurityAuditEventLine }) {
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
 
   return (
     <View style={[styles.eventRow, { borderBottomColor: theme.colors.border }]}>
@@ -627,12 +633,12 @@ function AuditEventRow({ event }: { event: SecurityAuditEventLine }) {
       </View>
 
       <View style={styles.detailGrid}>
-        <AuditDetail label="Email" value={event.email} />
-        <AuditDetail label="Company" value={event.companyId} />
-        <AuditDetail label="Branch" value={event.branchId} />
-        <AuditDetail label="Metodo" value={event.httpMethod} />
-        <AuditDetail label="Ruta" value={event.path} wide />
-        <AuditDetail label="Motivo" value={event.reason} wide />
+        <AuditDetail label={t('securityAudit.email')} value={event.email} />
+        <AuditDetail label={t('securityAudit.company')} value={event.companyId} />
+        <AuditDetail label={t('securityAudit.branch')} value={event.branchId} />
+        <AuditDetail label={t('securityAudit.method')} value={event.httpMethod} />
+        <AuditDetail label={t('securityAudit.path')} value={event.path} wide />
+        <AuditDetail label={t('securityAudit.reason')} value={event.reason} wide />
       </View>
     </View>
   );

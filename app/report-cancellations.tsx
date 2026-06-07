@@ -1,16 +1,16 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppDateField from '@/components/ui/AppDateField';
 import AppInput from '@/components/ui/AppInput';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { Branch, getActiveBranches } from '@/services/branchAdminService';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
-import { DailyCancellationLine, DailyCancellationsReport, getDailyCancellationsReport } from '@/services/reportService';
+import { DailyCancellationsReport, getDailyCancellationsReport } from '@/services/reportService';
 
 function todayIsoDate() {
   const now = new Date();
@@ -26,7 +26,7 @@ function formatMoney(value?: number | null) {
 }
 
 function formatDateTime(value?: string | null) {
-  if (!value) return '—';
+  if (!value) return 'â€”';
   return new Date(value).toLocaleString();
 }
 
@@ -94,6 +94,7 @@ function BranchSelector({
 
 export default function ReportCancellationsScreen() {
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
 
   const [session, setSession] = useState<UserSession | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -172,34 +173,38 @@ export default function ReportCancellationsScreen() {
 
   if (initialLoading) {
     return (
-      <AppScreen>
+      <AppShellPage
+        title={t('reports.dailyCancellationsTitle')}
+        subtitle={t('reports.dailyCancellationsDescription')}
+        activeRoute="report-cancellations"
+        session={session}
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute="/reports" />
-
-      <AppText variant="title" bold>
-        Cancelaciones diarias
-      </AppText>
-
+    <AppShellPage
+      title={t('reports.dailyCancellationsTitle')}
+      subtitle={t('reports.dailyCancellationsDescription')}
+      activeRoute="report-cancellations"
+      session={session}
+    >
       <AppCard>
         <AppText variant="subtitle" bold>
-          Filtros
+          {t('common.filters')}
         </AppText>
 
         <View style={sharedStyles.filters}>
           <AppDateField
-            label="Fecha"
+            label={t('common.date')}
             value={date}
             onChange={setDate}
           />
 
           <AppText variant="subtitle" bold>
-            Sucursal
+            {t('common.branch')}
           </AppText>
 
           <BranchSelector
@@ -209,7 +214,7 @@ export default function ReportCancellationsScreen() {
           />
 
           <AppButton
-            title={loading ? 'Consultando...' : 'Consultar'}
+            title={loading ? t('reports.querying') : t('reports.query')}
             onPress={loadReport}
             loading={loading}
             disabled={loading}
@@ -221,7 +226,7 @@ export default function ReportCancellationsScreen() {
         <>
           <AppCard>
             <AppText variant="subtitle" bold>
-              Resumen · {report.branchName || report.branchCode || 'Sucursal'} · {report.date}
+              Resumen Â· {report.branchName || report.branchCode || 'Sucursal'} Â· {report.date}
             </AppText>
 
             <View style={sharedStyles.summaryGrid}>
@@ -235,7 +240,7 @@ export default function ReportCancellationsScreen() {
           </AppCard>
 
           <AppInput
-            label="Buscar en líneas"
+            label="Buscar en lÃ­neas"
             placeholder="Cliente, folio, estado, referencia..."
             value={search}
             onChangeText={setSearch}
@@ -248,7 +253,7 @@ export default function ReportCancellationsScreen() {
 
             {filteredLines.length === 0 ? (
               <AppText color={theme.colors.mutedText}>
-                No hay líneas para mostrar.
+                No hay lÃ­neas para mostrar.
               </AppText>
             ) : (
               filteredLines.map((line: any, index: number) => (
@@ -261,9 +266,9 @@ export default function ReportCancellationsScreen() {
                 >
                   <View style={sharedStyles.headerRow}>
                     <View style={sharedStyles.headerText}>
-                      <AppText bold>{line.folio || `${line.sourceType || 'Origen'} #${line.sourceId || '—'}`}</AppText>
+                      <AppText bold>{line.folio || `${line.sourceType || 'Origen'} #${line.sourceId || 'â€”'}`}</AppText>
                       <AppText color={theme.colors.mutedText}>
-                        {line.customerName || 'Cliente sin nombre'} · {line.itemCode || 'Sin item'}
+                        {line.customerName || 'Cliente sin nombre'} Â· {line.itemCode || 'Sin item'}
                       </AppText>
                     </View>
                     <AppText bold color={theme.colors.danger}>
@@ -271,9 +276,9 @@ export default function ReportCancellationsScreen() {
                     </AppText>
                   </View>
                   <View style={sharedStyles.meta}>
-                    <AppText color={theme.colors.mutedText}>Estado: {line.status || '—'}</AppText>
-                    <AppText color={theme.colors.mutedText}>Canceló: {line.cancelledByUserName || line.cancelledByUserId || '—'}</AppText>
-                    <AppText color={theme.colors.mutedText}>Refund: {line.refundStatus || '—'} · {formatMoney(line.refundAmount)}</AppText>
+                    <AppText color={theme.colors.mutedText}>Estado: {line.status || 'â€”'}</AppText>
+                    <AppText color={theme.colors.mutedText}>CancelÃ³: {line.cancelledByUserName || line.cancelledByUserId || 'â€”'}</AppText>
+                    <AppText color={theme.colors.mutedText}>Refund: {line.refundStatus || 'â€”'} Â· {formatMoney(line.refundAmount)}</AppText>
                     <AppText variant="caption" color={theme.colors.mutedText}>
                       {formatDateTime(line.cancelledAt)}
                     </AppText>
@@ -287,11 +292,11 @@ export default function ReportCancellationsScreen() {
       ) : (
         <AppCard>
           <AppText color={theme.colors.mutedText}>
-            Selecciona fecha y sucursal, luego consulta el reporte.
+            {t('reports.selectDateBranchHint')}
           </AppText>
         </AppCard>
       )}
-    </AppScreen>
+    </AppShellPage>
   );
 }
 

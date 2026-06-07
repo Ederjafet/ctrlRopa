@@ -1,9 +1,8 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import {
@@ -145,21 +144,24 @@ export default function SystemRolesScreen() {
 
   if (loading) {
     return (
-      <AppScreen scroll={false}>
+      <AppShellPage
+        title={t('systemRoles.title')}
+        subtitle={t('systemRoles.cardHelp')}
+        activeRoute="system-roles"
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   return (
     <>
-      <AppScreen>
-        <AppBackButton fallbackRoute="/system" />
-
-        <AppText variant="title" bold>
-          {t('systemRoles.title')}
-        </AppText>
-
+      <AppShellPage
+        title={t('systemRoles.title')}
+        subtitle={t('systemRoles.cardHelp')}
+        activeRoute="system-roles"
+        rightContent={<AppButton title={t('systemRoles.newRole')} variant="secondary" onPress={openNew} />}
+      >
         <AppCard>
           <AppText variant="subtitle" bold>
             {t('systemRoles.cardTitle')}
@@ -168,8 +170,6 @@ export default function SystemRolesScreen() {
             {t('systemRoles.cardHelp')}
           </AppText>
         </AppCard>
-
-        <AppButton title={t('systemRoles.newRole')} onPress={openNew} />
 
         {loadError ? (
           <AppCard>
@@ -203,7 +203,7 @@ export default function SystemRolesScreen() {
             </AppCard>
           ))
         )}
-      </AppScreen>
+      </AppShellPage>
 
       <AppBottomModal
         visible={modalVisible}
@@ -239,7 +239,7 @@ export default function SystemRolesScreen() {
 
         <AppCard>
           <AppText variant="subtitle" bold>
-            Permisos existentes
+            {t('systemRoles.existingPermissions')}
           </AppText>
           <AppText color={theme.colors.mutedText}>
             {t('systemRoles.existingPermissionsHelp')}
