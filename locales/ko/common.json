@@ -1318,5 +1318,48 @@
     "missingPasswordTitle": "누락 비밀번호",
     "missingPasswordMessage": "누락 비밀번호",
     "saveErrorTitle": "저장 오류"
+  },
+  "errors": {
+    "connection": {
+      "title": "서버에 연결할 수 없습니다.",
+      "message": "연결을 확인하거나 다시 시도하세요."
+    },
+    "timeout": {
+      "title": "서버 응답이 너무 오래 걸렸습니다.",
+      "message": "몇 초 후 다시 시도하세요."
+    },
+    "sessionExpired": {
+      "title": "세션이 만료되었습니다.",
+      "message": "계속하려면 다시 로그인하세요."
+    },
+    "forbidden": {
+      "title": "이 작업을 수행할 권한이 없습니다.",
+      "message": "관리자에게 접근 권한을 요청하세요."
+    },
+    "notFound": {
+      "title": "요청한 정보를 찾을 수 없습니다.",
+      "message": "삭제되었거나 더 이상 사용할 수 없을 수 있습니다."
+    },
+    "conflict": {
+      "title": "정보가 변경되어 작업을 완료할 수 없습니다.",
+      "message": "화면을 새로 고친 뒤 다시 시도하세요."
+    },
+    "validation": {
+      "title": "입력한 정보를 확인하세요.",
+      "message": "누락되었거나 올바르지 않은 정보가 있습니다."
+    },
+    "internal": {
+      "title": "작업을 완료할 수 없습니다.",
+      "message": "다시 시도하세요. 계속되면 지원팀에 문의하세요."
+    },
+    "unknown": {
+      "title": "요청을 완료할 수 없습니다.",
+      "message": "다시 시도하세요. 계속되면 지원팀에 문의하세요."
+    },
+    "retry": "다시 시도",
+    "close": "닫기",
+    "refresh": "새로 고침",
+    "goToLogin": "로그인으로 이동",
+    "requestAccess": "접근 권한 요청"
   }
 }

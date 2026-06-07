@@ -1318,5 +1318,48 @@
     "missingPasswordTitle": "不足 パスワード",
     "missingPasswordMessage": "不足 パスワード",
     "saveErrorTitle": "保存 エラー"
+  },
+  "errors": {
+    "connection": {
+      "title": "サーバーに接続できませんでした。",
+      "message": "接続を確認するか、もう一度お試しください。"
+    },
+    "timeout": {
+      "title": "サーバーの応答に時間がかかりすぎています。",
+      "message": "数秒後にもう一度お試しください。"
+    },
+    "sessionExpired": {
+      "title": "セッションの有効期限が切れました。",
+      "message": "続行するにはもう一度サインインしてください。"
+    },
+    "forbidden": {
+      "title": "この操作を行う権限がありません。",
+      "message": "上長にアクセス権を依頼してください。"
+    },
+    "notFound": {
+      "title": "要求された情報が見つかりませんでした。",
+      "message": "削除されたか、利用できなくなっている可能性があります。"
+    },
+    "conflict": {
+      "title": "情報が変更されたため操作を完了できません。",
+      "message": "画面を更新して、もう一度お試しください。"
+    },
+    "validation": {
+      "title": "入力内容を確認してください。",
+      "message": "未入力または無効な情報があります。"
+    },
+    "internal": {
+      "title": "操作を完了できませんでした。",
+      "message": "もう一度お試しください。続く場合はサポートへ連絡してください。"
+    },
+    "unknown": {
+      "title": "リクエストを完了できませんでした。",
+      "message": "もう一度お試しください。続く場合はサポートへ連絡してください。"
+    },
+    "retry": "再試行",
+    "close": "閉じる",
+    "refresh": "更新",
+    "goToLogin": "サインインへ",
+    "requestAccess": "アクセスを依頼"
   }
 }

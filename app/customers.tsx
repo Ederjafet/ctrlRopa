@@ -9,22 +9,26 @@ import EmptyState from '@/components/ui/EmptyState';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { canAccessByPermission } from '@/services/accessControl';
+import { getActionableApiErrorMessage } from '@/services/apiError';
 import { ApiError } from '@/services/apiClient';
 import { Customer, getCustomersByBranch } from '@/services/customerService';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 
 export default function CustomersScreen() {
   const router = useRouter();
   const { isPhone } = useResponsiveLayout();
+  const { t } = useTranslation('common');
   const listColumns = isPhone ? 1 : 2;
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [filtered, setFiltered] = useState<Customer[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
   const [canCreateCustomer, setCanCreateCustomer] = useState(false);
   const [session, setSession] = useState<UserSession | null>(null);
   const navSections = useMemo(() => buildMainNavSections(session), [session]);
@@ -50,13 +54,17 @@ export default function CustomersScreen() {
 
     try {
       setIsLoading(true);
+      setErrorMessage('');
       const data = await getCustomersByBranch(currentSession.branchId);
       setCustomers(data);
       setFiltered(data);
     } catch (err: any) {
-      if (!(err instanceof ApiError && err.suppressUserNotification)) {
-        throw err;
+      if (err instanceof ApiError && err.suppressUserNotification) {
+        return;
       }
+      setCustomers([]);
+      setFiltered([]);
+      setErrorMessage(getActionableApiErrorMessage(err, t));
     } finally {
       setIsLoading(false);
     }
@@ -121,6 +129,18 @@ export default function CustomersScreen() {
           onChangeText={handleSearch}
         />
       </View>
+
+      {errorMessage ? (
+        <AppCard variant="danger">
+          <AppText>{errorMessage}</AppText>
+          <AppButton
+            title={t('errors.retry')}
+            variant="secondary"
+            onPress={loadCustomers}
+            style={styles.retryButton}
+          />
+        </AppCard>
+      ) : null}
 
       <FlatList
         key={listColumns}
@@ -199,5 +219,8 @@ const styles = StyleSheet.create({
   },
   search: {
     marginBottom: 12,
+  },
+  retryButton: {
+    marginTop: 12,
   },
 });

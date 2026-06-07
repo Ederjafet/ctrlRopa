@@ -369,3 +369,16 @@ Agregar a la corrida manual de LIVE:
 - revisar `Prenda al aire ahora`;
 - confirmar que sus acciones tambien quedan en fila con espacio suficiente y apiladas en mobile;
 - validar light/dark.
+
+## Nota PRODUCT-ERR-A
+
+Agregar a la corrida manual de errores frontend:
+
+- detener backend o simular error de red;
+- abrir `/door-reservation` y confirmar mensaje accionable, no `Ocurrio un error interno inesperado`;
+- abrir `/door-sale` y confirmar que los fallos de carga/creacion muestran guia de reintento o soporte;
+- abrir `/live` y validar errores de carga, refresh y acciones operativas con mensajes limpios;
+- abrir `/items-create`, `/customers`, `/reservations` y `/users`;
+- probar un usuario sin permiso si aplica y confirmar mensaje de solicitud de acceso;
+- confirmar que no se muestran stack traces, SQL, endpoints completos ni claves crudas;
+- validar ES/EN/PT/FR/JA/ZH/KO y light/dark.

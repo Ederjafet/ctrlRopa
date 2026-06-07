@@ -7,6 +7,7 @@ import AppInput from '@/components/ui/AppInput';
 import AppText from '@/components/ui/AppText';
 import EmptyState from '@/components/ui/EmptyState';
 import StatusBadge from '@/components/ui/StatusBadge';
+import { getActionableApiError } from '@/services/apiError';
 import { canManageUsers } from '@/services/livePermissionGuards';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import {
@@ -17,6 +18,7 @@ import {
 } from '@/services/userAdminService';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, FlatList, StyleSheet, View } from 'react-native';
 
 function isActive(user: AdminUser) {
@@ -46,6 +48,7 @@ function inheritedPermissionCount(user: AdminUser) {
 
 export default function UsersScreen() {
   const router = useRouter();
+  const { t } = useTranslation('common');
 
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [search, setSearch] = useState('');
@@ -53,6 +56,11 @@ export default function UsersScreen() {
   const [busyUserId, setBusyUserId] = useState<number | null>(null);
   const [session, setSession] = useState<UserSession | null>(null);
   const navSections = useMemo(() => buildMainNavSections(session), [session]);
+
+  const showActionableError = (error: unknown) => {
+    const copy = getActionableApiError(error, t);
+    Alert.alert(copy.title, copy.message, [{ text: copy.primaryActionLabel }]);
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -74,7 +82,7 @@ export default function UsersScreen() {
       const data = await getUsers();
       setUsers(data);
     } catch (error: any) {
-      Alert.alert('No se pudieron cargar usuarios', error?.message ?? 'Intenta nuevamente.');
+      showActionableError(error);
     } finally {
       setIsLoading(false);
     }
@@ -126,7 +134,7 @@ export default function UsersScreen() {
       }
       await loadUsers();
     } catch (error: any) {
-      Alert.alert('No se pudo actualizar el usuario', error?.message ?? 'Intenta nuevamente.');
+      showActionableError(error);
     } finally {
       setBusyUserId(null);
     }

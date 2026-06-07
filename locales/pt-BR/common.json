@@ -1318,5 +1318,48 @@
     "missingPasswordTitle": "Faltando senha",
     "missingPasswordMessage": "Faltando senha",
     "saveErrorTitle": "Salvar erro"
+  },
+  "errors": {
+    "connection": {
+      "title": "Não foi possível conectar ao servidor.",
+      "message": "Verifique sua conexão ou tente novamente."
+    },
+    "timeout": {
+      "title": "O servidor demorou demais para responder.",
+      "message": "Tente novamente em alguns segundos."
+    },
+    "sessionExpired": {
+      "title": "Sua sessão expirou.",
+      "message": "Entre novamente para continuar."
+    },
+    "forbidden": {
+      "title": "Você não tem permissão para realizar esta ação.",
+      "message": "Solicite acesso ao seu supervisor."
+    },
+    "notFound": {
+      "title": "As informações solicitadas não foram encontradas.",
+      "message": "Elas podem ter sido removidas ou não estar mais disponíveis."
+    },
+    "conflict": {
+      "title": "A operação não pode ser concluída porque as informações mudaram.",
+      "message": "Atualize a tela e tente novamente."
+    },
+    "validation": {
+      "title": "Revise os dados informados.",
+      "message": "Há informações pendentes ou inválidas."
+    },
+    "internal": {
+      "title": "Não foi possível concluir a operação.",
+      "message": "Tente novamente. Se continuar, reporte o caso ao suporte."
+    },
+    "unknown": {
+      "title": "Não foi possível concluir a solicitação.",
+      "message": "Tente novamente. Se continuar, reporte o caso ao suporte."
+    },
+    "retry": "Tentar novamente",
+    "close": "Fechar",
+    "refresh": "Atualizar",
+    "goToLogin": "Ir para login",
+    "requestAccess": "Solicitar acesso"
   }
 }

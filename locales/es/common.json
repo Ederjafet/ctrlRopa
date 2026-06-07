@@ -1318,5 +1318,48 @@
     "missingPasswordTitle": "Falta contrasena",
     "missingPasswordMessage": "Captura una contrasena inicial para el usuario.",
     "saveErrorTitle": "No se pudo guardar"
+  },
+  "errors": {
+    "connection": {
+      "title": "No se pudo conectar con el servidor.",
+      "message": "Revisa tu conexión o intenta nuevamente."
+    },
+    "timeout": {
+      "title": "El servidor tardó demasiado en responder.",
+      "message": "Intenta nuevamente en unos segundos."
+    },
+    "sessionExpired": {
+      "title": "Tu sesión expiró.",
+      "message": "Vuelve a iniciar sesión para continuar."
+    },
+    "forbidden": {
+      "title": "No tienes permiso para realizar esta acción.",
+      "message": "Solicita acceso a tu supervisor."
+    },
+    "notFound": {
+      "title": "No se encontró la información solicitada.",
+      "message": "Puede haber sido eliminada o ya no estar disponible."
+    },
+    "conflict": {
+      "title": "La operación no se puede completar porque la información cambió.",
+      "message": "Actualiza la pantalla e intenta nuevamente."
+    },
+    "validation": {
+      "title": "Revisa los datos capturados.",
+      "message": "Hay información pendiente o inválida."
+    },
+    "internal": {
+      "title": "No se pudo completar la operación.",
+      "message": "Intenta nuevamente. Si continúa, reporta el caso a soporte."
+    },
+    "unknown": {
+      "title": "No se pudo completar la solicitud.",
+      "message": "Intenta nuevamente. Si continúa, reporta el caso a soporte."
+    },
+    "retry": "Reintentar",
+    "close": "Cerrar",
+    "refresh": "Actualizar",
+    "goToLogin": "Ir a iniciar sesión",
+    "requestAccess": "Solicitar acceso"
   }
 }
