@@ -234,3 +234,14 @@ Agregar a la corrida manual de limpieza de idioma:
 - confirmar que `LIVE`, `QR`, `URL` y placeholders `{{...}}` se conservan como terminos tecnicos cuando aplica;
 - confirmar que pagos/caja no se consideran parte de esta fase;
 - validar light/dark.
+
+## Nota PRODUCT-I18N-B.1
+
+Agregar a la corrida manual:
+
+- abrir `/live` en japones, chino y coreano;
+- confirmar que no aparece la clave cruda `live.size`;
+- confirmar que talla aparece localizada;
+- revisar que `UI Kit`/`UIキット` no se vea roto en sidebar ni en modo oscuro;
+- confirmar que `LIVE`, `QR`, `URL`, `API`, `ID` y `CSV` se mantienen como prestamos tecnicos cuando aparezcan;
+- confirmar que no aparecen claves crudas `live.*`, `navigation.*`, `system.*`, `common.*` en los flujos principales.
