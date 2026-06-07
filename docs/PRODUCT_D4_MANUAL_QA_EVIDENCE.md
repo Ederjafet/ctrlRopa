@@ -209,3 +209,17 @@ Agregar a la corrida manual de LIVE:
 - ocultar y volver a enfocar la ventana para confirmar refresh al foco;
 - confirmar que no hay polling util para `qa.sinpermisos@local.test`;
 - confirmar light/dark y mobile/tablet.
+
+## Nota PRODUCT-I18N-A
+
+Agregar a la corrida manual multi-idioma:
+
+- abrir `/system` con `qa.admin`;
+- seleccionar `Português Brasil`, `Français`, `日本語`, `中文` y `한국어`;
+- confirmar que AppShell/sidebar/topbar/theme toggle/logout cambian con el idioma activo;
+- abrir `/live`, `/customers`, `/reservations`, `/users`, `/reports`, `/ui-kit` y `/appearance`;
+- confirmar que no aparecen `undefined`, `null` ni claves crudas;
+- revisar textos largos en portugues/frances y scripts asiaticos en desktop/tablet/mobile;
+- confirmar light/dark y persistencia al refrescar navegador.
+
+Las traducciones nuevas son base tecnica y deben pasar por revision humana/nativa antes de release internacional.

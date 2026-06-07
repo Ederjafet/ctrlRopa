@@ -1,0 +1,15 @@
+﻿ app/system.tsx                                     |   79 +-
+ docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md            |    8 +
+ docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md              |   14 +
+ docs/PRODUCT_D6_2B_VISIBLE_I18N_HARDCODES.md       |    4 +
+ docs/PRODUCT_I18N_A_MULTILANGUAGE_BASE.md          |  100 ++
+ locales/en/common.json                             |    7 +-
+ locales/es/common.json                             |    7 +-
+ locales/fr/common.json                             | 1139 ++++++++++++++++++++
+ locales/ja/common.json                             | 1139 ++++++++++++++++++++
+ locales/ko/common.json                             | 1139 ++++++++++++++++++++
+ locales/pt-BR/common.json                          | 1139 ++++++++++++++++++++
+ locales/zh/common.json                             | 1139 ++++++++++++++++++++
+ ...-A-multilanguage-base-report-20260606-221519.md |   84 ++
+ services/i18n.ts                                   |   36 +-
+ 14 files changed, 5987 insertions(+), 47 deletions(-)
