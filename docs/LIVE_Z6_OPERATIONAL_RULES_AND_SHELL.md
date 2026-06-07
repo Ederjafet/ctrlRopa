@@ -476,3 +476,7 @@ LIVE-Z9H agrega boton `Actualizar`, indicador de ultima actualizacion, refresh a
 # Nota LIVE-Z9I - Filtros de disponibilidad en prendas
 
 LIVE-Z9I agrega filtros `Disponibles`, `Apartadas`, `Vendidas / no disponibles` y `Todas` en el selector `Buscar prenda`. El filtro por defecto es `Disponibles`; las prendas bloqueadas siguen mostrando motivo cuando se revisan en `Todas` y la validacion operativa existente impide ponerlas al aire o prepararlas cuando no son validas.
+
+# Nota LIVE-Z9I.1 - Acciones responsive en tarjetas
+
+LIVE-Z9I.1 ajusta solo presentacion: las acciones de `Prenda preparada para cambio` y `Prenda al aire ahora` se muestran en fila en tablet/desktop y apiladas en mobile. No cambia permisos, reglas LIVE, filtros ni endpoints.

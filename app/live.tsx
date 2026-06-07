@@ -2874,52 +2874,58 @@ export default function LiveScreen() {
 
           {options.showOnAirAction ? (
             <View style={styles.preparedItemActions}>
-              <AppButton
-                title={
-                  isOnAir
-                    ? t('live.productAlreadyOnAir')
-                    : t('live.markSelectedProductOnAir')
-                }
-                variant={isOnAir ? 'neutral' : 'primary'}
-                onPress={handleSetSelectedItemActive}
-                loading={isSavingActiveItem}
-                disabled={
-                  isSavingActiveItem ||
-                  !operatorFlowEnabled ||
-                  !maySetActiveItem ||
-                  isOnAir ||
-                  !availability.canGoOnAir
-                }
-                disabledReason={
-                  !maySetActiveItem
-                    ? t('live.liveOperatePermissionError')
-                    : !operatorFlowEnabled
-                      ? t('live.selectOpenLiveReason')
-                      : isOnAir
-                        ? t('live.productAlreadyOnAir')
-                        : !availability.canGoOnAir
-                          ? availability.reason
-                        : undefined
-                }
-              />
-              {isPreparedForChange ? (
-                <>
+              <View style={[styles.liveItemActionRow, isPhone ? styles.liveItemActionStack : null]}>
+                <View style={styles.liveItemActionColumn}>
                   <AppButton
-                    title={t('live.removePreparedItem')}
-                    variant="neutral"
-                    onPress={handleRemovePreparedItem}
-                    disabled={isSavingActiveItem}
+                    title={
+                      isOnAir
+                        ? t('live.productAlreadyOnAir')
+                        : t('live.markSelectedProductOnAir')
+                    }
+                    variant={isOnAir ? 'neutral' : 'primary'}
+                    onPress={handleSetSelectedItemActive}
+                    loading={isSavingActiveItem}
+                    disabled={
+                      isSavingActiveItem ||
+                      !operatorFlowEnabled ||
+                      !maySetActiveItem ||
+                      isOnAir ||
+                      !availability.canGoOnAir
+                    }
+                    disabledReason={
+                      !maySetActiveItem
+                        ? t('live.liveOperatePermissionError')
+                        : !operatorFlowEnabled
+                          ? t('live.selectOpenLiveReason')
+                          : isOnAir
+                            ? t('live.productAlreadyOnAir')
+                            : !availability.canGoOnAir
+                              ? availability.reason
+                              : undefined
+                    }
                   />
-                  <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
-                    {t('live.removePreparedItemHelp')}
-                  </AppText>
-                </>
+                </View>
+                {isPreparedForChange ? (
+                  <View style={styles.liveItemActionColumn}>
+                    <AppButton
+                      title={t('live.removePreparedItem')}
+                      variant="neutral"
+                      onPress={handleRemovePreparedItem}
+                      disabled={isSavingActiveItem}
+                    />
+                  </View>
+                ) : null}
+              </View>
+              {isPreparedForChange ? (
+                <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+                  {t('live.removePreparedItemHelp')}
+                </AppText>
               ) : null}
             </View>
           ) : null}
           {options.highlighted && isOnAir && options.showActiveActions !== false ? (
-            <View style={styles.buttonRow}>
-              <View style={styles.buttonFill}>
+            <View style={[styles.liveItemActionRow, isPhone ? styles.liveItemActionStack : null]}>
+              <View style={styles.liveItemActionColumn}>
                 <AppButton
                   title={t('live.clearProductOnAir')}
                   variant="neutral"
@@ -2938,7 +2944,7 @@ export default function LiveScreen() {
                   {t('live.clearProductOnAirHelp')}
                 </AppText>
               </View>
-              <View style={styles.buttonFill}>
+              <View style={styles.liveItemActionColumn}>
                 <AppButton
                   title={t('live.changeItemOnAir')}
                   variant="secondary"
@@ -6011,6 +6017,19 @@ const styles = StyleSheet.create({
   },
   preparedItemActions: {
     gap: 8,
+  },
+  liveItemActionColumn: {
+    flex: 1,
+    minWidth: 180,
+  },
+  liveItemActionRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+  },
+  liveItemActionStack: {
+    flexDirection: 'column',
   },
   buttonRow: {
     flexDirection: 'row',

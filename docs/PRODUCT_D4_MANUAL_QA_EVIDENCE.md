@@ -355,3 +355,17 @@ Agregar a la corrida manual de LIVE:
 - confirmar que la busqueda conserva el filtro activo;
 - intentar seleccionar una vendida/no disponible y confirmar bloqueo claro;
 - validar light/dark y mobile/tablet.
+
+## Nota LIVE-Z9I.1
+
+Agregar a la corrida manual de LIVE:
+
+- entrar con `qa.admin`;
+- abrir `/live`;
+- preparar una prenda;
+- confirmar que en desktop/tablet `Poner esta prenda al aire` y `Quitar prenda preparada` aparecen en una sola linea;
+- reducir ancho o abrir mobile;
+- confirmar que esos botones se apilan correctamente;
+- revisar `Prenda al aire ahora`;
+- confirmar que sus acciones tambien quedan en fila con espacio suficiente y apiladas en mobile;
+- validar light/dark.
