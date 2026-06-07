@@ -41,6 +41,8 @@ Cuando falta cliente, el panel ofrece:
 
 Cuando el bloqueo solo requiere revisar el contexto, el panel ofrece `Entendido`.
 
+Nota LIVE-Z9G: estos paneles tambien aplican al vendedor cuando tiene permisos reales para apartar en LIVE. El vendedor operativo recibe la misma guia contextual para datos faltantes, pero no ve acciones sensibles como iniciar/cerrar LIVE o cambiar la prenda al aire.
+
 ## Items Create
 
 `/items-create?returnTo=/live` conserva el dialogo modal agregado en LIVE-Z9F para campos faltantes:

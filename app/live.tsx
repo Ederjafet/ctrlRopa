@@ -898,6 +898,11 @@ export default function LiveScreen() {
   const canViewPayments = liveCapabilities.canViewPayments;
   const canAccessCashbox = liveCapabilities.canAccessCashbox;
   const mayViewAnalytics = canViewLiveAnalytics(session);
+  const isSellerLiveActor = liveActorContext.actor === 'SELLER';
+  const mayManageLiveItemFlow =
+    mayPrepareItem || maySetActiveItem || mayClearActiveItem || mayCreateItem;
+  const operatorStepNumber = (baseStep: number) =>
+    mayManageLiveItemFlow ? baseStep : Math.max(1, baseStep - 1);
   const isMobileLayout = isPhone;
   const showRolesWidget =
     !isOperatorFocusedView &&
@@ -3833,7 +3838,7 @@ export default function LiveScreen() {
               {operatorLiveStateHelp}
             </AppText>
 
-            {!operatorLiveIsActive ? (
+            {!operatorLiveIsActive && mayStartLive ? (
               <AppButton
                 title={
                   selectedLiveStatus === 'CLOSED'
@@ -3843,7 +3848,7 @@ export default function LiveScreen() {
                 variant="primary"
                 onPress={handleStartLiveNow}
                 loading={isSavingLive}
-                disabled={isSavingLive || !mayStartLive}
+                disabled={isSavingLive}
                 disabledReason={operatorStartDisabledReason}
                 style={styles.operatorPrimaryButton}
               />
@@ -3860,50 +3865,52 @@ export default function LiveScreen() {
             ) : (
               <>
                 <View style={styles.operatorStepStack}>
-                  <LiveCompactCard style={[styles.operatorFlowStepCard, styles.operatorPrepareItemPanel]}>
-                    <AppText variant="caption" color={theme.colors.accent} bold>
-                      1. {t('live.operatorStepProduct')}
-                    </AppText>
-                    <AppText variant="caption" color={theme.colors.mutedText}>
-                      {t('live.prepareNextItemHelp')}
-                    </AppText>
+                  {mayManageLiveItemFlow ? (
+                    <LiveCompactCard style={[styles.operatorFlowStepCard, styles.operatorPrepareItemPanel]}>
+                      <AppText variant="caption" color={theme.colors.accent} bold>
+                        1. {t('live.operatorStepProduct')}
+                      </AppText>
+                      <AppText variant="caption" color={theme.colors.mutedText}>
+                        {t('live.prepareNextItemHelp')}
+                      </AppText>
 
-                    <View style={styles.operatorItemActionGrid}>
-                      {renderOperatorItemActionCard({
-                        icon: 'search',
-                        title: t('live.searchItem'),
-                        subtitle: t('live.searchItemActionHelp'),
-                        onPress: () => setIsItemModalVisible(true),
-                        disabled: !mayPrepareItem,
-                      })}
-                      {renderOperatorItemActionCard({
-                        icon: 'qr-code-scanner',
-                        title: t('live.scanQr'),
-                        subtitle: t('live.scanQrActionHelp'),
-                        onPress: () => setIsScannerVisible(true),
-                        disabled: !mayPrepareItem,
-                      })}
-                      {renderOperatorItemActionCard({
-                        icon: 'add-circle-outline',
-                        title: t('live.quickItem'),
-                        subtitle: t('live.quickItemActionHelp'),
-                        onPress: () => router.push('/items-create?returnTo=/live' as any),
-                        disabled: !mayCreateItem,
-                      })}
-                    </View>
+                      <View style={styles.operatorItemActionGrid}>
+                        {renderOperatorItemActionCard({
+                          icon: 'search',
+                          title: t('live.searchItem'),
+                          subtitle: t('live.searchItemActionHelp'),
+                          onPress: () => setIsItemModalVisible(true),
+                          disabled: !mayPrepareItem,
+                        })}
+                        {renderOperatorItemActionCard({
+                          icon: 'qr-code-scanner',
+                          title: t('live.scanQr'),
+                          subtitle: t('live.scanQrActionHelp'),
+                          onPress: () => setIsScannerVisible(true),
+                          disabled: !mayPrepareItem,
+                        })}
+                        {renderOperatorItemActionCard({
+                          icon: 'add-circle-outline',
+                          title: t('live.quickItem'),
+                          subtitle: t('live.quickItemActionHelp'),
+                          onPress: () => router.push('/items-create?returnTo=/live' as any),
+                          disabled: !mayCreateItem,
+                        })}
+                      </View>
 
-                    {preparedItem
-                      ? renderOperatorItemCard(preparedItem, {
-                          title: t('live.preparedItemForChangeTitle'),
-                          emptyText: t('live.operatorStepProductEmpty'),
-                          showOnAirAction: true,
-                        })
-                      : null}
-                  </LiveCompactCard>
+                      {preparedItem
+                        ? renderOperatorItemCard(preparedItem, {
+                            title: t('live.preparedItemForChangeTitle'),
+                            emptyText: t('live.operatorStepProductEmpty'),
+                            showOnAirAction: true,
+                          })
+                        : null}
+                    </LiveCompactCard>
+                  ) : null}
 
                   <LiveCompactCard style={[styles.operatorFlowStepCard, styles.operatorActiveItemPanel]}>
                     <AppText variant="caption" color={theme.colors.accent} bold>
-                      2. {t('live.operatorStepActiveItem')}
+                      {operatorStepNumber(2)}. {t('live.operatorStepActiveItem')}
                     </AppText>
                     <AppText variant="caption" color={theme.colors.mutedText}>
                       {t('live.activeItemSectionHelp')}
@@ -3916,6 +3923,7 @@ export default function LiveScreen() {
                           title: t('live.activeItemNowTitle'),
                           emptyText: t('live.noOfficialActiveProduct'),
                           highlighted: true,
+                          showActiveActions: mayClearActiveItem || maySetActiveItem,
                         })
                       : null}
                   </LiveCompactCard>
@@ -3923,7 +3931,7 @@ export default function LiveScreen() {
                   <View style={styles.operatorBookingGrid}>
                   <LiveCompactCard style={[styles.operatorFlowStepCard, styles.operatorInlinePanel]}>
                     <AppText variant="caption" color={theme.colors.accent} bold>
-                      3. {t('live.operatorStepPrice')}
+                      {operatorStepNumber(3)}. {t('live.operatorStepPrice')}
                     </AppText>
                     <AppText variant="caption" color={theme.colors.mutedText}>
                       {activeItem
@@ -3970,7 +3978,7 @@ export default function LiveScreen() {
 
                   <LiveCompactCard style={[styles.operatorFlowStepCard, styles.operatorInlinePanel]}>
                     <AppText variant="caption" color={theme.colors.accent} bold>
-                      3. {t('live.operatorStepCustomer')}
+                      {operatorStepNumber(3)}. {t('live.operatorStepCustomer')}
                     </AppText>
                     {!activeItem ? (
                       <AppText variant="caption" color={theme.colors.mutedText}>
@@ -4105,7 +4113,7 @@ export default function LiveScreen() {
 
                   <LiveCompactCard style={[styles.operatorFlowStepCard, styles.operatorReservePanel]}>
                     <AppText variant="caption" color={theme.colors.accent} bold>
-                      4. {t('live.operatorStepReservation')}
+                      {operatorStepNumber(4)}. {t('live.operatorStepReservation')}
                     </AppText>
                     <AppText variant="caption" color={theme.colors.mutedText}>
                       {t('live.reserveActiveItemHelp')}
@@ -4264,7 +4272,9 @@ export default function LiveScreen() {
                                     {t('live.cancelOperationalHelp')}
                                   </AppText>
                                 </View>
-                              ) : !operationalCancelled && !mayCancelLiveReservation ? (
+                              ) : !operationalCancelled &&
+                                !mayCancelLiveReservation &&
+                                !isSellerLiveActor ? (
                                 <AuthorizationRequestPanel
                                   actionLabel={t('live.authorizationActionCancelHold')}
                                   requiredCapability="canCancelReservation"
@@ -4311,29 +4321,20 @@ export default function LiveScreen() {
                   )}
                 </AppCard>
 
-                <AppButton
-                  title={t('live.operatorFinishLive')}
-                  variant="danger"
-                  onPress={() => (selectedLive ? handleCloseLive(selectedLive) : undefined)}
-                  loading={isSavingLive}
-                  disabled={isSavingLive || !selectedLiveIsOperable || !mayCloseLive}
-                  disabledReason={operatorFinishDisabledReason}
-                />
-                <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
-                  {t('live.closeLiveHelp')}
-                </AppText>
-                {selectedLiveIsOperable && !mayCloseLive ? (
-                  <AuthorizationRequestPanel
-                    actionLabel={t('live.authorizationActionCloseLive')}
-                    requiredCapability="canCloseLive"
-                    reason={t('live.authorizationCloseHelp')}
-                    entityContext={
-                      selectedLive ? t('live.liveNumber', { id: selectedLive.id }) : undefined
-                    }
-                    pendingBackendLabel={t('live.authorizationBackendRequired')}
-                    requestLabel={t('live.requestAuthorization')}
-                    onRequestAuthorization={() => handleRequestAuthorization('close')}
-                  />
+                {mayCloseLive ? (
+                  <>
+                    <AppButton
+                      title={t('live.operatorFinishLive')}
+                      variant="danger"
+                      onPress={() => (selectedLive ? handleCloseLive(selectedLive) : undefined)}
+                      loading={isSavingLive}
+                      disabled={isSavingLive || !selectedLiveIsOperable}
+                      disabledReason={operatorFinishDisabledReason}
+                    />
+                    <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+                      {t('live.closeLiveHelp')}
+                    </AppText>
+                  </>
                 ) : null}
               </>
             )}
@@ -5424,18 +5425,7 @@ export default function LiveScreen() {
                 loading={isSavingLive}
                 style={styles.buttonSpacing}
               />
-            ) : (
-              <AuthorizationRequestPanel
-                actionLabel={t('live.authorizationActionCloseLive')}
-                requiredCapability="canCloseLive"
-                reason={t('live.authorizationCloseHelp')}
-                entityContext={t('live.liveNumber', { id: selectedLive.id })}
-                pendingBackendLabel={t('live.authorizationBackendRequired')}
-                requestLabel={t('live.requestAuthorization')}
-                onRequestAuthorization={() => handleRequestAuthorization('close')}
-                style={styles.buttonSpacing}
-              />
-            )}
+            ) : null}
           </AppCard>
         ) : null}
 

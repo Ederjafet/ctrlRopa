@@ -1,0 +1,629 @@
+﻿diff --git a/app/live.tsx b/app/live.tsx
+index f1225b0..634dd2e 100644
+--- a/app/live.tsx
++++ b/app/live.tsx
+@@ -898,6 +898,11 @@ export default function LiveScreen() {
+   const canViewPayments = liveCapabilities.canViewPayments;
+   const canAccessCashbox = liveCapabilities.canAccessCashbox;
+   const mayViewAnalytics = canViewLiveAnalytics(session);
++  const isSellerLiveActor = liveActorContext.actor === 'SELLER';
++  const mayManageLiveItemFlow =
++    mayPrepareItem || maySetActiveItem || mayClearActiveItem || mayCreateItem;
++  const operatorStepNumber = (baseStep: number) =>
++    mayManageLiveItemFlow ? baseStep : Math.max(1, baseStep - 1);
+   const isMobileLayout = isPhone;
+   const showRolesWidget =
+     !isOperatorFocusedView &&
+@@ -3833,7 +3838,7 @@ export default function LiveScreen() {
+               {operatorLiveStateHelp}
+             </AppText>
+
+-            {!operatorLiveIsActive ? (
++            {!operatorLiveIsActive && mayStartLive ? (
+               <AppButton
+                 title={
+                   selectedLiveStatus === 'CLOSED'
+@@ -3843,7 +3848,7 @@ export default function LiveScreen() {
+                 variant="primary"
+                 onPress={handleStartLiveNow}
+                 loading={isSavingLive}
+-                disabled={isSavingLive || !mayStartLive}
++                disabled={isSavingLive}
+                 disabledReason={operatorStartDisabledReason}
+                 style={styles.operatorPrimaryButton}
+               />
+@@ -3860,50 +3865,52 @@ export default function LiveScreen() {
+             ) : (
+               <>
+                 <View style={styles.operatorStepStack}>
+-                  <LiveCompactCard style={[styles.operatorFlowStepCard, styles.operatorPrepareItemPanel]}>
+-                    <AppText variant="caption" color={theme.colors.accent} bold>
+-                      1. {t('live.operatorStepProduct')}
+-                    </AppText>
+-                    <AppText variant="caption" color={theme.colors.mutedText}>
+-                      {t('live.prepareNextItemHelp')}
+-                    </AppText>
++                  {mayManageLiveItemFlow ? (
++                    <LiveCompactCard style={[styles.operatorFlowStepCard, styles.operatorPrepareItemPanel]}>
++                      <AppText variant="caption" color={theme.colors.accent} bold>
++                        1. {t('live.operatorStepProduct')}
++                      </AppText>
++                      <AppText variant="caption" color={theme.colors.mutedText}>
++                        {t('live.prepareNextItemHelp')}
++                      </AppText>
+
+-                    <View style={styles.operatorItemActionGrid}>
+-                      {renderOperatorItemActionCard({
+-                        icon: 'search',
+-                        title: t('live.searchItem'),
+-                        subtitle: t('live.searchItemActionHelp'),
+-                        onPress: () => setIsItemModalVisible(true),
+-                        disabled: !mayPrepareItem,
+-                      })}
+-                      {renderOperatorItemActionCard({
+-                        icon: 'qr-code-scanner',
+-                        title: t('live.scanQr'),
+-                        subtitle: t('live.scanQrActionHelp'),
+-                        onPress: () => setIsScannerVisible(true),
+-                        disabled: !mayPrepareItem,
+-                      })}
+-                      {renderOperatorItemActionCard({
+-                        icon: 'add-circle-outline',
+-                        title: t('live.quickItem'),
+-                        subtitle: t('live.quickItemActionHelp'),
+-                        onPress: () => router.push('/items-create?returnTo=/live' as any),
+-                        disabled: !mayCreateItem,
+-                      })}
+-                    </View>
++                      <View style={styles.operatorItemActionGrid}>
++                        {renderOperatorItemActionCard({
++                          icon: 'search',
++                          title: t('live.searchItem'),
++                          subtitle: t('live.searchItemActionHelp'),
++                          onPress: () => setIsItemModalVisible(true),
++                          disabled: !mayPrepareItem,
++                        })}
++                        {renderOperatorItemActionCard({
++                          icon: 'qr-code-scanner',
++                          title: t('live.scanQr'),
++                          subtitle: t('live.scanQrActionHelp'),
++                          onPress: () => setIsScannerVisible(true),
++                          disabled: !mayPrepareItem,
++                        })}
++                        {renderOperatorItemActionCard({
++                          icon: 'add-circle-outline',
++                          title: t('live.quickItem'),
++                          subtitle: t('live.quickItemActionHelp'),
++                          onPress: () => router.push('/items-create?returnTo=/live' as any),
++                          disabled: !mayCreateItem,
++                        })}
++                      </View>
+
+-                    {preparedItem
+-                      ? renderOperatorItemCard(preparedItem, {
+-                          title: t('live.preparedItemForChangeTitle'),
+-                          emptyText: t('live.operatorStepProductEmpty'),
+-                          showOnAirAction: true,
+-                        })
+-                      : null}
+-                  </LiveCompactCard>
++                      {preparedItem
++                        ? renderOperatorItemCard(preparedItem, {
++                            title: t('live.preparedItemForChangeTitle'),
++                            emptyText: t('live.operatorStepProductEmpty'),
++                            showOnAirAction: true,
++                          })
++                        : null}
++                    </LiveCompactCard>
++                  ) : null}
+
+                   <LiveCompactCard style={[styles.operatorFlowStepCard, styles.operatorActiveItemPanel]}>
+                     <AppText variant="caption" color={theme.colors.accent} bold>
+-                      2. {t('live.operatorStepActiveItem')}
++                      {operatorStepNumber(2)}. {t('live.operatorStepActiveItem')}
+                     </AppText>
+                     <AppText variant="caption" color={theme.colors.mutedText}>
+                       {t('live.activeItemSectionHelp')}
+@@ -3916,6 +3923,7 @@ export default function LiveScreen() {
+                           title: t('live.activeItemNowTitle'),
+                           emptyText: t('live.noOfficialActiveProduct'),
+                           highlighted: true,
++                          showActiveActions: mayClearActiveItem || maySetActiveItem,
+                         })
+                       : null}
+                   </LiveCompactCard>
+@@ -3923,7 +3931,7 @@ export default function LiveScreen() {
+                   <View style={styles.operatorBookingGrid}>
+                   <LiveCompactCard style={[styles.operatorFlowStepCard, styles.operatorInlinePanel]}>
+                     <AppText variant="caption" color={theme.colors.accent} bold>
+-                      3. {t('live.operatorStepPrice')}
++                      {operatorStepNumber(3)}. {t('live.operatorStepPrice')}
+                     </AppText>
+                     <AppText variant="caption" color={theme.colors.mutedText}>
+                       {activeItem
+@@ -3970,7 +3978,7 @@ export default function LiveScreen() {
+
+                   <LiveCompactCard style={[styles.operatorFlowStepCard, styles.operatorInlinePanel]}>
+                     <AppText variant="caption" color={theme.colors.accent} bold>
+-                      3. {t('live.operatorStepCustomer')}
++                      {operatorStepNumber(3)}. {t('live.operatorStepCustomer')}
+                     </AppText>
+                     {!activeItem ? (
+                       <AppText variant="caption" color={theme.colors.mutedText}>
+@@ -4105,7 +4113,7 @@ export default function LiveScreen() {
+
+                   <LiveCompactCard style={[styles.operatorFlowStepCard, styles.operatorReservePanel]}>
+                     <AppText variant="caption" color={theme.colors.accent} bold>
+-                      4. {t('live.operatorStepReservation')}
++                      {operatorStepNumber(4)}. {t('live.operatorStepReservation')}
+                     </AppText>
+                     <AppText variant="caption" color={theme.colors.mutedText}>
+                       {t('live.reserveActiveItemHelp')}
+@@ -4264,7 +4272,9 @@ export default function LiveScreen() {
+                                     {t('live.cancelOperationalHelp')}
+                                   </AppText>
+                                 </View>
+-                              ) : !operationalCancelled && !mayCancelLiveReservation ? (
++                              ) : !operationalCancelled &&
++                                !mayCancelLiveReservation &&
++                                !isSellerLiveActor ? (
+                                 <AuthorizationRequestPanel
+                                   actionLabel={t('live.authorizationActionCancelHold')}
+                                   requiredCapability="canCancelReservation"
+@@ -4311,29 +4321,20 @@ export default function LiveScreen() {
+                   )}
+                 </AppCard>
+
+-                <AppButton
+-                  title={t('live.operatorFinishLive')}
+-                  variant="danger"
+-                  onPress={() => (selectedLive ? handleCloseLive(selectedLive) : undefined)}
+-                  loading={isSavingLive}
+-                  disabled={isSavingLive || !selectedLiveIsOperable || !mayCloseLive}
+-                  disabledReason={operatorFinishDisabledReason}
+-                />
+-                <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+-                  {t('live.closeLiveHelp')}
+-                </AppText>
+-                {selectedLiveIsOperable && !mayCloseLive ? (
+-                  <AuthorizationRequestPanel
+-                    actionLabel={t('live.authorizationActionCloseLive')}
+-                    requiredCapability="canCloseLive"
+-                    reason={t('live.authorizationCloseHelp')}
+-                    entityContext={
+-                      selectedLive ? t('live.liveNumber', { id: selectedLive.id }) : undefined
+-                    }
+-                    pendingBackendLabel={t('live.authorizationBackendRequired')}
+-                    requestLabel={t('live.requestAuthorization')}
+-                    onRequestAuthorization={() => handleRequestAuthorization('close')}
+-                  />
++                {mayCloseLive ? (
++                  <>
++                    <AppButton
++                      title={t('live.operatorFinishLive')}
++                      variant="danger"
++                      onPress={() => (selectedLive ? handleCloseLive(selectedLive) : undefined)}
++                      loading={isSavingLive}
++                      disabled={isSavingLive || !selectedLiveIsOperable}
++                      disabledReason={operatorFinishDisabledReason}
++                    />
++                    <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
++                      {t('live.closeLiveHelp')}
++                    </AppText>
++                  </>
+                 ) : null}
+               </>
+             )}
+@@ -5424,18 +5425,7 @@ export default function LiveScreen() {
+                 loading={isSavingLive}
+                 style={styles.buttonSpacing}
+               />
+-            ) : (
+-              <AuthorizationRequestPanel
+-                actionLabel={t('live.authorizationActionCloseLive')}
+-                requiredCapability="canCloseLive"
+-                reason={t('live.authorizationCloseHelp')}
+-                entityContext={t('live.liveNumber', { id: selectedLive.id })}
+-                pendingBackendLabel={t('live.authorizationBackendRequired')}
+-                requestLabel={t('live.requestAuthorization')}
+-                onRequestAuthorization={() => handleRequestAuthorization('close')}
+-                style={styles.buttonSpacing}
+-              />
+-            )}
++            ) : null}
+           </AppCard>
+         ) : null}
+
+diff --git a/docs/ERP_LIVE_ACTORS_MATRIX.md b/docs/ERP_LIVE_ACTORS_MATRIX.md
+index b07bb6c..17c18b3 100644
+--- a/docs/ERP_LIVE_ACTORS_MATRIX.md
++++ b/docs/ERP_LIVE_ACTORS_MATRIX.md
+@@ -21,15 +21,17 @@ modifica RBAC.
+ | 1 | Sin sesion, rol `NO_ACCESS`, sin permisos efectivos o sin acceso LIVE minimo | `NO_ACCESS_VIEW` | Bloquea `/live`; no renderiza consola, dashboard ni apoyo visual. |
+ | 2 | Rol `SUPERVISOR` o permiso de monitoreo/reportes sin rol operativo de apoyo | `SUPERVISOR_VIEW` | Dashboard de monitoreo/control. |
+ | 3 | Rol `ADMIN` o `QA_TENANT_ADMIN` con acceso LIVE | `OPERATOR_VIEW` | Consola operativa. |
+-| 4 | Rol `SELLER` o `QA_TENANT_SELLER` con acceso LIVE | `SELLER_PRESENTER_VIEW` | Vista de apoyo centrada en prenda al aire. |
+-| 5 | Cualquier caso no cubierto de forma segura | `NO_ACCESS_VIEW` | Bloqueo conservador. |
++| 4 | Rol `SELLER` o `QA_TENANT_SELLER` con canal `LIVE` y `DO_LIVE_RESERVATION` | `SELLER_OPERATION_VIEW` | Flujo de apartado limitado por permisos reales. |
++| 5 | Rol `SELLER` o `QA_TENANT_SELLER` sin permiso operativo LIVE | `SELLER_PRESENTER_VIEW` | Vista de apoyo centrada en prenda al aire. |
++| 6 | Cualquier caso no cubierto de forma segura | `NO_ACCESS_VIEW` | Bloqueo conservador. |
+
+ ## Vistas
+
+ | Vista | Puede ver | Puede ejecutar | Bloqueos |
+ |---|---|---|---|
+ | `OPERATOR_VIEW` | Estado LIVE, preparar prenda, prenda al aire, precio, cliente, reserva, reservas recientes, eventos/historial. | Iniciar/cerrar LIVE, poner/sacar prenda al aire, reservar, cambiar estado operativo si sus permisos reales lo permiten. | Pagos/caja/reportes/billing/IA. |
+-| `SELLER_PRESENTER_VIEW` | Estado LIVE, prenda al aire, precio, codigo, talla, color, stock, notas basicas. | Actualizacion ligera por polling; no opera reserva desde esta vista Z5. | Dashboard supervisor, consola operador, pagos/caja/reportes. |
++| `SELLER_OPERATION_VIEW` | Estado LIVE, prenda al aire, precio, cliente/interesado y apartados recientes. | Apartar en LIVE si tiene `DO_LIVE_RESERVATION`; seleccionar cliente con `VIEW_CUSTOMERS`; crear cliente con `CREATE_CUSTOMER`; cerrar como venta LIVE solo si tiene capacidad de venta operativa. | Iniciar/cerrar LIVE, cambiar prenda al aire, cancelar sin `CANCEL_RESERVATION`, dashboard supervisor, pagos/caja/reportes. |
++| `SELLER_PRESENTER_VIEW` | Estado LIVE, prenda al aire, precio, codigo, talla, color, stock, notas basicas. | Actualizacion ligera por polling; no opera apartados si no tiene permiso operativo. | Dashboard supervisor, consola operador, pagos/caja/reportes. |
+ | `SUPERVISOR_VIEW` | Indicadores reales disponibles, prenda al aire, reservas recientes, eventos recientes, resumen de cerrados. | Consulta y `Ver detalle`; no opera reservas desde esta vista Z5 salvo definicion futura explicita. | No muestra metricas demo ni acciones de operador. |
+ | `NO_ACCESS_VIEW` | Mensaje de acceso restringido. | Ninguna accion LIVE. | Todo flujo LIVE. |
+
+@@ -38,7 +40,7 @@ modifica RBAC.
+ | Usuario QA | Rol real | Empresa/sucursal | Permisos reales relevantes | Vista LIVE actual esperada | Acciones permitidas | Acciones bloqueadas | Diferencias encontradas | Correccion aplicada |
+ |---|---|---|---|---|---|---|---|---|
+ | `qa.admin@local.test` | `ADMIN` | `DEFAULT / QA_CTR` (`companyId=1`, `branchId=4`) | `DO_LIVE_RESERVATION`, `VIEW_CUSTOMERS`, `VIEW_INVENTORY`, `MANAGE_INVENTORY`, `VIEW_REPORTS`, permisos amplios de operacion. `VIEW_PAYMENTS` no viene listado, pero `ADMIN` conserva bypass frontend por `hasPermission`. | `OPERATOR_VIEW` | Consola operativa completa si canal LIVE esta habilitado: preparar prenda, poner al aire, precio, cliente, reserva, estado operativo, cerrar LIVE. | Pagos/caja/reportes como flujo principal de LIVE-Z5. | Sin diferencia funcional esperada. | Mantener `ADMIN` como operador. |
+-| `qa.vendedor.centro@local.test` | `SELLER` | `DEFAULT / QA_CTR` (`companyId=1`, `branchId=4`) | `DO_LIVE_RESERVATION`, `VIEW_CUSTOMERS`, `VIEW_INVENTORY`, `REGISTER_PAYMENTS`, `DO_DOOR_SALE`, `DO_DOOR_RESERVATION`. | `SELLER_PRESENTER_VIEW` | Ver estado LIVE, prenda al aire y precio para apoyo visual. | Dashboard supervisor, consola operador, pagos/caja/reportes. | Antes podia caer en vista operativa por `DO_LIVE_RESERVATION`. | Resolver mantiene rol `SELLER` como vista de apoyo visual en Z5. |
++| `qa.vendedor.centro@local.test` | `SELLER` | `DEFAULT / QA_CTR` (`companyId=1`, `branchId=4`) | `DO_LIVE_RESERVATION`, `VIEW_CUSTOMERS`, `VIEW_INVENTORY`, `REGISTER_PAYMENTS`, `DO_DOOR_SALE`, `DO_DOOR_RESERVATION`. | `SELLER_OPERATION_VIEW` si canal LIVE esta activo | Ver prenda al aire, precio y apartados recientes; seleccionar cliente; crear apartado LIVE; cerrar como venta LIVE si conserva `DO_DOOR_SALE`. | Iniciar/cerrar LIVE, preparar/cambiar prenda al aire, cancelar sin `CANCEL_RESERVATION`, dashboard supervisor, pagos/caja/reportes. | Z5/Z6 lo dejaban en apoyo aunque tenia permiso operativo. | LIVE-Z9G usa permisos reales para darle flujo de apartado sin escalarlo a admin. |
+ | `qa.supervisor.centro@local.test` | `SUPERVISOR` | `DEFAULT / QA_CTR` (`companyId=1`, `branchId=4`) | `DO_LIVE_RESERVATION`, `VIEW_REPORTS`, `VIEW_CUSTOMERS`, `VIEW_INVENTORY`, `MANAGE_INVENTORY`, `MANAGE_CASH_CLOSURES`, `REGISTER_PAYMENTS`, permisos de supervision/operacion amplia. | `SUPERVISOR_VIEW` | Ver dashboard de monitoreo/control, indicadores reales disponibles, prenda al aire, reservas recientes y eventos recientes. | Vista vendedor/presentadora, consola operador y acciones operativas como flujo principal, salvo autorizacion futura documentada. | Entraba con experiencia parecida a vendedor/presentadora por fallback visual. | Resolver prioriza rol `SUPERVISOR` y `/live` renderiza dashboard propio. |
+ | `qa.sinpermisos@local.test` | No se obtuvo `/api/me`; login respondio `403 Forbidden`. | No disponible por bloqueo AUTH. | No disponible por bloqueo AUTH. | `NO_ACCESS_VIEW` / bloqueo AUTH | Ninguna. | Operar LIVE, ver dashboard supervisor, ver apoyo vendedor. | Bloqueo real desde AUTH; no se debe inferir permisos. | Documentado como bloqueo; no se modifico AUTH. |
+
+@@ -60,3 +62,7 @@ modifica RBAC.
+ - Validar visualmente con los cuatro usuarios QA en navegador.
+ - Definir en una fase futura si un `SUPERVISOR` con permisos operativos debe tener acciones administrativas acotadas o solo consulta.
+ - Formalizar realtime LIVE (`LIVE-RT`) con SSE o WebSocket para reemplazar polling ligero.
++
++## Nota LIVE-Z9G
++
++LIVE-Z9G corrige la regla de vendedor: `SELLER` con canal `LIVE` + `DO_LIVE_RESERVATION` ya no queda forzado a apoyo visual. Entra al flujo de apartado y cada accion queda condicionada por capacidad real. `SELLER` sin permiso operativo permanece en vista de apoyo.
+diff --git a/docs/LIVE_Z6_CAPABILITIES_MATRIX.md b/docs/LIVE_Z6_CAPABILITIES_MATRIX.md
+index b4199ac..da6d0c5 100644
+--- a/docs/LIVE_Z6_CAPABILITIES_MATRIX.md
++++ b/docs/LIVE_Z6_CAPABILITIES_MATRIX.md
+@@ -21,15 +21,15 @@ Los nombres Operador, Vendedor/Presentadora, Supervisor y NO_ACCESS son experien
+ | Capacidad | Fuente actual | Uso en `/live` | Gap documentado |
+ |---|---|---|---|
+ | `canViewLive` | canal `LIVE` + rol/permiso real (`DO_LIVE_RESERVATION`, `VIEW_REPORTS`, ADMIN/SUPERVISOR/SELLER) | Renderizar acceso minimo LIVE | Permiso granular `VIEW_LIVE` pendiente. |
+-| `canStartLive` | permiso operativo actual `DO_LIVE_RESERVATION` | Mostrar/ejecutar iniciar live | Permiso granular `START_LIVE` pendiente. |
+-| `canCloseLive` | permiso operativo actual `DO_LIVE_RESERVATION` | Mostrar/ejecutar finalizar live | Permiso granular `CLOSE_LIVE` pendiente. |
+-| `canPrepareItem` | `DO_LIVE_RESERVATION` + `VIEW_INVENTORY` | Preparar siguiente prenda | Permiso granular de preparacion pendiente. |
+-| `canSetActiveItem` | `DO_LIVE_RESERVATION` + `VIEW_INVENTORY` | Poner prenda al aire | Permiso granular `SET_LIVE_ACTIVE_ITEM` pendiente. |
+-| `canClearActiveItem` | `DO_LIVE_RESERVATION` + `VIEW_INVENTORY` | Sacar prenda del aire | Permiso granular `CLEAR_LIVE_ACTIVE_ITEM` pendiente. |
++| `canStartLive` | operacion LIVE reservada a ADMIN o usuario operativo no SELLER/SUPERVISOR | Mostrar/ejecutar iniciar live | Permiso granular `START_LIVE` pendiente. |
++| `canCloseLive` | operacion LIVE reservada a ADMIN o usuario operativo no SELLER/SUPERVISOR | Mostrar/ejecutar finalizar live | Permiso granular `CLOSE_LIVE` pendiente. |
++| `canPrepareItem` | gestion de sesion LIVE + `VIEW_INVENTORY` | Preparar siguiente prenda | Permiso granular de preparacion pendiente. |
++| `canSetActiveItem` | gestion de sesion LIVE + `VIEW_INVENTORY` | Poner prenda al aire | Permiso granular `SET_LIVE_ACTIVE_ITEM` pendiente. |
++| `canClearActiveItem` | gestion de sesion LIVE + `VIEW_INVENTORY` | Sacar prenda del aire | Permiso granular `CLEAR_LIVE_ACTIVE_ITEM` pendiente. |
+ | `canCreateReservation` | `DO_LIVE_RESERVATION` | Crear reserva LIVE | Sin gap critico actual. |
+ | `canCancelReservation` | `DO_LIVE_RESERVATION` + `CANCEL_RESERVATION` | Cancelar apartado con motivo | Persistencia de nota libre queda para Z7 si se requiere. |
+ | `canMarkPending` | `DO_LIVE_RESERVATION` | Marcar pendiente | Permiso granular pendiente. |
+-| `canMarkOperationalSold` | `DO_LIVE_RESERVATION` | Vendido operativo con confirmacion | Permiso granular pendiente. |
++| `canMarkOperationalSold` | ADMIN o permiso real de venta operativa (`DO_DOOR_SALE`) dentro de operacion LIVE | Vendido operativo con confirmacion | Permiso granular LIVE especifico pendiente. |
+ | `canReleaseReservedItem` | `CANCEL_RESERVATION` + `MANAGE_INVENTORY` + `VIEW_PAYMENTS` | No se habilita accion si no puede validarse pago | Endpoint/regla formal de liberacion segura pendiente. |
+ | `canChangeLivePrice` | `DO_LIVE_RESERVATION` | Editar precio LIVE, sin tocar precio base | Permiso granular `CHANGE_LIVE_PRICE` pendiente. |
+ | `canViewLiveDashboard` | `SUPERVISOR`, `VIEW_REPORTS` o ADMIN | Vista supervisor | Permiso granular `VIEW_LIVE_DASHBOARD` pendiente. |
+@@ -43,7 +43,7 @@ Los nombres Operador, Vendedor/Presentadora, Supervisor y NO_ACCESS son experien
+ | Usuario QA | Rol real | Permisos reales detectados | Capacidades LIVE resultantes | Vista LIVE resultante | Acciones permitidas | Acciones bloqueadas | Observaciones / huecos |
+ |---|---|---|---|---|---|---|---|
+ | `qa.admin@local.test` | `ADMIN` | `DO_LIVE_RESERVATION`, `CANCEL_RESERVATION`, `VIEW_CUSTOMERS`, `VIEW_INVENTORY`, `MANAGE_INVENTORY`, `VIEW_REPORTS`, permisos amplios de operacion. No trae `VIEW_PAYMENTS` listado. | Opera LIVE, inicia/cierra, prepara prenda, pone/saca al aire, reserva, cambia estado operativo, ve dashboard/historial/eventos. No carga pagos sin `VIEW_PAYMENTS`. | Operador | Consola operativa, precio LIVE, reservas, cancelar apartado con motivo, vendido operativo con confirmacion. | Pagos/cobro si no existe `VIEW_PAYMENTS`; liberacion automatica si no se puede validar pago. | Faltan permisos granulares `START_LIVE`, `CLOSE_LIVE`, `SET/CLEAR_ACTIVE_ITEM`, `CHANGE_LIVE_PRICE`. |
+-| `qa.vendedor.centro@local.test` | `SELLER` | `DO_LIVE_RESERVATION`, `VIEW_CUSTOMERS`, `VIEW_INVENTORY`, `REGISTER_PAYMENTS`, `DO_DOOR_SALE`, `DO_DOOR_RESERVATION`. | Puede ver LIVE y queda en vista de apoyo por rol SELLER. Aunque tiene permiso operativo, la experiencia visual no lo convierte en supervisor. | Vendedor/Presentadora | Ver prenda al aire, precio y estado de live. | Dashboard supervisor y consola operador como experiencia principal; pagos sin `VIEW_PAYMENTS`. | Requiere definicion futura si SELLER debe operar reservas desde vista propia. |
++| `qa.vendedor.centro@local.test` | `SELLER` | `DO_LIVE_RESERVATION`, `VIEW_CUSTOMERS`, `VIEW_INVENTORY`, `REGISTER_PAYMENTS`, `DO_DOOR_SALE`, `DO_DOOR_RESERVATION`. | Puede ver LIVE y operar apartados por permiso real, sin convertirse en administrador. | Vendedor con flujo de apartados | Ver prenda al aire, precio, seleccionar cliente, crear apartado LIVE y cerrar como venta LIVE si conserva `DO_DOOR_SALE`. | Iniciar/cerrar LIVE, preparar/cambiar prenda al aire, cancelar sin `CANCEL_RESERVATION`, dashboard supervisor, pagos sin `VIEW_PAYMENTS`. | Ajustado en LIVE-Z9G: `SELLER` con `DO_LIVE_RESERVATION` ya no queda forzado a apoyo visual. |
+ | `qa.supervisor.centro@local.test` | `SUPERVISOR` | `DO_LIVE_RESERVATION`, `VIEW_REPORTS`, `VIEW_CUSTOMERS`, `VIEW_INVENTORY`, `MANAGE_INVENTORY`, `MANAGE_CASH_CLOSURES`, `REGISTER_PAYMENTS`, permisos de supervision/operacion amplia. | Dashboard LIVE, indicadores, eventos, reservas recientes, prenda al aire. No cae en vendedor por fallback. | Supervisor | Monitoreo/control con datos reales, ver detalle, eventos/historial. | Acciones operativas si no se exponen explicitamente por capacidades/vista; pagos sin `VIEW_PAYMENTS`. | Supervisor tiene permisos amplios pero Z6B mantiene dashboard como experiencia principal. |
+ | `qa.sinpermisos@local.test` | No disponible | Login respondio `403 Forbidden`; no se obtuvo `/api/me`. | Sin capacidades. | NO_ACCESS / bloqueo AUTH | Ninguna. | Todo LIVE. | No se infiere nada sin evidencia. |
+
+@@ -84,7 +84,8 @@ Los nombres Operador, Vendedor/Presentadora, Supervisor y NO_ACCESS son experien
+
+ - Iniciar usa `canStartLive`.
+ - Finalizar usa `canCloseLive`.
+-- En Z6B ambas capacidades derivan conservadoramente del permiso operativo actual `DO_LIVE_RESERVATION`.
++- En LIVE-Z9G ambas capacidades quedan reservadas a ADMIN o usuarios operativos no `SELLER`/`SUPERVISOR` mientras no existan permisos granulares.
++- Un `SELLER` con `DO_LIVE_RESERVATION` puede apartar, pero no inicia ni finaliza la sesion completa.
+ - Permisos granulares quedan documentados como pendiente.
+
+ ## Archivos relacionados
+@@ -109,3 +110,7 @@ GO condicionado para QA manual multiusuario:
+ - validar que Supervisor no cae en Vendedor;
+ - validar cancelacion con motivo;
+ - validar vendido operativo como no-pago.
++
++## Nota LIVE-Z9G
++
++LIVE-Z9G corrige la resolucion de vendedor: las acciones de apartado se habilitan por permisos reales y no por rol visual. `SELLER` con `DO_LIVE_RESERVATION` puede entrar al flujo de apartado acotado; `SELLER` sin permiso operativo sigue en apoyo/presentador.
+diff --git a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+index 8ed796b..0715f84 100644
+--- a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
++++ b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+@@ -70,7 +70,7 @@ Se conserva:
+
+ ## Vendedor / Presentadora
+
+-La vista de apoyo se conserva dentro del shell:
++La vista de apoyo se conserva dentro del shell para vendedores sin permiso operativo LIVE:
+
+ - estado del live;
+ - prenda al aire;
+@@ -78,6 +78,8 @@ La vista de apoyo se conserva dentro del shell:
+ - codigo/talla/color;
+ - sin consola operador ni dashboard supervisor.
+
++Nota LIVE-Z9G: si el vendedor tiene canal `LIVE` y permiso real `DO_LIVE_RESERVATION`, deja de quedar forzado a apoyo visual y entra a un flujo acotado de apartados. Ese flujo permite apartar y seleccionar/crear cliente solo cuando existen los permisos reales correspondientes, sin habilitar iniciar/cerrar LIVE ni cambiar prenda al aire.
++
+ ## NO_ACCESS
+
+ El guard existente se mantiene. Usuarios sin acceso LIVE siguen redirigidos a `/access-denied`; no se renderiza consola ni dashboard.
+diff --git a/docs/LIVE_Z9F_1_CONTEXTUAL_ACTION_PANELS.md b/docs/LIVE_Z9F_1_CONTEXTUAL_ACTION_PANELS.md
+index fd28f55..a38fccf 100644
+--- a/docs/LIVE_Z9F_1_CONTEXTUAL_ACTION_PANELS.md
++++ b/docs/LIVE_Z9F_1_CONTEXTUAL_ACTION_PANELS.md
+@@ -41,6 +41,8 @@ Cuando falta cliente, el panel ofrece:
+
+ Cuando el bloqueo solo requiere revisar el contexto, el panel ofrece `Entendido`.
+
++Nota LIVE-Z9G: estos paneles tambien aplican al vendedor cuando tiene permisos reales para apartar en LIVE. El vendedor operativo recibe la misma guia contextual para datos faltantes, pero no ve acciones sensibles como iniciar/cerrar LIVE o cambiar la prenda al aire.
++
+ ## Items Create
+
+ `/items-create?returnTo=/live` conserva el dialogo modal agregado en LIVE-Z9F para campos faltantes:
+diff --git a/docs/LIVE_Z9G_SELLER_CAPABILITIES.md b/docs/LIVE_Z9G_SELLER_CAPABILITIES.md
+new file mode 100644
+index 0000000..1a081cd
+--- /dev/null
++++ b/docs/LIVE_Z9G_SELLER_CAPABILITIES.md
+@@ -0,0 +1,79 @@
++# LIVE-Z9G - Capacidades reales del vendedor en LIVE
++
++## Objetivo
++
++Corregir la experiencia LIVE para que un vendedor pueda operar apartados cuando sus permisos reales lo permiten, sin convertirlo en administrador ni darle acciones sensibles sin permiso.
++
++## Hallazgo
++
++La sesion frontend ya conserva correctamente:
++
++- roles recibidos desde login o `/api/me`;
++- `effectivePermissions`;
++- canales habilitados.
++
++El problema estaba en `services/liveCapabilities.ts`: aunque `canOperateLive` se calculaba con canal `LIVE` + `DO_LIVE_RESERVATION`, `viewMode` forzaba a usuarios `SELLER` o `QA_TENANT_SELLER` a `support`. Por eso un vendedor con permiso real podia quedar visualmente como espectador/apoyo.
++
++## Regla aplicada
++
++La vista y acciones se derivan de capacidades reales:
++
++- `canCreateReservation`: canal `LIVE` + `DO_LIVE_RESERVATION`.
++- `canSelectCustomer`: operacion LIVE + `VIEW_CUSTOMERS`.
++- `canCreateCustomer`: operacion LIVE + `CREATE_CUSTOMER`.
++- `canSelectItem`: operacion LIVE + `VIEW_INVENTORY`.
++- `canMarkOperationalSold`: operacion LIVE + `DO_DOOR_SALE` o admin.
++- `canCancelReservation`: operacion LIVE + `CANCEL_RESERVATION`.
++- `canStartLive`, `canCloseLive`, `canPrepareItem`, `canSetActiveItem`, `canClearActiveItem`: reservadas a administracion/operacion no vendedor, porque no existen permisos granulares frontend/backend para separarlas con seguridad.
++
++## Matriz final
++
++| Actor | Condicion | Vista LIVE | Puede hacer | No debe hacer sin permiso |
++|---|---|---|---|---|
++| ADMIN / operador | Admin o usuario no vendedor/supervisor con canal `LIVE` + `DO_LIVE_RESERVATION` | Operador | Iniciar/cerrar LIVE, preparar prenda, poner al aire, apartar y estados segun capacidades | Pagos/caja/reportes fuera de LIVE |
++| SELLER con `DO_LIVE_RESERVATION` | Rol vendedor + permiso real LIVE | Operacion de apartados | Ver prenda al aire, precio, seleccionar cliente si tiene `VIEW_CUSTOMERS`, crear cliente si tiene `CREATE_CUSTOMER`, apartar, ver apartados recientes | Iniciar/cerrar LIVE, cambiar prenda al aire, cancelar apartado sin `CANCEL_RESERVATION`, cerrar venta LIVE sin `DO_DOOR_SALE` |
++| SELLER sin `DO_LIVE_RESERVATION` | Rol vendedor sin permiso operativo LIVE | Apoyo/presentador | Ver apoyo si tiene acceso minimo LIVE | Apartar u operar reservas |
++| SUPERVISOR | Rol supervisor | Supervision | Monitorear actividad, reservas, eventos y estado segun permisos | Caer en vista vendedor u operar como flujo principal |
++| NO_ACCESS | Sin permisos efectivos o sin acceso LIVE | Bloqueo | Ninguna accion LIVE | Toda operacion LIVE |
++
++## Cambios aplicados
++
++- `viewMode` ya no fuerza `support` para `SELLER` con `canOperateLive`.
++- Las acciones de iniciar/finalizar LIVE se ocultan si `canStartLive`/`canCloseLive` no existen.
++- `Cerrar como venta LIVE` depende de capacidad de venta operativa (`DO_DOOR_SALE`) o admin.
++- `Cancelar apartado` sigue dependiendo de `CANCEL_RESERVATION`.
++- `Volver a apartado` depende de capacidad real de cambiar estados operativos.
++- El texto visible del actor vendedor se ajusta para hablar de permisos reales.
++
++## Sin cambios fuera de alcance
++
++No se modificaron:
++
++- backend;
++- endpoints;
++- contratos de API;
++- AUTH/RBAC backend;
++- pagos/caja/reportes/billing/IA;
++- persistencia;
++- reglas profundas LIVE.
++
++## Validacion manual esperada
++
++1. Entrar con `qa.admin@local.test`.
++2. Confirmar consola operador completa.
++3. Entrar con `qa.vendedor.centro@local.test`.
++4. Confirmar que si tiene `DO_LIVE_RESERVATION` ve flujo de apartado, no solo apoyo.
++5. Confirmar que puede seleccionar cliente si tiene `VIEW_CUSTOMERS`.
++6. Confirmar que puede apartar si hay prenda al aire y precio valido.
++7. Confirmar que no ve iniciar/cerrar LIVE si no tiene esa capacidad.
++8. Confirmar que no ve cancelar apartado sin `CANCEL_RESERVATION`.
++9. Confirmar que `Cerrar como venta LIVE` solo aparece si tiene capacidad de venta operativa.
++10. Entrar con `qa.supervisor.centro@local.test` y confirmar dashboard supervisor.
++11. Entrar con `qa.sinpermisos@local.test` y confirmar bloqueo.
++12. Validar light/dark y mobile/tablet.
++
++## GO/NO-GO
++
++GO tecnico si pasan lint, TypeScript, export web, Maven test/package y `git diff --check`.
++
++GO visual pendiente de corrida manual multiusuario.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index a2136ce..e9bb380 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -184,3 +184,15 @@ Agregar a la corrida manual de LIVE:
+ - confirmar panel contextual con `Entendido`;
+ - validar que `items-create?returnTo=%2Flive` mantiene dialogo modal para campos faltantes;
+ - validar light/dark, presets visuales y mobile/tablet.
++
++## Nota LIVE-Z9G
++
++Agregar a la corrida manual de LIVE con `qa.vendedor.centro@local.test`:
++
++- confirmar que el vendedor con `DO_LIVE_RESERVATION` ve flujo de apartado y no solo apoyo visual;
++- confirmar que puede seleccionar cliente si conserva `VIEW_CUSTOMERS`;
++- confirmar que puede crear apartado LIVE con prenda al aire y precio valido;
++- confirmar que no ve iniciar/cerrar LIVE ni cambiar prenda al aire;
++- confirmar que no ve cancelar apartado si no tiene `CANCEL_RESERVATION`;
++- confirmar que `Cerrar como venta LIVE` solo aparece si conserva permiso real de venta operativa;
++- repetir validacion en light/dark y mobile/tablet.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index bf26356..ba1938d 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -67,7 +67,7 @@
+     "actorOperatorLabel": "OPERATOR",
+     "actorOperatorSubtitle": "Holds and follow-up",
+     "actorSellerLabel": "LIVE SELLER",
+-    "actorSellerSubtitle": "Sales support and on-air item",
++    "actorSellerSubtitle": "LIVE holds based on real permissions",
+     "actorSupervisorLabel": "LIVE SUPERVISOR",
+     "actorSupervisorSubtitle": "Monitoring and control",
+     "actorNoAccessLabel": "NO LIVE ACCESS",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index 7e62542..aec8ccb 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -67,7 +67,7 @@
+     "actorOperatorLabel": "OPERADOR",
+     "actorOperatorSubtitle": "Apartados y seguimiento",
+     "actorSellerLabel": "VENDEDOR LIVE",
+-    "actorSellerSubtitle": "Apoyo visual de venta y prenda al aire",
++    "actorSellerSubtitle": "Apartados LIVE segun permisos reales",
+     "actorSupervisorLabel": "SUPERVISOR LIVE",
+     "actorSupervisorSubtitle": "Monitoreo y control",
+     "actorNoAccessLabel": "SIN ACCESO LIVE",
+diff --git a/qa-reports/LIVE-Z9G-seller-capabilities-report-20260606-210231.md b/qa-reports/LIVE-Z9G-seller-capabilities-report-20260606-210231.md
+new file mode 100644
+index 0000000..45e973f
+--- /dev/null
++++ b/qa-reports/LIVE-Z9G-seller-capabilities-report-20260606-210231.md
+@@ -0,0 +1,69 @@
++# LIVE-Z9G - Reporte de capacidades reales del vendedor en LIVE
++
++## Objetivo
++
++Corregir la resolucion frontend de capacidades LIVE para que el vendedor pueda operar apartados cuando sus permisos reales lo permiten, sin elevarlo a administrador ni mostrar acciones sensibles sin permiso.
++
++## Alcance
++
++- Auditar sesion, rol y permisos consumidos por frontend.
++- Revisar `services/liveCapabilities.ts`, `services/liveActorResolver.ts`, `services/accessControl.ts` y `/live`.
++- Ajustar capacidades visibles por permisos reales.
++- Mantener backend, AUTH/RBAC, pagos, caja, reportes backend, billing e IA fuera de alcance.
++
++## Hallazgo
++
++`/api/me` y el servicio de autenticacion ya entregan `effectivePermissions`. El problema estaba en frontend: aunque `canOperateLive` se calculaba por canal `LIVE` + `DO_LIVE_RESERVATION`, `viewMode` forzaba a `SELLER` a `support`. Por eso `qa.vendedor.centro@local.test` podia tener permiso operativo y aun asi ver solo apoyo/espectador.
++
++## Regla aplicada
++
++- `SELLER` con `DO_LIVE_RESERVATION` entra a flujo operativo acotado de apartados.
++- `SELLER` sin `DO_LIVE_RESERVATION` permanece en apoyo/presentador.
++- Iniciar/cerrar LIVE y cambiar prenda al aire quedan reservados a admin u operador no vendedor/supervisor mientras no existan permisos granulares.
++- Cerrar como venta LIVE requiere admin o permiso real de venta operativa (`DO_DOOR_SALE`).
++- Cancelar apartado requiere `CANCEL_RESERVATION`.
++
++## Matriz final
++
++| Actor | Vista | Acciones permitidas | Acciones bloqueadas |
++|---|---|---|---|
++| Admin / operador | Consola operador | Iniciar/cerrar LIVE, preparar prenda, poner al aire, apartar y estados segun capacidades | Pagos/caja fuera del flujo LIVE |
++| Vendedor con `DO_LIVE_RESERVATION` | Flujo de apartados | Ver prenda al aire, seleccionar cliente con `VIEW_CUSTOMERS`, crear cliente con `CREATE_CUSTOMER`, apartar, cerrar como venta LIVE con `DO_DOOR_SALE` | Iniciar/cerrar LIVE, cambiar prenda al aire, cancelar sin `CANCEL_RESERVATION` |
++| Vendedor sin `DO_LIVE_RESERVATION` | Apoyo/presentador | Apoyo visual si tiene acceso minimo | Operar apartados |
++| Supervisor | Supervision | Monitorear estado, actividad, eventos y apartados | Caer en vista vendedor u operar como consola principal |
++| Sin permisos | Bloqueo | Ninguna | Toda operacion LIVE |
++
++## Cambios aplicados
++
++- `viewMode` ya no fuerza `support` para vendedores con permiso real de apartado LIVE.
++- Se separaron capacidades de apartado vs administracion de sesion LIVE.
++- Se ocultaron acciones de iniciar/finalizar LIVE para usuarios sin esa capacidad.
++- Se oculto el bloque de preparar/cambiar prenda al aire cuando el usuario no tiene esa capacidad.
++- Se evito mostrar solicitud de cancelacion al vendedor si no tiene `CANCEL_RESERVATION`.
++- Se actualizo el subtitulo visible del actor vendedor.
++- Se actualizo documentacion de actores, matriz Z6 y QA manual.
++
++## Validaciones tecnicas
++
++- `npm.cmd run lint`: OK, 0 errores, 53 warnings preexistentes.
++- `npx.cmd tsc --noEmit`: OK.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
++- `backend/control-ropa/./mvnw.cmd test`: OK, 73 tests, 0 failures, 0 errors.
++- `backend/control-ropa/./mvnw.cmd -q -DskipTests package`: OK.
++- `git --no-pager diff --check`: OK.
++
++## Validacion manual esperada
++
++1. Entrar con `qa.admin@local.test` y confirmar consola operador completa.
++2. Entrar con `qa.vendedor.centro@local.test`.
++3. Confirmar que si tiene `DO_LIVE_RESERVATION` puede apartar en LIVE.
++4. Confirmar que puede seleccionar cliente solo si tiene `VIEW_CUSTOMERS`.
++5. Confirmar que no ve iniciar/cerrar LIVE ni cambiar prenda al aire.
++6. Confirmar que no ve acciones no permitidas como cancelar sin `CANCEL_RESERVATION`.
++7. Confirmar supervisor en dashboard y sin permisos bloqueado.
++8. Validar light/dark y mobile/tablet.
++
++## GO/NO-GO
++
++- GO tecnico: SI.
++- GO visual: pendiente de corrida manual con los cuatro usuarios QA.
+diff --git a/services/liveCapabilities.ts b/services/liveCapabilities.ts
+index 1763766..eb0db65 100644
+--- a/services/liveCapabilities.ts
++++ b/services/liveCapabilities.ts
+@@ -87,7 +87,11 @@ export function resolveLiveCapabilities(user: UserSession | null): LiveCapabilit
+   const canSelectCustomer = operate && canAccessByPermission(user, 'VIEW_CUSTOMERS');
+   const canSelectItem = operate && canAccessByPermission(user, 'VIEW_INVENTORY');
+   const canManageInventory = canAccessByPermission(user, 'MANAGE_INVENTORY');
++  const canCreateDoorSale = canAccessByPermission(user, 'DO_DOOR_SALE');
++  const canManageLiveSession = operate && (admin || (!seller && !supervisor));
++  const canManageLiveItem = canManageLiveSession && canSelectItem;
+   const canCancelReservation = operate && canAccessByPermission(user, 'CANCEL_RESERVATION');
++  const canMarkOperationalSold = operate && (admin || canCreateDoorSale);
+   const canViewPayments = hasEffectivePermission(user, 'VIEW_PAYMENTS');
+   const canViewLiveDashboard = canViewLive && (supervisor || viewReports || admin);
+   const canChangeLivePrice =
+@@ -109,22 +113,22 @@ export function resolveLiveCapabilities(user: UserSession | null): LiveCapabilit
+     ? 'blocked'
+     : supervisor || (canViewLiveDashboard && !admin && !seller)
+       ? 'supervisor'
+-      : operate && !seller
++      : operate
+         ? 'operator'
+         : 'support';
+
+   return {
+     canViewLive,
+     canOperateLive: operate,
+-    canStartLive: operate,
+-    canCloseLive: operate,
+-    canPrepareItem: operate && canSelectItem,
+-    canSetActiveItem: operate && canSelectItem,
+-    canClearActiveItem: operate && canSelectItem,
++    canStartLive: canManageLiveSession,
++    canCloseLive: canManageLiveSession,
++    canPrepareItem: canManageLiveItem,
++    canSetActiveItem: canManageLiveItem,
++    canClearActiveItem: canManageLiveItem,
+     canCreateReservation: operate,
+     canCancelReservation,
+     canMarkPending: operate,
+-    canMarkOperationalSold: operate,
++    canMarkOperationalSold,
+     canReleaseReservedItem: canCancelReservation && canManageInventory && canViewPayments,
+     canChangeLivePrice,
+     canViewLiveDashboard,
+@@ -135,8 +139,8 @@ export function resolveLiveCapabilities(user: UserSession | null): LiveCapabilit
+     canSelectCustomer,
+     canCreateCustomer: operate && canAccessByPermission(user, 'CREATE_CUSTOMER'),
+     canSelectItem,
+-    canCreateItem: operate && canManageInventory,
+-    canChangeReservationStatus: operate,
++    canCreateItem: canManageLiveSession && canManageInventory,
++    canChangeReservationStatus: canMarkOperationalSold || canCancelReservation,
+     viewMode,
+     gaps,
+   };

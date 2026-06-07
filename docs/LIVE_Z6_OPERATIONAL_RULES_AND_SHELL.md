@@ -70,13 +70,15 @@ Se conserva:
 
 ## Vendedor / Presentadora
 
-La vista de apoyo se conserva dentro del shell:
+La vista de apoyo se conserva dentro del shell para vendedores sin permiso operativo LIVE:
 
 - estado del live;
 - prenda al aire;
 - precio;
 - codigo/talla/color;
 - sin consola operador ni dashboard supervisor.
+
+Nota LIVE-Z9G: si el vendedor tiene canal `LIVE` y permiso real `DO_LIVE_RESERVATION`, deja de quedar forzado a apoyo visual y entra a un flujo acotado de apartados. Ese flujo permite apartar y seleccionar/crear cliente solo cuando existen los permisos reales correspondientes, sin habilitar iniciar/cerrar LIVE ni cambiar prenda al aire.
 
 ## NO_ACCESS
 
