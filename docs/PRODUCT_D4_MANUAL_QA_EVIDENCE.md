@@ -291,3 +291,20 @@ Agregar a la corrida manual de sistema visual:
 - restaurar plantilla;
 - abrir opciones avanzadas y confirmar que el contenido tecnico no satura por defecto;
 - abrir `/appearance` y confirmar tarjeta `Diseno de la aplicacion` con boton `Abrir editor visual`.
+
+## Nota PRODUCT-C2.4
+
+Agregar a la corrida manual de sistema visual:
+
+- abrir `/ui-kit`;
+- ir a `Colores de marca`;
+- cambiar color principal y confirmar que no se abre la ventana nativa de Windows como experiencia principal;
+- cambiar color secundario;
+- cambiar color de acento;
+- confirmar que la paleta sugerida respeta los colores definidos;
+- revisar contraste de principal, secundario, acento, fondo, superficie y reservado;
+- confirmar que la preview refleja sidebar, card, boton primario, boton secundario, chip/acento, badge activo y badge reservado;
+- aplicar paleta localmente;
+- abrir `/live` o `/customers` y confirmar tema aplicado;
+- volver a `/ui-kit` y restaurar plantilla;
+- validar light/dark y mobile/tablet.

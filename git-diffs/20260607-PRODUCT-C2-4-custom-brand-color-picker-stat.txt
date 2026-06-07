@@ -1,0 +1,18 @@
+﻿ app/ui-kit.tsx                                     |  47 +++-
+ components/ui/AppColorPicker.tsx                   | 272 +++++++++++++++++++
+ components/ui/PaletteGeneratorCard.tsx             | 302 ++++++++++++++-------
+ docs/PRODUCT_C2_1_PALETTE_CONTRAST_GENERATOR.md    |  10 +
+ ...PRODUCT_C2_2_SIMPLIFIED_VISUAL_IDENTITY_FLOW.md |  10 +
+ docs/PRODUCT_C2_3_GUIDED_APP_DESIGN_FLOW.md        |  18 ++
+ docs/PRODUCT_C2_4_CUSTOM_BRAND_COLOR_PICKER.md     | 158 +++++++++++
+ docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md            |  10 +
+ docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md              |  17 ++
+ locales/en/common.json                             |  27 +-
+ locales/es/common.json                             |  27 +-
+ locales/fr/common.json                             |  27 +-
+ locales/ja/common.json                             |  27 +-
+ locales/ko/common.json                             |  27 +-
+ locales/pt-BR/common.json                          |  27 +-
+ locales/zh/common.json                             |  27 +-
+ theme/colorUtils.ts                                |  25 +-
+ 17 files changed, 923 insertions(+), 135 deletions(-)

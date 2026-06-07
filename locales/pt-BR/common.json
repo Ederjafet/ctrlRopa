@@ -1089,7 +1089,7 @@
     "flowSubtitle": "Siga estes passos: modelo, cor base, paleta, contraste, prévia e aplicação local.",
     "flowSteps": {
       "template": "Escolha um modelo visual",
-      "baseColor": "Escolha a cor principal",
+      "baseColor": "Cores da marca",
       "palette": "Revise a paleta sugerida",
       "contrast": "Revise contraste e legibilidade",
       "preview": "Veja a previa",
@@ -1150,7 +1150,8 @@
       "danger": "Estado reservado",
       "background": "Texto sobre fundo",
       "surface": "Texto sobre cartoes",
-      "button": "Botao principal"
+      "button": "Botao principal",
+      "secondary": "Cor secundaria"
     },
     "tokens": {
       "primary": "Principal",
@@ -1172,7 +1173,7 @@
     "previewReservedBadge": "Reservado",
     "previewNotice": "Aviso operacional de exemplo.",
     "appearanceCardTitle": "Design do aplicativo",
-    "appearanceCardHelp": "Configure cores, modelo visual e previa sem duplicar o gerador nesta tela.",
+    "appearanceCardHelp": "Configure modelo visual, cores da marca e previa sem duplicar o gerador nesta tela.",
     "openGenerator": "Abrir editor visual",
     "loading": "Carregando design do aplicativo...",
     "appDesignTitle": "Design do aplicativo",
@@ -1199,7 +1200,25 @@
     "legibilityHelp": "Antes de aplicar a paleta, revise se textos e botoes sao faceis de ler.",
     "lowContrastApplyWarning": "Esta paleta tem contrastes que devem ser revisados antes de aplicar.",
     "appPreviewTitle": "Previa do aplicativo",
-    "appPreviewHelp": "Assim as cores ficarao quando aplicadas em telas reais do sistema."
+    "appPreviewHelp": "Assim as cores ficarao quando aplicadas em telas reais do sistema.",
+    "brandColorsTitle": "Cores da marca",
+    "brandColorsHelp": "Voce pode usar apenas uma cor principal ou adicionar cores secundaria e de acento se sua marca tiver.",
+    "brandColorPrimary": "Cor principal",
+    "brandColorPrimaryHelp": "Usada para navegacao, botoes principais e acoes chave.",
+    "brandColorSecondary": "Cor secundaria",
+    "brandColorSecondaryHelp": "Usada para contraste, fundos fortes ou botoes secundarios.",
+    "brandColorAccent": "Cor de acento",
+    "brandColorAccentHelp": "Usada para destacar elementos, estados ou chamadas de atencao.",
+    "changeColor": "Alterar cor",
+    "chooseColor": "Escolher cor",
+    "chooseColorHelp": "Selecione uma amostra, ajuste o HEX ou use uma variacao gerada.",
+    "applyColor": "Aplicar cor",
+    "useThisColor": "Usar esta cor",
+    "restoreOriginalColor": "Restaurar cor original",
+    "automaticColor": "Automatico",
+    "useAutomaticColor": "Usar automatico",
+    "suggestedSwatches": "Amostras sugeridas",
+    "colorVariations": "Variacoes da cor"
   },
   "usersForm": {
     "newTitle": "Novo",

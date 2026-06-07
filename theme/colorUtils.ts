@@ -23,6 +23,12 @@ export type SemanticPalette = {
   surface: string;
 };
 
+export type BrandColorInputs = {
+  primary?: string | null;
+  secondary?: string | null;
+  accent?: string | null;
+};
+
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const normalizeHue = (hue: number) => ((hue % 360) + 360) % 360;
 const toHexChannel = (value: number) => clamp(Math.round(value), 0, 255).toString(16).padStart(2, '0');
@@ -219,17 +225,30 @@ export function generateSemanticPalette(
   value: string,
   harmony: HarmonyType,
   scheme: 'light' | 'dark',
+  brandColors: BrandColorInputs = {},
 ): SemanticPalette {
-  const base = normalizeHexColor(value);
+  const base = normalizeHexColor(brandColors.primary ?? value);
   const baseHsl = hexToHsl(base) ?? hexToHsl('#2563EB')!;
   const harmonyColors = generateHarmonyColors(base, harmony);
   const tone = generateTones(base, 4);
   const shade = generateShades(base, 4);
+  const secondary =
+    brandColors.secondary && isValidHexColor(brandColors.secondary)
+      ? normalizeHexColor(brandColors.secondary)
+      : scheme === 'dark'
+        ? tone[1]
+        : shade[1];
+  const accent =
+    brandColors.accent && isValidHexColor(brandColors.accent)
+      ? normalizeHexColor(brandColors.accent)
+      : harmony === 'monochromatic'
+        ? tone[2]
+        : harmonyColors[1];
 
   return {
     primary: base,
-    secondary: scheme === 'dark' ? tone[1] : shade[1],
-    accent: harmony === 'monochromatic' ? tone[2] : harmonyColors[1],
+    secondary,
+    accent,
     success: scheme === 'dark' ? '#86EFAC' : '#15803D',
     warning: scheme === 'dark' ? '#FBBF24' : '#B45309',
     danger: scheme === 'dark' ? '#FCA5A5' : '#B91C1C',

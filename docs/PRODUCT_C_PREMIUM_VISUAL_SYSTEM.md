@@ -365,3 +365,13 @@ Fecha: 2026-06-07
 PRODUCT-C2.3 reposiciona `/ui-kit` como pantalla de `Diseno de la aplicacion`: la configuracion visible ahora explica que se cambia la plantilla visual, el color principal, la paleta sugerida, contraste, legibilidad y preview antes de aplicar cambios locales.
 
 El sistema visual premium conserva presets, light/dark, overrides locales y modo avanzado. QA debe validar que el usuario entienda la secuencia sin abrir opciones tecnicas.
+
+---
+
+## Continuidad PRODUCT-C2.4 - Selector propio y colores de marca
+
+Fecha: 2026-06-07
+
+PRODUCT-C2.4 agrega un selector propio de color para `/ui-kit` y evita que la experiencia principal dependa del picker nativo de navegador/Windows. El flujo de diseno visual soporta color principal, secundario y acento, con preview y contraste antes de aplicar localmente.
+
+QA debe validar que el panel propio respete light/dark, presets, responsive y que los tres colores se reflejen en sidebar, cards, botones, chips/acento, badges y estados sin perder legibilidad.
