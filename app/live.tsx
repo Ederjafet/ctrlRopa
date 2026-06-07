@@ -118,6 +118,8 @@ type ActivityFeedEvent = {
   tone: 'success' | 'neutral' | 'info' | 'accent';
 };
 
+type LiveItemAvailabilityFilter = 'available' | 'reserved' | 'unavailable' | 'all';
+
 type LiveNoticeModalProps = {
   notice: LiveNotice | null;
   onClose: () => void;
@@ -497,6 +499,8 @@ export default function LiveScreen() {
 
   const [customerSearch, setCustomerSearch] = useState('');
   const [itemSearch, setItemSearch] = useState('');
+  const [itemAvailabilityFilter, setItemAvailabilityFilter] =
+    useState<LiveItemAvailabilityFilter>('available');
   const [isCustomerModalVisible, setIsCustomerModalVisible] = useState(false);
   const [isItemModalVisible, setIsItemModalVisible] = useState(false);
   const [isScannerVisible, setIsScannerVisible] = useState(false);
@@ -517,6 +521,12 @@ export default function LiveScreen() {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [refreshLiveLayoutPreferences, session?.userId])
   );
+
+  useEffect(() => {
+    if (isItemModalVisible) {
+      setItemAvailabilityFilter('available');
+    }
+  }, [isItemModalVisible]);
 
   const checkAccessAndLoad = async () => {
     try {
@@ -757,22 +767,6 @@ export default function LiveScreen() {
       )
       .slice(0, 25);
   }, [customers, customerSearch]);
-
-  const filteredItems = useMemo(() => {
-    const term = normalize(itemSearch);
-
-    if (!term) return items.slice(0, 30);
-
-    return items
-      .filter((item) =>
-        `${item.code ?? ''} ${item.qrCode ?? ''} ${item.productTypeName ?? ''} ${
-          item.brandName ?? ''
-        } ${item.sizeName ?? ''}`
-          .toLowerCase()
-          .includes(term)
-      )
-      .slice(0, 30);
-  }, [items, itemSearch]);
 
   const selectedLiveIsOperable = isLiveOperable(selectedLive);
   const operatorLiveIsActive = selectedLiveStatus === 'ACTIVE';
@@ -1346,6 +1340,86 @@ export default function LiveScreen() {
     },
     [branchReservations, canViewPayments, paidByReservationId, t]
   );
+  const getItemAvailabilityFilter = useCallback(
+    (item: Item): LiveItemAvailabilityFilter => {
+      const itemStatus = normalizeStatus(item.status);
+      const availability = getItemLiveAvailability(item);
+
+      if (itemStatus === 'RESERVED') return 'reserved';
+      if (availability.canGoOnAir) return 'available';
+      return 'unavailable';
+    },
+    [getItemLiveAvailability]
+  );
+  const searchedItems = useMemo(() => {
+    const term = normalize(itemSearch);
+    const matchesSearch = (item: Item) =>
+      `${item.code ?? ''} ${item.qrCode ?? ''} ${item.productTypeName ?? ''} ${
+        item.brandName ?? ''
+      } ${item.sizeName ?? ''}`
+        .toLowerCase()
+        .includes(term);
+
+    return term ? items.filter(matchesSearch) : items;
+  }, [items, itemSearch]);
+  const itemAvailabilityCounts = useMemo(
+    () =>
+      searchedItems.reduce(
+        (counts, item) => {
+          const filter = getItemAvailabilityFilter(item);
+          counts[filter] += 1;
+          counts.all += 1;
+          return counts;
+        },
+        {
+          available: 0,
+          reserved: 0,
+          unavailable: 0,
+          all: 0,
+        } as Record<LiveItemAvailabilityFilter, number>
+      ),
+    [getItemAvailabilityFilter, searchedItems]
+  );
+  const itemAvailabilityFilterOptions = useMemo(
+    () => [
+      {
+        key: 'available' as const,
+        label: t('live.itemFilterAvailable'),
+        count: itemAvailabilityCounts.available,
+      },
+      {
+        key: 'reserved' as const,
+        label: t('live.itemFilterReserved'),
+        count: itemAvailabilityCounts.reserved,
+      },
+      {
+        key: 'unavailable' as const,
+        label: t('live.itemFilterUnavailable'),
+        count: itemAvailabilityCounts.unavailable,
+      },
+      {
+        key: 'all' as const,
+        label: t('live.itemFilterAll'),
+        count: itemAvailabilityCounts.all,
+      },
+    ],
+    [itemAvailabilityCounts, t]
+  );
+  const filteredItems = useMemo(
+    () =>
+      searchedItems
+        .filter((item) => {
+          if (itemAvailabilityFilter === 'all') return true;
+          return getItemAvailabilityFilter(item) === itemAvailabilityFilter;
+        })
+        .slice(0, 30),
+    [getItemAvailabilityFilter, itemAvailabilityFilter, searchedItems]
+  );
+  const itemListEmptyMessage = itemLoadIssue
+    ? itemLoadIssue
+    : itemSearch.trim()
+      ? t('live.noItemSearchResults')
+      : t('live.noItemsAvailableWithFilters');
   const operatorStartDisabledReason = !mayStartLive
     ? t('live.liveOperatePermissionError')
     : isSavingLive
@@ -5654,6 +5728,50 @@ export default function LiveScreen() {
           onChangeText={setItemSearch}
         />
 
+        <View style={styles.itemFilterPanel}>
+          <View style={styles.itemFilterRow}>
+            {itemAvailabilityFilterOptions.map((option) => {
+              const selected = itemAvailabilityFilter === option.key;
+
+              return (
+                <Pressable
+                  key={option.key}
+                  onPress={() => setItemAvailabilityFilter(option.key)}
+                  style={[
+                    styles.itemFilterChip,
+                    {
+                      backgroundColor: selected
+                        ? theme.colors.primaryButtonBackground
+                        : theme.colors.surfaceMuted,
+                      borderColor: selected
+                        ? theme.colors.primaryButtonBackground
+                        : theme.colors.borderSubtle,
+                      borderRadius: theme.radius.sm,
+                    },
+                  ]}
+                >
+                  <AppText
+                    variant="caption"
+                    bold={selected}
+                    color={selected ? theme.colors.primaryButtonText : theme.colors.text}
+                  >
+                    {option.label}
+                  </AppText>
+                  <AppText
+                    variant="caption"
+                    color={selected ? theme.colors.primaryButtonText : theme.colors.mutedText}
+                  >
+                    {option.count}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </View>
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            {t('live.itemAvailabilityFilterHelp')}
+          </AppText>
+        </View>
+
         <FlatList
           data={filteredItems}
           style={styles.modalList}
@@ -5661,6 +5779,15 @@ export default function LiveScreen() {
           keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => {
             const availability = getItemLiveAvailability(item);
+            const availabilityFilter = getItemAvailabilityFilter(item);
+            const availabilityColor =
+              availabilityFilter === 'available'
+                ? theme.colors.success
+                : availabilityFilter === 'reserved'
+                  ? theme.colors.warning
+                  : normalizeStatus(item.status) === 'SOLD'
+                    ? theme.colors.danger
+                    : theme.colors.warning;
 
             return (
               <AppOptionRow
@@ -5678,13 +5805,13 @@ export default function LiveScreen() {
                 </AppText>
                 <AppText
                   variant="caption"
-                  color={availability.canGoOnAir ? theme.colors.success : theme.colors.warning}
+                  color={availabilityColor}
                   bold
                 >
                   {availability.label}
                 </AppText>
                 {availability.reason ? (
-                  <AppText variant="caption" color={theme.colors.warning}>
+                  <AppText variant="caption" color={availabilityColor}>
                     {availability.reason}
                   </AppText>
                 ) : null}
@@ -5693,7 +5820,7 @@ export default function LiveScreen() {
           }}
           ListEmptyComponent={
             <AppText>
-              {itemLoadIssue || t('live.noAvailableItems')}
+              {itemListEmptyMessage}
             </AppText>
           }
         />
@@ -6053,6 +6180,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginTop: 10,
     padding: 12,
+  },
+  itemFilterChip: {
+    alignItems: 'center',
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  itemFilterPanel: {
+    gap: 8,
+    marginTop: 10,
+  },
+  itemFilterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   modalList: {
     maxHeight: 420,

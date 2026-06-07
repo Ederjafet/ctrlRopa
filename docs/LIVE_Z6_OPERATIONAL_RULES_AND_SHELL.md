@@ -472,3 +472,7 @@ LIVE-Z9F.1 extiende el patron para que LIVE use paneles contextuales accionables
 # Nota LIVE-Z9H - Refresh vendedor/supervisor
 
 LIVE-Z9H agrega boton `Actualizar`, indicador de ultima actualizacion, refresh al volver a foco y polling controlado de 15 segundos para `SELLER` y `SUPERVISOR`. No implementa WebSocket/SSE, no toca backend y no consulta pagos/caja durante el polling.
+
+# Nota LIVE-Z9I - Filtros de disponibilidad en prendas
+
+LIVE-Z9I agrega filtros `Disponibles`, `Apartadas`, `Vendidas / no disponibles` y `Todas` en el selector `Buscar prenda`. El filtro por defecto es `Disponibles`; las prendas bloqueadas siguen mostrando motivo cuando se revisan en `Todas` y la validacion operativa existente impide ponerlas al aire o prepararlas cuando no son validas.

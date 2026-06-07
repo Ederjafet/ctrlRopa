@@ -1,0 +1,679 @@
+﻿diff --git a/app/live.tsx b/app/live.tsx
+index 9e09d51..b1fb8c4 100644
+--- a/app/live.tsx
++++ b/app/live.tsx
+@@ -118,6 +118,8 @@ type ActivityFeedEvent = {
+   tone: 'success' | 'neutral' | 'info' | 'accent';
+ };
+
++type LiveItemAvailabilityFilter = 'available' | 'reserved' | 'unavailable' | 'all';
++
+ type LiveNoticeModalProps = {
+   notice: LiveNotice | null;
+   onClose: () => void;
+@@ -497,6 +499,8 @@ export default function LiveScreen() {
+
+   const [customerSearch, setCustomerSearch] = useState('');
+   const [itemSearch, setItemSearch] = useState('');
++  const [itemAvailabilityFilter, setItemAvailabilityFilter] =
++    useState<LiveItemAvailabilityFilter>('available');
+   const [isCustomerModalVisible, setIsCustomerModalVisible] = useState(false);
+   const [isItemModalVisible, setIsItemModalVisible] = useState(false);
+   const [isScannerVisible, setIsScannerVisible] = useState(false);
+@@ -518,6 +522,12 @@ export default function LiveScreen() {
+     }, [refreshLiveLayoutPreferences, session?.userId])
+   );
+
++  useEffect(() => {
++    if (isItemModalVisible) {
++      setItemAvailabilityFilter('available');
++    }
++  }, [isItemModalVisible]);
++
+   const checkAccessAndLoad = async () => {
+     try {
+       const currentSession = await getSession();
+@@ -758,22 +768,6 @@ export default function LiveScreen() {
+       .slice(0, 25);
+   }, [customers, customerSearch]);
+
+-  const filteredItems = useMemo(() => {
+-    const term = normalize(itemSearch);
+-
+-    if (!term) return items.slice(0, 30);
+-
+-    return items
+-      .filter((item) =>
+-        `${item.code ?? ''} ${item.qrCode ?? ''} ${item.productTypeName ?? ''} ${
+-          item.brandName ?? ''
+-        } ${item.sizeName ?? ''}`
+-          .toLowerCase()
+-          .includes(term)
+-      )
+-      .slice(0, 30);
+-  }, [items, itemSearch]);
+-
+   const selectedLiveIsOperable = isLiveOperable(selectedLive);
+   const operatorLiveIsActive = selectedLiveStatus === 'ACTIVE';
+   const operatorFlowEnabled = !isOperatorFocusedView || operatorLiveIsActive;
+@@ -1346,6 +1340,86 @@ export default function LiveScreen() {
+     },
+     [branchReservations, canViewPayments, paidByReservationId, t]
+   );
++  const getItemAvailabilityFilter = useCallback(
++    (item: Item): LiveItemAvailabilityFilter => {
++      const itemStatus = normalizeStatus(item.status);
++      const availability = getItemLiveAvailability(item);
++
++      if (itemStatus === 'RESERVED') return 'reserved';
++      if (availability.canGoOnAir) return 'available';
++      return 'unavailable';
++    },
++    [getItemLiveAvailability]
++  );
++  const searchedItems = useMemo(() => {
++    const term = normalize(itemSearch);
++    const matchesSearch = (item: Item) =>
++      `${item.code ?? ''} ${item.qrCode ?? ''} ${item.productTypeName ?? ''} ${
++        item.brandName ?? ''
++      } ${item.sizeName ?? ''}`
++        .toLowerCase()
++        .includes(term);
++
++    return term ? items.filter(matchesSearch) : items;
++  }, [items, itemSearch]);
++  const itemAvailabilityCounts = useMemo(
++    () =>
++      searchedItems.reduce(
++        (counts, item) => {
++          const filter = getItemAvailabilityFilter(item);
++          counts[filter] += 1;
++          counts.all += 1;
++          return counts;
++        },
++        {
++          available: 0,
++          reserved: 0,
++          unavailable: 0,
++          all: 0,
++        } as Record<LiveItemAvailabilityFilter, number>
++      ),
++    [getItemAvailabilityFilter, searchedItems]
++  );
++  const itemAvailabilityFilterOptions = useMemo(
++    () => [
++      {
++        key: 'available' as const,
++        label: t('live.itemFilterAvailable'),
++        count: itemAvailabilityCounts.available,
++      },
++      {
++        key: 'reserved' as const,
++        label: t('live.itemFilterReserved'),
++        count: itemAvailabilityCounts.reserved,
++      },
++      {
++        key: 'unavailable' as const,
++        label: t('live.itemFilterUnavailable'),
++        count: itemAvailabilityCounts.unavailable,
++      },
++      {
++        key: 'all' as const,
++        label: t('live.itemFilterAll'),
++        count: itemAvailabilityCounts.all,
++      },
++    ],
++    [itemAvailabilityCounts, t]
++  );
++  const filteredItems = useMemo(
++    () =>
++      searchedItems
++        .filter((item) => {
++          if (itemAvailabilityFilter === 'all') return true;
++          return getItemAvailabilityFilter(item) === itemAvailabilityFilter;
++        })
++        .slice(0, 30),
++    [getItemAvailabilityFilter, itemAvailabilityFilter, searchedItems]
++  );
++  const itemListEmptyMessage = itemLoadIssue
++    ? itemLoadIssue
++    : itemSearch.trim()
++      ? t('live.noItemSearchResults')
++      : t('live.noItemsAvailableWithFilters');
+   const operatorStartDisabledReason = !mayStartLive
+     ? t('live.liveOperatePermissionError')
+     : isSavingLive
+@@ -5654,6 +5728,50 @@ export default function LiveScreen() {
+           onChangeText={setItemSearch}
+         />
+
++        <View style={styles.itemFilterPanel}>
++          <View style={styles.itemFilterRow}>
++            {itemAvailabilityFilterOptions.map((option) => {
++              const selected = itemAvailabilityFilter === option.key;
++
++              return (
++                <Pressable
++                  key={option.key}
++                  onPress={() => setItemAvailabilityFilter(option.key)}
++                  style={[
++                    styles.itemFilterChip,
++                    {
++                      backgroundColor: selected
++                        ? theme.colors.primaryButtonBackground
++                        : theme.colors.surfaceMuted,
++                      borderColor: selected
++                        ? theme.colors.primaryButtonBackground
++                        : theme.colors.borderSubtle,
++                      borderRadius: theme.radius.sm,
++                    },
++                  ]}
++                >
++                  <AppText
++                    variant="caption"
++                    bold={selected}
++                    color={selected ? theme.colors.primaryButtonText : theme.colors.text}
++                  >
++                    {option.label}
++                  </AppText>
++                  <AppText
++                    variant="caption"
++                    color={selected ? theme.colors.primaryButtonText : theme.colors.mutedText}
++                  >
++                    {option.count}
++                  </AppText>
++                </Pressable>
++              );
++            })}
++          </View>
++          <AppText variant="caption" color={theme.colors.mutedText}>
++            {t('live.itemAvailabilityFilterHelp')}
++          </AppText>
++        </View>
++
+         <FlatList
+           data={filteredItems}
+           style={styles.modalList}
+@@ -5661,6 +5779,15 @@ export default function LiveScreen() {
+           keyExtractor={(item) => String(item.id)}
+           renderItem={({ item }) => {
+             const availability = getItemLiveAvailability(item);
++            const availabilityFilter = getItemAvailabilityFilter(item);
++            const availabilityColor =
++              availabilityFilter === 'available'
++                ? theme.colors.success
++                : availabilityFilter === 'reserved'
++                  ? theme.colors.warning
++                  : normalizeStatus(item.status) === 'SOLD'
++                    ? theme.colors.danger
++                    : theme.colors.warning;
+
+             return (
+               <AppOptionRow
+@@ -5678,13 +5805,13 @@ export default function LiveScreen() {
+                 </AppText>
+                 <AppText
+                   variant="caption"
+-                  color={availability.canGoOnAir ? theme.colors.success : theme.colors.warning}
++                  color={availabilityColor}
+                   bold
+                 >
+                   {availability.label}
+                 </AppText>
+                 {availability.reason ? (
+-                  <AppText variant="caption" color={theme.colors.warning}>
++                  <AppText variant="caption" color={availabilityColor}>
+                     {availability.reason}
+                   </AppText>
+                 ) : null}
+@@ -5693,7 +5820,7 @@ export default function LiveScreen() {
+           }}
+           ListEmptyComponent={
+             <AppText>
+-              {itemLoadIssue || t('live.noAvailableItems')}
++              {itemListEmptyMessage}
+             </AppText>
+           }
+         />
+@@ -6054,6 +6181,23 @@ const styles = StyleSheet.create({
+     marginTop: 10,
+     padding: 12,
+   },
++  itemFilterChip: {
++    alignItems: 'center',
++    borderWidth: 1,
++    flexDirection: 'row',
++    gap: 6,
++    paddingHorizontal: 10,
++    paddingVertical: 7,
++  },
++  itemFilterPanel: {
++    gap: 8,
++    marginTop: 10,
++  },
++  itemFilterRow: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 8,
++  },
+   modalList: {
+     maxHeight: 420,
+   },
+diff --git a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+index 2187ec4..3dffd34 100644
+--- a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
++++ b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+@@ -472,3 +472,7 @@ LIVE-Z9F.1 extiende el patron para que LIVE use paneles contextuales accionables
+ # Nota LIVE-Z9H - Refresh vendedor/supervisor
+
+ LIVE-Z9H agrega boton `Actualizar`, indicador de ultima actualizacion, refresh al volver a foco y polling controlado de 15 segundos para `SELLER` y `SUPERVISOR`. No implementa WebSocket/SSE, no toca backend y no consulta pagos/caja durante el polling.
++
++# Nota LIVE-Z9I - Filtros de disponibilidad en prendas
++
++LIVE-Z9I agrega filtros `Disponibles`, `Apartadas`, `Vendidas / no disponibles` y `Todas` en el selector `Buscar prenda`. El filtro por defecto es `Disponibles`; las prendas bloqueadas siguen mostrando motivo cuando se revisan en `Todas` y la validacion operativa existente impide ponerlas al aire o prepararlas cuando no son validas.
+diff --git a/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md b/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md
+index d2715a3..462a462 100644
+--- a/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md
++++ b/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md
+@@ -90,3 +90,7 @@ LIVE-Z9F agrega un dialogo accionable para validaciones bloqueantes de alta rapi
+ ## Continuidad LIVE-Z9F.1
+
+ Los bloqueos operativos de LIVE se alinean con `AppActionDialog` en modo contextual. La seleccion de la misma prenda al aire y las confirmaciones de prenda preparada conservan la logica de LIVE-Z9D, pero el estilo visual queda dentro del mismo sistema de paneles/dialogos.
++
++## Continuidad LIVE-Z9I
++
++LIVE-Z9I agrega filtros de disponibilidad en el selector `Buscar prenda`. Al preparar una prenda para cambio, el selector abre por defecto en `Disponibles`, pero permite revisar `Apartadas`, `Vendidas / no disponibles` o `Todas` sin cambiar la regla que bloquea prendas no operables.
+diff --git a/docs/LIVE_Z9G_SELLER_CAPABILITIES.md b/docs/LIVE_Z9G_SELLER_CAPABILITIES.md
+index 89407c1..7c6dced 100644
+--- a/docs/LIVE_Z9G_SELLER_CAPABILITIES.md
++++ b/docs/LIVE_Z9G_SELLER_CAPABILITIES.md
+@@ -81,3 +81,7 @@ LIVE-Z9H agrega refresh controlado para que el vendedor con flujo de apartados n
+ GO tecnico si pasan lint, TypeScript, export web, Maven test/package y `git diff --check`.
+
+ GO visual pendiente de corrida manual multiusuario.
++
++## Continuidad LIVE-Z9I
++
++LIVE-Z9I mantiene la matriz de capacidades: ver el selector de prendas sigue dependiendo de `VIEW_INVENTORY` y operar LIVE sigue dependiendo de permisos reales. Los nuevos filtros solo cambian visibilidad dentro del selector; no conceden acciones ni permiten seleccionar prendas bloqueadas.
+diff --git a/docs/LIVE_Z9H_VIEW_REFRESH.md b/docs/LIVE_Z9H_VIEW_REFRESH.md
+index b5b0e73..3ad3be6 100644
+--- a/docs/LIVE_Z9H_VIEW_REFRESH.md
++++ b/docs/LIVE_Z9H_VIEW_REFRESH.md
+@@ -75,3 +75,7 @@ LIVE-Z9H es una fase de refresh controlado. WebSocket/SSE queda fuera porque req
+ GO tecnico si pasan lint, TypeScript, export web, Maven test/package y `git diff --check`.
+
+ GO visual pendiente de corrida manual multiusuario.
++
++## Continuidad LIVE-Z9I
++
++LIVE-Z9I no cambia el refresh controlado. Si el inventario o apartados se refrescan por la carga existente, el selector recalcula contadores y filtros de disponibilidad con los datos actuales en memoria. No se agrega polling de inventario ni pagos.
+diff --git a/docs/LIVE_Z9I_ITEM_SELECTOR_AVAILABILITY_FILTERS.md b/docs/LIVE_Z9I_ITEM_SELECTOR_AVAILABILITY_FILTERS.md
+new file mode 100644
+index 0000000..abcd6c7
+--- /dev/null
++++ b/docs/LIVE_Z9I_ITEM_SELECTOR_AVAILABILITY_FILTERS.md
+@@ -0,0 +1,116 @@
++# LIVE-Z9I - Filtros de disponibilidad en selector de prendas
++
++Fecha: 2026-06-07
++Rama: `feature/live-z9i-item-selector-availability-filters`
++
++## Objetivo
++
++LIVE-Z9I agrega filtros claros de disponibilidad en el selector `Buscar prenda` de `/live`, para que el operador encuentre rapido prendas que si puede poner al aire o preparar para cambio.
++
++No se modifican backend, endpoints, AUTH/RBAC, pagos, caja ni reglas profundas LIVE.
++
++## Problema reportado por QA
++
++El selector de prendas podia mostrar en la misma lista:
++
++- prendas disponibles;
++- prendas apartadas o reservadas;
++- prendas vendidas;
++- prendas con disponibilidad no confirmada.
++
++Esto confundia durante la operacion LIVE porque el operador necesitaba enfocarse primero en prendas disponibles.
++
++## Auditoria
++
++El selector de prendas esta implementado dentro de `app/live.tsx` con `AppBottomModal`, `AppInput`, `FlatList` y `AppOptionRow`.
++
++La disponibilidad operativa ya se resolvia con `getItemLiveAvailability`, que bloquea seleccion y puesta al aire cuando la prenda no es valida. LIVE-Z9I reutiliza esa regla para filtrar visualmente sin cambiar contratos de API.
++
++## Filtros agregados
++
++El selector muestra chips con contador:
++
++- `Disponibles`;
++- `Apartadas`;
++- `Vendidas / no disponibles`;
++- `Todas`.
++
++El filtro por defecto al abrir el selector es `Disponibles`.
++
++## Comportamiento de busqueda
++
++La busqueda existente se conserva:
++
++- codigo;
++- QR;
++- tipo;
++- marca;
++- talla.
++
++Los filtros de disponibilidad se aplican despues de la busqueda. Los contadores se calculan sobre los resultados de la busqueda actual.
++
++## Reglas de disponibilidad
++
++- `AVAILABLE` y estados operables segun `getItemLiveAvailability`: disponibles.
++- `RESERVED`: apartadas.
++- `SOLD`, disponibilidad no confirmada u otros estados no operables: vendidas / no disponibles.
++- `DISABLED` sigue excluido desde la carga existente.
++
++Si se cambia a `Todas`, las prendas no disponibles se muestran con su motivo, pero la seleccion sigue bloqueada por la validacion existente.
++
++## Estados visuales
++
++- Disponible: color `success`.
++- Apartada: color `warning`.
++- Vendida: color `danger`.
++- No disponible / no confirmada: color `warning` o bloqueo segun motivo.
++
++No se agregan colores hardcodeados; se usan tokens del tema.
++
++## I18N
++
++Se agregan claves `live.*` en:
++
++- `es`;
++- `en`;
++- `pt-BR`;
++- `fr`;
++- `ja`;
++- `zh`;
++- `ko`.
++
++Textos nuevos:
++
++- filtros de disponibilidad;
++- mostrar/ocultar no disponibles;
++- ayuda del filtro;
++- empty state por filtro;
++- empty state por busqueda.
++
++## Validacion manual esperada
++
++1. Entrar con `qa.admin`.
++2. Abrir `/live`.
++3. Abrir `Buscar prenda`.
++4. Confirmar que el filtro por defecto es `Disponibles`.
++5. Confirmar que vendidas/reservadas no aparecen por defecto.
++6. Cambiar a `Todas`.
++7. Confirmar que vendidas/reservadas aparecen con motivo.
++8. Buscar por codigo, tipo, marca o talla.
++9. Confirmar que los filtros siguen aplicando.
++10. Intentar seleccionar vendida/no disponible.
++11. Confirmar que no permite operacion o muestra bloqueo claro.
++12. Validar light/dark y mobile/tablet.
++
++## Limitaciones
++
++- No se crea endpoint nuevo.
++- No se implementa filtro backend.
++- La disponibilidad depende de los datos ya cargados en frontend.
++- La validacion final sigue siendo la regla operativa existente al seleccionar o poner al aire.
++
++## GO/NO-GO
++
++GO tecnico si pasan lint, TypeScript, export web, Maven test/package y `git diff --check`.
++
++GO visual pendiente de corrida manual con inventario que contenga prendas disponibles, apartadas y vendidas.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index 90519a9..ce06dd4 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -338,3 +338,20 @@ Agregar a la corrida manual de sistema visual:
+ - confirmar que no aparece warning `Encountered two children with the same key`;
+ - aplicar color y confirmar que la paleta/preview se actualizan;
+ - validar light/dark y mobile/tablet.
++
++## Nota LIVE-Z9I
++
++Agregar a la corrida manual de LIVE:
++
++- entrar con `qa.admin`;
++- abrir `/live`;
++- abrir `Buscar prenda`;
++- confirmar filtro por defecto `Disponibles`;
++- confirmar que vendidas/reservadas no aparecen por defecto;
++- cambiar a `Todas`;
++- confirmar que vendidas/reservadas aparecen con motivo;
++- cambiar a `Apartadas` y `Vendidas / no disponibles`;
++- buscar por codigo, tipo, marca o talla;
++- confirmar que la busqueda conserva el filtro activo;
++- intentar seleccionar una vendida/no disponible y confirmar bloqueo claro;
++- validar light/dark y mobile/tablet.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index 059b079..7c1273c 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -607,7 +607,16 @@
+     "preparedItemNowLiveTitle": "The prepared item is now live",
+     "preparedItemNowLiveMessage": "The prepared item is now live and ready for holds.",
+     "preparedItemRemovedTitle": "Prepared item removed",
+-    "preparedItemRemovedMessage": "The prepared item was removed."
++    "preparedItemRemovedMessage": "The prepared item was removed.",
++    "itemFilterAvailable": "Available",
++    "itemFilterReserved": "On hold",
++    "itemFilterUnavailable": "Sold / unavailable",
++    "itemFilterAll": "All",
++    "showUnavailableItems": "Show unavailable",
++    "hideUnavailableItems": "Hide unavailable",
++    "itemAvailabilityFilterHelp": "Available items are shown by default for Live operation.",
++    "noItemsAvailableWithFilters": "No items available with those filters.",
++    "noItemSearchResults": "No results for this search."
+   },
+   "payments": {
+     "title": "Payments / Collections",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index ff59bff..acf863f 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -607,7 +607,16 @@
+     "preparedItemNowLiveTitle": "La prenda preparada paso al aire",
+     "preparedItemNowLiveMessage": "La prenda preparada paso al aire y quedo lista para apartados.",
+     "preparedItemRemovedTitle": "Prenda preparada retirada",
+-    "preparedItemRemovedMessage": "La prenda preparada fue retirada."
++    "preparedItemRemovedMessage": "La prenda preparada fue retirada.",
++    "itemFilterAvailable": "Disponibles",
++    "itemFilterReserved": "Apartadas",
++    "itemFilterUnavailable": "Vendidas / no disponibles",
++    "itemFilterAll": "Todas",
++    "showUnavailableItems": "Mostrar no disponibles",
++    "hideUnavailableItems": "Ocultar no disponibles",
++    "itemAvailabilityFilterHelp": "Por defecto se muestran prendas disponibles para operar LIVE.",
++    "noItemsAvailableWithFilters": "No hay prendas disponibles con esos filtros.",
++    "noItemSearchResults": "No hay resultados para esta busqueda."
+   },
+   "payments": {
+     "title": "Pagos / Cobros",
+diff --git a/locales/fr/common.json b/locales/fr/common.json
+index ab61d08..7d026cc 100644
+--- a/locales/fr/common.json
++++ b/locales/fr/common.json
+@@ -607,7 +607,16 @@
+     "preparedItemNowLiveTitle": "Préparé article maintenant LIVE",
+     "preparedItemNowLiveMessage": "Préparé article maintenant LIVE",
+     "preparedItemRemovedTitle": "Préparé article élément",
+-    "preparedItemRemovedMessage": "Préparé article élément"
++    "preparedItemRemovedMessage": "Préparé article élément",
++    "itemFilterAvailable": "Disponibles",
++    "itemFilterReserved": "Reservees",
++    "itemFilterUnavailable": "Vendues / indisponibles",
++    "itemFilterAll": "Toutes",
++    "showUnavailableItems": "Afficher les indisponibles",
++    "hideUnavailableItems": "Masquer les indisponibles",
++    "itemAvailabilityFilterHelp": "Par defaut, les articles disponibles sont affiches pour l operation LIVE.",
++    "noItemsAvailableWithFilters": "Aucun article disponible avec ces filtres.",
++    "noItemSearchResults": "Aucun resultat pour cette recherche."
+   },
+   "payments": {
+     "title": "Payments / Collections",
+diff --git a/locales/ja/common.json b/locales/ja/common.json
+index 3c0bd8e..1b9fb6d 100644
+--- a/locales/ja/common.json
++++ b/locales/ja/common.json
+@@ -607,7 +607,16 @@
+     "preparedItemNowLiveTitle": "準備済み 商品 今 LIVE",
+     "preparedItemNowLiveMessage": "準備済み 商品 今 LIVE",
+     "preparedItemRemovedTitle": "準備済み 商品 項目",
+-    "preparedItemRemovedMessage": "準備済み 商品 項目"
++    "preparedItemRemovedMessage": "準備済み 商品 項目",
++    "itemFilterAvailable": "利用可能",
++    "itemFilterReserved": "取り置き",
++    "itemFilterUnavailable": "販売済み / 利用不可",
++    "itemFilterAll": "すべて",
++    "showUnavailableItems": "利用不可を表示",
++    "hideUnavailableItems": "利用不可を非表示",
++    "itemAvailabilityFilterHelp": "LIVE操作では、既定で利用可能な商品を表示します。",
++    "noItemsAvailableWithFilters": "このフィルターで利用可能な商品はありません。",
++    "noItemSearchResults": "この検索に一致する結果はありません。"
+   },
+   "payments": {
+     "title": "Payments / Collections",
+diff --git a/locales/ko/common.json b/locales/ko/common.json
+index 9aebcc8..c2023ca 100644
+--- a/locales/ko/common.json
++++ b/locales/ko/common.json
+@@ -607,7 +607,16 @@
+     "preparedItemNowLiveTitle": "준비됨 상품 지금 LIVE",
+     "preparedItemNowLiveMessage": "준비됨 상품 지금 LIVE",
+     "preparedItemRemovedTitle": "준비됨 상품 항목",
+-    "preparedItemRemovedMessage": "준비됨 상품 항목"
++    "preparedItemRemovedMessage": "준비됨 상품 항목",
++    "itemFilterAvailable": "사용 가능",
++    "itemFilterReserved": "예약됨",
++    "itemFilterUnavailable": "판매됨 / 사용 불가",
++    "itemFilterAll": "전체",
++    "showUnavailableItems": "사용 불가 표시",
++    "hideUnavailableItems": "사용 불가 숨기기",
++    "itemAvailabilityFilterHelp": "LIVE 운영에서는 기본적으로 사용 가능한 상품을 표시합니다.",
++    "noItemsAvailableWithFilters": "이 필터에 맞는 사용 가능한 상품이 없습니다.",
++    "noItemSearchResults": "이 검색 결과가 없습니다."
+   },
+   "payments": {
+     "title": "Payments / Collections",
+diff --git a/locales/pt-BR/common.json b/locales/pt-BR/common.json
+index 64cf9ba..3995af3 100644
+--- a/locales/pt-BR/common.json
++++ b/locales/pt-BR/common.json
+@@ -607,7 +607,16 @@
+     "preparedItemNowLiveTitle": "Preparado peça agora LIVE",
+     "preparedItemNowLiveMessage": "Preparado peça agora LIVE",
+     "preparedItemRemovedTitle": "Preparado peça campo",
+-    "preparedItemRemovedMessage": "Preparado peça campo"
++    "preparedItemRemovedMessage": "Preparado peça campo",
++    "itemFilterAvailable": "Disponiveis",
++    "itemFilterReserved": "Reservadas",
++    "itemFilterUnavailable": "Vendidas / indisponiveis",
++    "itemFilterAll": "Todas",
++    "showUnavailableItems": "Mostrar indisponiveis",
++    "hideUnavailableItems": "Ocultar indisponiveis",
++    "itemAvailabilityFilterHelp": "Por padrao, itens disponiveis sao exibidos para a operacao LIVE.",
++    "noItemsAvailableWithFilters": "Nao ha itens disponiveis com esses filtros.",
++    "noItemSearchResults": "Nao ha resultados para esta busca."
+   },
+   "payments": {
+     "title": "Payments / Collections",
+diff --git a/locales/zh/common.json b/locales/zh/common.json
+index 3893c8d..33e5ddd 100644
+--- a/locales/zh/common.json
++++ b/locales/zh/common.json
+@@ -607,7 +607,16 @@
+     "preparedItemNowLiveTitle": "已准备商品现在LIVE",
+     "preparedItemNowLiveMessage": "已准备商品现在LIVE",
+     "preparedItemRemovedTitle": "已准备商品项目",
+-    "preparedItemRemovedMessage": "已准备商品项目"
++    "preparedItemRemovedMessage": "已准备商品项目",
++    "itemFilterAvailable": "可用",
++    "itemFilterReserved": "已预留",
++    "itemFilterUnavailable": "已售 / 不可用",
++    "itemFilterAll": "全部",
++    "showUnavailableItems": "显示不可用",
++    "hideUnavailableItems": "隐藏不可用",
++    "itemAvailabilityFilterHelp": "LIVE 操作默认显示可用商品。",
++    "noItemsAvailableWithFilters": "没有符合这些筛选条件的可用商品。",
++    "noItemSearchResults": "此搜索没有结果。"
+   },
+   "payments": {
+     "title": "Payments / Collections",
+diff --git a/qa-reports/LIVE-Z9I-item-selector-availability-filters-report-20260607-130651.md b/qa-reports/LIVE-Z9I-item-selector-availability-filters-report-20260607-130651.md
+new file mode 100644
+index 0000000..038fb4b
+--- /dev/null
++++ b/qa-reports/LIVE-Z9I-item-selector-availability-filters-report-20260607-130651.md
+@@ -0,0 +1,63 @@
++# LIVE-Z9I - QA report
++
++Fecha: 2026-06-07 13:06:51
++Rama: `feature/live-z9i-item-selector-availability-filters`
++
++## Alcance validado
++
++- Selector `Buscar prenda` en `/live`.
++- Filtro por defecto `Disponibles` al abrir el selector.
++- Chips de disponibilidad con contador:
++  - Disponibles;
++  - Apartadas;
++  - Vendidas / no disponibles;
++  - Todas.
++- Busqueda conservada por codigo, QR, tipo, marca y talla.
++- Categorizacion reutilizando `getItemLiveAvailability`.
++- Estados visuales con tokens semanticos del tema.
++- Empty states diferenciados para busqueda y filtros.
++- Textos i18n agregados en `es`, `en`, `pt-BR`, `fr`, `ja`, `zh` y `ko`.
++
++## Validaciones ejecutadas
++
++| Validacion | Resultado | Nota |
++| --- | --- | --- |
++| `npm.cmd run lint` | PASS | 0 errores, 53 warnings existentes del repo. |
++| `npx.cmd tsc --noEmit` | PASS | Sin errores TypeScript. |
++| `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export` | PASS | Export web generado con 73 rutas estaticas, incluyendo `/live`. |
++| `backend/control-ropa/.mvnw.cmd test` | PASS | 73 tests, 0 fallas, 0 errores. |
++| `backend/control-ropa/.mvnw.cmd -q -DskipTests package` | PASS | Package generado sin errores. |
++| `git --no-pager diff --check` | PASS | Sin whitespace errors. |
++
++## I18N
++
++Auditoria de estructura:
++
++```text
++es: leaves=1254 missing=0 extra=0
++en: leaves=1254 missing=0 extra=0
++pt-BR: leaves=1254 missing=0 extra=0
++fr: leaves=1254 missing=0 extra=0
++ja: leaves=1254 missing=0 extra=0
++zh: leaves=1254 missing=0 extra=0
++ko: leaves=1254 missing=0 extra=0
++```
++
++## Validacion manual esperada
++
++1. Entrar con `qa.admin`.
++2. Abrir `/live`.
++3. Abrir `Buscar prenda`.
++4. Confirmar filtro por defecto `Disponibles`.
++5. Confirmar que vendidas/reservadas no aparecen por defecto.
++6. Cambiar a `Todas`.
++7. Confirmar que aparecen vendidas/reservadas con motivo.
++8. Buscar por codigo, tipo, marca o talla.
++9. Confirmar que los filtros siguen aplicando.
++10. Intentar seleccionar vendida/no disponible.
++11. Confirmar que no permite operacion o muestra bloqueo claro.
++12. Validar light/dark y mobile/tablet.
++
++## Resultado
++
++GO tecnico para commit si el diff staged queda dentro de alcance.

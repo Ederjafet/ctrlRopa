@@ -75,3 +75,7 @@ LIVE-Z9H es una fase de refresh controlado. WebSocket/SSE queda fuera porque req
 GO tecnico si pasan lint, TypeScript, export web, Maven test/package y `git diff --check`.
 
 GO visual pendiente de corrida manual multiusuario.
+
+## Continuidad LIVE-Z9I
+
+LIVE-Z9I no cambia el refresh controlado. Si el inventario o apartados se refrescan por la carga existente, el selector recalcula contadores y filtros de disponibilidad con los datos actuales en memoria. No se agrega polling de inventario ni pagos.

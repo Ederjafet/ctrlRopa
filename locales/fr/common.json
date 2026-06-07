@@ -607,7 +607,16 @@
     "preparedItemNowLiveTitle": "Préparé article maintenant LIVE",
     "preparedItemNowLiveMessage": "Préparé article maintenant LIVE",
     "preparedItemRemovedTitle": "Préparé article élément",
-    "preparedItemRemovedMessage": "Préparé article élément"
+    "preparedItemRemovedMessage": "Préparé article élément",
+    "itemFilterAvailable": "Disponibles",
+    "itemFilterReserved": "Reservees",
+    "itemFilterUnavailable": "Vendues / indisponibles",
+    "itemFilterAll": "Toutes",
+    "showUnavailableItems": "Afficher les indisponibles",
+    "hideUnavailableItems": "Masquer les indisponibles",
+    "itemAvailabilityFilterHelp": "Par defaut, les articles disponibles sont affiches pour l operation LIVE.",
+    "noItemsAvailableWithFilters": "Aucun article disponible avec ces filtres.",
+    "noItemSearchResults": "Aucun resultat pour cette recherche."
   },
   "payments": {
     "title": "Payments / Collections",

@@ -607,7 +607,16 @@
     "preparedItemNowLiveTitle": "準備済み 商品 今 LIVE",
     "preparedItemNowLiveMessage": "準備済み 商品 今 LIVE",
     "preparedItemRemovedTitle": "準備済み 商品 項目",
-    "preparedItemRemovedMessage": "準備済み 商品 項目"
+    "preparedItemRemovedMessage": "準備済み 商品 項目",
+    "itemFilterAvailable": "利用可能",
+    "itemFilterReserved": "取り置き",
+    "itemFilterUnavailable": "販売済み / 利用不可",
+    "itemFilterAll": "すべて",
+    "showUnavailableItems": "利用不可を表示",
+    "hideUnavailableItems": "利用不可を非表示",
+    "itemAvailabilityFilterHelp": "LIVE操作では、既定で利用可能な商品を表示します。",
+    "noItemsAvailableWithFilters": "このフィルターで利用可能な商品はありません。",
+    "noItemSearchResults": "この検索に一致する結果はありません。"
   },
   "payments": {
     "title": "Payments / Collections",
