@@ -1,0 +1,1725 @@
+﻿diff --git a/app/ui-kit.tsx b/app/ui-kit.tsx
+index e0e9ec1..7a687eb 100644
+--- a/app/ui-kit.tsx
++++ b/app/ui-kit.tsx
+@@ -114,13 +114,13 @@ export default function UiKitPreview() {
+     const surfaceContrast = getContrastRatio(theme.colors.textPrimary, editorValues.surface);
+
+     if (backgroundContrast !== null && backgroundContrast < 3) {
+-      warnings.push('El fondo puede tener bajo contraste con el texto principal.');
++      warnings.push(t('paletteGenerator.backgroundContrastWarning'));
+     }
+     if (surfaceContrast !== null && surfaceContrast < 3) {
+-      warnings.push('La superficie/cards puede tener bajo contraste con el texto principal.');
++      warnings.push(t('paletteGenerator.surfaceContrastWarning'));
+     }
+     return warnings;
+-  }, [editorValues.background, editorValues.surface, theme.colors.textPrimary]);
++  }, [editorValues.background, editorValues.surface, t, theme.colors.textPrimary]);
+   const generatedPalette = useMemo(
+     () => generateSemanticPalette(normalizeHexColor(brandColors.primary), paletteHarmony, activeScheme, brandColors),
+     [activeScheme, brandColors, paletteHarmony],
+@@ -344,7 +344,7 @@ export default function UiKitPreview() {
+           <View style={styles.previewTextBlock}>
+             <AppText bold>{t('paletteGenerator.activeTemplate')}</AppText>
+             <AppText variant="caption" color={theme.colors.mutedText}>
+-              {t('paletteGenerator.localConfigHelp')}
++              {t('paletteGenerator.templateActiveHelp')}
+             </AppText>
+           </View>
+           <StatusBadge
+@@ -463,20 +463,26 @@ export default function UiKitPreview() {
+         subtitle={t('paletteGenerator.advancedOptionsHelp')}
+       />
+       <SectionHeader
+-        title={t('paletteGenerator.controlledEditorTitle')}
+-        subtitle={t('paletteGenerator.controlledEditorSubtitle')}
++        title={t('paletteGenerator.advancedLocalTokensTitle')}
++        subtitle={t('paletteGenerator.advancedLocalTokensHelp')}
+       />
+       <AppCard variant="elevated" style={styles.previewCard}>
+         <View style={styles.themePreviewHeader}>
+           <View style={styles.previewTextBlock}>
+-            <AppText bold>Identidad visual local</AppText>
++            <AppText bold>{t('paletteGenerator.advancedLocalTokensTitle')}</AppText>
+             <AppText variant="caption" color={theme.colors.mutedText}>
+-              Editando modo {activeScheme === 'dark' ? 'oscuro' : 'claro'} sobre{' '}
+-              {activePreset.label}. No modifica backend ni tenant.
++              {t('paletteGenerator.advancedLocalTokensModeHelp', {
++                scheme: activeScheme === 'dark' ? t('theme.dark') : t('theme.light'),
++                template: activePreset.label,
++              })}
+             </AppText>
+           </View>
+           <StatusBadge
+-            label={customVisualIdentity?.presetId === visualPresetId ? 'Personalizada' : 'Base'}
++            label={
++              customVisualIdentity?.presetId === visualPresetId
++                ? t('paletteGenerator.customStatus')
++                : t('paletteGenerator.baseStatus')
++            }
+             tone={customVisualIdentity?.presetId === visualPresetId ? 'warning' : 'info'}
+           />
+         </View>
+@@ -518,9 +524,9 @@ export default function UiKitPreview() {
+
+         <View style={styles.segmentedRow}>
+           <View style={styles.previewTextBlock}>
+-            <AppText bold>Radio visual</AppText>
++            <AppText bold>{t('paletteGenerator.visualRadius')}</AppText>
+             <AppText variant="caption" color={theme.colors.mutedText}>
+-              Ajusta la suavidad global sin editar componentes individuales.
++              {t('paletteGenerator.visualRadiusHelp')}
+             </AppText>
+           </View>
+           {(['standard', 'soft', 'compact'] as const).map((radius) => (
+@@ -535,9 +541,9 @@ export default function UiKitPreview() {
+
+         <View style={styles.segmentedRow}>
+           <View style={styles.previewTextBlock}>
+-            <AppText bold>Densidad visual</AppText>
++            <AppText bold>{t('paletteGenerator.visualDensity')}</AppText>
+             <AppText variant="caption" color={theme.colors.mutedText}>
+-              Controla spacing global soportado por el tema.
++              {t('paletteGenerator.visualDensityHelp')}
+             </AppText>
+           </View>
+           {(['NORMAL', 'COMPACT'] as const).map((density) => (
+@@ -553,7 +559,7 @@ export default function UiKitPreview() {
+         {contrastWarnings.length > 0 ? (
+           <AppCard variant="warning" style={styles.compactNotice}>
+             <AppText bold color={theme.colors.warning}>
+-              Revisar contraste
++              {t('paletteGenerator.reviewContrast')}
+             </AppText>
+             {contrastWarnings.map((warning) => (
+               <AppText key={warning} variant="caption" color={theme.colors.textSecondary}>
+@@ -565,23 +571,22 @@ export default function UiKitPreview() {
+
+         <View style={styles.buttonRow}>
+           <AppButton
+-            title="Aplicar cambios localmente"
++            title={t('paletteGenerator.applyLocalChanges')}
+             variant="primary"
+             disabled={hasEditorErrors}
+-            disabledReason="Corrige los colores invalidos antes de aplicar."
++            disabledReason={t('paletteGenerator.invalidColorsFeedback')}
+             onPress={applyVisualIdentityChanges}
+           />
+         </View>
+
+         <AppText variant="caption" color={theme.colors.mutedText}>
+-          Esta personalizacion se guarda localmente en esta fase. La persistencia por cliente/tenant
+-          queda pendiente.
++          {t('paletteGenerator.localTenantPendingHelp')}
+         </AppText>
+       </AppCard>
+
+       <SectionHeader
+-        title="Preview de identidad"
+-        subtitle="Referencia en vivo de botones, cards, badges, inputs y estado reservado."
++        title={t('paletteGenerator.advancedPreviewTitle')}
++        subtitle={t('paletteGenerator.advancedPreviewHelp')}
+       />
+       <AppResponsiveGrid tabletColumns={2} desktopColumns={3}>
+         <AppCard variant="selected" style={styles.previewCard}>
+@@ -622,7 +627,10 @@ export default function UiKitPreview() {
+         </AppCard>
+       </AppResponsiveGrid>
+
+-      <SectionHeader title="Design tokens" subtitle="Colores, radios, sombras y spacing base" />
++      <SectionHeader
++        title={t('paletteGenerator.designTokensTitle')}
++        subtitle={t('paletteGenerator.designTokensHelp')}
++      />
+       <AppResponsiveGrid tabletColumns={2} desktopColumns={4}>
+         {Object.entries(designTokens.colors).slice(0, 12).map(([name, color]) => (
+           <AppCard key={name} style={styles.tokenCard}>
+@@ -636,8 +644,8 @@ export default function UiKitPreview() {
+       </AppResponsiveGrid>
+
+       <SectionHeader
+-        title="Tokens semanticos del tema activo"
+-        subtitle="Superficies, texto, inputs y estados usados por AppShell, LIVE y detalle"
++        title={t('paletteGenerator.semanticTokensTitle')}
++        subtitle={t('paletteGenerator.semanticTokensHelp')}
+       />
+       <AppResponsiveGrid tabletColumns={2} desktopColumns={4}>
+         {[
+diff --git a/components/ui/AppColorPicker.tsx b/components/ui/AppColorPicker.tsx
+index 7b1da8c..4cb9368 100644
+--- a/components/ui/AppColorPicker.tsx
++++ b/components/ui/AppColorPicker.tsx
+@@ -56,19 +56,22 @@ export default function AppColorPicker({
+
+   const normalizedDraft = normalizeHexColor(draftColor);
+   const draftIsValid = isValidHexColor(draftColor);
+-  const variations = useMemo(() => {
++  const tints = useMemo(() => {
+     const base = normalizeHexColor(draftColor);
+-    return [
+-      ...generateTints(base, 4),
+-      base,
+-      ...generateShades(base, 4),
+-      ...generateTones(base, 3),
+-    ];
++    return generateTints(base, 5);
+   }, [draftColor]);
+-  const swatches = useMemo(() => {
+-    const merged = [...suggestedColors, ...variations].map((color) => normalizeHexColor(color));
+-    return Array.from(new Set(merged));
+-  }, [suggestedColors, variations]);
++  const shades = useMemo(() => {
++    const base = normalizeHexColor(draftColor);
++    return generateShades(base, 5);
++  }, [draftColor]);
++  const tones = useMemo(() => {
++    const base = normalizeHexColor(draftColor);
++    return generateTones(base, 5);
++  }, [draftColor]);
++  const swatches = useMemo(
++    () => Array.from(new Set(suggestedColors.map((color) => normalizeHexColor(color)))),
++    [suggestedColors],
++  );
+
+   const apply = () => {
+     if (!draftIsValid) return;
+@@ -124,7 +127,7 @@ export default function AppColorPicker({
+             <View style={styles.section}>
+               <AppText bold>{t('paletteGenerator.suggestedSwatches')}</AppText>
+               <View style={styles.swatchGrid}>
+-                {suggestedColors.map((color) => (
++                {swatches.map((color) => (
+                   <ColorTile
+                     key={color}
+                     color={normalizeHexColor(color)}
+@@ -137,16 +140,24 @@ export default function AppColorPicker({
+
+             <View style={styles.section}>
+               <AppText bold>{t('paletteGenerator.colorVariations')}</AppText>
+-              <View style={styles.swatchGrid}>
+-                {swatches.map((color) => (
+-                  <ColorTile
+-                    key={color}
+-                    color={color}
+-                    selected={color === normalizedDraft}
+-                    onPress={() => setDraftColor(color)}
+-                  />
+-                ))}
+-              </View>
++              <VariationRow
++                title={t('paletteGenerator.tints')}
++                colors={tints}
++                selectedColor={normalizedDraft}
++                onPick={setDraftColor}
++              />
++              <VariationRow
++                title={t('paletteGenerator.shades')}
++                colors={shades}
++                selectedColor={normalizedDraft}
++                onPick={setDraftColor}
++              />
++              <VariationRow
++                title={t('paletteGenerator.tones')}
++                colors={tones}
++                selectedColor={normalizedDraft}
++                onPick={setDraftColor}
++              />
+             </View>
+           </ScrollView>
+
+@@ -207,6 +218,38 @@ function ColorTile({
+   );
+ }
+
++function VariationRow({
++  colors,
++  onPick,
++  selectedColor,
++  title,
++}: {
++  colors: string[];
++  onPick: (color: string) => void;
++  selectedColor: string;
++  title: string;
++}) {
++  const { theme } = useAppTheme();
++
++  return (
++    <View style={styles.variationRow}>
++      <AppText variant="caption" color={theme.colors.mutedText}>
++        {title}
++      </AppText>
++      <View style={styles.swatchGrid}>
++        {colors.map((color) => (
++          <ColorTile
++            key={color}
++            color={color}
++            selected={color === selectedColor}
++            onPress={() => onPick(color)}
++          />
++        ))}
++      </View>
++    </View>
++  );
++}
++
+ const styles = StyleSheet.create({
+   actionButton: {
+     minWidth: 140,
+@@ -269,4 +312,7 @@ const styles = StyleSheet.create({
+     flex: 1,
+     minWidth: 0,
+   },
++  variationRow: {
++    gap: 8,
++  },
+ });
+diff --git a/components/ui/PaletteGeneratorCard.tsx b/components/ui/PaletteGeneratorCard.tsx
+index 09e9989..767ea11 100644
+--- a/components/ui/PaletteGeneratorCard.tsx
++++ b/components/ui/PaletteGeneratorCard.tsx
+@@ -6,9 +6,6 @@ import {
+   SemanticPalette,
+   generateHarmonyColors,
+   generateSemanticPalette,
+-  generateShades,
+-  generateTints,
+-  generateTones,
+   getContrastRatio,
+   getContrastStatus,
+   getReadableTextColor,
+@@ -72,9 +69,6 @@ export default function PaletteGeneratorCard({
+     () => generateSemanticPalette(normalizedPrimary, harmony, activeScheme, brandColors),
+     [activeScheme, brandColors, harmony, normalizedPrimary],
+   );
+-  const tints = useMemo(() => generateTints(normalizedPrimary, 7), [normalizedPrimary]);
+-  const shades = useMemo(() => generateShades(normalizedPrimary, 7), [normalizedPrimary]);
+-  const tones = useMemo(() => generateTones(normalizedPrimary, 7), [normalizedPrimary]);
+   const harmonyColors = useMemo(
+     () => generateHarmonyColors(normalizedPrimary, harmony),
+     [harmony, normalizedPrimary],
+@@ -148,10 +142,12 @@ export default function PaletteGeneratorCard({
+   const hasLowContrast = contrastRows.some((row) => row.status === 'low');
+   const visibleContrastRows = advancedMode
+     ? contrastRows
+-    : contrastRows.filter((row) =>
+-        ['button', 'secondary', 'accent', 'danger', 'background', 'surface'].includes(row.key),
+-      );
++    : contrastRows.filter((row) => ['button', 'background', 'danger'].includes(row.key));
+   const tokenEntries = Object.entries(palette) as [EditableVisualTokenKey, string][];
++  const customBrandColorCount = [normalizedSecondary, normalizedAccent].filter(Boolean).length;
++  const harmonyNoteKey = customBrandColorCount > 0
++    ? 'paletteGenerator.usingDefinedBrandColors'
++    : 'paletteGenerator.harmonySuggestionHelp';
+   const brandColorRows = [
+     {
+       key: 'primary' as const,
+@@ -240,49 +236,52 @@ export default function PaletteGeneratorCard({
+               />
+             </View>
+           ) : null}
++          <View
++            style={[
++              styles.helperPanel,
++              {
++                backgroundColor: theme.colors.infoCardBackground,
++                borderColor: theme.colors.info,
++              },
++            ]}
++          >
++            <AppText variant="caption" color={theme.colors.textSecondary}>
++              {t(harmonyNoteKey)}
++            </AppText>
++          </View>
+         </View>
+
+-        <View style={styles.controlColumn}>
+-          <AppText bold>{t('paletteGenerator.harmony')}</AppText>
+-          <View style={styles.harmonyGrid}>
+-            {HARMONIES.map((option) => (
+-              <AppButton
+-                key={option}
+-                title={t(`paletteGenerator.harmonies.${option}`)}
+-                variant={harmony === option ? 'secondary' : 'neutral'}
+-                onPress={() => onHarmonyChange(option)}
+-                style={styles.harmonyButton}
+-              />
+-            ))}
++        {advancedMode ? (
++          <View style={styles.controlColumn}>
++            <AppText bold>{t('paletteGenerator.harmony')}</AppText>
++            <View style={styles.harmonyGrid}>
++              {HARMONIES.map((option) => (
++                <AppButton
++                  key={option}
++                  title={t(`paletteGenerator.harmonies.${option}`)}
++                  variant={harmony === option ? 'secondary' : 'neutral'}
++                  onPress={() => onHarmonyChange(option)}
++                  style={styles.harmonyButton}
++                />
++              ))}
++            </View>
++            <AppText variant="caption" color={theme.colors.mutedText}>
++              {t('paletteGenerator.harmonyHelp')}
++            </AppText>
++            <View style={styles.swatchRow}>
++              {harmonyColors.map((color) => (
++                <ColorSwatch
++                  key={color}
++                  color={color}
++                  label={color}
++                  onPress={() => onBrandColorChange('primary', color)}
++                />
++              ))}
++            </View>
+           </View>
+-          {advancedMode ? (
+-            <>
+-              <AppText variant="caption" color={theme.colors.mutedText}>
+-                {t('paletteGenerator.harmonyHelp')}
+-              </AppText>
+-              <View style={styles.swatchRow}>
+-                {harmonyColors.map((color) => (
+-                  <ColorSwatch
+-                    key={color}
+-                    color={color}
+-                    label={color}
+-                    onPress={() => onBrandColorChange('primary', color)}
+-                  />
+-                ))}
+-              </View>
+-            </>
+-          ) : null}
+-        </View>
++        ) : null}
+       </View>
+
+-      {advancedMode ? (
+-        <>
+-          <VariationBlock title={t('paletteGenerator.tints')} colors={tints} onPick={(color) => onBrandColorChange('primary', color)} />
+-          <VariationBlock title={t('paletteGenerator.shades')} colors={shades} onPick={(color) => onBrandColorChange('primary', color)} />
+-          <VariationBlock title={t('paletteGenerator.tones')} colors={tones} onPick={(color) => onBrandColorChange('primary', color)} />
+-        </>
+-      ) : null}
+-
+       <View style={styles.sectionBlock}>
+         <View style={styles.headerRow}>
+           <View style={styles.flexBlock}>
+@@ -340,14 +339,14 @@ export default function PaletteGeneratorCard({
+                 },
+               ]}
+             >
+-              <AppText bold color={theme.colors.warning}>
+-                {t('paletteGenerator.lowContrast')}
+-              </AppText>
+-              <AppText variant="caption" color={theme.colors.textSecondary}>
+-                {t('paletteGenerator.reviewBeforeApply')}
+-              </AppText>
+-            </View>
+-          ) : null}
++            <AppText bold color={theme.colors.warning}>
++              {t('paletteGenerator.lowContrast')}
++            </AppText>
++            <AppText variant="caption" color={theme.colors.textSecondary}>
++                {t('paletteGenerator.lowContrastActionHelp')}
++            </AppText>
++          </View>
++        ) : null}
+           <View style={styles.contrastList}>
+             {visibleContrastRows.map((row) => (
+               <ContrastRow
+@@ -443,32 +442,6 @@ function BrandColorCard({
+   );
+ }
+
+-function VariationBlock({
+-  colors,
+-  onPick,
+-  title,
+-}: {
+-  colors: string[];
+-  onPick: (color: string) => void;
+-  title: string;
+-}) {
+-  return (
+-    <View style={styles.sectionBlock}>
+-      <AppText bold>{title}</AppText>
+-      <View style={styles.scaleRow}>
+-        {colors.map((color) => (
+-          <Pressable key={color} onPress={() => onPick(color)} style={styles.scaleSwatchWrap}>
+-            <View style={[styles.scaleSwatch, { backgroundColor: color }]} />
+-            <AppText variant="caption" style={styles.hexText}>
+-              {color}
+-            </AppText>
+-          </Pressable>
+-        ))}
+-      </View>
+-    </View>
+-  );
+-}
+-
+ function ColorSwatch({
+   color,
+   label,
+@@ -719,8 +692,11 @@ const styles = StyleSheet.create({
+     gap: 12,
+     justifyContent: 'space-between',
+   },
+-  hexText: {
+-    textAlign: 'center',
++  helperPanel: {
++    borderRadius: 10,
++    borderWidth: 1,
++    paddingHorizontal: 12,
++    paddingVertical: 10,
+   },
+   metaPill: {
+     borderRadius: 10,
+@@ -790,20 +766,6 @@ const styles = StyleSheet.create({
+     height: 36,
+     width: 36,
+   },
+-  scaleRow: {
+-    flexDirection: 'row',
+-    flexWrap: 'wrap',
+-    gap: 8,
+-  },
+-  scaleSwatch: {
+-    borderRadius: 8,
+-    height: 42,
+-    width: 74,
+-  },
+-  scaleSwatchWrap: {
+-    alignItems: 'center',
+-    gap: 4,
+-  },
+   sectionBlock: {
+     gap: 8,
+   },
+diff --git a/docs/PRODUCT_C2_2_SIMPLIFIED_VISUAL_IDENTITY_FLOW.md b/docs/PRODUCT_C2_2_SIMPLIFIED_VISUAL_IDENTITY_FLOW.md
+index 88e9bb9..170e015 100644
+--- a/docs/PRODUCT_C2_2_SIMPLIFIED_VISUAL_IDENTITY_FLOW.md
++++ b/docs/PRODUCT_C2_2_SIMPLIFIED_VISUAL_IDENTITY_FLOW.md
+@@ -191,3 +191,13 @@ Fecha: 2026-06-07
+ PRODUCT-C2.4 conserva la pantalla simplificada y reemplaza la experiencia principal de color nativo por un selector propio de la aplicacion. El flujo visible cambia de un solo color base a `Colores de marca`, con principal, secundario y acento.
+
+ Las escalas, armonias detalladas, tokens tecnicos y datos RGB/HSL siguen en modo avanzado para no saturar la experiencia inicial.
++
++---
++
++## Continuidad PRODUCT-C2.5 - Menos laboratorio
++
++Fecha: 2026-06-07
++
++PRODUCT-C2.5 completa la simplificacion moviendo escalas largas al modal de color, dejando armonia como sugerencia avanzada y renombrando la identidad local como editor avanzado de tokens locales.
++
++La vista principal ya no intenta explicar tokens tecnicos al usuario final.
+diff --git a/docs/PRODUCT_C2_3_GUIDED_APP_DESIGN_FLOW.md b/docs/PRODUCT_C2_3_GUIDED_APP_DESIGN_FLOW.md
+index edae29c..88bfdc3 100644
+--- a/docs/PRODUCT_C2_3_GUIDED_APP_DESIGN_FLOW.md
++++ b/docs/PRODUCT_C2_3_GUIDED_APP_DESIGN_FLOW.md
+@@ -147,3 +147,13 @@ La experiencia visible ahora permite configurar:
+ El cambio evita que el selector nativo de Windows/navegador sea la experiencia principal. La seleccion se realiza con `AppColorPicker`, un panel propio con HEX, swatches, variaciones, aplicar, cancelar y restaurar color original.
+
+ La paleta sugerida respeta los colores definidos por el usuario y completa los tokens restantes con reglas semanticas seguras.
++
++---
++
++## Continuidad PRODUCT-C2.5 - Flujo final simplificado
++
++Fecha: 2026-06-07
++
++PRODUCT-C2.5 reduce aun mas la carga tecnica del flujo guiado. La vista principal queda centrada en plantilla, colores de marca, paleta sugerida, legibilidad, preview y acciones de aplicar/restaurar.
++
++Las variaciones de color se muestran dentro del selector propio, la armonia queda como opcion avanzada y los tokens internos dejan de aparecer como una tarea esperada para usuario final.
+diff --git a/docs/PRODUCT_C2_4_CUSTOM_BRAND_COLOR_PICKER.md b/docs/PRODUCT_C2_4_CUSTOM_BRAND_COLOR_PICKER.md
+index 7982b27..98c79d4 100644
+--- a/docs/PRODUCT_C2_4_CUSTOM_BRAND_COLOR_PICKER.md
++++ b/docs/PRODUCT_C2_4_CUSTOM_BRAND_COLOR_PICKER.md
+@@ -156,3 +156,20 @@ Las traducciones nuevas son base tecnica y requieren revision humana/nativa ante
+ - No se agregan fuentes externas.
+ - El picker nativo queda fuera de la experiencia principal.
+ - La validacion de contraste sigue siendo basica y no reemplaza auditoria completa de accesibilidad.
++
++---
++
++## Continuidad PRODUCT-C2.5 - Simplificacion final
++
++Fecha: 2026-06-07
++
++PRODUCT-C2.5 conserva el selector propio y los tres colores de marca, pero simplifica la primera vista de `/ui-kit`.
++
++Cambios principales:
++
++- `tints`, `shades` y `tones` se mueven al modal `AppColorPicker`;
++- el selector de armonia queda en opciones avanzadas;
++- la armonia se explica como sugerencia automatica, no como limitante;
++- `Identidad visual local` se renombra a `Editor avanzado de tokens locales`;
++- `Design tokens` queda como diagnostico tecnico dentro de avanzado;
++- el bloque visible de contraste se reduce a `Legibilidad`.
+diff --git a/docs/PRODUCT_C2_5_BRAND_EDITOR_SIMPLIFICATION.md b/docs/PRODUCT_C2_5_BRAND_EDITOR_SIMPLIFICATION.md
+new file mode 100644
+index 0000000..1ee1f81
+--- /dev/null
++++ b/docs/PRODUCT_C2_5_BRAND_EDITOR_SIMPLIFICATION.md
+@@ -0,0 +1,160 @@
++# PRODUCT-C2.5 - Simplificacion final de editor visual de marca
++
++Fecha: 2026-06-07
++Rama: `feature/product-c2-5-brand-editor-simplification`
++
++## Objetivo
++
++PRODUCT-C2.5 simplifica la experiencia principal de `/ui-kit` para que se lea como configuracion de diseno de la aplicacion, no como laboratorio tecnico.
++
++La fase mantiene el selector propio de PRODUCT-C2.4, los tres colores de marca, la paleta sugerida, contraste, preview, aplicacion local y restauracion de plantilla.
++
++## Problema detectado
++
++Aunque PRODUCT-C2.4 funcionaba tecnicamente, la pantalla seguia mostrando demasiado en la vista inicial:
++
++- escalas largas de `tints`, `shades` y `tones`;
++- selector de armonia como control visible de primer nivel;
++- textos de identidad visual local;
++- design tokens y tokens semanticos;
++- copy que podia hacer pensar al cliente que debia editar variables internas.
++
++## Vista principal final
++
++La vista principal queda enfocada en:
++
++1. Plantilla visual.
++2. Colores de marca.
++3. Paleta sugerida.
++4. Legibilidad.
++5. Vista previa de la aplicacion.
++6. Aplicar cambios / restaurar.
++7. Opciones avanzadas.
++
++No se muestran por defecto tokens tecnicos, RGB/HSL, escalas largas, componentes, templates ni ratios completos.
++
++## Colores de marca
++
++Se mantienen:
++
++- `Principal`: navegacion, botones principales y acciones clave.
++- `Secundario`: contraste, fondos fuertes o botones secundarios.
++- `Acento`: elementos destacados, chips, detalles o llamadas de atencion.
++
++El acento se explica como tercer color de marca, no como token tecnico.
++
++## Variaciones
++
++Las variaciones se movieron al modal `AppColorPicker`.
++
++Al cambiar principal, secundario o acento, el modal muestra:
++
++- color actual;
++- HEX;
++- muestras sugeridas;
++- claros;
++- oscuros;
++- desaturados;
++- aplicar/cancelar.
++
++La pantalla principal ya no muestra todas las escalas al mismo tiempo.
++
++## Armonia
++
++La armonia queda como sugerencia avanzada, no como limitante.
++
++Reglas documentadas en UI:
++
++- si solo hay color principal, el sistema sugiere secundario y acento;
++- si hay secundario o acento definido, esos colores se respetan;
++- cuando hay colores definidos, se muestra `Usando colores de marca definidos`.
++
++El selector de armonia se conserva dentro de opciones avanzadas.
++
++## Legibilidad
++
++El bloque visible se renombra a `Legibilidad`.
++
++La vista principal revisa solo:
++
++- boton principal;
++- texto sobre fondo;
++- estado reservado.
++
++Los ratios y contrastes completos quedan en opciones avanzadas.
++
++## Identidad local y tokens
++
++`Identidad visual local` se renombra dentro de avanzado a `Editor avanzado de tokens locales`.
++
++La explicacion aclara que:
++
++- son tokens internos;
++- se guardan localmente en este dispositivo;
++- no son necesarios para configurar la apariencia basica;
++- no modifican backend ni tenant.
++
++`Design tokens` tambien queda dentro de avanzado con una descripcion de diagnostico tecnico.
++
++## /appearance
++
++`/appearance` mantiene una tarjeta simple hacia `/ui-kit`:
++
++- plantilla visual;
++- colores de marca;
++- vista previa de la aplicacion.
++
++No se duplica el generador.
++
++## I18N
++
++Se agregaron y ajustaron claves `paletteGenerator.*` en:
++
++- `es`;
++- `en`;
++- `pt-BR`;
++- `fr`;
++- `ja`;
++- `zh`;
++- `ko`.
++
++Auditoria local de estructura:
++
++```text
++es: leaves=1238 missing=0 extra=0
++en: leaves=1238 missing=0 extra=0
++pt-BR: leaves=1238 missing=0 extra=0
++fr: leaves=1238 missing=0 extra=0
++ja: leaves=1238 missing=0 extra=0
++zh: leaves=1238 missing=0 extra=0
++ko: leaves=1238 missing=0 extra=0
++```
++
++Las traducciones nuevas son base tecnica y requieren revision humana/nativa antes de release internacional.
++
++## Validacion manual esperada
++
++1. Entrar con `qa.admin`.
++2. Abrir `/ui-kit`.
++3. Confirmar que la vista principal no parece laboratorio tecnico.
++4. Elegir plantilla visual.
++5. Revisar `Colores de marca`.
++6. Cambiar principal, secundario y acento con el picker propio.
++7. Confirmar que claros/oscuros/desaturados aparecen dentro del modal.
++8. Confirmar que armonia no aparece como limitante en la vista principal.
++9. Revisar paleta sugerida.
++10. Revisar `Legibilidad`.
++11. Confirmar preview antes de aplicar.
++12. Aplicar paleta localmente.
++13. Restaurar plantilla.
++14. Abrir opciones avanzadas.
++15. Confirmar que editor de tokens locales, design tokens, componentes y templates siguen disponibles.
++16. Validar light/dark y mobile/tablet.
++
++## Limitaciones
++
++- No hay persistencia backend ni por tenant.
++- No se elimina la capacidad tecnica; queda en avanzado.
++- No se implementa ajuste automatico de contraste en esta fase.
++- No se instalan dependencias externas.
++- No se agregan fuentes externas.
+diff --git a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+index ce1d923..43bd916 100644
+--- a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
++++ b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+@@ -375,3 +375,13 @@ Fecha: 2026-06-07
+ PRODUCT-C2.4 agrega un selector propio de color para `/ui-kit` y evita que la experiencia principal dependa del picker nativo de navegador/Windows. El flujo de diseno visual soporta color principal, secundario y acento, con preview y contraste antes de aplicar localmente.
+
+ QA debe validar que el panel propio respete light/dark, presets, responsive y que los tres colores se reflejen en sidebar, cards, botones, chips/acento, badges y estados sin perder legibilidad.
++
++---
++
++## Continuidad PRODUCT-C2.5 - Editor de marca simplificado
++
++Fecha: 2026-06-07
++
++PRODUCT-C2.5 simplifica la superficie principal de `/ui-kit`: plantillas, colores de marca, paleta sugerida, legibilidad, preview y acciones finales. Las variaciones de color se abren desde el picker propio y los tokens quedan como diagnostico avanzado.
++
++QA debe confirmar que la vista inicial ya no se perciba como laboratorio tecnico y que el modo avanzado conserve las herramientas internas.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index 5ecd1e3..95a7e47 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -308,3 +308,18 @@ Agregar a la corrida manual de sistema visual:
+ - abrir `/live` o `/customers` y confirmar tema aplicado;
+ - volver a `/ui-kit` y restaurar plantilla;
+ - validar light/dark y mobile/tablet.
++
++## Nota PRODUCT-C2.5
++
++Agregar a la corrida manual de sistema visual:
++
++- abrir `/ui-kit`;
++- confirmar que la vista principal muestra solo plantilla visual, colores de marca, paleta sugerida, legibilidad, preview, aplicar/restaurar y opciones avanzadas;
++- confirmar que `tints`, `shades` y `tones` ya no ocupan espacio en la pantalla principal;
++- cambiar principal, secundario y acento y confirmar que claros/oscuros/desaturados aparecen dentro del modal `Cambiar color`;
++- confirmar que armonia aparece como sugerencia avanzada, no como limitante del flujo principal;
++- revisar que `Identidad visual local` se muestre en avanzado como `Editor avanzado de tokens locales`;
++- revisar que `Design tokens` solo aparezca en avanzado como diagnostico tecnico;
++- aplicar paleta localmente;
++- restaurar plantilla;
++- validar light/dark y mobile/tablet.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index 4db1740..d312a3f 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -1091,9 +1091,9 @@
+     "restrictedTitle": "Restricted access",
+     "restrictedMessage": "Application design is an internal view for administration and development.",
+     "sectionTitle": "Visual palette generator",
+-    "sectionSubtitle": "Choose a base color and review harmonies, variations, contrast, and preview before applying.",
++    "sectionSubtitle": "Configure brand colors, readability, and preview before applying.",
+     "flowTitle": "Visual identity flow",
+-    "flowSubtitle": "Follow these steps: template, base color, palette, contrast, preview, and local application.",
++    "flowSubtitle": "Follow these steps: template, brand colors, palette, readability, preview, and local application.",
+     "flowSteps": {
+       "template": "Choose a visual template",
+       "baseColor": "Brand colors",
+@@ -1103,8 +1103,9 @@
+       "apply": "Apply or restore changes"
+     },
+     "templateSectionTitle": "Choose a visual template",
+-    "templateSectionHelp": "Select a visual base for your system. Then you can adjust the main color.",
++    "templateSectionHelp": "Select a visual base for your system. Then you can adjust the brand colors.",
+     "activeTemplate": "Active visual template",
++    "templateActiveHelp": "This is the current visual base of the application.",
+     "localConfigHelp": "This configuration is saved locally in this phase.",
+     "templateActive": "Active",
+     "activeTemplateButton": "Active template",
+@@ -1120,7 +1121,9 @@
+     "invalidHex": "Use a valid HEX format. Example: #2563EB",
+     "quickSwatches": "Quick swatches",
+     "harmony": "Color harmony",
+-    "harmonyHelp": "Harmonies suggest accents without replacing semantic status colors.",
++    "harmonyHelp": "Harmony only suggests colors when you have not defined secondary or accent. If you define them, they are respected.",
++    "harmonySuggestionHelp": "If you only choose a main color, the system suggests secondary and accent colors automatically.",
++    "usingDefinedBrandColors": "Using defined brand colors.",
+     "harmonies": {
+       "monochromatic": "Monochromatic",
+       "complementary": "Complementary",
+@@ -1128,13 +1131,13 @@
+       "triadic": "Triadic",
+       "tetradic": "Tetradic"
+     },
+-    "tints": "Tints / light",
+-    "shades": "Shades / dark",
+-    "tones": "Tones / desaturated",
++    "tints": "Light variants",
++    "shades": "Dark variants",
++    "tones": "Desaturated variants",
+     "suggestedPalette": "Suggested palette",
+     "suggestedPaletteHelp": "Tap a token to load it into the editor or apply the full palette locally.",
+     "appPaletteTitle": "Suggested palette for the application",
+-    "appPaletteHelp": "The system proposes colors for buttons, accents, alerts, background, and cards.",
++    "appPaletteHelp": "With your brand colors, the system proposes these colors for the application.",
+     "applyLocal": "Apply palette locally",
+     "appliedFeedback": "Palette applied locally.",
+     "manualAppliedFeedback": "Customization applied locally.",
+@@ -1150,14 +1153,16 @@
+     "localStorageHelp": "These changes are saved locally on this device.",
+     "advancedOptionsTitle": "Advanced options",
+     "advancedOptionsHelp": "These options are useful for development or fine tuning. They are not required to configure the basic appearance.",
+-    "contrastTitle": "Basic contrast",
+-    "contrastHelp": "Approximate WCAG contrast review for text, buttons, and surfaces.",
++    "contrastTitle": "Technical contrast",
++    "contrastHelp": "Approximate WCAG contrast review for text, buttons, brand colors, and surfaces.",
+     "mainContrast": "Main contrast",
+     "mainContrastHelp": "Summary of the contrasts that most affect buttons, background, and reserved status.",
+-    "legibilityTitle": "Contrast and readability",
+-    "legibilityHelp": "Before applying the palette, check that text and buttons are easy to read.",
++    "legibilityTitle": "Readability",
++    "legibilityHelp": "This checks whether text and buttons are easy to read with your colors.",
+     "lowContrast": "Low contrast",
+     "reviewBeforeApply": "Review this color before applying it.",
++    "lowContrastActionHelp": "Change color or review before applying.",
++    "adjustAutomatically": "Adjust automatically",
+     "lowContrastApplyWarning": "This palette has contrasts that should be reviewed before applying it.",
+     "recommendedText": "Recommended text:",
+     "lightText": "light",
+@@ -1199,7 +1204,7 @@
+     "previewReservedBadge": "Reserved",
+     "previewNotice": "Sample operational notice.",
+     "appearanceCardTitle": "Application design",
+-    "appearanceCardHelp": "Configure visual template, brand colors, and preview without duplicating the generator on this screen.",
++    "appearanceCardHelp": "Configure visual template, brand colors, and application preview.",
+     "openGenerator": "Open visual editor",
+     "brandColorsTitle": "Brand colors",
+     "brandColorsHelp": "You can use only one main color or add secondary and accent colors if your brand has them.",
+@@ -1211,14 +1216,34 @@
+     "brandColorAccentHelp": "Used to highlight elements, states, or calls to attention.",
+     "changeColor": "Change color",
+     "chooseColor": "Choose color",
+-    "chooseColorHelp": "Select a swatch, adjust the HEX value, or use a generated variation.",
++    "chooseColorHelp": "Select a swatch, adjust the HEX value, or use a light, dark, or desaturated variation.",
+     "applyColor": "Apply color",
+     "useThisColor": "Use this color",
+     "restoreOriginalColor": "Restore original color",
+     "automaticColor": "Automatic",
+     "useAutomaticColor": "Use automatic",
+     "suggestedSwatches": "Suggested swatches",
+-    "colorVariations": "Color variations"
++    "colorVariations": "Color variations",
++    "backgroundContrastWarning": "The background may have low contrast with primary text.",
++    "surfaceContrastWarning": "The surface or cards may have low contrast with primary text.",
++    "advancedLocalTokensTitle": "Advanced local token editor",
++    "advancedLocalTokensHelp": "These values modify internal tokens saved locally on this device. They are not required to configure the basic appearance.",
++    "advancedLocalTokensModeHelp": "Editing {{scheme}} mode on {{template}}. This does not modify backend or tenant settings.",
++    "customStatus": "Customized",
++    "baseStatus": "Base",
++    "visualRadius": "Visual radius",
++    "visualRadiusHelp": "Adjust global softness without editing individual components.",
++    "visualDensity": "Visual density",
++    "visualDensityHelp": "Control global spacing supported by the theme.",
++    "reviewContrast": "Review contrast",
++    "applyLocalChanges": "Apply changes locally",
++    "localTenantPendingHelp": "This customization is saved locally in this phase. Customer or tenant persistence remains pending.",
++    "advancedPreviewTitle": "Identity preview",
++    "advancedPreviewHelp": "Technical reference for buttons, cards, badges, inputs, and reserved status.",
++    "designTokensTitle": "Design tokens",
++    "designTokensHelp": "Tokens are internal variables used by application components. They are shown for diagnostics and technical adjustments.",
++    "semanticTokensTitle": "Semantic tokens of the active theme",
++    "semanticTokensHelp": "Surfaces, text, inputs, and states used by AppShell, LIVE, and detail screens."
+   },
+   "usersForm": {
+     "newTitle": "New user",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index 397f98c..aa964c4 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -1091,9 +1091,9 @@
+     "restrictedTitle": "Acceso restringido",
+     "restrictedMessage": "El diseno de la aplicacion es una vista interna para administracion y desarrollo.",
+     "sectionTitle": "Generador visual de paletas",
+-    "sectionSubtitle": "Elige un color base y revisa armonias, variaciones, contraste y preview antes de aplicar.",
++    "sectionSubtitle": "Configura colores de marca, legibilidad y vista previa antes de aplicar.",
+     "flowTitle": "Flujo de identidad visual",
+-    "flowSubtitle": "Sigue estos pasos: plantilla, color base, paleta, contraste, vista previa y aplicacion local.",
++    "flowSubtitle": "Sigue estos pasos: plantilla, colores de marca, paleta, legibilidad, vista previa y aplicacion local.",
+     "flowSteps": {
+       "template": "Elige una plantilla visual",
+       "baseColor": "Colores de marca",
+@@ -1103,8 +1103,9 @@
+       "apply": "Aplica o restaura cambios"
+     },
+     "templateSectionTitle": "Elige una plantilla visual",
+-    "templateSectionHelp": "Selecciona una base visual para tu sistema. Despues puedes ajustar el color principal.",
++    "templateSectionHelp": "Selecciona una base visual para tu sistema. Despues puedes ajustar los colores de marca.",
+     "activeTemplate": "Plantilla visual activa",
++    "templateActiveHelp": "Esta es la base visual actual de la aplicacion.",
+     "localConfigHelp": "Esta configuracion se guarda localmente en esta fase.",
+     "templateActive": "Activa",
+     "activeTemplateButton": "Plantilla activa",
+@@ -1120,7 +1121,9 @@
+     "invalidHex": "Usa formato HEX valido. Ejemplo: #2563EB",
+     "quickSwatches": "Muestras rapidas",
+     "harmony": "Armonia de color",
+-    "harmonyHelp": "Las armonias sugieren acentos sin reemplazar colores semanticos de estado.",
++    "harmonyHelp": "La armonia solo sugiere colores cuando no definiste secundario o acento. Si los definiste, se respetan.",
++    "harmonySuggestionHelp": "Si solo eliges color principal, el sistema sugiere secundario y acento automaticamente.",
++    "usingDefinedBrandColors": "Usando colores de marca definidos.",
+     "harmonies": {
+       "monochromatic": "Monocromatica",
+       "complementary": "Complementaria",
+@@ -1128,13 +1131,13 @@
+       "triadic": "Triadica",
+       "tetradic": "Tetradica"
+     },
+-    "tints": "Tints / claros",
+-    "shades": "Shades / oscuros",
+-    "tones": "Tones / desaturados",
++    "tints": "Claros",
++    "shades": "Oscuros",
++    "tones": "Desaturados",
+     "suggestedPalette": "Paleta sugerida",
+     "suggestedPaletteHelp": "Toca un token para cargarlo en el editor o aplica toda la paleta localmente.",
+     "appPaletteTitle": "Paleta sugerida para la aplicacion",
+-    "appPaletteHelp": "El sistema propone colores para botones, acentos, alertas, fondo y tarjetas.",
++    "appPaletteHelp": "Con tus colores de marca, el sistema propone estos colores para la aplicacion.",
+     "applyLocal": "Aplicar paleta localmente",
+     "appliedFeedback": "Paleta aplicada localmente.",
+     "manualAppliedFeedback": "Personalizacion aplicada localmente.",
+@@ -1150,14 +1153,16 @@
+     "localStorageHelp": "Estos cambios se guardan localmente en este dispositivo.",
+     "advancedOptionsTitle": "Opciones avanzadas",
+     "advancedOptionsHelp": "Estas opciones son utiles para desarrollo o ajustes finos. No son necesarias para configurar la apariencia basica.",
+-    "contrastTitle": "Contraste basico",
+-    "contrastHelp": "Revision aproximada de contraste WCAG para texto, botones y superficies.",
++    "contrastTitle": "Contraste tecnico",
++    "contrastHelp": "Revision aproximada de contraste WCAG para texto, botones, colores de marca y superficies.",
+     "mainContrast": "Contraste principal",
+     "mainContrastHelp": "Resumen de los contrastes que mas afectan botones, fondo y estado reservado.",
+-    "legibilityTitle": "Contraste y legibilidad",
+-    "legibilityHelp": "Antes de aplicar la paleta, revisa que los textos y botones sean faciles de leer.",
++    "legibilityTitle": "Legibilidad",
++    "legibilityHelp": "Esto revisa si los textos y botones se leen bien con tus colores.",
+     "lowContrast": "Contraste bajo",
+     "reviewBeforeApply": "Revisa este color antes de aplicarlo.",
++    "lowContrastActionHelp": "Cambia color o revisa antes de aplicar.",
++    "adjustAutomatically": "Ajustar automaticamente",
+     "lowContrastApplyWarning": "La paleta tiene contrastes que conviene revisar antes de aplicarla.",
+     "recommendedText": "Texto recomendado:",
+     "lightText": "claro",
+@@ -1199,7 +1204,7 @@
+     "previewReservedBadge": "Reservada",
+     "previewNotice": "Aviso operativo de ejemplo.",
+     "appearanceCardTitle": "Diseno de la aplicacion",
+-    "appearanceCardHelp": "Configura plantilla visual, colores de marca y vista previa sin duplicar el generador en esta pantalla.",
++    "appearanceCardHelp": "Configura plantilla visual, colores de marca y vista previa de la aplicacion.",
+     "openGenerator": "Abrir editor visual",
+     "brandColorsTitle": "Colores de marca",
+     "brandColorsHelp": "Puedes usar solo un color principal o agregar colores secundario y acento si tu marca los tiene.",
+@@ -1211,14 +1216,34 @@
+     "brandColorAccentHelp": "Se usa para resaltar elementos, estados o llamadas de atencion.",
+     "changeColor": "Cambiar color",
+     "chooseColor": "Elegir color",
+-    "chooseColorHelp": "Selecciona una muestra, ajusta el HEX o usa una variacion generada.",
++    "chooseColorHelp": "Selecciona una muestra, ajusta el HEX o usa una variacion clara, oscura o desaturada.",
+     "applyColor": "Aplicar color",
+     "useThisColor": "Usar este color",
+     "restoreOriginalColor": "Restaurar color original",
+     "automaticColor": "Automatico",
+     "useAutomaticColor": "Usar automatico",
+     "suggestedSwatches": "Muestras sugeridas",
+-    "colorVariations": "Variaciones del color"
++    "colorVariations": "Variaciones del color",
++    "backgroundContrastWarning": "El fondo puede tener bajo contraste con el texto principal.",
++    "surfaceContrastWarning": "La superficie o tarjetas pueden tener bajo contraste con el texto principal.",
++    "advancedLocalTokensTitle": "Editor avanzado de tokens locales",
++    "advancedLocalTokensHelp": "Estos valores modifican tokens internos guardados localmente en este dispositivo. No son necesarios para configurar la apariencia basica.",
++    "advancedLocalTokensModeHelp": "Editando modo {{scheme}} sobre {{template}}. No modifica backend ni tenant.",
++    "customStatus": "Personalizada",
++    "baseStatus": "Base",
++    "visualRadius": "Radio visual",
++    "visualRadiusHelp": "Ajusta la suavidad global sin editar componentes individuales.",
++    "visualDensity": "Densidad visual",
++    "visualDensityHelp": "Controla el espaciado global soportado por el tema.",
++    "reviewContrast": "Revisar contraste",
++    "applyLocalChanges": "Aplicar cambios localmente",
++    "localTenantPendingHelp": "Esta personalizacion se guarda localmente en esta fase. La persistencia por cliente o tenant queda pendiente.",
++    "advancedPreviewTitle": "Preview de identidad",
++    "advancedPreviewHelp": "Referencia tecnica de botones, cards, badges, inputs y estado reservado.",
++    "designTokensTitle": "Design tokens",
++    "designTokensHelp": "Los tokens son variables internas que usan los componentes de la aplicacion. Se muestran para diagnostico y ajustes tecnicos.",
++    "semanticTokensTitle": "Tokens semanticos del tema activo",
++    "semanticTokensHelp": "Superficies, texto, inputs y estados usados por AppShell, LIVE y detalle."
+   },
+   "usersForm": {
+     "newTitle": "Nuevo usuario",
+diff --git a/locales/fr/common.json b/locales/fr/common.json
+index af77284..25afaf5 100644
+--- a/locales/fr/common.json
++++ b/locales/fr/common.json
+@@ -1084,9 +1084,9 @@
+   },
+   "paletteGenerator": {
+     "sectionTitle": "Générateur visuel de palettes",
+-    "sectionSubtitle": "Choisissez une couleur de base et vérifiez les harmonies, variations, contrastes et aperçu avant application.",
++    "sectionSubtitle": "Configurez les couleurs de marque, la lisibilite et l apercu avant d appliquer.",
+     "flowTitle": "Flux d'identité visuelle",
+-    "flowSubtitle": "Suivez ces étapes : modèle, couleur de base, palette, contraste, aperçu et application locale.",
++    "flowSubtitle": "Suivez ces etapes : modele, couleurs de marque, palette, lisibilite, apercu et application locale.",
+     "flowSteps": {
+       "template": "Choisissez un modele visuel",
+       "baseColor": "Couleurs de marque",
+@@ -1108,7 +1108,7 @@
+     "invalidHex": "Utilisez un format HEX valide. Exemple : #2563EB",
+     "quickSwatches": "Échantillons rapides",
+     "harmony": "Harmonie de couleur",
+-    "harmonyHelp": "Les harmonies suggèrent des accents sans remplacer les couleurs sémantiques de statut.",
++    "harmonyHelp": "L harmonie suggere seulement des couleurs quand vous n avez pas defini de secondaire ou d accent. Si vous les definissez, elles sont respectees.",
+     "harmonies": {
+       "monochromatic": "Monochromatique",
+       "complementary": "Complémentaire",
+@@ -1116,9 +1116,9 @@
+       "triadic": "Triadique",
+       "tetradic": "Tétradique"
+     },
+-    "tints": "Tints / clairs",
+-    "shades": "Shades / sombres",
+-    "tones": "Tones / désaturés",
++    "tints": "Claires",
++    "shades": "Foncees",
++    "tones": "Desaturees",
+     "suggestedPalette": "Palette suggérée",
+     "suggestedPaletteHelp": "Touchez un token pour le charger dans l'éditeur ou appliquez toute la palette localement.",
+     "applyLocal": "Appliquer la palette localement",
+@@ -1129,8 +1129,8 @@
+     "restoreTemplate": "Restaurer le modèle",
+     "showTechnicalDetails": "Voir les détails techniques",
+     "hideTechnicalDetails": "Masquer les détails techniques",
+-    "contrastTitle": "Contraste de base",
+-    "contrastHelp": "Vérification approximative WCAG du contraste pour textes, boutons et surfaces.",
++    "contrastTitle": "Contraste technique",
++    "contrastHelp": "Controle approximatif WCAG du contraste pour textes, boutons, couleurs de marque et surfaces.",
+     "mainContrast": "Contraste principal",
+     "mainContrastHelp": "Résumé des contrastes qui affectent surtout les boutons, le fond et l'état réservé.",
+     "lowContrast": "Contraste faible",
+@@ -1173,7 +1173,7 @@
+     "previewReservedBadge": "Réservé",
+     "previewNotice": "Avis opérationnel d'exemple.",
+     "appearanceCardTitle": "Conception de l'application",
+-    "appearanceCardHelp": "Configurez le modele visuel, les couleurs de marque et l apercu sans dupliquer le generateur sur cet ecran.",
++    "appearanceCardHelp": "Configurez le modele visuel, les couleurs de marque et l apercu de l application.",
+     "openGenerator": "Ouvrir l'editeur visuel",
+     "loading": "Chargement de la conception de l'application...",
+     "appDesignTitle": "Conception de l'application",
+@@ -1183,12 +1183,12 @@
+     "restrictedTitle": "Acces restreint",
+     "restrictedMessage": "La conception de l'application est une vue interne pour l'administration et le developpement.",
+     "templateSectionTitle": "Choisissez un modele visuel",
+-    "templateSectionHelp": "Selectionnez une base visuelle pour votre systeme. Vous pourrez ensuite ajuster la couleur principale.",
++    "templateSectionHelp": "Selectionnez une base visuelle pour votre systeme. Vous pourrez ensuite ajuster les couleurs de marque.",
+     "brandColorTitle": "Couleur principale de marque",
+     "brandColorHelp": "Choisissez la couleur qui identifie votre activite. Le systeme proposera une palette pour les boutons, les accents et les etats.",
+     "baseColorHelp": "Utilisez le selecteur visuel ou saisissez le HEX de la couleur principale.",
+     "appPaletteTitle": "Palette suggeree pour l'application",
+-    "appPaletteHelp": "Le systeme propose des couleurs pour les boutons, les accents, les alertes, le fond et les cartes.",
++    "appPaletteHelp": "Avec vos couleurs de marque, le systeme propose ces couleurs pour l application.",
+     "showAdvancedOptions": "Voir les options avancees",
+     "hideAdvancedOptions": "Masquer les options avancees",
+     "applyChangesTitle": "Appliquer les modifications",
+@@ -1196,8 +1196,8 @@
+     "localStorageHelp": "Ces changements sont enregistres localement sur cet appareil.",
+     "advancedOptionsTitle": "Options avancees",
+     "advancedOptionsHelp": "Ces options sont utiles au developpement ou aux ajustements fins. Elles ne sont pas necessaires pour configurer l'apparence de base.",
+-    "legibilityTitle": "Contraste et lisibilite",
+-    "legibilityHelp": "Avant d appliquer la palette, verifiez que les textes et les boutons sont faciles a lire.",
++    "legibilityTitle": "Lisibilite",
++    "legibilityHelp": "Cela verifie si les textes et boutons se lisent bien avec vos couleurs.",
+     "lowContrastApplyWarning": "Cette palette contient des contrastes a verifier avant application.",
+     "appPreviewTitle": "Apercu de l'application",
+     "appPreviewHelp": "Voici comment les couleurs apparaitront dans les ecrans reels du systeme.",
+@@ -1211,14 +1211,39 @@
+     "brandColorAccentHelp": "Utilisee pour mettre en valeur des elements, des etats ou des appels a l attention.",
+     "changeColor": "Changer la couleur",
+     "chooseColor": "Choisir une couleur",
+-    "chooseColorHelp": "Selectionnez un echantillon, ajustez le HEX ou utilisez une variation generee.",
++    "chooseColorHelp": "Selectionnez une nuance, ajustez le HEX ou utilisez une variation claire, foncee ou desaturee.",
+     "applyColor": "Appliquer la couleur",
+     "useThisColor": "Utiliser cette couleur",
+     "restoreOriginalColor": "Restaurer la couleur originale",
+     "automaticColor": "Automatique",
+     "useAutomaticColor": "Utiliser automatique",
+     "suggestedSwatches": "Echantillons suggeres",
+-    "colorVariations": "Variations de couleur"
++    "colorVariations": "Variations de couleur",
++    "templateActiveHelp": "C est la base visuelle actuelle de l application.",
++    "harmonySuggestionHelp": "Si vous choisissez seulement une couleur principale, le systeme suggere automatiquement secondaire et accent.",
++    "usingDefinedBrandColors": "Couleurs de marque definies utilisees.",
++    "lowContrastActionHelp": "Changez la couleur ou verifiez avant d appliquer.",
++    "adjustAutomatically": "Ajuster automatiquement",
++    "backgroundContrastWarning": "Le fond peut avoir un contraste faible avec le texte principal.",
++    "surfaceContrastWarning": "La surface ou les cartes peuvent avoir un contraste faible avec le texte principal.",
++    "advancedLocalTokensTitle": "Editeur avance de tokens locaux",
++    "advancedLocalTokensHelp": "Ces valeurs modifient des tokens internes enregistres localement sur cet appareil. Elles ne sont pas necessaires pour configurer l apparence de base.",
++    "advancedLocalTokensModeHelp": "Edition du mode {{scheme}} sur {{template}}. Cela ne modifie pas le backend ni le tenant.",
++    "customStatus": "Personnalisee",
++    "baseStatus": "Base",
++    "visualRadius": "Rayon visuel",
++    "visualRadiusHelp": "Ajuste la douceur globale sans modifier les composants individuellement.",
++    "visualDensity": "Densite visuelle",
++    "visualDensityHelp": "Controle l espacement global pris en charge par le theme.",
++    "reviewContrast": "Verifier le contraste",
++    "applyLocalChanges": "Appliquer localement",
++    "localTenantPendingHelp": "Cette personnalisation est enregistree localement dans cette phase. La persistance client ou tenant reste en attente.",
++    "advancedPreviewTitle": "Apercu de l identite",
++    "advancedPreviewHelp": "Reference technique des boutons, cartes, badges, champs et etat reserve.",
++    "designTokensTitle": "Design tokens",
++    "designTokensHelp": "Les tokens sont des variables internes utilisees par les composants de l application. Ils sont affiches pour diagnostic et ajustements techniques.",
++    "semanticTokensTitle": "Tokens semantiques du theme actif",
++    "semanticTokensHelp": "Surfaces, texte, champs et etats utilises par AppShell, LIVE et les ecrans de detail."
+   },
+   "usersForm": {
+     "newTitle": "Nouveau",
+diff --git a/locales/ja/common.json b/locales/ja/common.json
+index 8c30d74..d009cbd 100644
+--- a/locales/ja/common.json
++++ b/locales/ja/common.json
+@@ -1084,9 +1084,9 @@
+   },
+   "paletteGenerator": {
+     "sectionTitle": "ビジュアルパレット生成",
+-    "sectionSubtitle": "ベースカラーを選び、適用前に配色、バリエーション、コントラスト、プレビューを確認します。",
++    "sectionSubtitle": "ブランドカラー、読みやすさ、プレビューを確認してから適用します。",
+     "flowTitle": "ビジュアルIDフロー",
+-    "flowSubtitle": "テンプレート、ベースカラー、パレット、コントラスト、プレビュー、適用の順で進めます。",
++    "flowSubtitle": "テンプレート、ブランドカラー、パレット、読みやすさ、プレビュー、ローカル適用の順に進みます。",
+     "flowSteps": {
+       "template": "??????????????",
+       "baseColor": "???????",
+@@ -1108,7 +1108,7 @@
+     "invalidHex": "有効なHEX形式を使用してください。例: #2563EB",
+     "quickSwatches": "クイックスウォッチ",
+     "harmony": "カラー調和",
+-    "harmonyHelp": "調和はアクセント候補を示します。状態用の意味カラーは置き換えません。",
++    "harmonyHelp": "ハーモニーは、セカンダリまたはアクセントを未設定の場合だけ色を提案します。設定済みの色は尊重されます。",
+     "harmonies": {
+       "monochromatic": "モノクロマティック",
+       "complementary": "補色",
+@@ -1116,9 +1116,9 @@
+       "triadic": "トライアド",
+       "tetradic": "テトラード"
+     },
+-    "tints": "Tints / 明るい色",
+-    "shades": "Shades / 暗い色",
+-    "tones": "Tones / 低彩度",
++    "tints": "明るい色",
++    "shades": "暗い色",
++    "tones": "低彩度",
+     "suggestedPalette": "おすすめパレット",
+     "suggestedPaletteHelp": "トークンをタップしてエディターに読み込むか、パレット全体をローカルに適用します。",
+     "applyLocal": "パレットをローカル適用",
+@@ -1129,8 +1129,8 @@
+     "restoreTemplate": "テンプレートを復元",
+     "showTechnicalDetails": "技術詳細を表示",
+     "hideTechnicalDetails": "技術詳細を非表示",
+-    "contrastTitle": "基本コントラスト",
+-    "contrastHelp": "テキスト、ボタン、サーフェスのWCAG近似コントラストを確認します。",
++    "contrastTitle": "技術的なコントラスト",
++    "contrastHelp": "テキスト、ボタン、ブランドカラー、サーフェスのWCAGコントラストを概算で確認します。",
+     "mainContrast": "主要コントラスト",
+     "mainContrastHelp": "ボタン、背景、予約済み状態に影響する主要コントラストの概要です。",
+     "lowContrast": "低コントラスト",
+@@ -1173,7 +1173,7 @@
+     "previewReservedBadge": "予約済み",
+     "previewNotice": "サンプル運用通知。",
+     "appearanceCardTitle": "????????",
+-    "appearanceCardHelp": "????????????????????????????????????????????????",
++    "appearanceCardHelp": "ビジュアルテンプレート、ブランドカラー、アプリのプレビューを設定します。",
+     "openGenerator": "?????????????",
+     "loading": "?????????????...",
+     "appDesignTitle": "????????",
+@@ -1183,12 +1183,12 @@
+     "restrictedTitle": "??????",
+     "restrictedMessage": "????????????????????????",
+     "templateSectionTitle": "??????????????",
+-    "templateSectionHelp": "???????????????????????????????????",
++    "templateSectionHelp": "システムの見た目の土台を選びます。その後でブランドカラーを調整できます。",
+     "brandColorTitle": "???????????",
+     "brandColorHelp": "?????????????????????????????????????????????",
+     "baseColorHelp": "????????????HEX???????????????",
+     "appPaletteTitle": "???????????",
+-    "appPaletteHelp": "???????????????????????????????",
++    "appPaletteHelp": "ブランドカラーをもとに、アプリケーション用の色を提案します。",
+     "showAdvancedOptions": "???????????",
+     "hideAdvancedOptions": "????????????",
+     "applyChangesTitle": "?????",
+@@ -1196,8 +1196,8 @@
+     "localStorageHelp": "?????????????????????????",
+     "advancedOptionsTitle": "????????",
+     "advancedOptionsHelp": "???????????????????????????????????",
+-    "legibilityTitle": "????????????",
+-    "legibilityHelp": "???????????????????????????????",
++    "legibilityTitle": "読みやすさ",
++    "legibilityHelp": "選んだ色でテキストとボタンが読みやすいか確認します。",
+     "lowContrastApplyWarning": "?????????????????????????????",
+     "appPreviewTitle": "?????????",
+     "appPreviewHelp": "?????????????????????",
+@@ -1211,14 +1211,39 @@
+     "brandColorAccentHelp": "?????????????????????",
+     "changeColor": "????",
+     "chooseColor": "????",
+-    "chooseColorHelp": "??????HEX????????????????????????",
++    "chooseColorHelp": "スウォッチ、HEX、または明るい/暗い/低彩度のバリエーションから選びます。",
+     "applyColor": "????",
+     "useThisColor": "??????",
+     "restoreOriginalColor": "??????",
+     "automaticColor": "??",
+     "useAutomaticColor": "?????",
+     "suggestedSwatches": "?????????",
+-    "colorVariations": "?????????"
++    "colorVariations": "?????????",
++    "templateActiveHelp": "これはアプリケーションで現在使用している見た目の土台です。",
++    "harmonySuggestionHelp": "メインカラーだけを選ぶと、システムがセカンダリとアクセントを自動提案します。",
++    "usingDefinedBrandColors": "定義済みのブランドカラーを使用しています。",
++    "lowContrastActionHelp": "色を変更するか、適用前に確認してください。",
++    "adjustAutomatically": "自動調整",
++    "backgroundContrastWarning": "背景とメインテキストのコントラストが低い可能性があります。",
++    "surfaceContrastWarning": "サーフェスまたはカードとメインテキストのコントラストが低い可能性があります。",
++    "advancedLocalTokensTitle": "ローカルトークン詳細エディター",
++    "advancedLocalTokensHelp": "この値は、この端末にローカル保存される内部トークンを変更します。基本的な外観設定には不要です。",
++    "advancedLocalTokensModeHelp": "{{template}} の {{scheme}} モードを編集中です。バックエンドやテナントは変更されません。",
++    "customStatus": "カスタム",
++    "baseStatus": "ベース",
++    "visualRadius": "角丸",
++    "visualRadiusHelp": "個別コンポーネントを編集せず、全体の丸みを調整します。",
++    "visualDensity": "表示密度",
++    "visualDensityHelp": "テーマがサポートする全体の余白を調整します。",
++    "reviewContrast": "コントラスト確認",
++    "applyLocalChanges": "ローカルに適用",
++    "localTenantPendingHelp": "このカスタマイズはこのフェーズではローカル保存です。顧客またはテナント単位の永続化は未対応です。",
++    "advancedPreviewTitle": "アイデンティティプレビュー",
++    "advancedPreviewHelp": "ボタン、カード、バッジ、入力、予約状態の技術確認用プレビューです。",
++    "designTokensTitle": "Design tokens",
++    "designTokensHelp": "トークンはアプリケーションコンポーネントが使う内部変数です。診断と技術調整のために表示します。",
++    "semanticTokensTitle": "有効テーマのセマンティックトークン",
++    "semanticTokensHelp": "AppShell、LIVE、詳細画面で使うサーフェス、テキスト、入力、状態です。"
+   },
+   "usersForm": {
+     "newTitle": "新規",
+diff --git a/locales/ko/common.json b/locales/ko/common.json
+index 6333c78..c3dbcdf 100644
+--- a/locales/ko/common.json
++++ b/locales/ko/common.json
+@@ -1084,9 +1084,9 @@
+   },
+   "paletteGenerator": {
+     "sectionTitle": "시각적 팔레트 생성기",
+-    "sectionSubtitle": "기본 색상을 선택하고 적용 전에 조화, 변형, 대비, 미리보기를 확인합니다.",
++    "sectionSubtitle": "적용하기 전에 브랜드 색상, 가독성, 미리보기를 설정합니다.",
+     "flowTitle": "시각 아이덴티티 흐름",
+-    "flowSubtitle": "템플릿, 기본 색상, 팔레트, 대비, 미리보기, 로컬 적용 순서로 진행합니다.",
++    "flowSubtitle": "템플릿, 브랜드 색상, 팔레트, 가독성, 미리보기, 로컬 적용 순서로 진행합니다.",
+     "flowSteps": {
+       "template": "?? ??? ??",
+       "baseColor": "??? ??",
+@@ -1108,7 +1108,7 @@
+     "invalidHex": "유효한 HEX 형식을 사용하세요. 예: #2563EB",
+     "quickSwatches": "빠른 색상",
+     "harmony": "색상 조화",
+-    "harmonyHelp": "조화 색상은 강조색을 제안하며 상태 의미 색상을 대체하지 않습니다.",
++    "harmonyHelp": "색상 조화는 보조색 또는 강조색을 정의하지 않았을 때만 제안합니다. 정의한 색상은 그대로 사용됩니다.",
+     "harmonies": {
+       "monochromatic": "단색",
+       "complementary": "보색",
+@@ -1116,9 +1116,9 @@
+       "triadic": "삼각 배색",
+       "tetradic": "사각 배색"
+     },
+-    "tints": "Tints / 밝은 색",
+-    "shades": "Shades / 어두운 색",
+-    "tones": "Tones / 저채도",
++    "tints": "밝은 색",
++    "shades": "어두운 색",
++    "tones": "저채도 색",
+     "suggestedPalette": "추천 팔레트",
+     "suggestedPaletteHelp": "토큰을 눌러 편집기에 넣거나 전체 팔레트를 로컬에 적용합니다.",
+     "applyLocal": "팔레트 로컬 적용",
+@@ -1129,8 +1129,8 @@
+     "restoreTemplate": "템플릿 복원",
+     "showTechnicalDetails": "기술 세부 정보 보기",
+     "hideTechnicalDetails": "기술 세부 정보 숨기기",
+-    "contrastTitle": "기본 대비",
+-    "contrastHelp": "텍스트, 버튼, 표면의 WCAG 대비를 근사치로 확인합니다.",
++    "contrastTitle": "기술 대비",
++    "contrastHelp": "텍스트, 버튼, 브랜드 색상, 표면의 WCAG 대비를 대략적으로 확인합니다.",
+     "mainContrast": "주요 대비",
+     "mainContrastHelp": "버튼, 배경, 예약 상태에 가장 영향을 주는 대비 요약입니다.",
+     "lowContrast": "낮은 대비",
+@@ -1173,7 +1173,7 @@
+     "previewReservedBadge": "예약됨",
+     "previewNotice": "예시 운영 알림.",
+     "appearanceCardTitle": "? ???",
+-    "appearanceCardHelp": "? ???? ???? ???? ?? ?? ???, ??? ??, ?? ??? ?????.",
++    "appearanceCardHelp": "시각 템플릿, 브랜드 색상, 애플리케이션 미리보기를 설정합니다.",
+     "openGenerator": "?? ??? ??",
+     "loading": "? ???? ???? ?...",
+     "appDesignTitle": "? ???",
+@@ -1183,12 +1183,12 @@
+     "restrictedTitle": "?? ??",
+     "restrictedMessage": "? ???? ??? ??? ?? ?? ?????.",
+     "templateSectionTitle": "?? ??? ??",
+-    "templateSectionHelp": "???? ?? ??? ?????. ?? ?? ??? ??? ? ????.",
++    "templateSectionHelp": "시스템의 시각적 기반을 선택한 뒤 브랜드 색상을 조정할 수 있습니다.",
+     "brandColorTitle": "??? ?? ??",
+     "brandColorHelp": "????? ???? ??? ?????. ? ???? ??, ??, ?? ?? ???? ?????.",
+     "baseColorHelp": "?? ??? ?? HEX ??? ?? ??? ?????.",
+     "appPaletteTitle": "? ?? ???",
+-    "appPaletteHelp": "???? ??, ??, ??, ??, ?? ??? ?????.",
++    "appPaletteHelp": "브랜드 색상을 바탕으로 애플리케이션에 사용할 색상을 제안합니다.",
+     "showAdvancedOptions": "?? ?? ??",
+     "hideAdvancedOptions": "?? ?? ???",
+     "applyChangesTitle": "?? ??",
+@@ -1196,8 +1196,8 @@
+     "localStorageHelp": "? ?? ??? ? ??? ??? ?????.",
+     "advancedOptionsTitle": "?? ??",
+     "advancedOptionsHelp": "?? ?? ?? ??? ??? ?????. ?? ?? ???? ???? ????.",
+-    "legibilityTitle": "??? ???",
+-    "legibilityHelp": "???? ???? ?? ???? ??? ?? ??? ?????.",
++    "legibilityTitle": "가독성",
++    "legibilityHelp": "선택한 색상에서 텍스트와 버튼이 잘 읽히는지 확인합니다.",
+     "lowContrastApplyWarning": "? ????? ?? ?? ???? ? ??? ????.",
+     "appPreviewTitle": "? ?? ??",
+     "appPreviewHelp": "?? ??? ??? ??? ??? ?? ?????.",
+@@ -1211,14 +1211,39 @@
+     "brandColorAccentHelp": "??, ?? ?? ?? ??? ???? ? ?????.",
+     "changeColor": "?? ??",
+     "chooseColor": "?? ??",
+-    "chooseColorHelp": "?? ??, HEX ? ?? ??? ??? ?????.",
++    "chooseColorHelp": "스와치, HEX 또는 밝은/어두운/저채도 변형을 선택합니다.",
+     "applyColor": "?? ??",
+     "useThisColor": "? ?? ??",
+     "restoreOriginalColor": "?? ?? ??",
+     "automaticColor": "??",
+     "useAutomaticColor": "?? ??",
+     "suggestedSwatches": "?? ??",
+-    "colorVariations": "?? ??"
++    "colorVariations": "?? ??",
++    "templateActiveHelp": "현재 애플리케이션에서 사용하는 시각적 기반입니다.",
++    "harmonySuggestionHelp": "기본 색상만 선택하면 시스템이 보조색과 강조색을 자동으로 제안합니다.",
++    "usingDefinedBrandColors": "정의한 브랜드 색상을 사용 중입니다.",
++    "lowContrastActionHelp": "색상을 바꾸거나 적용 전에 검토하세요.",
++    "adjustAutomatically": "자동 조정",
++    "backgroundContrastWarning": "배경과 기본 텍스트의 대비가 낮을 수 있습니다.",
++    "surfaceContrastWarning": "표면 또는 카드와 기본 텍스트의 대비가 낮을 수 있습니다.",
++    "advancedLocalTokensTitle": "고급 로컬 토큰 편집기",
++    "advancedLocalTokensHelp": "이 값은 이 기기에 로컬 저장되는 내부 토큰을 수정합니다. 기본 외관 설정에는 필요하지 않습니다.",
++    "advancedLocalTokensModeHelp": "{{template}}의 {{scheme}} 모드를 편집 중입니다. 백엔드나 테넌트 설정은 변경하지 않습니다.",
++    "customStatus": "사용자 지정",
++    "baseStatus": "기본",
++    "visualRadius": "시각 반경",
++    "visualRadiusHelp": "개별 컴포넌트를 편집하지 않고 전체 둥근 정도를 조정합니다.",
++    "visualDensity": "시각 밀도",
++    "visualDensityHelp": "테마가 지원하는 전체 간격을 제어합니다.",
++    "reviewContrast": "대비 검토",
++    "applyLocalChanges": "로컬에 변경 적용",
++    "localTenantPendingHelp": "이 사용자 지정은 이 단계에서 로컬에 저장됩니다. 고객 또는 테넌트 단위 저장은 아직 남아 있습니다.",
++    "advancedPreviewTitle": "아이덴티티 미리보기",
++    "advancedPreviewHelp": "버튼, 카드, 배지, 입력, 예약 상태에 대한 기술 참고입니다.",
++    "designTokensTitle": "Design tokens",
++    "designTokensHelp": "토큰은 애플리케이션 컴포넌트가 사용하는 내부 변수입니다. 진단과 기술 조정을 위해 표시됩니다.",
++    "semanticTokensTitle": "활성 테마의 의미 토큰",
++    "semanticTokensHelp": "AppShell, LIVE, 상세 화면에서 사용하는 표면, 텍스트, 입력, 상태입니다."
+   },
+   "usersForm": {
+     "newTitle": "새",
+diff --git a/locales/pt-BR/common.json b/locales/pt-BR/common.json
+index 49951ce..53f94d0 100644
+--- a/locales/pt-BR/common.json
++++ b/locales/pt-BR/common.json
+@@ -1084,9 +1084,9 @@
+   },
+   "paletteGenerator": {
+     "sectionTitle": "Gerador visual de paletas",
+-    "sectionSubtitle": "Escolha uma cor base e revise harmonias, variações, contraste e prévia antes de aplicar.",
++    "sectionSubtitle": "Configure cores da marca, legibilidade e previa antes de aplicar.",
+     "flowTitle": "Fluxo de identidade visual",
+-    "flowSubtitle": "Siga estes passos: modelo, cor base, paleta, contraste, prévia e aplicação local.",
++    "flowSubtitle": "Siga estes passos: modelo, cores da marca, paleta, legibilidade, previa e aplicacao local.",
+     "flowSteps": {
+       "template": "Escolha um modelo visual",
+       "baseColor": "Cores da marca",
+@@ -1108,7 +1108,7 @@
+     "invalidHex": "Use um formato HEX válido. Exemplo: #2563EB",
+     "quickSwatches": "Amostras rápidas",
+     "harmony": "Harmonia de cor",
+-    "harmonyHelp": "As harmonias sugerem acentos sem substituir as cores semânticas de status.",
++    "harmonyHelp": "A harmonia so sugere cores quando voce nao definiu secundaria ou acento. Se voce definiu, elas sao respeitadas.",
+     "harmonies": {
+       "monochromatic": "Monocromática",
+       "complementary": "Complementar",
+@@ -1116,9 +1116,9 @@
+       "triadic": "Triádica",
+       "tetradic": "Tetrádica"
+     },
+-    "tints": "Tints / claros",
+-    "shades": "Shades / escuros",
+-    "tones": "Tones / dessaturados",
++    "tints": "Claros",
++    "shades": "Escuros",
++    "tones": "Dessaturados",
+     "suggestedPalette": "Paleta sugerida",
+     "suggestedPaletteHelp": "Toque em um token para carregá-lo no editor ou aplique toda a paleta localmente.",
+     "applyLocal": "Aplicar paleta localmente",
+@@ -1129,8 +1129,8 @@
+     "restoreTemplate": "Restaurar modelo",
+     "showTechnicalDetails": "Ver detalhes técnicos",
+     "hideTechnicalDetails": "Ocultar detalhes técnicos",
+-    "contrastTitle": "Contraste básico",
+-    "contrastHelp": "Revisão aproximada de contraste WCAG para texto, botões e superfícies.",
++    "contrastTitle": "Contraste tecnico",
++    "contrastHelp": "Revisao aproximada de contraste WCAG para texto, botoes, cores da marca e superficies.",
+     "mainContrast": "Contraste principal",
+     "mainContrastHelp": "Resumo dos contrastes que mais afetam botões, fundo e status reservado.",
+     "lowContrast": "Baixo contraste",
+@@ -1173,7 +1173,7 @@
+     "previewReservedBadge": "Reservado",
+     "previewNotice": "Aviso operacional de exemplo.",
+     "appearanceCardTitle": "Design do aplicativo",
+-    "appearanceCardHelp": "Configure modelo visual, cores da marca e previa sem duplicar o gerador nesta tela.",
++    "appearanceCardHelp": "Configure modelo visual, cores da marca e previa do aplicativo.",
+     "openGenerator": "Abrir editor visual",
+     "loading": "Carregando design do aplicativo...",
+     "appDesignTitle": "Design do aplicativo",
+@@ -1183,12 +1183,12 @@
+     "restrictedTitle": "Acesso restrito",
+     "restrictedMessage": "O design do aplicativo e uma visualizacao interna para administracao e desenvolvimento.",
+     "templateSectionTitle": "Escolha um modelo visual",
+-    "templateSectionHelp": "Selecione uma base visual para o sistema. Depois voce pode ajustar a cor principal.",
++    "templateSectionHelp": "Selecione uma base visual para o sistema. Depois voce pode ajustar as cores da marca.",
+     "brandColorTitle": "Cor principal da marca",
+     "brandColorHelp": "Escolha a cor que identifica seu negocio. A partir dela o sistema propoe uma paleta para botoes, acentos e estados.",
+     "baseColorHelp": "Use o seletor visual ou digite o HEX da cor principal.",
+     "appPaletteTitle": "Paleta sugerida para o aplicativo",
+-    "appPaletteHelp": "O sistema propoe cores para botoes, acentos, alertas, fundo e cartoes.",
++    "appPaletteHelp": "Com suas cores da marca, o sistema propoe estas cores para o aplicativo.",
+     "showAdvancedOptions": "Ver opcoes avancadas",
+     "hideAdvancedOptions": "Ocultar opcoes avancadas",
+     "applyChangesTitle": "Aplicar alteracoes",
+@@ -1196,8 +1196,8 @@
+     "localStorageHelp": "Estas alteracoes sao salvas localmente neste dispositivo.",
+     "advancedOptionsTitle": "Opcoes avancadas",
+     "advancedOptionsHelp": "Estas opcoes sao uteis para desenvolvimento ou ajustes finos. Nao sao necessarias para configurar a aparencia basica.",
+-    "legibilityTitle": "Contraste e legibilidade",
+-    "legibilityHelp": "Antes de aplicar a paleta, revise se textos e botoes sao faceis de ler.",
++    "legibilityTitle": "Legibilidade",
++    "legibilityHelp": "Isto revisa se textos e botoes sao faceis de ler com suas cores.",
+     "lowContrastApplyWarning": "Esta paleta tem contrastes que devem ser revisados antes de aplicar.",
+     "appPreviewTitle": "Previa do aplicativo",
+     "appPreviewHelp": "Assim as cores ficarao quando aplicadas em telas reais do sistema.",
+@@ -1211,14 +1211,39 @@
+     "brandColorAccentHelp": "Usada para destacar elementos, estados ou chamadas de atencao.",
+     "changeColor": "Alterar cor",
+     "chooseColor": "Escolher cor",
+-    "chooseColorHelp": "Selecione uma amostra, ajuste o HEX ou use uma variacao gerada.",
++    "chooseColorHelp": "Selecione uma amostra, ajuste o HEX ou use uma variacao clara, escura ou dessaturada.",
+     "applyColor": "Aplicar cor",
+     "useThisColor": "Usar esta cor",
+     "restoreOriginalColor": "Restaurar cor original",
+     "automaticColor": "Automatico",
+     "useAutomaticColor": "Usar automatico",
+     "suggestedSwatches": "Amostras sugeridas",
+-    "colorVariations": "Variacoes da cor"
++    "colorVariations": "Variacoes da cor",
++    "templateActiveHelp": "Esta e a base visual atual do aplicativo.",
++    "harmonySuggestionHelp": "Se voce escolher apenas uma cor principal, o sistema sugere secundaria e acento automaticamente.",
++    "usingDefinedBrandColors": "Usando cores da marca definidas.",
++    "lowContrastActionHelp": "Altere a cor ou revise antes de aplicar.",
++    "adjustAutomatically": "Ajustar automaticamente",
++    "backgroundContrastWarning": "O fundo pode ter baixo contraste com o texto principal.",
++    "surfaceContrastWarning": "A superficie ou os cartoes podem ter baixo contraste com o texto principal.",
++    "advancedLocalTokensTitle": "Editor avancado de tokens locais",
++    "advancedLocalTokensHelp": "Estes valores modificam tokens internos salvos localmente neste dispositivo. Nao sao necessarios para configurar a aparencia basica.",
++    "advancedLocalTokensModeHelp": "Editando modo {{scheme}} sobre {{template}}. Isto nao modifica backend nem tenant.",
++    "customStatus": "Personalizada",
++    "baseStatus": "Base",
++    "visualRadius": "Raio visual",
++    "visualRadiusHelp": "Ajusta a suavidade global sem editar componentes individuais.",
++    "visualDensity": "Densidade visual",
++    "visualDensityHelp": "Controla o espacamento global suportado pelo tema.",
++    "reviewContrast": "Revisar contraste",
++    "applyLocalChanges": "Aplicar alteracoes localmente",
++    "localTenantPendingHelp": "Esta personalizacao e salva localmente nesta fase. A persistencia por cliente ou tenant fica pendente.",
++    "advancedPreviewTitle": "Previa da identidade",
++    "advancedPreviewHelp": "Referencia tecnica de botoes, cards, badges, inputs e status reservado.",
++    "designTokensTitle": "Design tokens",
++    "designTokensHelp": "Tokens sao variaveis internas usadas pelos componentes do aplicativo. Sao exibidos para diagnostico e ajustes tecnicos.",
++    "semanticTokensTitle": "Tokens semanticos do tema ativo",
++    "semanticTokensHelp": "Superficies, texto, inputs e estados usados por AppShell, LIVE e telas de detalhe."
+   },
+   "usersForm": {
+     "newTitle": "Novo",
+diff --git a/locales/zh/common.json b/locales/zh/common.json
+index 4b451be..e139399 100644
+--- a/locales/zh/common.json
++++ b/locales/zh/common.json
+@@ -1084,9 +1084,9 @@
+   },
+   "paletteGenerator": {
+     "sectionTitle": "可视化调色板生成器",
+-    "sectionSubtitle": "选择基础色，并在应用前查看配色、变化、对比度和预览。",
++    "sectionSubtitle": "在应用前配置品牌颜色、可读性和预览。",
+     "flowTitle": "视觉身份流程",
+-    "flowSubtitle": "按模板、基础色、调色板、对比度、预览和本地应用的顺序操作。",
++    "flowSubtitle": "按步骤完成：模板、品牌颜色、调色板、可读性、预览和本地应用。",
+     "flowSteps": {
+       "template": "??????",
+       "baseColor": "????",
+@@ -1108,7 +1108,7 @@
+     "invalidHex": "请使用有效的HEX格式。例如：#2563EB",
+     "quickSwatches": "快速色块",
+     "harmony": "色彩和谐",
+-    "harmonyHelp": "和谐配色用于建议强调色，不替换状态语义颜色。",
++    "harmonyHelp": "色彩和谐仅在未定义辅助色或强调色时提供建议；已定义的颜色会被保留。",
+     "harmonies": {
+       "monochromatic": "单色",
+       "complementary": "互补",
+@@ -1116,9 +1116,9 @@
+       "triadic": "三角色",
+       "tetradic": "四角色"
+     },
+-    "tints": "Tints / 浅色",
+-    "shades": "Shades / 深色",
+-    "tones": "Tones / 低饱和",
++    "tints": "浅色",
++    "shades": "深色",
++    "tones": "低饱和色",
+     "suggestedPalette": "建议调色板",
+     "suggestedPaletteHelp": "点击颜色令牌加载到编辑器，或将整套调色板应用到本地。",
+     "applyLocal": "本地应用调色板",
+@@ -1129,8 +1129,8 @@
+     "restoreTemplate": "恢复模板",
+     "showTechnicalDetails": "查看技术细节",
+     "hideTechnicalDetails": "隐藏技术细节",
+-    "contrastTitle": "基础对比度",
+-    "contrastHelp": "近似检查文本、按钮和表面的WCAG对比度。",
++    "contrastTitle": "技术对比度",
++    "contrastHelp": "近似检查文本、按钮、品牌颜色和表面的 WCAG 对比度。",
+     "mainContrast": "主要对比度",
+     "mainContrastHelp": "汇总最影响按钮、背景和预留状态的对比度。",
+     "lowContrast": "低对比度",
+@@ -1173,7 +1173,7 @@
+     "previewReservedBadge": "已预留",
+     "previewNotice": "示例运营提示。",
+     "appearanceCardTitle": "????",
+-    "appearanceCardHelp": "??????????????????????????",
++    "appearanceCardHelp": "配置视觉模板、品牌颜色和应用预览。",
+     "openGenerator": "???????",
+     "loading": "????????...",
+     "appDesignTitle": "????",
+@@ -1183,12 +1183,12 @@
+     "restrictedTitle": "????",
+     "restrictedMessage": "??????????????????",
+     "templateSectionTitle": "??????",
+-    "templateSectionHelp": "??????????????????????",
++    "templateSectionHelp": "为系统选择视觉基础，然后可以调整品牌颜色。",
+     "brandColorTitle": "?????",
+     "brandColorHelp": "??????????????????????????????",
+     "baseColorHelp": "??????????????HEX??",
+     "appPaletteTitle": "???????",
+-    "appPaletteHelp": "????????????????????????",
++    "appPaletteHelp": "系统会根据你的品牌颜色为应用建议这些颜色。",
+     "showAdvancedOptions": "??????",
+     "hideAdvancedOptions": "??????",
+     "applyChangesTitle": "????",
+@@ -1196,8 +1196,8 @@
+     "localStorageHelp": "??????????????",
+     "advancedOptionsTitle": "????",
+     "advancedOptionsHelp": "???????????????????????????",
+-    "legibilityTitle": "???????",
+-    "legibilityHelp": "????????????????????",
++    "legibilityTitle": "可读性",
++    "legibilityHelp": "检查文本和按钮在你的颜色下是否容易阅读。",
+     "lowContrastApplyWarning": "??????????????????",
+     "appPreviewTitle": "????",
+     "appPreviewHelp": "????????????????????",
+@@ -1211,14 +1211,39 @@
+     "brandColorAccentHelp": "?????????????",
+     "changeColor": "????",
+     "chooseColor": "????",
+-    "chooseColorHelp": "???????HEX????????????",
++    "chooseColorHelp": "选择色块、调整 HEX，或使用浅色、深色、低饱和变化。",
+     "applyColor": "????",
+     "useThisColor": "?????",
+     "restoreOriginalColor": "?????",
+     "automaticColor": "??",
+     "useAutomaticColor": "????",
+     "suggestedSwatches": "????",
+-    "colorVariations": "????"
++    "colorVariations": "????",
++    "templateActiveHelp": "这是应用当前使用的视觉基础。",
++    "harmonySuggestionHelp": "如果只选择主色，系统会自动建议辅助色和强调色。",
++    "usingDefinedBrandColors": "正在使用已定义的品牌颜色。",
++    "lowContrastActionHelp": "请更换颜色，或在应用前再次检查。",
++    "adjustAutomatically": "自动调整",
++    "backgroundContrastWarning": "背景与主要文本的对比度可能偏低。",
++    "surfaceContrastWarning": "表面或卡片与主要文本的对比度可能偏低。",
++    "advancedLocalTokensTitle": "高级本地 token 编辑器",
++    "advancedLocalTokensHelp": "这些值会修改保存在本设备上的内部 token。基础外观配置不需要使用它们。",
++    "advancedLocalTokensModeHelp": "正在编辑 {{template}} 的 {{scheme}} 模式。不会修改后端或租户配置。",
++    "customStatus": "已自定义",
++    "baseStatus": "基础",
++    "visualRadius": "视觉圆角",
++    "visualRadiusHelp": "无需编辑单个组件即可调整全局圆角。",
++    "visualDensity": "视觉密度",
++    "visualDensityHelp": "控制主题支持的全局间距。",
++    "reviewContrast": "检查对比度",
++    "applyLocalChanges": "本地应用更改",
++    "localTenantPendingHelp": "此自定义在本阶段仅保存在本地。客户或租户级持久化仍待实现。",
++    "advancedPreviewTitle": "身份预览",
++    "advancedPreviewHelp": "用于技术检查按钮、卡片、徽章、输入框和预留状态。",
++    "designTokensTitle": "Design tokens",
++    "designTokensHelp": "Token 是应用组件使用的内部变量，显示用于诊断和技术调整。",
++    "semanticTokensTitle": "当前主题的语义 token",
++    "semanticTokensHelp": "AppShell、LIVE 和详情页使用的表面、文本、输入和状态。"
+   },
+   "usersForm": {
+     "newTitle": "新建",
+diff --git a/qa-reports/PRODUCT-C2-5-brand-editor-simplification-report-20260607-110459.md b/qa-reports/PRODUCT-C2-5-brand-editor-simplification-report-20260607-110459.md
+new file mode 100644
+index 0000000..aa142fe
+--- /dev/null
++++ b/qa-reports/PRODUCT-C2-5-brand-editor-simplification-report-20260607-110459.md
+@@ -0,0 +1,76 @@
++# PRODUCT-C2.5 - Brand editor simplification QA report
++
++Fecha: 2026-06-07 11:04:59
++Rama: `feature/product-c2-5-brand-editor-simplification`
++
++## Resumen
++
++PRODUCT-C2.5 simplifica `/ui-kit` para que la vista principal funcione como editor visual de marca y no como laboratorio tecnico. Se conserva la capacidad tecnica en opciones avanzadas.
++
++## Cambios auditados
++
++- La vista principal queda enfocada en plantilla visual, colores de marca, paleta sugerida, legibilidad, preview y aplicar/restaurar.
++- `tints`, `shades` y `tones` se movieron al modal `AppColorPicker`.
++- El selector de armonia queda en opciones avanzadas.
++- La armonia se presenta como sugerencia automatica cuando faltan secundario/acento, no como limitacion.
++- `Identidad visual local` se renombra como `Editor avanzado de tokens locales`.
++- `Design tokens` queda en avanzado con explicacion de diagnostico tecnico.
++- El resumen visible de contraste se reduce a `Legibilidad`.
++- `/appearance` conserva el acceso simple al editor visual.
++
++## Validaciones ejecutadas
++
++```text
++npm.cmd run lint
++Resultado: PASS con 53 warnings preexistentes, 0 errores.
++
++npx.cmd tsc --noEmit
++Resultado: PASS.
++
++npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export
++Resultado: PASS. Exporto 73 rutas estaticas, incluyendo /ui-kit.
++
++backend/control-ropa/.\\mvnw.cmd test
++Resultado: PASS. Tests run: 73, Failures: 0, Errors: 0, Skipped: 0.
++
++backend/control-ropa/.\\mvnw.cmd -q -DskipTests package
++Resultado: PASS.
++
++git --no-pager diff --check
++Resultado: PASS. Solo avisos LF/CRLF.
++```
++
++## Auditoria i18n
++
++```text
++es: leaves=1238 missing=0 extra=0
++en: leaves=1238 missing=0 extra=0
++pt-BR: leaves=1238 missing=0 extra=0
++fr: leaves=1238 missing=0 extra=0
++ja: leaves=1238 missing=0 extra=0
++zh: leaves=1238 missing=0 extra=0
++ko: leaves=1238 missing=0 extra=0
++```
++
++## Flujo manual esperado
++
++1. Entrar con `qa.admin`.
++2. Abrir `/ui-kit`.
++3. Confirmar que la vista principal no parece laboratorio tecnico.
++4. Revisar plantilla visual.
++5. Revisar colores de marca.
++6. Cambiar principal, secundario y acento con el picker propio.
++7. Confirmar que claros, oscuros y desaturados aparecen dentro del modal.
++8. Confirmar que armonia no aparece como limitante en la vista principal.
++9. Revisar paleta sugerida.
++10. Revisar legibilidad.
++11. Confirmar preview antes de aplicar.
++12. Aplicar paleta localmente.
++13. Restaurar plantilla.
++14. Abrir opciones avanzadas.
++15. Confirmar que editor de tokens locales, design tokens, componentes y templates siguen disponibles.
++16. Validar light/dark y mobile/tablet.
++
++## Resultado
++
++GO tecnico. La fase queda lista para commit si el staged diff conserva el alcance y `git diff --cached --check` pasa.

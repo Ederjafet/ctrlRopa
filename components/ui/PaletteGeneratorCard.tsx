@@ -6,9 +6,6 @@ import {
   SemanticPalette,
   generateHarmonyColors,
   generateSemanticPalette,
-  generateShades,
-  generateTints,
-  generateTones,
   getContrastRatio,
   getContrastStatus,
   getReadableTextColor,
@@ -72,9 +69,6 @@ export default function PaletteGeneratorCard({
     () => generateSemanticPalette(normalizedPrimary, harmony, activeScheme, brandColors),
     [activeScheme, brandColors, harmony, normalizedPrimary],
   );
-  const tints = useMemo(() => generateTints(normalizedPrimary, 7), [normalizedPrimary]);
-  const shades = useMemo(() => generateShades(normalizedPrimary, 7), [normalizedPrimary]);
-  const tones = useMemo(() => generateTones(normalizedPrimary, 7), [normalizedPrimary]);
   const harmonyColors = useMemo(
     () => generateHarmonyColors(normalizedPrimary, harmony),
     [harmony, normalizedPrimary],
@@ -148,10 +142,12 @@ export default function PaletteGeneratorCard({
   const hasLowContrast = contrastRows.some((row) => row.status === 'low');
   const visibleContrastRows = advancedMode
     ? contrastRows
-    : contrastRows.filter((row) =>
-        ['button', 'secondary', 'accent', 'danger', 'background', 'surface'].includes(row.key),
-      );
+    : contrastRows.filter((row) => ['button', 'background', 'danger'].includes(row.key));
   const tokenEntries = Object.entries(palette) as [EditableVisualTokenKey, string][];
+  const customBrandColorCount = [normalizedSecondary, normalizedAccent].filter(Boolean).length;
+  const harmonyNoteKey = customBrandColorCount > 0
+    ? 'paletteGenerator.usingDefinedBrandColors'
+    : 'paletteGenerator.harmonySuggestionHelp';
   const brandColorRows = [
     {
       key: 'primary' as const,
@@ -240,48 +236,51 @@ export default function PaletteGeneratorCard({
               />
             </View>
           ) : null}
-        </View>
-
-        <View style={styles.controlColumn}>
-          <AppText bold>{t('paletteGenerator.harmony')}</AppText>
-          <View style={styles.harmonyGrid}>
-            {HARMONIES.map((option) => (
-              <AppButton
-                key={option}
-                title={t(`paletteGenerator.harmonies.${option}`)}
-                variant={harmony === option ? 'secondary' : 'neutral'}
-                onPress={() => onHarmonyChange(option)}
-                style={styles.harmonyButton}
-              />
-            ))}
+          <View
+            style={[
+              styles.helperPanel,
+              {
+                backgroundColor: theme.colors.infoCardBackground,
+                borderColor: theme.colors.info,
+              },
+            ]}
+          >
+            <AppText variant="caption" color={theme.colors.textSecondary}>
+              {t(harmonyNoteKey)}
+            </AppText>
           </View>
-          {advancedMode ? (
-            <>
-              <AppText variant="caption" color={theme.colors.mutedText}>
-                {t('paletteGenerator.harmonyHelp')}
-              </AppText>
-              <View style={styles.swatchRow}>
-                {harmonyColors.map((color) => (
-                  <ColorSwatch
-                    key={color}
-                    color={color}
-                    label={color}
-                    onPress={() => onBrandColorChange('primary', color)}
-                  />
-                ))}
-              </View>
-            </>
-          ) : null}
         </View>
-      </View>
 
-      {advancedMode ? (
-        <>
-          <VariationBlock title={t('paletteGenerator.tints')} colors={tints} onPick={(color) => onBrandColorChange('primary', color)} />
-          <VariationBlock title={t('paletteGenerator.shades')} colors={shades} onPick={(color) => onBrandColorChange('primary', color)} />
-          <VariationBlock title={t('paletteGenerator.tones')} colors={tones} onPick={(color) => onBrandColorChange('primary', color)} />
-        </>
-      ) : null}
+        {advancedMode ? (
+          <View style={styles.controlColumn}>
+            <AppText bold>{t('paletteGenerator.harmony')}</AppText>
+            <View style={styles.harmonyGrid}>
+              {HARMONIES.map((option) => (
+                <AppButton
+                  key={option}
+                  title={t(`paletteGenerator.harmonies.${option}`)}
+                  variant={harmony === option ? 'secondary' : 'neutral'}
+                  onPress={() => onHarmonyChange(option)}
+                  style={styles.harmonyButton}
+                />
+              ))}
+            </View>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {t('paletteGenerator.harmonyHelp')}
+            </AppText>
+            <View style={styles.swatchRow}>
+              {harmonyColors.map((color) => (
+                <ColorSwatch
+                  key={color}
+                  color={color}
+                  label={color}
+                  onPress={() => onBrandColorChange('primary', color)}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
+      </View>
 
       <View style={styles.sectionBlock}>
         <View style={styles.headerRow}>
@@ -340,14 +339,14 @@ export default function PaletteGeneratorCard({
                 },
               ]}
             >
-              <AppText bold color={theme.colors.warning}>
-                {t('paletteGenerator.lowContrast')}
-              </AppText>
-              <AppText variant="caption" color={theme.colors.textSecondary}>
-                {t('paletteGenerator.reviewBeforeApply')}
-              </AppText>
-            </View>
-          ) : null}
+            <AppText bold color={theme.colors.warning}>
+              {t('paletteGenerator.lowContrast')}
+            </AppText>
+            <AppText variant="caption" color={theme.colors.textSecondary}>
+                {t('paletteGenerator.lowContrastActionHelp')}
+            </AppText>
+          </View>
+        ) : null}
           <View style={styles.contrastList}>
             {visibleContrastRows.map((row) => (
               <ContrastRow
@@ -438,32 +437,6 @@ function BrandColorCard({
         {optional && value ? (
           <AppButton title={t('paletteGenerator.useAutomaticColor')} variant="neutral" onPress={onClear} />
         ) : null}
-      </View>
-    </View>
-  );
-}
-
-function VariationBlock({
-  colors,
-  onPick,
-  title,
-}: {
-  colors: string[];
-  onPick: (color: string) => void;
-  title: string;
-}) {
-  return (
-    <View style={styles.sectionBlock}>
-      <AppText bold>{title}</AppText>
-      <View style={styles.scaleRow}>
-        {colors.map((color) => (
-          <Pressable key={color} onPress={() => onPick(color)} style={styles.scaleSwatchWrap}>
-            <View style={[styles.scaleSwatch, { backgroundColor: color }]} />
-            <AppText variant="caption" style={styles.hexText}>
-              {color}
-            </AppText>
-          </Pressable>
-        ))}
       </View>
     </View>
   );
@@ -719,8 +692,11 @@ const styles = StyleSheet.create({
     gap: 12,
     justifyContent: 'space-between',
   },
-  hexText: {
-    textAlign: 'center',
+  helperPanel: {
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   metaPill: {
     borderRadius: 10,
@@ -789,20 +765,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     height: 36,
     width: 36,
-  },
-  scaleRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  scaleSwatch: {
-    borderRadius: 8,
-    height: 42,
-    width: 74,
-  },
-  scaleSwatchWrap: {
-    alignItems: 'center',
-    gap: 4,
   },
   sectionBlock: {
     gap: 8,
