@@ -184,3 +184,15 @@ Agregar a la corrida manual de LIVE:
 - confirmar panel contextual con `Entendido`;
 - validar que `items-create?returnTo=%2Flive` mantiene dialogo modal para campos faltantes;
 - validar light/dark, presets visuales y mobile/tablet.
+
+## Nota LIVE-Z9G
+
+Agregar a la corrida manual de LIVE con `qa.vendedor.centro@local.test`:
+
+- confirmar que el vendedor con `DO_LIVE_RESERVATION` ve flujo de apartado y no solo apoyo visual;
+- confirmar que puede seleccionar cliente si conserva `VIEW_CUSTOMERS`;
+- confirmar que puede crear apartado LIVE con prenda al aire y precio valido;
+- confirmar que no ve iniciar/cerrar LIVE ni cambiar prenda al aire;
+- confirmar que no ve cancelar apartado si no tiene `CANCEL_RESERVATION`;
+- confirmar que `Cerrar como venta LIVE` solo aparece si conserva permiso real de venta operativa;
+- repetir validacion en light/dark y mobile/tablet.

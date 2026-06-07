@@ -21,15 +21,15 @@ Los nombres Operador, Vendedor/Presentadora, Supervisor y NO_ACCESS son experien
 | Capacidad | Fuente actual | Uso en `/live` | Gap documentado |
 |---|---|---|---|
 | `canViewLive` | canal `LIVE` + rol/permiso real (`DO_LIVE_RESERVATION`, `VIEW_REPORTS`, ADMIN/SUPERVISOR/SELLER) | Renderizar acceso minimo LIVE | Permiso granular `VIEW_LIVE` pendiente. |
-| `canStartLive` | permiso operativo actual `DO_LIVE_RESERVATION` | Mostrar/ejecutar iniciar live | Permiso granular `START_LIVE` pendiente. |
-| `canCloseLive` | permiso operativo actual `DO_LIVE_RESERVATION` | Mostrar/ejecutar finalizar live | Permiso granular `CLOSE_LIVE` pendiente. |
-| `canPrepareItem` | `DO_LIVE_RESERVATION` + `VIEW_INVENTORY` | Preparar siguiente prenda | Permiso granular de preparacion pendiente. |
-| `canSetActiveItem` | `DO_LIVE_RESERVATION` + `VIEW_INVENTORY` | Poner prenda al aire | Permiso granular `SET_LIVE_ACTIVE_ITEM` pendiente. |
-| `canClearActiveItem` | `DO_LIVE_RESERVATION` + `VIEW_INVENTORY` | Sacar prenda del aire | Permiso granular `CLEAR_LIVE_ACTIVE_ITEM` pendiente. |
+| `canStartLive` | operacion LIVE reservada a ADMIN o usuario operativo no SELLER/SUPERVISOR | Mostrar/ejecutar iniciar live | Permiso granular `START_LIVE` pendiente. |
+| `canCloseLive` | operacion LIVE reservada a ADMIN o usuario operativo no SELLER/SUPERVISOR | Mostrar/ejecutar finalizar live | Permiso granular `CLOSE_LIVE` pendiente. |
+| `canPrepareItem` | gestion de sesion LIVE + `VIEW_INVENTORY` | Preparar siguiente prenda | Permiso granular de preparacion pendiente. |
+| `canSetActiveItem` | gestion de sesion LIVE + `VIEW_INVENTORY` | Poner prenda al aire | Permiso granular `SET_LIVE_ACTIVE_ITEM` pendiente. |
+| `canClearActiveItem` | gestion de sesion LIVE + `VIEW_INVENTORY` | Sacar prenda del aire | Permiso granular `CLEAR_LIVE_ACTIVE_ITEM` pendiente. |
 | `canCreateReservation` | `DO_LIVE_RESERVATION` | Crear reserva LIVE | Sin gap critico actual. |
 | `canCancelReservation` | `DO_LIVE_RESERVATION` + `CANCEL_RESERVATION` | Cancelar apartado con motivo | Persistencia de nota libre queda para Z7 si se requiere. |
 | `canMarkPending` | `DO_LIVE_RESERVATION` | Marcar pendiente | Permiso granular pendiente. |
-| `canMarkOperationalSold` | `DO_LIVE_RESERVATION` | Vendido operativo con confirmacion | Permiso granular pendiente. |
+| `canMarkOperationalSold` | ADMIN o permiso real de venta operativa (`DO_DOOR_SALE`) dentro de operacion LIVE | Vendido operativo con confirmacion | Permiso granular LIVE especifico pendiente. |
 | `canReleaseReservedItem` | `CANCEL_RESERVATION` + `MANAGE_INVENTORY` + `VIEW_PAYMENTS` | No se habilita accion si no puede validarse pago | Endpoint/regla formal de liberacion segura pendiente. |
 | `canChangeLivePrice` | `DO_LIVE_RESERVATION` | Editar precio LIVE, sin tocar precio base | Permiso granular `CHANGE_LIVE_PRICE` pendiente. |
 | `canViewLiveDashboard` | `SUPERVISOR`, `VIEW_REPORTS` o ADMIN | Vista supervisor | Permiso granular `VIEW_LIVE_DASHBOARD` pendiente. |
@@ -43,7 +43,7 @@ Los nombres Operador, Vendedor/Presentadora, Supervisor y NO_ACCESS son experien
 | Usuario QA | Rol real | Permisos reales detectados | Capacidades LIVE resultantes | Vista LIVE resultante | Acciones permitidas | Acciones bloqueadas | Observaciones / huecos |
 |---|---|---|---|---|---|---|---|
 | `qa.admin@local.test` | `ADMIN` | `DO_LIVE_RESERVATION`, `CANCEL_RESERVATION`, `VIEW_CUSTOMERS`, `VIEW_INVENTORY`, `MANAGE_INVENTORY`, `VIEW_REPORTS`, permisos amplios de operacion. No trae `VIEW_PAYMENTS` listado. | Opera LIVE, inicia/cierra, prepara prenda, pone/saca al aire, reserva, cambia estado operativo, ve dashboard/historial/eventos. No carga pagos sin `VIEW_PAYMENTS`. | Operador | Consola operativa, precio LIVE, reservas, cancelar apartado con motivo, vendido operativo con confirmacion. | Pagos/cobro si no existe `VIEW_PAYMENTS`; liberacion automatica si no se puede validar pago. | Faltan permisos granulares `START_LIVE`, `CLOSE_LIVE`, `SET/CLEAR_ACTIVE_ITEM`, `CHANGE_LIVE_PRICE`. |
-| `qa.vendedor.centro@local.test` | `SELLER` | `DO_LIVE_RESERVATION`, `VIEW_CUSTOMERS`, `VIEW_INVENTORY`, `REGISTER_PAYMENTS`, `DO_DOOR_SALE`, `DO_DOOR_RESERVATION`. | Puede ver LIVE y queda en vista de apoyo por rol SELLER. Aunque tiene permiso operativo, la experiencia visual no lo convierte en supervisor. | Vendedor/Presentadora | Ver prenda al aire, precio y estado de live. | Dashboard supervisor y consola operador como experiencia principal; pagos sin `VIEW_PAYMENTS`. | Requiere definicion futura si SELLER debe operar reservas desde vista propia. |
+| `qa.vendedor.centro@local.test` | `SELLER` | `DO_LIVE_RESERVATION`, `VIEW_CUSTOMERS`, `VIEW_INVENTORY`, `REGISTER_PAYMENTS`, `DO_DOOR_SALE`, `DO_DOOR_RESERVATION`. | Puede ver LIVE y operar apartados por permiso real, sin convertirse en administrador. | Vendedor con flujo de apartados | Ver prenda al aire, precio, seleccionar cliente, crear apartado LIVE y cerrar como venta LIVE si conserva `DO_DOOR_SALE`. | Iniciar/cerrar LIVE, preparar/cambiar prenda al aire, cancelar sin `CANCEL_RESERVATION`, dashboard supervisor, pagos sin `VIEW_PAYMENTS`. | Ajustado en LIVE-Z9G: `SELLER` con `DO_LIVE_RESERVATION` ya no queda forzado a apoyo visual. |
 | `qa.supervisor.centro@local.test` | `SUPERVISOR` | `DO_LIVE_RESERVATION`, `VIEW_REPORTS`, `VIEW_CUSTOMERS`, `VIEW_INVENTORY`, `MANAGE_INVENTORY`, `MANAGE_CASH_CLOSURES`, `REGISTER_PAYMENTS`, permisos de supervision/operacion amplia. | Dashboard LIVE, indicadores, eventos, reservas recientes, prenda al aire. No cae en vendedor por fallback. | Supervisor | Monitoreo/control con datos reales, ver detalle, eventos/historial. | Acciones operativas si no se exponen explicitamente por capacidades/vista; pagos sin `VIEW_PAYMENTS`. | Supervisor tiene permisos amplios pero Z6B mantiene dashboard como experiencia principal. |
 | `qa.sinpermisos@local.test` | No disponible | Login respondio `403 Forbidden`; no se obtuvo `/api/me`. | Sin capacidades. | NO_ACCESS / bloqueo AUTH | Ninguna. | Todo LIVE. | No se infiere nada sin evidencia. |
 
@@ -84,7 +84,8 @@ Los nombres Operador, Vendedor/Presentadora, Supervisor y NO_ACCESS son experien
 
 - Iniciar usa `canStartLive`.
 - Finalizar usa `canCloseLive`.
-- En Z6B ambas capacidades derivan conservadoramente del permiso operativo actual `DO_LIVE_RESERVATION`.
+- En LIVE-Z9G ambas capacidades quedan reservadas a ADMIN o usuarios operativos no `SELLER`/`SUPERVISOR` mientras no existan permisos granulares.
+- Un `SELLER` con `DO_LIVE_RESERVATION` puede apartar, pero no inicia ni finaliza la sesion completa.
 - Permisos granulares quedan documentados como pendiente.
 
 ## Archivos relacionados
@@ -109,3 +110,7 @@ GO condicionado para QA manual multiusuario:
 - validar que Supervisor no cae en Vendedor;
 - validar cancelacion con motivo;
 - validar vendido operativo como no-pago.
+
+## Nota LIVE-Z9G
+
+LIVE-Z9G corrige la resolucion de vendedor: las acciones de apartado se habilitan por permisos reales y no por rol visual. `SELLER` con `DO_LIVE_RESERVATION` puede entrar al flujo de apartado acotado; `SELLER` sin permiso operativo sigue en apoyo/presentador.

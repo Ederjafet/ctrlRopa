@@ -87,7 +87,11 @@ export function resolveLiveCapabilities(user: UserSession | null): LiveCapabilit
   const canSelectCustomer = operate && canAccessByPermission(user, 'VIEW_CUSTOMERS');
   const canSelectItem = operate && canAccessByPermission(user, 'VIEW_INVENTORY');
   const canManageInventory = canAccessByPermission(user, 'MANAGE_INVENTORY');
+  const canCreateDoorSale = canAccessByPermission(user, 'DO_DOOR_SALE');
+  const canManageLiveSession = operate && (admin || (!seller && !supervisor));
+  const canManageLiveItem = canManageLiveSession && canSelectItem;
   const canCancelReservation = operate && canAccessByPermission(user, 'CANCEL_RESERVATION');
+  const canMarkOperationalSold = operate && (admin || canCreateDoorSale);
   const canViewPayments = hasEffectivePermission(user, 'VIEW_PAYMENTS');
   const canViewLiveDashboard = canViewLive && (supervisor || viewReports || admin);
   const canChangeLivePrice =
@@ -109,22 +113,22 @@ export function resolveLiveCapabilities(user: UserSession | null): LiveCapabilit
     ? 'blocked'
     : supervisor || (canViewLiveDashboard && !admin && !seller)
       ? 'supervisor'
-      : operate && !seller
+      : operate
         ? 'operator'
         : 'support';
 
   return {
     canViewLive,
     canOperateLive: operate,
-    canStartLive: operate,
-    canCloseLive: operate,
-    canPrepareItem: operate && canSelectItem,
-    canSetActiveItem: operate && canSelectItem,
-    canClearActiveItem: operate && canSelectItem,
+    canStartLive: canManageLiveSession,
+    canCloseLive: canManageLiveSession,
+    canPrepareItem: canManageLiveItem,
+    canSetActiveItem: canManageLiveItem,
+    canClearActiveItem: canManageLiveItem,
     canCreateReservation: operate,
     canCancelReservation,
     canMarkPending: operate,
-    canMarkOperationalSold: operate,
+    canMarkOperationalSold,
     canReleaseReservedItem: canCancelReservation && canManageInventory && canViewPayments,
     canChangeLivePrice,
     canViewLiveDashboard,
@@ -135,8 +139,8 @@ export function resolveLiveCapabilities(user: UserSession | null): LiveCapabilit
     canSelectCustomer,
     canCreateCustomer: operate && canAccessByPermission(user, 'CREATE_CUSTOMER'),
     canSelectItem,
-    canCreateItem: operate && canManageInventory,
-    canChangeReservationStatus: operate,
+    canCreateItem: canManageLiveSession && canManageInventory,
+    canChangeReservationStatus: canMarkOperationalSold || canCancelReservation,
     viewMode,
     gaps,
   };
