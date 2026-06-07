@@ -616,7 +616,10 @@
     "hideUnavailableItems": "Hide unavailable",
     "itemAvailabilityFilterHelp": "Available items are shown by default for Live operation.",
     "noItemsAvailableWithFilters": "No items available with those filters.",
-    "noItemSearchResults": "No results for this search."
+    "noItemSearchResults": "No results for this search.",
+    "newReservationReceivedTitle": "New hold received",
+    "newReservationReceivedMessage": "A hold was added during the LIVE session.",
+    "newReservationReceivedAction": "View holds"
   },
   "payments": {
     "title": "Payments / Collections",

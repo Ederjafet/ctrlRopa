@@ -59,3 +59,7 @@ El barrido detecto otros modulos con `err.message` directo fuera del alcance pri
 - Probar recurso inexistente o conflicto si aplica.
 - Abrir `/live`, `/items-create`, `/customers`, `/reservations` y `/users`.
 - Validar light/dark e idiomas ES/EN/PT/FR/JA/ZH/KO.
+
+## Continuidad LIVE-Z9J
+
+LIVE-Z9J reutiliza `getActionableApiError` en el refresh controlado de operador/admin. Si falla la sincronizacion de apartados/eventos, la UI muestra mensaje accionable y no expone el error interno crudo.

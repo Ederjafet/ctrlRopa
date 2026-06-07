@@ -85,3 +85,7 @@ GO visual pendiente de corrida manual multiusuario.
 ## Continuidad LIVE-Z9I
 
 LIVE-Z9I mantiene la matriz de capacidades: ver el selector de prendas sigue dependiendo de `VIEW_INVENTORY` y operar LIVE sigue dependiendo de permisos reales. Los nuevos filtros solo cambian visibilidad dentro del selector; no conceden acciones ni permiten seleccionar prendas bloqueadas.
+
+## Continuidad LIVE-Z9J
+
+LIVE-Z9J no cambia capacidades ni concede acciones nuevas. Solo permite que operador/admin sincronice apartados/eventos generados por vendedor u otros usuarios mediante refresh controlado. El vendedor conserva su matriz de permisos reales y `NO_ACCESS` no obtiene polling util.

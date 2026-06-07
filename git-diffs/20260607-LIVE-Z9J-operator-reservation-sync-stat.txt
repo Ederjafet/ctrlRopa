@@ -1,0 +1,16 @@
+ app/live.tsx                                       | 121 ++++++++++++++++++++-
+ docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md        |   4 +
+ docs/LIVE_Z9G_SELLER_CAPABILITIES.md               |   4 +
+ docs/LIVE_Z9H_VIEW_REFRESH.md                      |   6 +
+ docs/LIVE_Z9J_OPERATOR_RESERVATION_SYNC.md         |  81 ++++++++++++++
+ docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md              |  15 +++
+ docs/PRODUCT_ERR_A_ACTIONABLE_ERRORS.md            |   4 +
+ locales/en/common.json                             |   5 +-
+ locales/es/common.json                             |   5 +-
+ locales/fr/common.json                             |   5 +-
+ locales/ja/common.json                             |   5 +-
+ locales/ko/common.json                             |   5 +-
+ locales/pt-BR/common.json                          |   5 +-
+ locales/zh/common.json                             |   5 +-
+ ...ator-reservation-sync-report-20260607-144844.md |  42 +++++++
+ 15 files changed, 301 insertions(+), 11 deletions(-)

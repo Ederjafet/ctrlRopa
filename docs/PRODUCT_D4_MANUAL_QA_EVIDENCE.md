@@ -382,3 +382,18 @@ Agregar a la corrida manual de errores frontend:
 - probar un usuario sin permiso si aplica y confirmar mensaje de solicitud de acceso;
 - confirmar que no se muestran stack traces, SQL, endpoints completos ni claves crudas;
 - validar ES/EN/PT/FR/JA/ZH/KO y light/dark.
+
+## Nota LIVE-Z9J
+
+Agregar a la corrida manual multiusuario de LIVE:
+
+- entrar con `qa.admin` u operador y abrir `/live`;
+- entrar con vendedor en otro navegador/dispositivo y abrir `/live`;
+- crear un apartado desde vendedor;
+- confirmar que operador/admin lo ve sin salir/entrar;
+- confirmar aviso `Nuevo apartado recibido`;
+- confirmar que no se borra cliente seleccionado, prenda preparada ni precio en edicion del operador;
+- confirmar boton `Actualizar` y `Ultima actualizacion`;
+- ocultar/mostrar ventana y confirmar refresh al volver a foco;
+- confirmar que `qa.sinpermisos` no hace polling util;
+- validar light/dark y mobile/tablet.

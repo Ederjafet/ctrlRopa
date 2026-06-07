@@ -1,0 +1,544 @@
+﻿diff --git a/app/live.tsx b/app/live.tsx
+index 4c2101f..6750ce8 100644
+--- a/app/live.tsx
++++ b/app/live.tsx
+@@ -96,6 +96,11 @@ type LiveNotice = {
+   tone: 'success' | 'warning' | 'danger';
+ };
+
++type LiveNewReservationNotice = {
++  count: number;
++  latestReservationId?: number;
++};
++
+ type LiveReservationIssue = {
+   detail: string;
+   action: 'customer' | 'item' | 'none';
+@@ -459,6 +464,8 @@ export default function LiveScreen() {
+   const [isRefreshingLiveView, setIsRefreshingLiveView] = useState(false);
+   const [lastLiveRefreshAt, setLastLiveRefreshAt] = useState<Date | null>(null);
+   const [liveRefreshIssue, setLiveRefreshIssue] = useState<string | null>(null);
++  const [newReservationNotice, setNewReservationNotice] =
++    useState<LiveNewReservationNotice | null>(null);
+
+   const [lives, setLives] = useState<Live[]>([]);
+   const [selectedLive, setSelectedLive] = useState<Live | null>(null);
+@@ -1443,6 +1450,15 @@ export default function LiveScreen() {
+     });
+   };
+
++  const handleViewNewReservations = () => {
++    const reservationId = newReservationNotice?.latestReservationId;
++    setNewReservationNotice(null);
++
++    if (reservationId) {
++      goToReservationDetail(reservationId);
++    }
++  };
++
+   const goToReservationPayment = (reservationId: number) => {
+     router.push({
+       pathname: '/payments',
+@@ -1454,6 +1470,7 @@ export default function LiveScreen() {
+     live: Live,
+     source: 'recent' | 'history' | 'auto' = 'recent'
+   ) => {
++    setNewReservationNotice(null);
+     setSelectedLive(live);
+     setActiveItemForReservation(activeItemFromLive(live));
+     updateRecentReservations(branchReservations, live.id);
+@@ -1520,7 +1537,12 @@ export default function LiveScreen() {
+   }, []);
+
+   const refreshLiveViewData = useCallback(async (
+-    options: { showSuccess?: boolean; showError?: boolean } = {}
++    options: {
++      notifyNewReservations?: boolean;
++      preserveOperatorDraft?: boolean;
++      showError?: boolean;
++      showSuccess?: boolean;
++    } = {}
+   ) => {
+     if (liveViewRefreshInFlightRef.current) {
+       return false;
+@@ -1554,8 +1576,14 @@ export default function LiveScreen() {
+       const savedLive = savedLiveId
+         ? liveData.find((live) => live.id === savedLiveId && live.status !== 'CLOSED')
+         : null;
++      const shouldKeepClosedSelectedLive =
++        refreshedSelectedLive &&
++        normalizeStatus(refreshedSelectedLive.status) === 'CLOSED' &&
++        selectedClosedLiveSource !== 'auto';
+       const nextSelectedLive =
+-        refreshedSelectedLive && refreshedSelectedLive.status !== 'CLOSED'
++        refreshedSelectedLive &&
++        (normalizeStatus(refreshedSelectedLive.status) !== 'CLOSED' ||
++          shouldKeepClosedSelectedLive)
+           ? refreshedSelectedLive
+           : savedLive ??
+             liveData.find((live) => live.status === 'ACTIVE') ??
+@@ -1569,13 +1597,31 @@ export default function LiveScreen() {
+           return b.id - a.id;
+         })[0];
+       const contextLiveId = nextSelectedLive?.id ?? latestClosedLive?.id;
++      const nextActiveItem = activeItemFromLive(nextSelectedLive);
++      const shouldPreserveOperatorDraft =
++        options.preserveOperatorDraft !== false &&
++        liveActorContext.actor === 'OPERATOR' &&
++        Boolean(
++          selectedCustomer ||
++          selectedItem ||
++          priceText.trim() ||
++          isCustomerModalVisible ||
++          isItemModalVisible ||
++          isScannerVisible
++        );
++      const shouldNotifyNewReservations =
++        options.notifyNewReservations ?? liveActorContext.actor === 'OPERATOR';
+
+       setLives(liveData);
+       setSelectedLive(nextSelectedLive);
+       if (!nextSelectedLive) {
+         setSelectedClosedLiveSource('auto');
+       }
+-      setActiveItemForReservation(activeItemFromLive(nextSelectedLive));
++      if (shouldPreserveOperatorDraft) {
++        setActiveItem(nextActiveItem);
++      } else {
++        setActiveItemForReservation(nextActiveItem);
++      }
+       setLiveLoadIssue(null);
+
+       const [reservationResult, eventResult] = await Promise.allSettled([
+@@ -1584,6 +1630,20 @@ export default function LiveScreen() {
+       ]);
+
+       if (reservationResult.status === 'fulfilled') {
++        const nextRecentReservations = mapLiveReservations(
++          reservationResult.value,
++          nextSelectedLive?.id
++        );
++        const previousReservationIds = new Set(
++          recentReservations.map((entry) => entry.reservation.id)
++        );
++        const receivedReservations =
++          shouldNotifyNewReservations && lastLiveRefreshAt
++            ? nextRecentReservations.filter(
++                (entry) => !previousReservationIds.has(entry.reservation.id)
++              )
++            : [];
++
+         setReservationLoadIssue(null);
+         setBranchReservations(reservationResult.value);
+         await updateRecentReservations(
+@@ -1592,6 +1652,13 @@ export default function LiveScreen() {
+           false,
+           { clearPaymentsWhenSkipped: false }
+         );
++
++        if (receivedReservations.length > 0) {
++          setNewReservationNotice({
++            count: receivedReservations.length,
++            latestReservationId: receivedReservations[0]?.reservation.id,
++          });
++        }
+       } else {
+         setReservationLoadIssue(
+           resolveLoadIssue(
+@@ -1644,7 +1711,17 @@ export default function LiveScreen() {
+     }
+   }, [
+     router,
++    isCustomerModalVisible,
++    isItemModalVisible,
++    isScannerVisible,
++    lastLiveRefreshAt,
++    liveActorContext.actor,
++    priceText,
++    recentReservations,
+     selectedLive,
++    selectedCustomer,
++    selectedClosedLiveSource,
++    selectedItem,
+     setActiveItemForReservation,
+     t,
+     updateRecentReservations,
+@@ -1657,7 +1734,9 @@ export default function LiveScreen() {
+   const shouldAutoRefreshLiveView =
+     isAllowed === true &&
+     liveCapabilities.canViewLive &&
+-    (liveActorContext.actor === 'SELLER' || liveActorContext.actor === 'SUPERVISOR');
++    (liveActorContext.actor === 'OPERATOR' ||
++      liveActorContext.actor === 'SELLER' ||
++      liveActorContext.actor === 'SUPERVISOR');
+
+   useEffect(() => {
+     if (!shouldAutoRefreshLiveView) return undefined;
+@@ -3984,6 +4063,25 @@ export default function LiveScreen() {
+             </View>
+           </AppCard>
+         ) : null}
++        {newReservationNotice ? (
++          <AppCard variant="success" style={styles.newReservationNoticeCard}>
++            <View style={styles.newReservationNoticeRow}>
++              <View style={styles.newReservationNoticeText}>
++                <AppText bold>{t('live.newReservationReceivedTitle')}</AppText>
++                <AppText variant="caption" color={theme.colors.mutedText}>
++                  {t('live.newReservationReceivedMessage', {
++                    count: newReservationNotice.count,
++                  })}
++                </AppText>
++              </View>
++              <AppButton
++                title={t('live.newReservationReceivedAction')}
++                variant="secondary"
++                onPress={handleViewNewReservations}
++              />
++            </View>
++          </AppCard>
++        ) : null}
+
+         {isOperatorFocusedView ? (
+           <LiveActionCard
+@@ -6186,6 +6284,21 @@ const styles = StyleSheet.create({
+     gap: 3,
+     minWidth: 180,
+   },
++  newReservationNoticeCard: {
++    marginBottom: 10,
++  },
++  newReservationNoticeRow: {
++    alignItems: 'center',
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 10,
++    justifyContent: 'space-between',
++  },
++  newReservationNoticeText: {
++    flex: 1,
++    gap: 3,
++    minWidth: 190,
++  },
+   livePulse: {
+     height: 9,
+     width: 9,
+diff --git a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+index 5a38d3d..ffc5972 100644
+--- a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
++++ b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+@@ -480,3 +480,7 @@ LIVE-Z9I agrega filtros `Disponibles`, `Apartadas`, `Vendidas / no disponibles`
+ # Nota LIVE-Z9I.1 - Acciones responsive en tarjetas
+
+ LIVE-Z9I.1 ajusta solo presentacion: las acciones de `Prenda preparada para cambio` y `Prenda al aire ahora` se muestran en fila en tablet/desktop y apiladas en mobile. No cambia permisos, reglas LIVE, filtros ni endpoints.
++
++# Nota LIVE-Z9J - Sincronizacion operador/admin
++
++LIVE-Z9J extiende el refresh controlado a operador/admin para que apartados creados por vendedor u otros usuarios aparezcan en LIVE sin salir/entrar. No implementa WebSocket/SSE, no consulta pagos/caja y no sobrescribe cliente seleccionado, prenda preparada ni precio en edicion.
+diff --git a/docs/LIVE_Z9G_SELLER_CAPABILITIES.md b/docs/LIVE_Z9G_SELLER_CAPABILITIES.md
+index 7c6dced..393311a 100644
+--- a/docs/LIVE_Z9G_SELLER_CAPABILITIES.md
++++ b/docs/LIVE_Z9G_SELLER_CAPABILITIES.md
+@@ -85,3 +85,7 @@ GO visual pendiente de corrida manual multiusuario.
+ ## Continuidad LIVE-Z9I
+
+ LIVE-Z9I mantiene la matriz de capacidades: ver el selector de prendas sigue dependiendo de `VIEW_INVENTORY` y operar LIVE sigue dependiendo de permisos reales. Los nuevos filtros solo cambian visibilidad dentro del selector; no conceden acciones ni permiten seleccionar prendas bloqueadas.
++
++## Continuidad LIVE-Z9J
++
++LIVE-Z9J no cambia capacidades ni concede acciones nuevas. Solo permite que operador/admin sincronice apartados/eventos generados por vendedor u otros usuarios mediante refresh controlado. El vendedor conserva su matriz de permisos reales y `NO_ACCESS` no obtiene polling util.
+diff --git a/docs/LIVE_Z9H_VIEW_REFRESH.md b/docs/LIVE_Z9H_VIEW_REFRESH.md
+index 3ad3be6..a73b924 100644
+--- a/docs/LIVE_Z9H_VIEW_REFRESH.md
++++ b/docs/LIVE_Z9H_VIEW_REFRESH.md
+@@ -79,3 +79,9 @@ GO visual pendiente de corrida manual multiusuario.
+ ## Continuidad LIVE-Z9I
+
+ LIVE-Z9I no cambia el refresh controlado. Si el inventario o apartados se refrescan por la carga existente, el selector recalcula contadores y filtros de disponibilidad con los datos actuales en memoria. No se agrega polling de inventario ni pagos.
++
++## Continuidad LIVE-Z9J
++
++LIVE-Z9J extiende el refresh controlado a operador/admin para sincronizar apartados y eventos generados por otros usuarios. El polling sigue en 15 segundos, no consulta pagos/caja y conserva captura local del operador: cliente seleccionado, prenda preparada, precio en edicion, filtros y modales.
++
++Si entra un apartado nuevo, se muestra un aviso no bloqueante `Nuevo apartado recibido` con accion `Ver apartados`.
+diff --git a/docs/LIVE_Z9J_OPERATOR_RESERVATION_SYNC.md b/docs/LIVE_Z9J_OPERATOR_RESERVATION_SYNC.md
+new file mode 100644
+index 0000000..06a095a
+--- /dev/null
++++ b/docs/LIVE_Z9J_OPERATOR_RESERVATION_SYNC.md
+@@ -0,0 +1,81 @@
++# LIVE-Z9J - Sincronizacion de apartados para operador/admin
++
++## Objetivo
++
++Permitir que operador/admin vea apartados creados por otros usuarios durante `/live` sin salir y volver a entrar, manteniendo endpoints existentes y sin implementar WebSocket/SSE.
++
++## Problema QA
++
++El vendedor podia crear un apartado mientras operador/admin seguia en LIVE. La vista operador no recibia polling automatico y podia quedarse con apartados/eventos anteriores hasta un refresh manual o reentrada.
++
++## Que se sincroniza
++
++El refresh liviano de LIVE ahora tambien aplica a operador/admin:
++
++- lista de lives de la sucursal;
++- estado del live seleccionado;
++- prenda al aire proveniente del backend;
++- apartados recientes del live;
++- eventos/actividad del live;
++- indicador de ultima actualizacion;
++- errores de refresh con el mapper accionable de PRODUCT-ERR-A.
++
++## Que no se sobrescribe
++
++Para no romper captura local del operador, el refresh automatico conserva:
++
++- cliente seleccionado;
++- prenda preparada para cambio;
++- precio que el operador esta editando;
++- busquedas, filtros y modales abiertos;
++- formularios temporales de captura.
++
++Si hay captura local en curso, la prenda al aire se actualiza en estado visual pero no se recalcula el `priceText` local.
++
++## Frecuencia
++
++- Polling controlado cada 15 segundos.
++- Se pausa cuando `AppState` no esta activo.
++- Se refresca al volver a foco.
++- Se evita duplicar requests con un guard de refresh en curso.
++- No consulta pagos ni caja durante polling.
++
++## Aviso de nuevo apartado
++
++Cuando el operador/admin recibe un apartado que no estaba en su lista previa, se muestra un aviso no bloqueante:
++
++- titulo: `Nuevo apartado recibido`;
++- mensaje: `Se agrego un apartado durante el LIVE.`;
++- accion: `Ver apartados`.
++
++El aviso no usa modal y no interrumpe la captura.
++
++## Relacion con PRODUCT-ERR-A
++
++Los fallos de refresh usan `getActionableApiError`, por lo que no se muestran mensajes genericos como `Ocurrio un error interno inesperado` ni detalles tecnicos.
++
++## Limites
++
++- No hay sincronizacion instantanea en tiempo real.
++- WebSocket/SSE queda para una fase futura con contrato backend, tenant/security y estrategia de reconexion.
++- No se agregan endpoints.
++- No se cambian permisos, capacidades, pagos, caja ni reglas LIVE profundas.
++
++## Validacion manual esperada
++
++1. Admin/operador abre `/live`.
++2. Vendedor abre `/live` en otro navegador/dispositivo.
++3. Vendedor crea apartado.
++4. Operador debe verlo sin salir/entrar.
++5. Confirmar aviso `Nuevo apartado recibido`.
++6. Confirmar que no se borra cliente seleccionado, prenda preparada ni precio en edicion.
++7. Confirmar boton `Actualizar`.
++8. Confirmar `Ultima actualizacion`.
++9. Confirmar que `NO_ACCESS` no hace polling util.
++10. Validar light/dark y mobile/tablet.
++
++## GO/NO-GO
++
++GO tecnico si pasan lint, TypeScript, export web, Maven test/package y `git diff --check`.
++
++GO visual pendiente de corrida manual multiusuario.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index c2ff6b3..65f9f75 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -382,3 +382,18 @@ Agregar a la corrida manual de errores frontend:
+ - probar un usuario sin permiso si aplica y confirmar mensaje de solicitud de acceso;
+ - confirmar que no se muestran stack traces, SQL, endpoints completos ni claves crudas;
+ - validar ES/EN/PT/FR/JA/ZH/KO y light/dark.
++
++## Nota LIVE-Z9J
++
++Agregar a la corrida manual multiusuario de LIVE:
++
++- entrar con `qa.admin` u operador y abrir `/live`;
++- entrar con vendedor en otro navegador/dispositivo y abrir `/live`;
++- crear un apartado desde vendedor;
++- confirmar que operador/admin lo ve sin salir/entrar;
++- confirmar aviso `Nuevo apartado recibido`;
++- confirmar que no se borra cliente seleccionado, prenda preparada ni precio en edicion del operador;
++- confirmar boton `Actualizar` y `Ultima actualizacion`;
++- ocultar/mostrar ventana y confirmar refresh al volver a foco;
++- confirmar que `qa.sinpermisos` no hace polling util;
++- validar light/dark y mobile/tablet.
+diff --git a/docs/PRODUCT_ERR_A_ACTIONABLE_ERRORS.md b/docs/PRODUCT_ERR_A_ACTIONABLE_ERRORS.md
+index 0b43900..81d581d 100644
+--- a/docs/PRODUCT_ERR_A_ACTIONABLE_ERRORS.md
++++ b/docs/PRODUCT_ERR_A_ACTIONABLE_ERRORS.md
+@@ -59,3 +59,7 @@ El barrido detecto otros modulos con `err.message` directo fuera del alcance pri
+ - Probar recurso inexistente o conflicto si aplica.
+ - Abrir `/live`, `/items-create`, `/customers`, `/reservations` y `/users`.
+ - Validar light/dark e idiomas ES/EN/PT/FR/JA/ZH/KO.
++
++## Continuidad LIVE-Z9J
++
++LIVE-Z9J reutiliza `getActionableApiError` en el refresh controlado de operador/admin. Si falla la sincronizacion de apartados/eventos, la UI muestra mensaje accionable y no expone el error interno crudo.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index efc3e7a..119442d 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -616,7 +616,10 @@
+     "hideUnavailableItems": "Hide unavailable",
+     "itemAvailabilityFilterHelp": "Available items are shown by default for Live operation.",
+     "noItemsAvailableWithFilters": "No items available with those filters.",
+-    "noItemSearchResults": "No results for this search."
++    "noItemSearchResults": "No results for this search.",
++    "newReservationReceivedTitle": "New hold received",
++    "newReservationReceivedMessage": "A hold was added during the LIVE session.",
++    "newReservationReceivedAction": "View holds"
+   },
+   "payments": {
+     "title": "Payments / Collections",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index 5201c80..a1e6307 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -616,7 +616,10 @@
+     "hideUnavailableItems": "Ocultar no disponibles",
+     "itemAvailabilityFilterHelp": "Por defecto se muestran prendas disponibles para operar LIVE.",
+     "noItemsAvailableWithFilters": "No hay prendas disponibles con esos filtros.",
+-    "noItemSearchResults": "No hay resultados para esta busqueda."
++    "noItemSearchResults": "No hay resultados para esta busqueda.",
++    "newReservationReceivedTitle": "Nuevo apartado recibido",
++    "newReservationReceivedMessage": "Se agregÃ³ un apartado durante el LIVE.",
++    "newReservationReceivedAction": "Ver apartados"
+   },
+   "payments": {
+     "title": "Pagos / Cobros",
+diff --git a/locales/fr/common.json b/locales/fr/common.json
+index c752eb5..482972a 100644
+--- a/locales/fr/common.json
++++ b/locales/fr/common.json
+@@ -616,7 +616,10 @@
+     "hideUnavailableItems": "Masquer les indisponibles",
+     "itemAvailabilityFilterHelp": "Par defaut, les articles disponibles sont affiches pour l operation LIVE.",
+     "noItemsAvailableWithFilters": "Aucun article disponible avec ces filtres.",
+-    "noItemSearchResults": "Aucun resultat pour cette recherche."
++    "noItemSearchResults": "Aucun resultat pour cette recherche.",
++    "newReservationReceivedTitle": "Nouvelle rÃ©servation reÃ§ue",
++    "newReservationReceivedMessage": "Une rÃ©servation a Ã©tÃ© ajoutÃ©e pendant la session LIVE.",
++    "newReservationReceivedAction": "Voir les rÃ©servations"
+   },
+   "payments": {
+     "title": "Payments / Collections",
+diff --git a/locales/ja/common.json b/locales/ja/common.json
+index 5ef9fe2..ff1edf3 100644
+--- a/locales/ja/common.json
++++ b/locales/ja/common.json
+@@ -616,7 +616,10 @@
+     "hideUnavailableItems": "åˆ©ç”¨ä¸å¯ã‚’éžè¡¨ç¤º",
+     "itemAvailabilityFilterHelp": "LIVEæ“ä½œã§ã¯ã€æ—¢å®šã§åˆ©ç”¨å¯èƒ½ãªå•†å“ã‚’è¡¨ç¤ºã—ã¾ã™ã€‚",
+     "noItemsAvailableWithFilters": "ã“ã®ãƒ•ã‚£ãƒ«ã‚¿ãƒ¼ã§åˆ©ç”¨å¯èƒ½ãªå•†å“ã¯ã‚ã‚Šã¾ã›ã‚“ã€‚",
+-    "noItemSearchResults": "ã“ã®æ¤œç´¢ã«ä¸€è‡´ã™ã‚‹çµæžœã¯ã‚ã‚Šã¾ã›ã‚“ã€‚"
++    "noItemSearchResults": "ã“ã®æ¤œç´¢ã«ä¸€è‡´ã™ã‚‹çµæžœã¯ã‚ã‚Šã¾ã›ã‚“ã€‚",
++    "newReservationReceivedTitle": "æ–°ã—ã„å–ã‚Šç½®ãã‚’å—ä¿¡ã—ã¾ã—ãŸ",
++    "newReservationReceivedMessage": "LIVEä¸­ã«å–ã‚Šç½®ããŒè¿½åŠ ã•ã‚Œã¾ã—ãŸã€‚",
++    "newReservationReceivedAction": "å–ã‚Šç½®ãã‚’è¡¨ç¤º"
+   },
+   "payments": {
+     "title": "Payments / Collections",
+diff --git a/locales/ko/common.json b/locales/ko/common.json
+index 5a69606..61e0c1d 100644
+--- a/locales/ko/common.json
++++ b/locales/ko/common.json
+@@ -616,7 +616,10 @@
+     "hideUnavailableItems": "ì‚¬ìš© ë¶ˆê°€ ìˆ¨ê¸°ê¸°",
+     "itemAvailabilityFilterHelp": "LIVE ìš´ì˜ì—ì„œëŠ” ê¸°ë³¸ì ìœ¼ë¡œ ì‚¬ìš© ê°€ëŠ¥í•œ ìƒí’ˆì„ í‘œì‹œí•©ë‹ˆë‹¤.",
+     "noItemsAvailableWithFilters": "ì´ í•„í„°ì— ë§žëŠ” ì‚¬ìš© ê°€ëŠ¥í•œ ìƒí’ˆì´ ì—†ìŠµë‹ˆë‹¤.",
+-    "noItemSearchResults": "ì´ ê²€ìƒ‰ ê²°ê³¼ê°€ ì—†ìŠµë‹ˆë‹¤."
++    "noItemSearchResults": "ì´ ê²€ìƒ‰ ê²°ê³¼ê°€ ì—†ìŠµë‹ˆë‹¤.",
++    "newReservationReceivedTitle": "ìƒˆ ì˜ˆì•½ì´ ì ‘ìˆ˜ë˜ì—ˆìŠµë‹ˆë‹¤",
++    "newReservationReceivedMessage": "LIVE ì¤‘ ì˜ˆì•½ì´ ì¶”ê°€ë˜ì—ˆìŠµë‹ˆë‹¤.",
++    "newReservationReceivedAction": "ì˜ˆì•½ ë³´ê¸°"
+   },
+   "payments": {
+     "title": "Payments / Collections",
+diff --git a/locales/pt-BR/common.json b/locales/pt-BR/common.json
+index 9957f58..fce23dd 100644
+--- a/locales/pt-BR/common.json
++++ b/locales/pt-BR/common.json
+@@ -616,7 +616,10 @@
+     "hideUnavailableItems": "Ocultar indisponiveis",
+     "itemAvailabilityFilterHelp": "Por padrao, itens disponiveis sao exibidos para a operacao LIVE.",
+     "noItemsAvailableWithFilters": "Nao ha itens disponiveis com esses filtros.",
+-    "noItemSearchResults": "Nao ha resultados para esta busca."
++    "noItemSearchResults": "Nao ha resultados para esta busca.",
++    "newReservationReceivedTitle": "Nova reserva recebida",
++    "newReservationReceivedMessage": "Uma reserva foi adicionada durante o LIVE.",
++    "newReservationReceivedAction": "Ver reservas"
+   },
+   "payments": {
+     "title": "Payments / Collections",
+diff --git a/locales/zh/common.json b/locales/zh/common.json
+index 92e137d..3fb283d 100644
+--- a/locales/zh/common.json
++++ b/locales/zh/common.json
+@@ -616,7 +616,10 @@
+     "hideUnavailableItems": "éšè—ä¸å¯ç”¨",
+     "itemAvailabilityFilterHelp": "LIVE æ“ä½œé»˜è®¤æ˜¾ç¤ºå¯ç”¨å•†å“ã€‚",
+     "noItemsAvailableWithFilters": "æ²¡æœ‰ç¬¦åˆè¿™äº›ç­›é€‰æ¡ä»¶çš„å¯ç”¨å•†å“ã€‚",
+-    "noItemSearchResults": "æ­¤æœç´¢æ²¡æœ‰ç»“æžœã€‚"
++    "noItemSearchResults": "æ­¤æœç´¢æ²¡æœ‰ç»“æžœã€‚",
++    "newReservationReceivedTitle": "æ”¶åˆ°æ–°çš„é¢„ç•™",
++    "newReservationReceivedMessage": "LIVEæœŸé—´æ–°å¢žäº†ä¸€ä¸ªé¢„ç•™ã€‚",
++    "newReservationReceivedAction": "æŸ¥çœ‹é¢„ç•™"
+   },
+   "payments": {
+     "title": "Payments / Collections",
+diff --git a/qa-reports/LIVE-Z9J-operator-reservation-sync-report-20260607-144844.md b/qa-reports/LIVE-Z9J-operator-reservation-sync-report-20260607-144844.md
+new file mode 100644
+index 0000000..4bb1dbd
+--- /dev/null
++++ b/qa-reports/LIVE-Z9J-operator-reservation-sync-report-20260607-144844.md
+@@ -0,0 +1,42 @@
++# LIVE-Z9J - Reporte QA tecnico
++
++Fecha: 2026-06-07 14:48:44
++Rama: `feature/live-z9j-operator-reservation-sync`
++
++## Alcance
++
++Se extendio el refresh controlado de LIVE para que operador/admin sincronice apartados y eventos creados por otros usuarios sin salir/entrar.
++
++## Cambios verificados tecnicamente
++
++- Polling de 15 segundos ahora aplica a `OPERATOR`, `SELLER` y `SUPERVISOR`.
++- `NO_ACCESS` no hace polling util porque no pasa `canViewLive`.
++- El refresh liviano sincroniza lives, apartados recientes y eventos.
++- El polling no consulta pagos ni caja.
++- Si el operador tiene captura local en curso, no se pisa cliente seleccionado, prenda preparada, precio, busquedas ni modales.
++- Se agrega aviso inline `Nuevo apartado recibido` cuando entra un apartado nuevo para operador/admin.
++- Los errores de refresh usan el mapper accionable de PRODUCT-ERR-A.
++
++## Limitaciones
++
++- No se implementa WebSocket/SSE.
++- La sincronizacion depende de polling/foco y puede tardar hasta 15 segundos.
++- La confirmacion visual multiusuario queda para QA manual.
++
++## Validacion manual esperada
++
++- Admin/operador abre `/live`.
++- Vendedor crea apartado desde otra sesion.
++- Operador ve el apartado sin salir/entrar.
++- Operador ve aviso `Nuevo apartado recibido`.
++- Operador conserva cliente, prenda preparada y precio en edicion.
++- Light/dark y mobile/tablet se mantienen.
++
++## Validaciones tecnicas
++
++- `npm.cmd run lint`: PASS, con warnings preexistentes del repositorio.
++- `npx.cmd tsc --noEmit`: PASS.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: PASS.
++- `backend/control-ropa/.\\mvnw.cmd test`: PASS, 73 tests.
++- `backend/control-ropa/.\\mvnw.cmd -q -DskipTests package`: PASS.
++- `git --no-pager diff --check`: PASS antes de staging.

@@ -616,7 +616,10 @@
     "hideUnavailableItems": "Ocultar no disponibles",
     "itemAvailabilityFilterHelp": "Por defecto se muestran prendas disponibles para operar LIVE.",
     "noItemsAvailableWithFilters": "No hay prendas disponibles con esos filtros.",
-    "noItemSearchResults": "No hay resultados para esta busqueda."
+    "noItemSearchResults": "No hay resultados para esta busqueda.",
+    "newReservationReceivedTitle": "Nuevo apartado recibido",
+    "newReservationReceivedMessage": "Se agregó un apartado durante el LIVE.",
+    "newReservationReceivedAction": "Ver apartados"
   },
   "payments": {
     "title": "Pagos / Cobros",

@@ -79,3 +79,9 @@ GO visual pendiente de corrida manual multiusuario.
 ## Continuidad LIVE-Z9I
 
 LIVE-Z9I no cambia el refresh controlado. Si el inventario o apartados se refrescan por la carga existente, el selector recalcula contadores y filtros de disponibilidad con los datos actuales en memoria. No se agrega polling de inventario ni pagos.
+
+## Continuidad LIVE-Z9J
+
+LIVE-Z9J extiende el refresh controlado a operador/admin para sincronizar apartados y eventos generados por otros usuarios. El polling sigue en 15 segundos, no consulta pagos/caja y conserva captura local del operador: cliente seleccionado, prenda preparada, precio en edicion, filtros y modales.
+
+Si entra un apartado nuevo, se muestra un aviso no bloqueante `Nuevo apartado recibido` con accion `Ver apartados`.
