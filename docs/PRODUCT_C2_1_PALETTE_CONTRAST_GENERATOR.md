@@ -205,3 +205,13 @@ PRODUCT-C2.2 conserva el generador de paletas, armonias, contraste y preview de 
 6. Aplicar o restaurar.
 
 Las secciones largas de tokens, escalas completas, componentes, templates, variantes y ratios tecnicos quedan disponibles en detalles avanzados. El cambio no elimina capacidades; reduce la carga visual inicial para QA y clientes.
+
+---
+
+## Continuidad PRODUCT-C2.3 - Flujo de diseno de aplicacion
+
+Fecha: 2026-06-07
+
+PRODUCT-C2.3 mantiene el generador tecnico de PRODUCT-C2.1, pero cambia el lenguaje de la experiencia principal a `Diseno de la aplicacion`. El color base pasa a explicarse como color principal de marca, la paleta sugerida usa nombres entendibles y la accion de aplicar/restaurar queda al final del flujo.
+
+El generador avanzado sigue disponible, pero deja de ser el mensaje principal para usuario final.

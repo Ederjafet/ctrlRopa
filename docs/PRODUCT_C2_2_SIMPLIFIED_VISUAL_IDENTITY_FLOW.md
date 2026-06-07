@@ -162,3 +162,22 @@ Las traducciones nuevas son base tecnica y requieren revision humana/nativa ante
 - No se agregan fuentes externas.
 - La validacion de contraste sigue siendo basica.
 - Las traducciones nuevas requieren revision nativa.
+
+---
+
+## Continuidad PRODUCT-C2.3 - Diseno de la aplicacion
+
+Fecha: 2026-06-07
+
+PRODUCT-C2.3 conserva la simplificacion de PRODUCT-C2.2, pero cambia el enfoque visible: `/ui-kit` ya no se presenta primero como laboratorio o catalogo tecnico, sino como `Diseno de la aplicacion`.
+
+La vista principal queda organizada como secuencia accionable para usuario admin:
+
+1. elegir plantilla visual;
+2. elegir color principal;
+3. revisar paleta sugerida;
+4. revisar contraste y legibilidad;
+5. mirar la vista previa;
+6. aplicar o restaurar cambios.
+
+El UI Kit tecnico, tokens, componentes, templates, variantes y detalles de contraste siguen disponibles en opciones avanzadas.

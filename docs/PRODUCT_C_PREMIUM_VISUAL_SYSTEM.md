@@ -355,3 +355,13 @@ Fecha: 2026-06-06
 PRODUCT-C2.2 simplifica `/ui-kit` para que el usuario vea primero un flujo de identidad visual guiado: plantilla activa, color base, paleta sugerida, contraste principal, preview real y acciones de aplicar/restaurar. El contenido avanzado del laboratorio visual queda colapsado por defecto.
 
 La validacion visual debe confirmar que la simplificacion no elimina el generador, no rompe los overrides locales, no oculta la restauracion de plantilla y mantiene disponible el modo avanzado para tokens, componentes, templates, variantes y detalles tecnicos.
+
+---
+
+## Continuidad PRODUCT-C2.3 - Diseno visual de la aplicacion
+
+Fecha: 2026-06-07
+
+PRODUCT-C2.3 reposiciona `/ui-kit` como pantalla de `Diseno de la aplicacion`: la configuracion visible ahora explica que se cambia la plantilla visual, el color principal, la paleta sugerida, contraste, legibilidad y preview antes de aplicar cambios locales.
+
+El sistema visual premium conserva presets, light/dark, overrides locales y modo avanzado. QA debe validar que el usuario entienda la secuencia sin abrir opciones tecnicas.
