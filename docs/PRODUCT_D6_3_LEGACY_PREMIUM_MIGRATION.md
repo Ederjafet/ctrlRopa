@@ -69,6 +69,18 @@ No se traducen claves tecnicas, codigos de permisos, codigos de canal, estados b
 
 No quedaron pantallas del listado D6.3 sin migrar. Rutas fuera del listado se dejan para fases posteriores si QA las detecta como legacy.
 
+## Nota PRODUCT-D6.4
+
+PRODUCT-D6.4 extiende la misma estrategia de `AppShellPage` a pantallas operativas que no entraron en el listado D6.3:
+
+- `/door-sale`
+- `/door-reservation`
+- `/items`
+- `/items-create`
+- `/batches`
+
+Las rutas de caja (`cash-closures`, `cash-closure-detail`) se documentan como legacy pendiente, pero no se migran en D6.4 porque caja queda explicitamente fuera de alcance.
+
 ## Riesgos pendientes
 
 - Algunas tablas de reportes muestran estados/codigos que vienen del backend; se mantienen como datos tecnicos.

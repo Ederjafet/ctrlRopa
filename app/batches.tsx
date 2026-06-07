@@ -1,8 +1,7 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import {
@@ -16,16 +15,17 @@ import { hasAnyPermission } from '@/services/accessControl';
 import { getSession } from '@/services/sessionStorage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 
 type BatchStatusFilter = 'ALL' | BatchStatus;
 
-const statusFilters: { label: string; value: BatchStatusFilter }[] = [
-  { label: 'Todo', value: 'ALL' },
-  { label: 'Por recibir', value: 'ANNOUNCED' },
-  { label: 'Recibidos', value: 'RECEIVED' },
-  { label: 'Cerrados', value: 'RECONCILED' },
-  { label: 'Cancelados', value: 'CANCELLED' },
+const statusFilters: { labelKey: string; value: BatchStatusFilter }[] = [
+  { labelKey: 'operationalScreens.batches.filterAll', value: 'ALL' },
+  { labelKey: 'operationalScreens.batches.filterAnnounced', value: 'ANNOUNCED' },
+  { labelKey: 'operationalScreens.batches.filterReceived', value: 'RECEIVED' },
+  { labelKey: 'operationalScreens.batches.filterReconciled', value: 'RECONCILED' },
+  { labelKey: 'operationalScreens.batches.filterCancelled', value: 'CANCELLED' },
 ];
 
 function normalize(value?: string | null) {
@@ -35,6 +35,7 @@ function normalize(value?: string | null) {
 export default function BatchesScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
 
   const [batches, setBatches] = useState<Batch[]>([]);
   const [search, setSearch] = useState('');
@@ -108,32 +109,33 @@ export default function BatchesScreen() {
 
   if (loading) {
     return (
-      <AppScreen scroll={false}>
+      <AppShellPage
+        title={t('navigation.items.batches')}
+        subtitle={t('operationalScreens.batches.subtitle')}
+        activeRoute="batches"
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   return (
-    <AppScreen scroll={false}>
-      <AppBackButton fallbackRoute="/" />
-
-      <AppText variant="title" bold>
-        Lotes
-      </AppText>
-
-      <AppText variant="caption" color={theme.colors.mutedText} style={styles.intro}>
-        Administra recepción, clasificación y conciliación de lotes de inventario.
-      </AppText>
-
-      {canManageInventory ? (
-        <View style={styles.createButtonWrapper}>
-          <AppButton title="+ Nuevo lote" onPress={() => router.push('/batch-form')} />
-        </View>
-      ) : null}
+    <AppShellPage
+      title={t('navigation.items.batches')}
+      subtitle={t('operationalScreens.batches.subtitle')}
+      activeRoute="batches"
+      rightContent={
+        canManageInventory ? (
+          <AppButton
+            title={t('operationalScreens.batches.createBatch')}
+            onPress={() => router.push('/batch-form')}
+          />
+        ) : null
+      }
+    >
 
       <AppInput
-        placeholder="Buscar por folio, estado o notas"
+        placeholder={t('operationalScreens.batches.searchPlaceholder')}
         value={search}
         onChangeText={setSearch}
       />
@@ -142,7 +144,7 @@ export default function BatchesScreen() {
         {statusFilters.map((filter) => (
           <View key={filter.value} style={styles.filterButton}>
             <AppButton
-              title={filter.label}
+              title={t(filter.labelKey)}
               variant={statusFilter === filter.value ? 'primary' : 'secondary'}
               onPress={() => setStatusFilter(filter.value)}
             />
@@ -177,10 +179,10 @@ export default function BatchesScreen() {
                     {item.folio}
                   </AppText>
                   <AppText variant="caption" color={theme.colors.mutedText}>
-                    {item.branchName || 'Sucursal actual'}
+                    {item.branchName || t('operationalScreens.batches.currentBranch')}
                   </AppText>
                   <AppText variant="caption" color={theme.colors.mutedText}>
-                    Proveedor: {item.supplierName || 'Sin proveedor'}
+                    {t('operationalScreens.batches.supplier')}: {item.supplierName || t('operationalScreens.batches.noSupplier')}
                   </AppText>
                 </View>
 
@@ -201,18 +203,18 @@ export default function BatchesScreen() {
               </View>
 
               <View style={styles.metricsRow}>
-                <AppText>Esperado: {item.expectedQuantity ?? 0}</AppText>
-                <AppText>Recibido: {item.receivedQuantity ?? '-'}</AppText>
+                <AppText>{t('operationalScreens.batches.expected')}: {item.expectedQuantity ?? 0}</AppText>
+                <AppText>{t('operationalScreens.batches.received')}: {item.receivedQuantity ?? '-'}</AppText>
               </View>
 
               <View style={styles.metricsRow}>
-                <AppText>Clasificado: {item.classifiedQuantity ?? 0}</AppText>
-                <AppText>Items: {item.itemCount ?? 0}</AppText>
+                <AppText>{t('operationalScreens.batches.classified')}: {item.classifiedQuantity ?? 0}</AppText>
+                <AppText>{t('operationalScreens.batches.items')}: {item.itemCount ?? 0}</AppText>
               </View>
 
               {item.receivedAt ? (
                 <AppText variant="caption" color={theme.colors.mutedText} style={styles.note}>
-                  Recibido: {new Date(item.receivedAt).toLocaleString('es-MX')}
+                  {t('operationalScreens.batches.received')}: {new Date(item.receivedAt).toLocaleString('es-MX')}
                 </AppText>
               ) : null}
 
@@ -223,31 +225,28 @@ export default function BatchesScreen() {
               ) : null}
 
               <AppText variant="caption" color={theme.colors.mutedText} style={styles.hint}>
-                Tocar para ver detalle
+                {t('operationalScreens.batches.tapDetail')}
               </AppText>
             </AppCard>
           </Pressable>
         )}
         ListEmptyComponent={
           <AppCard>
-            <AppText>No hay lotes para mostrar.</AppText>
+            <AppText>{t('operationalScreens.batches.noBatches')}</AppText>
             <View style={styles.emptyAction}>
-              <AppButton title="Crear primer lote" onPress={() => router.push('/batch-form')} />
+              <AppButton
+                title={t('operationalScreens.batches.createFirst')}
+                onPress={() => router.push('/batch-form')}
+              />
             </View>
           </AppCard>
         }
       />
-    </AppScreen>
+    </AppShellPage>
   );
 }
 
 const styles = StyleSheet.create({
-  intro: {
-    marginBottom: 12,
-  },
-  createButtonWrapper: {
-    marginBottom: 12,
-  },
   filterRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

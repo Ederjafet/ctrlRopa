@@ -279,3 +279,19 @@ Ver:
 - `docs/PRODUCT_D_ROLE_BASED_QA_MATRIX.md`
 - `docs/PRODUCT_D_QA_CHECKLIST.md`
 - `docs/PRODUCT_D_ROLE_BASED_QA_HANDOFF.md`
+
+---
+
+## Continuidad PRODUCT-D6.4 - Operacion legacy a AppShell
+
+Fecha: 2026-06-06
+
+PRODUCT-D6.4 extiende el sistema visual premium a pantallas operativas legacy:
+
+- `/door-sale`
+- `/door-reservation`
+- `/items`
+- `/items-create`
+- `/batches`
+
+La fase no cambia tokens ni reglas de negocio. Aplica `AppShellPage`, sidebar/drawer, active state e i18n principal para que venta puerta, apartado puerta, inventario, alta de prendas y lotes ya no se vean como pantallas aisladas.

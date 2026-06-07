@@ -1,11 +1,10 @@
+import AppShellPage from '@/components/layout/AppShellPage';
 import QRScannerModal from '@/components/qr/QRScannerModal';
-import AppBackButton from '@/components/ui/AppBackButton';
 import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 
@@ -30,6 +29,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 type CartLine = {
   item: Item;
@@ -47,6 +47,7 @@ type ReservationValidationIssue =
 export default function DoorReservationScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
 
   const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -434,35 +435,42 @@ export default function DoorReservationScreen() {
 
   if (isAllowed === null || isLoading) {
     return (
-      <AppScreen>
+      <AppShellPage
+        title={t('navigation.items.doorHold')}
+        subtitle={t('operationalScreens.doorReservation.subtitle')}
+        activeRoute="door-reservation"
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   return (
     <>
-      <AppScreen>
-      <AppBackButton fallbackRoute="/" />
-
-      <AppText variant="title" bold>
-        Crear apartado en puerta
-      </AppText>
+      <AppShellPage
+        title={t('navigation.items.doorHold')}
+        subtitle={t('operationalScreens.doorReservation.subtitle')}
+        activeRoute="door-reservation"
+      >
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Cliente
+          {t('operationalScreens.shared.customer')}
         </AppText>
 
         <AppText>
           {selectedCustomer
             ? selectedCustomer.name
-            : 'Selecciona un cliente real. No se permite cliente genérico.'}
+            : t('operationalScreens.doorReservation.selectRealCustomer')}
         </AppText>
 
         <View style={styles.actionSpacing}>
           <AppButton
-            title={selectedCustomer ? 'Cambiar cliente' : 'Seleccionar cliente'}
+            title={
+              selectedCustomer
+                ? t('operationalScreens.shared.changeCustomer')
+                : t('operationalScreens.shared.selectCustomer')
+            }
             variant="operation"
             onPress={() => setIsCustomerModalVisible(true)}
           />
@@ -471,28 +479,28 @@ export default function DoorReservationScreen() {
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Agregar prenda
+          {t('operationalScreens.shared.addItem')}
         </AppText>
         <AppText color={theme.colors.mutedText}>
-          Usa código, QR, búsqueda o alta rapida para agregar prendas al apartado.
+          {t('operationalScreens.doorReservation.addItemHelp')}
         </AppText>
 
         <AppInput
-          placeholder="Escanea o escribe código/QR"
+          placeholder={t('operationalScreens.shared.scanOrCodePlaceholder')}
           value={scanInput}
           onChangeText={setScanInput}
           onSubmitEditing={() => addItemByCode(scanInput)}
         />
 
         <AppButton
-          title="Agregar por código"
+          title={t('operationalScreens.shared.addByCode')}
           variant="operation"
           onPress={() => addItemByCode(scanInput)}
         />
 
         <View style={styles.actionSpacing}>
           <AppButton
-            title="Buscar prenda"
+            title={t('operationalScreens.shared.searchItem')}
             variant="operation"
             onPress={() => setIsItemModalVisible(true)}
           />
@@ -500,7 +508,7 @@ export default function DoorReservationScreen() {
 
         <View style={styles.actionSpacing}>
           <AppButton
-            title="Escanear con cámara"
+            title={t('operationalScreens.shared.scanWithCamera')}
             variant="operation"
             onPress={() => setIsScannerVisible(true)}
           />
@@ -509,32 +517,37 @@ export default function DoorReservationScreen() {
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Prendas
+          {t('operationalScreens.shared.items')}
         </AppText>
 
         {cart.length === 0 ? (
-          <AppText color={theme.colors.mutedText}>No hay prendas agregadas.</AppText>
+          <AppText color={theme.colors.mutedText}>
+            {t('operationalScreens.shared.noItemsAdded')}
+          </AppText>
         ) : (
           cart.map((line) => (
-            <View key={line.item.id} style={styles.cartLine}>
+            <View
+              key={line.item.id}
+              style={[styles.cartLine, { borderBottomColor: theme.colors.borderSubtle }]}
+            >
               <AppText bold>{line.item.code}</AppText>
 
               <AppText>
-                {line.item.productTypeName || 'Sin tipo'} ·{' '}
-                {line.item.brandName || 'Sin marca'} ·{' '}
-                {line.item.sizeName || 'Sin talla'}
+                {line.item.productTypeName || t('operationalScreens.shared.noType')} ·{' '}
+                {line.item.brandName || t('operationalScreens.shared.noBrand')} ·{' '}
+                {line.item.sizeName || t('operationalScreens.shared.noSize')}
               </AppText>
 
               <AppInput
-                label="Precio apartado *"
+                label={t('operationalScreens.doorReservation.holdPrice')}
                 value={line.priceText}
                 onChangeText={(value) => updateLinePrice(line.item.id, value)}
                 keyboardType="numeric"
-                placeholder="Captura precio"
+                placeholder={t('operationalScreens.doorReservation.pricePlaceholder')}
               />
 
               <AppButton
-                title="Quitar"
+                title={t('operationalScreens.shared.remove')}
                 variant="danger"
                 onPress={() => removeItemFromCart(line.item.id)}
               />
@@ -543,14 +556,14 @@ export default function DoorReservationScreen() {
         )}
 
         <AppButton
-          title="Agregar prenda"
+          title={t('operationalScreens.shared.addItem')}
           variant="operation"
           onPress={() => setIsItemModalVisible(true)}
         />
 
         <View style={styles.actionSpacing}>
           <AppButton
-            title="Alta rápida de prenda"
+            title={t('operationalScreens.doorReservation.quickItem')}
             variant="operation"
             onPress={() =>
               router.push('/items-create?returnTo=/door-reservation' as any)
@@ -561,29 +574,29 @@ export default function DoorReservationScreen() {
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Anticipo
+          {t('operationalScreens.doorReservation.advance')}
         </AppText>
 
         <AppInput
-          label="Anticipo opcional"
+          label={t('operationalScreens.doorReservation.optionalAdvance')}
           value={advanceText}
           onChangeText={setAdvanceText}
           keyboardType="numeric"
-          placeholder="0.00"
+          placeholder={t('operationalScreens.doorReservation.advancePlaceholder')}
         />
 
         {getAdvance() > 0 ? (
           <>
             <AppText>
-              Método:{' '}
+              {t('operationalScreens.shared.paymentMethod')}:{' '}
               {selectedPaymentMethod
                 ? selectedPaymentMethod.name
-                : 'Sin seleccionar'}
+                : t('operationalScreens.shared.noSelection')}
             </AppText>
 
             <View style={styles.actionSpacing}>
               <AppButton
-                title="Seleccionar método de pago"
+                title={t('operationalScreens.shared.selectPaymentMethod')}
                 variant="operation"
                 onPress={() => setIsPaymentModalVisible(true)}
               />
@@ -591,17 +604,17 @@ export default function DoorReservationScreen() {
           </>
         ) : (
           <AppText color={theme.colors.mutedText}>
-            Si no capturas anticipo, solo se creará el apartado.
+            {t('operationalScreens.doorReservation.advanceHelp')}
           </AppText>
         )}
 
         <View style={styles.totalRow}>
-          <AppText bold>Total apartado</AppText>
+          <AppText bold>{t('operationalScreens.doorReservation.holdTotal')}</AppText>
           <AppText bold>{formatMoney(getTotal())}</AppText>
         </View>
 
         <View style={styles.totalRow}>
-          <AppText bold>Saldo pendiente</AppText>
+          <AppText bold>{t('operationalScreens.doorReservation.pendingBalance')}</AppText>
           <AppText bold>
             {formatMoney(Math.max(getTotal() - getAdvance(), 0))}
           </AppText>
@@ -609,12 +622,12 @@ export default function DoorReservationScreen() {
       </AppCard>
 
       <AppButton
-        title="Crear apartado"
+        title={t('operationalScreens.doorReservation.createHold')}
         onPress={handleSave}
         loading={isSaving}
         disabled={isSaving}
       />
-      </AppScreen>
+      </AppShellPage>
 
       <QRScannerModal
         visible={isScannerVisible}
@@ -624,12 +637,12 @@ export default function DoorReservationScreen() {
 
       <AppBottomModal
         visible={isCustomerModalVisible}
-        title="Seleccionar cliente"
+        title={t('operationalScreens.shared.selectCustomer')}
         onClose={() => setIsCustomerModalVisible(false)}
         scroll={false}
       >
         <AppInput
-          placeholder="Buscar cliente"
+          placeholder={t('operationalScreens.shared.searchCustomerPlaceholder')}
           value={customerSearch}
           onChangeText={setCustomerSearch}
         />
@@ -642,24 +655,24 @@ export default function DoorReservationScreen() {
           renderItem={({ item }) => (
             <AppOptionRow
               title={item.name}
-              subtitle={`${item.phone || 'Sin teléfono'} · ${
-                item.email || 'Sin correo'
+              subtitle={`${item.phone || t('operationalScreens.shared.noPhone')} · ${
+                item.email || t('operationalScreens.shared.noEmail')
               }`}
               onPress={() => selectCustomer(item)}
             />
           )}
-          ListEmptyComponent={<AppText>No hay clientes reales activos.</AppText>}
+          ListEmptyComponent={<AppText>{t('operationalScreens.shared.noCustomers')}</AppText>}
         />
       </AppBottomModal>
 
       <AppBottomModal
         visible={isItemModalVisible}
-        title="Agregar prenda"
+        title={t('operationalScreens.shared.addItem')}
         onClose={() => setIsItemModalVisible(false)}
         scroll={false}
       >
         <AppInput
-          placeholder="Buscar por código, tipo, marca o talla"
+          placeholder={t('operationalScreens.shared.searchItemPlaceholder')}
           value={itemSearch}
           onChangeText={setItemSearch}
         />
@@ -672,26 +685,28 @@ export default function DoorReservationScreen() {
           renderItem={({ item }) => (
             <AppOptionRow
               title={item.code}
-              subtitle={`${item.productTypeName || 'Sin tipo'} · ${
-                item.brandName || 'Sin marca'
-              } · ${item.sizeName || 'Sin talla'}`}
+              subtitle={`${item.productTypeName || t('operationalScreens.shared.noType')} · ${
+                item.brandName || t('operationalScreens.shared.noBrand')
+              } · ${item.sizeName || t('operationalScreens.shared.noSize')}`}
               onPress={() => addItemToCart(item)}
             >
               <AppText variant="caption" color={theme.colors.mutedText}>
-                Precio sugerido:{' '}
+                {t('operationalScreens.shared.suggestedPrice')}:{' '}
                 {item.price !== null && item.price !== undefined
                   ? formatMoney(item.price)
-                  : 'Sin precio'}
+                  : t('operationalScreens.shared.noPrice')}
               </AppText>
             </AppOptionRow>
           )}
-          ListEmptyComponent={<AppText>No hay prendas disponibles.</AppText>}
+          ListEmptyComponent={
+            <AppText>{t('operationalScreens.shared.noItemsAvailable')}</AppText>
+          }
         />
       </AppBottomModal>
 
       <AppBottomModal
         visible={isPaymentModalVisible}
-        title="Método de pago"
+        title={t('operationalScreens.shared.paymentMethod')}
         onClose={() => setIsPaymentModalVisible(false)}
       >
         {paymentMethods.map((method) => (
@@ -705,30 +720,30 @@ export default function DoorReservationScreen() {
 
       <AppBottomModal
         visible={validationIssue !== null}
-        title="Falta completar el apartado"
+        title={t('operationalScreens.doorReservation.validationTitle')}
         onClose={() => setValidationIssue(null)}
         showCancelButton={false}
       >
         {validationIssue === 'CUSTOMER' ? (
-          <AppText>Selecciona un cliente real para crear el apartado.</AppText>
+          <AppText>{t('operationalScreens.doorReservation.validationCustomer')}</AppText>
         ) : null}
         {validationIssue === 'ITEM' ? (
-          <AppText>Agrega al menos una prenda al apartado.</AppText>
+          <AppText>{t('operationalScreens.doorReservation.validationItem')}</AppText>
         ) : null}
         {validationIssue === 'PRICE' ? (
-          <AppText>Revisa que todas las prendas tengan precio mayor a cero.</AppText>
+          <AppText>{t('operationalScreens.doorReservation.validationPrice')}</AppText>
         ) : null}
         {validationIssue === 'ADVANCE' ? (
-          <AppText>El anticipo debe ser cero o mayor, y no puede superar el total.</AppText>
+          <AppText>{t('operationalScreens.doorReservation.validationAdvance')}</AppText>
         ) : null}
         {validationIssue === 'PAYMENT' ? (
-          <AppText>Selecciona el metodo de pago para registrar el anticipo.</AppText>
+          <AppText>{t('operationalScreens.doorReservation.validationPayment')}</AppText>
         ) : null}
 
         <View style={styles.modalActions}>
           <View style={styles.modalAction}>
             <AppButton
-              title="Cerrar"
+              title={t('operationalScreens.shared.close')}
               variant="secondary"
               onPress={() => setValidationIssue(null)}
             />
@@ -737,12 +752,12 @@ export default function DoorReservationScreen() {
             <AppButton
               title={
                 validationIssue === 'CUSTOMER'
-                  ? 'Elegir cliente'
+                  ? t('operationalScreens.doorReservation.chooseCustomer')
                   : validationIssue === 'ITEM'
-                    ? 'Agregar prenda'
+                    ? t('operationalScreens.shared.addItem')
                     : validationIssue === 'PAYMENT'
-                      ? 'Elegir pago'
-                      : 'Revisar'
+                      ? t('operationalScreens.shared.choosePayment')
+                      : t('operationalScreens.shared.review')
               }
               onPress={() => {
                 const issue = validationIssue;
@@ -775,7 +790,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eeeeee',
   },
   modalList: {
     maxHeight: 420,

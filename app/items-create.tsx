@@ -1,11 +1,10 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
 import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
-import AppScreen from '@/components/ui/AppScreen';
 import AppSelectorField from '@/components/ui/AppSelectorField';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
@@ -339,16 +338,20 @@ export default function ItemsCreateScreen() {
     selector?.options.filter((option) => matchesOption(option, selectorSearch)) ?? [];
 
   return (
-    <AppScreen>
-        <AppBackButton fallbackRoute={returnRoute} />
-        <AppText variant="title" bold>
-          Alta masiva de prendas
-        </AppText>
-
+    <AppShellPage
+      title={t('navigation.items.createItems')}
+      subtitle={t('operationalScreens.itemsCreate.subtitle')}
+      activeRoute="items-create"
+      rightContent={
+        <AppButton
+          title={t('operationalScreens.itemsCreate.backToFlow')}
+          variant="secondary"
+          onPress={() => router.replace(returnRoute as any)}
+        />
+      }
+    >
         <AppText variant="caption" style={styles.intro}>
-          Crea una o varias prendas disponibles para inventario. El tipo de
-          prenda y la talla son obligatorios; lote, marca, ubicación y precio
-          sugerido son opcionales.
+          {t('operationalScreens.itemsCreate.intro')}
         </AppText>
 
         {successMessage ? (
@@ -510,7 +513,7 @@ export default function ItemsCreateScreen() {
         </AppCard>
 
         <AppButton
-          title="Generar prendas"
+          title={t('operationalScreens.itemsCreate.generateItems')}
           onPress={handleCreate}
           loading={isSaving}
         />
@@ -560,7 +563,7 @@ export default function ItemsCreateScreen() {
           }
         />
       </AppBottomModal>
-    </AppScreen>
+    </AppShellPage>
   );
 }
 

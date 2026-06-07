@@ -1,8 +1,7 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 
@@ -14,6 +13,7 @@ import { getSession } from '@/services/sessionStorage';
 
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -25,16 +25,17 @@ import {
 
 type InventoryStatusFilter = 'ALL' | ItemStatus;
 
-const statusFilters: Array<{ label: string; value: InventoryStatusFilter }> = [
-  { label: 'Todo', value: 'ALL' },
-  { label: 'Disponible', value: 'AVAILABLE' },
-  { label: 'Reservado', value: 'RESERVED' },
-  { label: 'Vendido', value: 'SOLD' },
+const statusFilters: { labelKey: string; value: InventoryStatusFilter }[] = [
+  { labelKey: 'operationalScreens.items.filterAll', value: 'ALL' },
+  { labelKey: 'operationalScreens.items.filterAvailable', value: 'AVAILABLE' },
+  { labelKey: 'operationalScreens.items.filterReserved', value: 'RESERVED' },
+  { labelKey: 'operationalScreens.items.filterSold', value: 'SOLD' },
 ];
 
 export default function ItemsScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
 
   const [items, setItems] = useState<Item[]>([]);
   const [filtered, setFiltered] = useState<Item[]>([]);
@@ -109,20 +110,20 @@ export default function ItemsScreen() {
   };
 
   const formatMoney = (value?: number | null) => {
-    if (value === null || value === undefined) return 'Sin precio';
+    if (value === null || value === undefined) return t('operationalScreens.shared.noPrice');
     return `$${value.toFixed(2)}`;
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'AVAILABLE':
-        return '#2e7d32';
+        return theme.colors.success;
       case 'SOLD':
-        return '#999999';
+        return theme.colors.textMuted;
       case 'RESERVED':
-        return '#f9a825';
+        return theme.colors.danger;
       case 'ON_CONSIGNMENT':
-        return '#7e57c2';
+        return theme.colors.accent;
       case 'DISABLED':
         return theme.colors.mutedText;
       default:
@@ -139,33 +140,28 @@ export default function ItemsScreen() {
 
   if (isLoading) {
     return (
-      <AppScreen scroll={false}>
+      <AppShellPage
+        title={t('navigation.items.itemsInventory')}
+        subtitle={t('operationalScreens.items.subtitle')}
+        activeRoute="items"
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   return (
-    <AppScreen scroll={false}>
-      <AppBackButton fallbackRoute="/" />
-
-      <View style={styles.headerRow}>
-        <View style={styles.titleWrapper}>
-          <AppText variant="title" bold>
-            Inventario
-          </AppText>
-          <AppText variant="caption" color={theme.colors.mutedText}>
-            Consulta prendas y da de alta nuevas piezas desde este módulo.
-          </AppText>
-        </View>
-      </View>
-
-      <View style={styles.createButtonWrapper}>
-        <AppButton title="+ Alta prenda" onPress={goToCreateItem} />
-      </View>
+    <AppShellPage
+      title={t('navigation.items.itemsInventory')}
+      subtitle={t('operationalScreens.items.subtitle')}
+      activeRoute="items"
+      rightContent={
+        <AppButton title={t('operationalScreens.items.createItem')} onPress={goToCreateItem} />
+      }
+    >
 
       <AppInput
-        placeholder="Buscar por código, tipo, marca, talla, lote o ubicación"
+        placeholder={t('operationalScreens.items.searchPlaceholder')}
         value={search}
         onChangeText={setSearch}
       />
@@ -180,7 +176,7 @@ export default function ItemsScreen() {
         {statusFilters.map((filter) => (
           <View key={filter.value} style={styles.filterButton}>
             <AppButton
-              title={filter.label}
+              title={t(filter.labelKey)}
               variant={statusFilter === filter.value ? 'primary' : 'secondary'}
               onPress={() => setStatusFilter(filter.value)}
             />
@@ -209,18 +205,18 @@ export default function ItemsScreen() {
               <AppText bold>{item.code}</AppText>
 
               <AppText>
-                {item.productTypeName || 'Sin tipo'} ·{' '}
-                {item.brandName || 'Sin marca'} ·{' '}
-                {item.sizeName || 'Sin talla'}
+                {item.productTypeName || t('operationalScreens.shared.noType')} ·{' '}
+                {item.brandName || t('operationalScreens.shared.noBrand')} ·{' '}
+                {item.sizeName || t('operationalScreens.shared.noSize')}
               </AppText>
 
               <View style={styles.metaBlock}>
                 <AppText variant="caption" color={theme.colors.mutedText}>
-                  Lote: {item.batchFolio || 'Sin lote'}
+                  {t('operationalScreens.items.batch')}: {item.batchFolio || t('operationalScreens.items.noBatch')}
                 </AppText>
 
                 <AppText variant="caption" color={theme.colors.mutedText}>
-                  Ubicación: {item.storageLocationName || 'Sin ubicación'}
+                  {t('operationalScreens.items.location')}: {item.storageLocationName || t('operationalScreens.items.noLocation')}
                 </AppText>
               </View>
 
@@ -242,21 +238,21 @@ export default function ItemsScreen() {
                 color={theme.colors.mutedText}
                 style={styles.hint}
               >
-                Tocar para ver detalle
+                {t('operationalScreens.items.tapDetail')}
               </AppText>
             </AppCard>
           </Pressable>
         )}
         ListEmptyComponent={
           <AppCard>
-            <AppText>No hay prendas en inventario.</AppText>
+            <AppText>{t('operationalScreens.items.noInventory')}</AppText>
             <View style={styles.emptyAction}>
-              <AppButton title="Crear primera prenda" onPress={goToCreateItem} />
+              <AppButton title={t('operationalScreens.items.createFirst')} onPress={goToCreateItem} />
             </View>
           </AppCard>
         }
       />
-    </AppScreen>
+    </AppShellPage>
   );
 }
 
@@ -266,15 +262,6 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 24,
-  },
-  headerRow: {
-    marginBottom: 12,
-  },
-  titleWrapper: {
-    flex: 1,
-  },
-  createButtonWrapper: {
-    marginBottom: 12,
   },
   filterRow: {
     flexDirection: 'row',

@@ -1,11 +1,10 @@
+import AppShellPage from '@/components/layout/AppShellPage';
 import QRScannerModal from '@/components/qr/QRScannerModal';
-import AppBackButton from '@/components/ui/AppBackButton';
 import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 
@@ -31,6 +30,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 type CartLine = {
   item: Item;
@@ -42,6 +42,7 @@ type SaleValidationIssue = 'ITEM' | 'PAYMENT' | 'PRICE' | null;
 export default function DoorSaleScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
 
   const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -378,35 +379,42 @@ export default function DoorSaleScreen() {
 
   if (isAllowed === null || isLoading) {
     return (
-      <AppScreen>
+      <AppShellPage
+        title={t('navigation.items.doorSale')}
+        subtitle={t('operationalScreens.doorSale.subtitle')}
+        activeRoute="door-sale"
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   return (
     <>
-      <AppScreen>
-      <AppBackButton fallbackRoute="/" />
-
-      <AppText variant="title" bold>
-        Venta puerta
-      </AppText>
+      <AppShellPage
+        title={t('navigation.items.doorSale')}
+        subtitle={t('operationalScreens.doorSale.subtitle')}
+        activeRoute="door-sale"
+      >
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Cliente
+          {t('operationalScreens.shared.customer')}
         </AppText>
 
         <AppText>
           {selectedCustomer
             ? selectedCustomer.name
-            : 'Sin cliente seleccionado. Se usará cliente genérico puerta.'}
+            : t('operationalScreens.doorSale.genericCustomer')}
         </AppText>
 
         <View style={styles.actions}>
           <AppButton
-            title={selectedCustomer ? 'Cambiar cliente' : 'Seleccionar cliente'}
+            title={
+              selectedCustomer
+                ? t('operationalScreens.shared.changeCustomer')
+                : t('operationalScreens.shared.selectCustomer')
+            }
             variant="operation"
             onPress={() => setIsCustomerModalVisible(true)}
           />
@@ -414,7 +422,7 @@ export default function DoorSaleScreen() {
           {selectedCustomer ? (
             <View style={styles.actionSpacing}>
               <AppButton
-                title="Usar genérico puerta"
+                title={t('operationalScreens.doorSale.useGenericCustomer')}
                 variant="secondary"
                 onPress={() => setSelectedCustomer(null)}
               />
@@ -425,28 +433,28 @@ export default function DoorSaleScreen() {
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Agregar prenda
+          {t('operationalScreens.shared.addItem')}
         </AppText>
         <AppText color={theme.colors.mutedText}>
-          Usa código, QR, búsqueda o alta rapida para agregar prendas a la venta.
+          {t('operationalScreens.doorSale.addItemHelp')}
         </AppText>
 
         <AppInput
-          placeholder="Escanea o escribe código/QR"
+          placeholder={t('operationalScreens.shared.scanOrCodePlaceholder')}
           value={scanInput}
           onChangeText={setScanInput}
           onSubmitEditing={() => addItemByCode(scanInput)}
         />
 
         <AppButton
-          title="Agregar por código"
+          title={t('operationalScreens.shared.addByCode')}
           variant="operation"
           onPress={() => addItemByCode(scanInput)}
         />
 
         <View style={styles.actionSpacing}>
           <AppButton
-            title="Buscar prenda"
+            title={t('operationalScreens.shared.searchItem')}
             variant="operation"
             onPress={() => setIsItemModalVisible(true)}
           />
@@ -454,7 +462,7 @@ export default function DoorSaleScreen() {
 
         <View style={styles.actionSpacing}>
           <AppButton
-            title="Escanear con cámara"
+            title={t('operationalScreens.shared.scanWithCamera')}
             variant="operation"
             onPress={() => setIsScannerVisible(true)}
           />
@@ -462,7 +470,7 @@ export default function DoorSaleScreen() {
 
         <View style={styles.actionSpacing}>
           <AppButton
-            title="Alta rapida de prenda"
+            title={t('operationalScreens.doorSale.quickItem')}
             variant="operation"
             onPress={() =>
               router.push('/items-create?returnTo=/door-sale' as any)
@@ -473,31 +481,36 @@ export default function DoorSaleScreen() {
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Prendas
+          {t('operationalScreens.shared.items')}
         </AppText>
 
         {cart.length === 0 ? (
-          <AppText color={theme.colors.mutedText}>No hay prendas agregadas.</AppText>
+          <AppText color={theme.colors.mutedText}>
+            {t('operationalScreens.shared.noItemsAdded')}
+          </AppText>
         ) : (
           cart.map((line) => (
-            <View key={line.item.id} style={styles.cartLine}>
+            <View
+              key={line.item.id}
+              style={[styles.cartLine, { borderBottomColor: theme.colors.borderSubtle }]}
+            >
               <AppText bold>{line.item.code}</AppText>
               <AppText>
-                {line.item.productTypeName || 'Sin tipo'} ·{' '}
-                {line.item.brandName || 'Sin marca'} ·{' '}
-                {line.item.sizeName || 'Sin talla'}
+                {line.item.productTypeName || t('operationalScreens.shared.noType')} ·{' '}
+                {line.item.brandName || t('operationalScreens.shared.noBrand')} ·{' '}
+                {line.item.sizeName || t('operationalScreens.shared.noSize')}
               </AppText>
 
               <AppInput
-                label="Precio de venta *"
+                label={t('operationalScreens.doorSale.salePrice')}
                 value={line.priceText}
                 onChangeText={(value) => updateLinePrice(line.item.id, value)}
                 keyboardType="numeric"
-                placeholder="Captura precio"
+                placeholder={t('operationalScreens.doorSale.pricePlaceholder')}
               />
 
               <AppButton
-                title="Quitar"
+                title={t('operationalScreens.shared.remove')}
                 variant="danger"
                 onPress={() => removeItemFromCart(line.item.id)}
               />
@@ -509,35 +522,37 @@ export default function DoorSaleScreen() {
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Pago
+          {t('operationalScreens.shared.payment')}
         </AppText>
 
         <AppText>
-          Método:{' '}
-          {selectedPaymentMethod ? selectedPaymentMethod.name : 'Sin seleccionar'}
+          {t('operationalScreens.shared.paymentMethod')}:{' '}
+          {selectedPaymentMethod
+            ? selectedPaymentMethod.name
+            : t('operationalScreens.shared.noSelection')}
         </AppText>
 
         <View style={styles.actionSpacing}>
           <AppButton
-            title="Seleccionar método de pago"
+            title={t('operationalScreens.shared.selectPaymentMethod')}
             variant="operation"
             onPress={() => setIsPaymentModalVisible(true)}
           />
         </View>
 
         <View style={styles.totalRow}>
-          <AppText bold>Total</AppText>
+          <AppText bold>{t('operationalScreens.shared.total')}</AppText>
           <AppText bold>{formatMoney(getTotal())}</AppText>
         </View>
       </AppCard>
 
       <AppButton
-        title="Registrar venta pagada"
+        title={t('operationalScreens.doorSale.registerPaidSale')}
         onPress={handleSale}
         loading={isSaving}
         disabled={isSaving}
       />
-      </AppScreen>
+      </AppShellPage>
 
       <QRScannerModal
         visible={isScannerVisible}
@@ -547,12 +562,12 @@ export default function DoorSaleScreen() {
 
       <AppBottomModal
         visible={isCustomerModalVisible}
-        title="Seleccionar cliente"
+        title={t('operationalScreens.shared.selectCustomer')}
         onClose={() => setIsCustomerModalVisible(false)}
         scroll={false}
       >
         <AppInput
-          placeholder="Buscar cliente"
+          placeholder={t('operationalScreens.shared.searchCustomerPlaceholder')}
           value={customerSearch}
           onChangeText={setCustomerSearch}
         />
@@ -565,22 +580,22 @@ export default function DoorSaleScreen() {
           renderItem={({ item }) => (
             <AppOptionRow
               title={item.name}
-              subtitle={item.phone || 'Sin teléfono'}
+              subtitle={item.phone || t('operationalScreens.shared.noPhone')}
               onPress={() => selectCustomer(item)}
             />
           )}
-          ListEmptyComponent={<AppText>No hay clientes.</AppText>}
+          ListEmptyComponent={<AppText>{t('operationalScreens.shared.noCustomers')}</AppText>}
         />
       </AppBottomModal>
 
       <AppBottomModal
         visible={isItemModalVisible}
-        title="Agregar prenda"
+        title={t('operationalScreens.shared.addItem')}
         onClose={() => setIsItemModalVisible(false)}
         scroll={false}
       >
         <AppInput
-          placeholder="Buscar por código, tipo, marca o talla"
+          placeholder={t('operationalScreens.shared.searchItemPlaceholder')}
           value={itemSearch}
           onChangeText={setItemSearch}
         />
@@ -593,26 +608,28 @@ export default function DoorSaleScreen() {
           renderItem={({ item }) => (
             <AppOptionRow
               title={item.code}
-              subtitle={`${item.productTypeName || 'Sin tipo'} · ${
-                item.brandName || 'Sin marca'
-              } · ${item.sizeName || 'Sin talla'}`}
+              subtitle={`${item.productTypeName || t('operationalScreens.shared.noType')} · ${
+                item.brandName || t('operationalScreens.shared.noBrand')
+              } · ${item.sizeName || t('operationalScreens.shared.noSize')}`}
               onPress={() => addItemToCart(item)}
             >
               <AppText variant="caption" color={theme.colors.mutedText}>
-                Precio sugerido:{' '}
+                {t('operationalScreens.shared.suggestedPrice')}:{' '}
                 {item.price !== null && item.price !== undefined
                   ? formatMoney(item.price)
-                  : 'Sin precio'}
+                  : t('operationalScreens.shared.noPrice')}
               </AppText>
             </AppOptionRow>
           )}
-          ListEmptyComponent={<AppText>No hay prendas disponibles.</AppText>}
+          ListEmptyComponent={
+            <AppText>{t('operationalScreens.shared.noItemsAvailable')}</AppText>
+          }
         />
       </AppBottomModal>
 
       <AppBottomModal
         visible={isPaymentModalVisible}
-        title="Método de pago"
+        title={t('operationalScreens.shared.paymentMethod')}
         onClose={() => setIsPaymentModalVisible(false)}
       >
         {paymentMethods.map((method) => (
@@ -626,24 +643,24 @@ export default function DoorSaleScreen() {
 
       <AppBottomModal
         visible={validationIssue !== null}
-        title="Falta completar la venta"
+        title={t('operationalScreens.doorSale.validationTitle')}
         onClose={() => setValidationIssue(null)}
         showCancelButton={false}
       >
         {validationIssue === 'ITEM' ? (
-          <AppText>Agrega al menos una prenda para poder registrar la venta.</AppText>
+          <AppText>{t('operationalScreens.doorSale.validationItem')}</AppText>
         ) : null}
         {validationIssue === 'PAYMENT' ? (
-          <AppText>Selecciona el metodo de pago antes de registrar la venta.</AppText>
+          <AppText>{t('operationalScreens.doorSale.validationPayment')}</AppText>
         ) : null}
         {validationIssue === 'PRICE' ? (
-          <AppText>Revisa que todas las prendas tengan precio mayor a cero.</AppText>
+          <AppText>{t('operationalScreens.doorSale.validationPrice')}</AppText>
         ) : null}
 
         <View style={styles.modalActions}>
           <View style={styles.modalAction}>
             <AppButton
-              title="Cerrar"
+              title={t('operationalScreens.shared.close')}
               variant="secondary"
               onPress={() => setValidationIssue(null)}
             />
@@ -652,10 +669,10 @@ export default function DoorSaleScreen() {
             <AppButton
               title={
                 validationIssue === 'ITEM'
-                  ? 'Agregar prenda'
+                  ? t('operationalScreens.doorSale.addItemAction')
                   : validationIssue === 'PAYMENT'
-                    ? 'Elegir pago'
-                    : 'Revisar precios'
+                    ? t('operationalScreens.shared.choosePayment')
+                    : t('operationalScreens.doorSale.reviewPrices')
               }
               onPress={() => {
                 const issue = validationIssue;
@@ -690,7 +707,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eeeeee',
   },
   modalList: {
     maxHeight: 420,
