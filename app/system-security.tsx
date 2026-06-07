@@ -1,8 +1,7 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import {
@@ -11,6 +10,7 @@ import {
   updateSecuritySettings,
 } from '@/services/securitySettingsService';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, Switch, View } from 'react-native';
 
 type FormState = {
@@ -49,6 +49,7 @@ function toNumber(value: string) {
 
 export default function SystemSecurityScreen() {
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
   const [form, setForm] = useState<FormState>({
     sessionTimeoutMinutes: '30',
     maxLoginAttempts: '5',
@@ -74,23 +75,23 @@ export default function SystemSecurityScreen() {
     const historyCount = toNumber(form.passwordHistoryCount);
     const absoluteHours = toNumber(form.absoluteSessionTimeoutHours);
 
-    if (timeout < 5 || timeout > 720) return 'El cierre de sesión debe estar entre 5 y 720 minutos.';
-    if (attempts < 3 || attempts > 20) return 'Los intentos de login deben estar entre 3 y 20.';
-    if (lockout < 1 || lockout > 1440) return 'El bloqueo temporal debe estar entre 1 y 1440 minutos.';
-    if (passwordMinLength < 6 || passwordMinLength > 64) return 'La longitud minima de contraseña debe estar entre 6 y 64.';
-    if (expirationDays < 0 || expirationDays > 365) return 'La expiracion de contraseña debe estar entre 0 y 365 dias.';
-    if (historyCount < 0 || historyCount > 20) return 'El historial de contraseñas debe estar entre 0 y 20.';
-    if (absoluteHours < 0 || absoluteHours > 720) return 'La sesión maxima absoluta debe estar entre 0 y 720 horas.';
+    if (timeout < 5 || timeout > 720) return t('securitySettings.validationSessionTimeout');
+    if (attempts < 3 || attempts > 20) return t('securitySettings.validationMaxAttempts');
+    if (lockout < 1 || lockout > 1440) return t('securitySettings.validationLockout');
+    if (passwordMinLength < 6 || passwordMinLength > 64) return t('securitySettings.validationPasswordMin');
+    if (expirationDays < 0 || expirationDays > 365) return t('securitySettings.validationExpiration');
+    if (historyCount < 0 || historyCount > 20) return t('securitySettings.validationHistory');
+    if (absoluteHours < 0 || absoluteHours > 720) return t('securitySettings.validationAbsolute');
 
     return null;
-  }, [form]);
+  }, [form, t]);
 
   const saveBlockedReason = useMemo(() => {
-    if (loading) return 'Espera a que termine de cargar la configuración.';
-    if (saving) return 'Se estan guardando los parametros.';
+    if (loading) return t('securitySettings.waitLoading');
+    if (saving) return t('securitySettings.savingReason');
     if (validationMessage) return validationMessage;
     return undefined;
-  }, [loading, saving, validationMessage]);
+  }, [loading, saving, validationMessage, t]);
 
   useEffect(() => {
     loadSettings();
@@ -103,7 +104,7 @@ export default function SystemSecurityScreen() {
       const settings = await getSecuritySettings();
       setForm(toForm(settings));
     } catch (err: any) {
-      Alert.alert('Seguridad dev', err?.message || 'No se pudo cargar la configuración.');
+      Alert.alert(t('securitySettings.loadErrorTitle'), err?.message || t('securitySettings.loadErrorMessage'));
     } finally {
       setLoading(false);
     }
@@ -125,7 +126,7 @@ export default function SystemSecurityScreen() {
 
   const save = async () => {
     if (validationMessage) {
-      Alert.alert('Revisa los valores', validationMessage);
+      Alert.alert(t('securitySettings.validationTitle'), validationMessage);
       return;
     }
 
@@ -147,35 +148,33 @@ export default function SystemSecurityScreen() {
       });
 
       setForm(toForm(settings));
-      Alert.alert('Seguridad actualizada', 'Los parametros se guardaron correctamente.');
+      Alert.alert(t('securitySettings.savedTitle'), t('securitySettings.savedMessage'));
     } catch (err: any) {
-      Alert.alert('No se pudo guardar', err?.message || 'Revisa tu conexión o permisos.');
+      Alert.alert(t('securitySettings.saveErrorTitle'), err?.message || t('securitySettings.saveErrorMessage'));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute="/system" />
-
-      <AppText variant="title" bold>
-        Seguridad dev
-      </AppText>
+    <AppShellPage
+      title={t('securitySettings.title')}
+      subtitle={t('securitySettings.subtitle')}
+      activeRoute="system-security"
+    >
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Parametros operativos
+          {t('securitySettings.parametersTitle')}
         </AppText>
         <AppText color={theme.colors.mutedText}>
-          Solo soporte tecnico puede modificar estos valores. Aplican al cierre por
-          inactividad y al bloqueo temporal por intentos fallidos.
+          {t('securitySettings.parametersHelp')}
         </AppText>
       </AppCard>
 
       <AppCard>
         <AppInput
-          label="Cerrar sesión por inactividad (minutos)"
+          label={t('securitySettings.sessionTimeout')}
           value={form.sessionTimeoutMinutes}
           onChangeText={(value) => updateField('sessionTimeoutMinutes', value)}
           keyboardType="number-pad"
@@ -183,7 +182,7 @@ export default function SystemSecurityScreen() {
         />
 
         <AppInput
-          label="Longitud minima de contraseña"
+          label={t('securitySettings.passwordMinLength')}
           value={form.passwordMinLength}
           onChangeText={(value) => updateField('passwordMinLength', value)}
           keyboardType="number-pad"
@@ -191,7 +190,7 @@ export default function SystemSecurityScreen() {
         />
 
         <AppInput
-          label="Expirar contraseña cada (dias, 0 desactiva)"
+          label={t('securitySettings.passwordExpirationDays')}
           value={form.passwordExpirationDays}
           onChangeText={(value) => updateField('passwordExpirationDays', value)}
           keyboardType="number-pad"
@@ -199,7 +198,7 @@ export default function SystemSecurityScreen() {
         />
 
         <AppInput
-          label="No reutilizar ultimas contraseñas"
+          label={t('securitySettings.passwordHistoryCount')}
           value={form.passwordHistoryCount}
           onChangeText={(value) => updateField('passwordHistoryCount', value)}
           keyboardType="number-pad"
@@ -207,32 +206,32 @@ export default function SystemSecurityScreen() {
         />
 
         <PolicySwitch
-          label="Requerir mayuscula"
+          label={t('securitySettings.requireUppercase')}
           value={form.passwordRequireUppercase}
           onValueChange={() => toggleField('passwordRequireUppercase')}
           disabled={loading || saving}
         />
         <PolicySwitch
-          label="Requerir minuscula"
+          label={t('securitySettings.requireLowercase')}
           value={form.passwordRequireLowercase}
           onValueChange={() => toggleField('passwordRequireLowercase')}
           disabled={loading || saving}
         />
         <PolicySwitch
-          label="Requerir numero"
+          label={t('securitySettings.requireNumber')}
           value={form.passwordRequireNumber}
           onValueChange={() => toggleField('passwordRequireNumber')}
           disabled={loading || saving}
         />
         <PolicySwitch
-          label="Requerir simbolo"
+          label={t('securitySettings.requireSymbol')}
           value={form.passwordRequireSymbol}
           onValueChange={() => toggleField('passwordRequireSymbol')}
           disabled={loading || saving}
         />
 
         <AppInput
-          label="Intentos fallidos antes de bloquear"
+          label={t('securitySettings.maxLoginAttempts')}
           value={form.maxLoginAttempts}
           onChangeText={(value) => updateField('maxLoginAttempts', value)}
           keyboardType="number-pad"
@@ -240,7 +239,7 @@ export default function SystemSecurityScreen() {
         />
 
         <AppInput
-          label="Tiempo de bloqueo temporal (minutos)"
+          label={t('securitySettings.loginLockoutMinutes')}
           value={form.loginLockoutMinutes}
           onChangeText={(value) => updateField('loginLockoutMinutes', value)}
           keyboardType="number-pad"
@@ -248,7 +247,7 @@ export default function SystemSecurityScreen() {
         />
 
         <AppInput
-          label="Sesión maxima absoluta (horas, 0 desactiva)"
+          label={t('securitySettings.absoluteSessionTimeout')}
           value={form.absoluteSessionTimeoutHours}
           onChangeText={(value) => updateField('absoluteSessionTimeoutHours', value)}
           keyboardType="number-pad"
@@ -262,21 +261,21 @@ export default function SystemSecurityScreen() {
 
       <View style={styles.actions}>
         <AppButton
-          title={saving ? 'Guardando...' : 'Guardar parametros'}
+          title={saving ? t('securitySettings.saving') : t('securitySettings.save')}
           onPress={save}
           loading={saving}
           disabled={loading || saving || Boolean(validationMessage)}
           disabledReason={saveBlockedReason}
         />
         <AppButton
-          title="Recargar"
+          title={t('securitySettings.reload')}
           variant="secondary"
           onPress={loadSettings}
           disabled={loading || saving}
           style={styles.secondaryAction}
         />
       </View>
-    </AppScreen>
+    </AppShellPage>
   );
 }
 
