@@ -60,6 +60,10 @@ La deuda restante queda acotada a estados/codigos retornados por backend y a pan
 
 PRODUCT-D6.5 agrega i18n visible para `/system-security` y `/system-sessions` mediante `securitySettings.*` y `securitySessions.*`, junto con la migracion de ambas rutas a `AppShellPage`.
 
+## Actualizacion PRODUCT-I18N-A
+
+PRODUCT-I18N-A amplia la base i18n de `es/en` a `pt-BR`, `fr`, `ja`, `zh` y `ko`. El selector de `/system` deja de estar limitado a dos idiomas y `services/i18n.ts` registra recursos completos por idioma con fallback seguro. Las traducciones nuevas son base de QA tecnico y requieren revision humana/nativa antes de release internacional.
+
 ## Validacion manual esperada
 
 1. Entrar con `qa.admin@local.test`.

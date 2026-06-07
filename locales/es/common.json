@@ -2,7 +2,12 @@
   "language": {
     "label": "Idioma",
     "spanish": "Español",
-    "english": "Inglés"
+    "english": "Inglés",
+    "portugueseBrazil": "Português Brasil",
+    "french": "Français",
+    "japanese": "日本語",
+    "chineseSimplified": "中文",
+    "korean": "한국어"
   },
   "common": {
     "close": "Cerrar",

@@ -311,3 +311,11 @@ PRODUCT-D6.5 audita automaticamente rutas `app/*.tsx`, migra `/system-security` 
 Fecha: 2026-06-06
 
 PRODUCT-D6.6 extiende el AppShell premium a rutas visibles de clientes, apartados/reservas, usuarios, inventario/lotes, pedidos y paquetes de cliente. La fase no cambia tokens ni reglas de negocio; reduce pantallas legacy y deja pendiente una limpieza de i18n profundo por dominio.
+
+---
+
+## Continuidad PRODUCT-I18N-A - Base multi-idioma
+
+Fecha: 2026-06-06
+
+PRODUCT-I18N-A agrega soporte base para `pt-BR`, `fr`, `ja`, `zh` y `ko` sin incorporar fuentes externas ni cambiar tokens visuales. La validacion visual debe revisar que AppShell, sidebar, botones, cards y theme toggle soporten textos largos y scripts asiaticos en light/dark y presets existentes. Las traducciones nuevas requieren revision humana/nativa antes de release internacional.

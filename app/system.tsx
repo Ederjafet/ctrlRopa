@@ -6,7 +6,7 @@ import AppInfoCard from '@/components/ui/AppInfoCard';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { hasPermission, hasRole } from '@/services/accessControl';
-import { changeAppLanguage } from '@/services/i18n';
+import { changeAppLanguage, type SupportedLanguage } from '@/services/i18n';
 import { canConfigureSystem } from '@/services/livePermissionGuards';
 import {
   DEFAULT_LIVE_LAYOUT_PREFERENCES,
@@ -25,6 +25,23 @@ type SystemTileProps = {
   description: string;
   onPress: () => void;
 };
+
+const LANGUAGE_OPTIONS: { code: SupportedLanguage; labelKey: string }[] = [
+  { code: 'es', labelKey: 'language.spanish' },
+  { code: 'en', labelKey: 'language.english' },
+  { code: 'pt-BR', labelKey: 'language.portugueseBrazil' },
+  { code: 'fr', labelKey: 'language.french' },
+  { code: 'ja', labelKey: 'language.japanese' },
+  { code: 'zh', labelKey: 'language.chineseSimplified' },
+  { code: 'ko', labelKey: 'language.korean' },
+];
+
+function isActiveLanguage(currentLanguage: string, optionLanguage: SupportedLanguage) {
+  return currentLanguage
+    .toLowerCase()
+    .replace('_', '-')
+    .startsWith(optionLanguage.toLowerCase());
+}
 
 export default function SystemScreen() {
   const router = useRouter();
@@ -75,44 +92,28 @@ export default function SystemScreen() {
       <AppInfoCard title={t('system.languageTitle')}>
         <AppText>{t('system.languageHelp')}</AppText>
         <View style={styles.languageRow}>
-          <Pressable
-            onPress={() => void changeAppLanguage('es')}
-            style={({ pressed }) => [
-              styles.languageOption,
-              {
-                backgroundColor: pressed
-                  ? theme.colors.optionPressedBackground
-                  : theme.colors.surface,
-                borderColor: i18n.language.startsWith('es')
-                  ? theme.colors.accent
-                  : theme.colors.border,
-                borderRadius: theme.radius.md,
-              },
-            ]}
-          >
-            <AppText bold={i18n.language.startsWith('es')}>
-              {t('language.spanish')}
-            </AppText>
-          </Pressable>
-          <Pressable
-            onPress={() => void changeAppLanguage('en')}
-            style={({ pressed }) => [
-              styles.languageOption,
-              {
-                backgroundColor: pressed
-                  ? theme.colors.optionPressedBackground
-                  : theme.colors.surface,
-                borderColor: i18n.language.startsWith('en')
-                  ? theme.colors.accent
-                  : theme.colors.border,
-                borderRadius: theme.radius.md,
-              },
-            ]}
-          >
-            <AppText bold={i18n.language.startsWith('en')}>
-              {t('language.english')}
-            </AppText>
-          </Pressable>
+          {LANGUAGE_OPTIONS.map((languageOption) => {
+            const active = isActiveLanguage(i18n.language, languageOption.code);
+
+            return (
+              <Pressable
+                key={languageOption.code}
+                onPress={() => void changeAppLanguage(languageOption.code)}
+                style={({ pressed }) => [
+                  styles.languageOption,
+                  {
+                    backgroundColor: pressed
+                      ? theme.colors.optionPressedBackground
+                      : theme.colors.surface,
+                    borderColor: active ? theme.colors.accent : theme.colors.border,
+                    borderRadius: theme.radius.md,
+                  },
+                ]}
+              >
+                <AppText bold={active}>{t(languageOption.labelKey)}</AppText>
+              </Pressable>
+            );
+          })}
         </View>
       </AppInfoCard>
 
