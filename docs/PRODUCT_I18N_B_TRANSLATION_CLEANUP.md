@@ -150,3 +150,7 @@ No se tocaron pagos/caja. Por eso `payments.*` puede seguir usando fallback de i
 ## Decision
 
 GO tecnico condicionado a QA visual y revision humana/nativa de traducciones antes de release internacional.
+
+## Continuidad PRODUCT-I18N-B.1
+
+PRODUCT-I18N-B.1 corrige claves crudas detectadas despues de la limpieza, en particular `live.size` y `live.noCustomerSelected`, y define un glosario de prestamos linguisticos controlados. Se mantiene `LIVE`, `QR`, `URL`, `API`, `ID`, `CSV` y `UI Kit` como terminos tecnicos cuando aplica; en japones el item de navegacion queda como `UIキット` para mejorar consistencia visual.

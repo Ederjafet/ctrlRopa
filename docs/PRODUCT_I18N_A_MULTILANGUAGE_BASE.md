@@ -102,3 +102,7 @@ No se agregan fuentes externas ni assets de fuentes. La validacion visual espera
 ## Continuidad PRODUCT-I18N-B
 
 PRODUCT-I18N-B corrige mezclas visibles detectadas en QA, especialmente en `/live` con idiomas asiaticos activos. La fase reduce valores heredados de ingles/espanol en `live.*`, `operationalScreens.*`, pantallas de sistema y formularios cercanos al AppShell, manteniendo estructura completa de claves y sin tocar pagos/caja.
+
+## Continuidad PRODUCT-I18N-B.1
+
+PRODUCT-I18N-B.1 agrega glosario i18n para distinguir terminos operativos traducibles de prestamos tecnicos controlados. Tambien corrige claves crudas visibles (`live.size`, `live.noCustomerSelected`) y mantiene el criterio de revision humana/nativa antes de release internacional.

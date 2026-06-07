@@ -327,3 +327,11 @@ PRODUCT-I18N-A agrega soporte base para `pt-BR`, `fr`, `ja`, `zh` y `ko` sin inc
 Fecha: 2026-06-06
 
 PRODUCT-I18N-B reduce mezclas visibles de idioma en LIVE, AppShell, sistema y formularios cercanos. No agrega fuentes ni cambia tokens; la revision visual debe enfocarse en overflow, legibilidad de scripts asiaticos, textos largos en frances/portugues y consistencia light/dark. La revision nativa sigue siendo requisito antes de release internacional.
+
+---
+
+## Continuidad PRODUCT-I18N-B.1 - Prestamos tecnicos y claves crudas
+
+Fecha: 2026-06-06
+
+PRODUCT-I18N-B.1 define un glosario visual para terminos tecnicos que pueden mantenerse como prestamos (`LIVE`, `QR`, `URL`, `UI Kit`, `API`, `ID`, `CSV`) y corrige claves crudas de LIVE. La revision visual debe asegurar que esos prestamos no rompan jerarquia, contraste, sidebar, dark mode ni responsive.

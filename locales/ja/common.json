@@ -217,6 +217,7 @@
     "productOnAirChip": "オンエア",
     "itemPlaceholder": "商品",
     "itemCodeLabel": "商品 コード",
+    "size": "サイズ",
     "color": "色",
     "noColor": "なし 色",
     "stock": "在庫",
@@ -580,6 +581,7 @@
     "selectCustomerModal": "選択 顧客",
     "searchCustomer": "検索 顧客",
     "noActiveCustomers": "なし 現在 顧客",
+    "noCustomerSelected": "顧客未選択",
     "selectItemModal": "選択 商品",
     "searchItemPlaceholder": "コード、種類、ブランド、サイズで検索",
     "noAvailableItems": "なし 利用可能 商品",
@@ -798,7 +800,7 @@
       "securityAudit": "セキュリティ監査",
       "devSecurity": "開発セキュリティ",
       "sessionsLocks": "セッションとロック",
-      "uiKit": "UI Kit"
+      "uiKit": "UIキット"
     },
     "noRole": "ロールなし"
   },

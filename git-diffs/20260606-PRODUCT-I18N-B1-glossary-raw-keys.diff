@@ -1,0 +1,458 @@
+diff --git a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+index 26a034c..46b3d3b 100644
+--- a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
++++ b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+@@ -327,3 +327,11 @@ PRODUCT-I18N-A agrega soporte base para `pt-BR`, `fr`, `ja`, `zh` y `ko` sin inc
+ Fecha: 2026-06-06
+
+ PRODUCT-I18N-B reduce mezclas visibles de idioma en LIVE, AppShell, sistema y formularios cercanos. No agrega fuentes ni cambia tokens; la revision visual debe enfocarse en overflow, legibilidad de scripts asiaticos, textos largos en frances/portugues y consistencia light/dark. La revision nativa sigue siendo requisito antes de release internacional.
++
++---
++
++## Continuidad PRODUCT-I18N-B.1 - Prestamos tecnicos y claves crudas
++
++Fecha: 2026-06-06
++
++PRODUCT-I18N-B.1 define un glosario visual para terminos tecnicos que pueden mantenerse como prestamos (`LIVE`, `QR`, `URL`, `UI Kit`, `API`, `ID`, `CSV`) y corrige claves crudas de LIVE. La revision visual debe asegurar que esos prestamos no rompan jerarquia, contraste, sidebar, dark mode ni responsive.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index 765e9e7..cb04cc1 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -234,3 +234,14 @@ Agregar a la corrida manual de limpieza de idioma:
+ - confirmar que `LIVE`, `QR`, `URL` y placeholders `{{...}}` se conservan como terminos tecnicos cuando aplica;
+ - confirmar que pagos/caja no se consideran parte de esta fase;
+ - validar light/dark.
++
++## Nota PRODUCT-I18N-B.1
++
++Agregar a la corrida manual:
++
++- abrir `/live` en japones, chino y coreano;
++- confirmar que no aparece la clave cruda `live.size`;
++- confirmar que talla aparece localizada;
++- revisar que `UI Kit`/`UIキット` no se vea roto en sidebar ni en modo oscuro;
++- confirmar que `LIVE`, `QR`, `URL`, `API`, `ID` y `CSV` se mantienen como prestamos tecnicos cuando aparezcan;
++- confirmar que no aparecen claves crudas `live.*`, `navigation.*`, `system.*`, `common.*` en los flujos principales.
+diff --git a/docs/PRODUCT_I18N_A_MULTILANGUAGE_BASE.md b/docs/PRODUCT_I18N_A_MULTILANGUAGE_BASE.md
+index e96f9d4..24d7d3a 100644
+--- a/docs/PRODUCT_I18N_A_MULTILANGUAGE_BASE.md
++++ b/docs/PRODUCT_I18N_A_MULTILANGUAGE_BASE.md
+@@ -102,3 +102,7 @@ No se agregan fuentes externas ni assets de fuentes. La validacion visual espera
+ ## Continuidad PRODUCT-I18N-B
+
+ PRODUCT-I18N-B corrige mezclas visibles detectadas en QA, especialmente en `/live` con idiomas asiaticos activos. La fase reduce valores heredados de ingles/espanol en `live.*`, `operationalScreens.*`, pantallas de sistema y formularios cercanos al AppShell, manteniendo estructura completa de claves y sin tocar pagos/caja.
++
++## Continuidad PRODUCT-I18N-B.1
++
++PRODUCT-I18N-B.1 agrega glosario i18n para distinguir terminos operativos traducibles de prestamos tecnicos controlados. Tambien corrige claves crudas visibles (`live.size`, `live.noCustomerSelected`) y mantiene el criterio de revision humana/nativa antes de release internacional.
+diff --git a/docs/PRODUCT_I18N_B1_GLOSSARY_RAW_KEYS.md b/docs/PRODUCT_I18N_B1_GLOSSARY_RAW_KEYS.md
+new file mode 100644
+index 0000000..d0c339b
+--- /dev/null
++++ b/docs/PRODUCT_I18N_B1_GLOSSARY_RAW_KEYS.md
+@@ -0,0 +1,146 @@
++# PRODUCT-I18N-B.1 - Glosario i18n, prestamos linguisticos y claves crudas
++
++Fecha: 2026-06-06
++
++## Objetivo
++
++Cerrar problemas visibles de i18n posteriores a PRODUCT-I18N-B:
++
++- corregir claves crudas visibles en UI;
++- definir un glosario de terminos traducibles y no traducibles;
++- documentar prestamos linguisticos controlados;
++- ajustar el caso visual de `UI Kit` sin cambiar logica funcional.
++
++No se modifica backend, AUTH/RBAC, pagos, caja, reportes backend, billing, IA, endpoints ni reglas LIVE.
++
++## Problema detectado
++
++QA visual detecto que `/live` mostraba la clave cruda:
++
++```text
++live.size
++```
++
++La causa fue una clave usada en `app/live.tsx`:
++
++```text
++t('live.size')
++```
++
++pero no definida en `locales/*/common.json`.
++
++Durante la auditoria estatica tambien se detecto otra clave faltante potencial:
++
++```text
++live.noCustomerSelected
++```
++
++## Correccion aplicada
++
++Se agregaron las claves a los siete idiomas:
++
++| Idioma | `live.size` | `live.noCustomerSelected` |
++| --- | --- | --- |
++| `es` | Talla | Cliente no seleccionado |
++| `en` | Size | No customer selected |
++| `pt-BR` | Tamanho | Nenhum cliente selecionado |
++| `fr` | Taille | Aucun client sélectionné |
++| `ja` | サイズ | 顧客未選択 |
++| `zh` | 尺码 | 未选择客户 |
++| `ko` | 사이즈 | 선택된 고객 없음 |
++
++## Auditoria de claves crudas
++
++Se auditaron claves estaticas usadas por `t('...')` e `i18n.t('...')` en `app/` y `components/`.
++
++Resultado posterior:
++
++```text
++static i18n keys=948
++missing=0
++```
++
++Se mantiene estructura completa:
++
++```text
++es: leaves=1087 missing=0 extra=0
++en: leaves=1087 missing=0 extra=0
++pt-BR: leaves=1087 missing=0 extra=0
++fr: leaves=1087 missing=0 extra=0
++ja: leaves=1087 missing=0 extra=0
++zh: leaves=1087 missing=0 extra=0
++ko: leaves=1087 missing=0 extra=0
++```
++
++## Glosario de prestamos linguisticos controlados
++
++Estos terminos se pueden mantener sin traduccion cuando aparecen como marca, sigla o concepto tecnico universal:
++
++| Termino | Decision |
++| --- | --- |
++| LIVE | Mantener. Es nombre operativo del modulo. |
++| QR | Mantener. Sigla tecnica universal. |
++| URL | Mantener. Sigla tecnica universal. |
++| UI Kit | Mantener como prestamo tecnico; en japones se usa `UIキット` por consistencia visual. |
++| API | Mantener. Sigla tecnica. |
++| ID | Mantener. Identificador tecnico. |
++| CSV | Mantener. Formato tecnico. |
++| Excel | Mantener si aparece como producto/formato. |
++| SKU | Mantener si aparece como codigo de inventario. |
++| AppShell | Mantener solo en documentacion tecnica; evitarlo como label operativo de usuario. |
++
++## Terminos operativos traducibles
++
++Estos terminos si deben traducirse en UI visible porque describen acciones o conceptos operativos para usuarios:
++
++| Ingles / tecnico | ES | PT-BR | FR | JA | ZH | KO |
++| --- | --- | --- | --- | --- | --- | --- |
++| Size | Talla | Tamanho | Taille | サイズ | 尺码 | 사이즈 |
++| Customer | Cliente | Cliente | Client | 顧客 | 客户 | 고객 |
++| Hold | Apartado | Apartado | Mise de côté | 取り置き | 预留 | 홀드 |
++| Item | Prenda | Peça | Article | 商品 | 商品 | 상품 |
++| Price | Precio | Preço | Prix | 価格 | 价格 | 가격 |
++| Branch | Sucursal | Filial | Succursale | 店舗 | 门店 | 지점 |
++| Status | Estado | Status | État | ステータス | 状态 | 상태 |
++| Refresh | Actualizar | Atualizar | Actualiser | 更新 | 刷新 | 새로고침 |
++| Sign out | Cerrar sesión | Sair | Se déconnecter | サインアウト | 退出登录 | 로그아웃 |
++| Light | Claro | Claro | Clair | ライト | 浅色 | 라이트 |
++| Dark | Oscuro | Escuro | Sombre | ダーク | 深色 | 다크 |
++| Available | Disponible | Disponível | Disponible | 利用可能 | 可用 | 사용 가능 |
++| Reserved | Reservada | Apartado | Mis de côté | 取り置き済み | 已预留 | 홀드됨 |
++
++## Decision sobre UI Kit
++
++`UI Kit` se mantiene como prestamo tecnico para `es`, `en`, `pt-BR`, `fr`, `zh` y `ko`.
++
++Para `ja` se ajusto el label visible a:
++
++```text
++UIキット
++```
++
++Motivo:
++
++- mantiene el prestamo tecnico `UI`;
++- evita que el sidebar se vea como mezcla abrupta de latin + japones;
++- conserva una forma comun y reconocible para usuarios tecnicos japoneses.
++
++No se cambio layout ni logica del sidebar.
++
++## Validacion manual esperada
++
++1. Abrir `/system`.
++2. Cambiar a japones.
++3. Abrir `/live`.
++4. Confirmar que no aparece `live.size`.
++5. Confirmar que talla aparece como `サイズ`.
++6. Confirmar que `UIキット` se ve correcto en el sidebar.
++7. Repetir en chino y coreano.
++8. Confirmar que `LIVE`, `QR` y `URL` se conservan como prestamos tecnicos.
++9. Validar light/dark.
++
++## Limitaciones
++
++- Las traducciones siguen siendo base tecnica y requieren revision humana/nativa antes de release internacional.
++- No se traducen codigos tecnicos, permisos, rutas, IDs ni estados backend cuando son datos.
++- No se tocan pagos/caja en esta fase.
+diff --git a/docs/PRODUCT_I18N_B_TRANSLATION_CLEANUP.md b/docs/PRODUCT_I18N_B_TRANSLATION_CLEANUP.md
+index f4cab7b..ec1d80d 100644
+--- a/docs/PRODUCT_I18N_B_TRANSLATION_CLEANUP.md
++++ b/docs/PRODUCT_I18N_B_TRANSLATION_CLEANUP.md
+@@ -150,3 +150,7 @@ No se tocaron pagos/caja. Por eso `payments.*` puede seguir usando fallback de i
+ ## Decision
+
+ GO tecnico condicionado a QA visual y revision humana/nativa de traducciones antes de release internacional.
++
++## Continuidad PRODUCT-I18N-B.1
++
++PRODUCT-I18N-B.1 corrige claves crudas detectadas despues de la limpieza, en particular `live.size` y `live.noCustomerSelected`, y define un glosario de prestamos linguisticos controlados. Se mantiene `LIVE`, `QR`, `URL`, `API`, `ID`, `CSV` y `UI Kit` como terminos tecnicos cuando aplica; en japones el item de navegacion queda como `UIキット` para mejorar consistencia visual.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index c1af8f1..b2f7bcf 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -217,6 +217,7 @@
+     "productOnAirChip": "On air",
+     "itemPlaceholder": "No photo",
+     "itemCodeLabel": "Code",
++    "size": "Size",
+     "color": "Color",
+     "noColor": "No color",
+     "stock": "Stock",
+@@ -580,6 +581,7 @@
+     "selectCustomerModal": "Select customer",
+     "searchCustomer": "Search customer",
+     "noActiveCustomers": "There are no active customers.",
++    "noCustomerSelected": "No customer selected",
+     "selectItemModal": "Select item",
+     "searchItemPlaceholder": "Search by code, type, brand, or size",
+     "noAvailableItems": "There are no available items.",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index 3f635f1..178fd56 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -217,6 +217,7 @@
+     "productOnAirChip": "Al aire",
+     "itemPlaceholder": "Sin foto",
+     "itemCodeLabel": "Codigo",
++    "size": "Talla",
+     "color": "Color",
+     "noColor": "Sin color",
+     "stock": "Stock",
+@@ -577,6 +578,7 @@
+     "selectCustomerModal": "Seleccionar cliente",
+     "searchCustomer": "Buscar cliente",
+     "noActiveCustomers": "No hay clientes activos.",
++    "noCustomerSelected": "Cliente no seleccionado",
+     "selectItemModal": "Seleccionar prenda",
+     "searchItemPlaceholder": "Buscar por código, tipo, marca o talla",
+     "noAvailableItems": "No hay prendas disponibles.",
+diff --git a/locales/fr/common.json b/locales/fr/common.json
+index 35304e8..73112ec 100644
+--- a/locales/fr/common.json
++++ b/locales/fr/common.json
+@@ -217,6 +217,7 @@
+     "productOnAirChip": "À l'antenne",
+     "itemPlaceholder": "Article",
+     "itemCodeLabel": "Article code",
++    "size": "Taille",
+     "color": "Couleur",
+     "noColor": "Sans couleur",
+     "stock": "Stock",
+@@ -580,6 +581,7 @@
+     "selectCustomerModal": "Sélectionner client",
+     "searchCustomer": "Rechercher client",
+     "noActiveCustomers": "Sans actif clients",
++    "noCustomerSelected": "Aucun client sélectionné",
+     "selectItemModal": "Sélectionner article",
+     "searchItemPlaceholder": "Rechercher par code, type, marque ou taille",
+     "noAvailableItems": "Sans disponible articles",
+diff --git a/locales/ja/common.json b/locales/ja/common.json
+index 1fc6328..21e0424 100644
+--- a/locales/ja/common.json
++++ b/locales/ja/common.json
+@@ -217,6 +217,7 @@
+     "productOnAirChip": "オンエア",
+     "itemPlaceholder": "商品",
+     "itemCodeLabel": "商品 コード",
++    "size": "サイズ",
+     "color": "色",
+     "noColor": "なし 色",
+     "stock": "在庫",
+@@ -580,6 +581,7 @@
+     "selectCustomerModal": "選択 顧客",
+     "searchCustomer": "検索 顧客",
+     "noActiveCustomers": "なし 現在 顧客",
++    "noCustomerSelected": "顧客未選択",
+     "selectItemModal": "選択 商品",
+     "searchItemPlaceholder": "コード、種類、ブランド、サイズで検索",
+     "noAvailableItems": "なし 利用可能 商品",
+@@ -798,7 +800,7 @@
+       "securityAudit": "セキュリティ監査",
+       "devSecurity": "開発セキュリティ",
+       "sessionsLocks": "セッションとロック",
+-      "uiKit": "UI Kit"
++      "uiKit": "UIキット"
+     },
+     "noRole": "ロールなし"
+   },
+diff --git a/locales/ko/common.json b/locales/ko/common.json
+index f7784b6..3a0b5fc 100644
+--- a/locales/ko/common.json
++++ b/locales/ko/common.json
+@@ -217,6 +217,7 @@
+     "productOnAirChip": "방송 중",
+     "itemPlaceholder": "상품",
+     "itemCodeLabel": "상품 코드",
++    "size": "사이즈",
+     "color": "색상",
+     "noColor": "없음 색상",
+     "stock": "재고",
+@@ -580,6 +581,7 @@
+     "selectCustomerModal": "선택 고객",
+     "searchCustomer": "검색 고객",
+     "noActiveCustomers": "없음 현재 고객",
++    "noCustomerSelected": "선택된 고객 없음",
+     "selectItemModal": "선택 상품",
+     "searchItemPlaceholder": "코드, 유형, 브랜드 또는 사이즈로 검색",
+     "noAvailableItems": "없음 사용 가능 상품",
+diff --git a/locales/pt-BR/common.json b/locales/pt-BR/common.json
+index f5e90cb..91f31ec 100644
+--- a/locales/pt-BR/common.json
++++ b/locales/pt-BR/common.json
+@@ -217,6 +217,7 @@
+     "productOnAirChip": "No ar",
+     "itemPlaceholder": "Peça",
+     "itemCodeLabel": "Peça código",
++    "size": "Tamanho",
+     "color": "Cor",
+     "noColor": "Sem cor",
+     "stock": "Estoque",
+@@ -580,6 +581,7 @@
+     "selectCustomerModal": "Selecionar cliente",
+     "searchCustomer": "Buscar cliente",
+     "noActiveCustomers": "Sem ativo clientes",
++    "noCustomerSelected": "Nenhum cliente selecionado",
+     "selectItemModal": "Selecionar peça",
+     "searchItemPlaceholder": "Buscar por código, tipo, marca ou tamanho",
+     "noAvailableItems": "Sem disponível peças",
+diff --git a/locales/zh/common.json b/locales/zh/common.json
+index 2e5ecf6..80d5c54 100644
+--- a/locales/zh/common.json
++++ b/locales/zh/common.json
+@@ -217,6 +217,7 @@
+     "productOnAirChip": "直播中",
+     "itemPlaceholder": "商品",
+     "itemCodeLabel": "商品代码",
++    "size": "尺码",
+     "color": "颜色",
+     "noColor": "无颜色",
+     "stock": "库存",
+@@ -580,6 +581,7 @@
+     "selectCustomerModal": "选择客户",
+     "searchCustomer": "搜索客户",
+     "noActiveCustomers": "无当前客户",
++    "noCustomerSelected": "未选择客户",
+     "selectItemModal": "选择商品",
+     "searchItemPlaceholder": "按代码、类型、品牌或尺码搜索",
+     "noAvailableItems": "无可用商品",
+diff --git a/qa-reports/PRODUCT-I18N-B1-glossary-raw-keys-report-20260606-230800.md b/qa-reports/PRODUCT-I18N-B1-glossary-raw-keys-report-20260606-230800.md
+new file mode 100644
+index 0000000..5c6cf61
+--- /dev/null
++++ b/qa-reports/PRODUCT-I18N-B1-glossary-raw-keys-report-20260606-230800.md
+@@ -0,0 +1,92 @@
++# PRODUCT-I18N-B.1 - Glosario i18n, prestamos linguisticos y claves crudas
++
++Fecha: 2026-06-06 23:08:00 America/Mexico_City
++Rama: feature/product-i18n-b1-glossary-raw-keys
++
++## Alcance
++
++- Corregir la clave cruda visible `live.size` en LIVE.
++- Revisar claves i18n usadas estaticamente en `app/` y `components/`.
++- Agregar la clave faltante `live.noCustomerSelected`.
++- Definir glosario de terminos traducibles y prestamos linguisticos controlados.
++- Mantener `UI Kit` como prestamo tecnico, con `UIキット` en japones por legibilidad.
++
++## Correcciones
++
++| Clave | ES | EN | PT-BR | FR | JA | ZH | KO |
++| --- | --- | --- | --- | --- | --- | --- | --- |
++| `live.size` | Talla | Size | Tamanho | Taille | サイズ | 尺码 | 사이즈 |
++| `live.noCustomerSelected` | Cliente no seleccionado | No customer selected | Nenhum cliente selecionado | Aucun client sélectionné | 顧客未選択 | 未选择客户 | 선택된 고객 없음 |
++
++## Auditoria i18n
++
++Estructura de locales:
++
++- es: leaves=1087 missing=0 extra=0
++- en: leaves=1087 missing=0 extra=0
++- pt-BR: leaves=1087 missing=0 extra=0
++- fr: leaves=1087 missing=0 extra=0
++- ja: leaves=1087 missing=0 extra=0
++- zh: leaves=1087 missing=0 extra=0
++- ko: leaves=1087 missing=0 extra=0
++
++Uso estatico de `t('...')` en `app/` y `components/`:
++
++- static i18n keys=948
++- missing=0
++
++## Glosario
++
++Prestamos linguisticos controlados:
++
++- LIVE
++- QR
++- URL
++- UI Kit
++- API
++- ID
++- CSV
++- Excel
++- SKU
++- AppShell solo en documentacion tecnica
++
++Terminos operativos traducibles:
++
++- Size / Talla
++- Customer / Cliente
++- Hold / Apartado
++- Item / Prenda
++- Price / Precio
++- Branch / Sucursal
++- Status / Estado
++- Refresh / Actualizar
++- Sign out / Cerrar sesion
++- Light / Claro
++- Dark / Oscuro
++- Available / Disponible
++- Reserved / Reservada
++
++## Validaciones ejecutadas
++
++- `npm.cmd run lint`: PASS, 0 errores, 53 advertencias preexistentes.
++- `npx.cmd tsc --noEmit`: PASS.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: PASS.
++- `backend/control-ropa/.\\mvnw.cmd test`: PASS, 73 tests, 0 fallas, 0 errores.
++- `backend/control-ropa/.\\mvnw.cmd -q -DskipTests package`: PASS.
++- `git --no-pager diff --check`: PASS.
++
++## Validacion manual esperada
++
++1. Abrir `/system`.
++2. Cambiar a japones.
++3. Abrir `/live`.
++4. Confirmar que no aparece `live.size`.
++5. Confirmar que talla aparece como `サイズ`.
++6. Confirmar que `UIキット` no se ve roto en sidebar.
++7. Repetir revision de talla en chino (`尺码`) y coreano (`사이즈`).
++8. Confirmar que LIVE, QR y URL se mantienen como prestamos tecnicos.
++9. Validar light/dark.
++
++## Resultado
++
++GO tecnico para QA manual de PRODUCT-I18N-B.1. Las traducciones base siguen requiriendo revision humana/nativa antes de release internacional.
