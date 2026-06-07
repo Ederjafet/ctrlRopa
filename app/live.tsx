@@ -12,6 +12,7 @@ import {
   LiveMetricCard,
   LiveWarningCard,
 } from '@/components/live/LiveCommerceCards';
+import AppActionDialog from '@/components/ui/AppActionDialog';
 import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
@@ -77,7 +78,6 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Modal,
   Pressable,
   StyleSheet,
   View,
@@ -93,6 +93,14 @@ type LiveNotice = {
   title: string;
   message: string;
   tone: 'success' | 'warning' | 'danger';
+};
+
+type LiveReservationIssue = {
+  detail: string;
+  action: 'customer' | 'item' | 'none';
+  title?: string;
+  message?: string;
+  tone?: 'info' | 'warning' | 'danger' | 'success';
 };
 
 type AuthorizationRequestContext =
@@ -386,38 +394,21 @@ function getLiveEventTone(eventType: string): ActivityFeedEvent['tone'] {
 }
 
 function LiveNoticeModal({ notice, onClose }: LiveNoticeModalProps) {
-  const { theme } = useAppTheme();
   const { t } = useTranslation('common');
 
-  const color =
-    notice?.tone === 'danger'
-      ? theme.colors.danger
-      : notice?.tone === 'warning'
-        ? theme.colors.warning
-        : theme.colors.success;
-
   return (
-    <Modal visible={!!notice} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={[styles.noticeBackdrop, { backgroundColor: theme.colors.backdrop }]}>
-        <View
-          style={[
-            styles.noticeDialog,
-            {
-              backgroundColor: theme.colors.modalBackground,
-              borderColor: color,
-              borderRadius: theme.radius.lg,
-              padding: theme.spacing.lg,
-            },
-          ]}
-        >
-          <AppText variant="subtitle" bold color={color}>
-            {notice?.title}
-          </AppText>
-          <AppText>{notice?.message}</AppText>
-          <AppButton title={t('common.understood')} onPress={onClose} />
-        </View>
-      </View>
-    </Modal>
+    <AppActionDialog
+      visible={!!notice}
+      mode="modal"
+      title={notice?.title ?? ''}
+      message={notice?.message ?? ''}
+      variant={notice?.tone ?? 'info'}
+      primaryAction={{
+        label: t('common.understood'),
+        onPress: onClose,
+      }}
+      onClose={onClose}
+    />
   );
 }
 
@@ -444,7 +435,7 @@ export default function LiveScreen() {
   const [cancelReservationToConfirm, setCancelReservationToConfirm] = useState<number | null>(null);
   const [authorizationRequestContext, setAuthorizationRequestContext] =
     useState<AuthorizationRequestContext | null>(null);
-  const [reservationIssue, setReservationIssue] = useState<string | null>(null);
+  const [reservationIssue, setReservationIssue] = useState<LiveReservationIssue | null>(null);
   const [showDemoMetrics, setShowDemoMetrics] = useState(true);
   const [liveLayoutPreferences, setLiveLayoutPreferences] =
     useState<LiveLayoutPreferences>(DEFAULT_LIVE_LAYOUT_PREFERENCES);
@@ -1940,6 +1931,7 @@ export default function LiveScreen() {
     setSelectedCustomer(customer);
     setCustomerSearch('');
     setIsCustomerModalVisible(false);
+    setReservationIssue(null);
   };
 
   const selectItem = (item: Item) => {
@@ -1974,6 +1966,7 @@ export default function LiveScreen() {
     setSelectedItem(item);
     setItemSearch('');
     setIsItemModalVisible(false);
+    setReservationIssue(null);
 
     if (availability.warning) {
       setLiveNotice({
@@ -2034,6 +2027,7 @@ export default function LiveScreen() {
       );
       setActiveItemForReservation(activeItemFromLive(updated));
       setSelectedItem(null);
+      setReservationIssue(null);
       await updateLiveEvents(updated.id);
       setLiveNotice({
         title: isSwitchingPreparedItem
@@ -2151,6 +2145,60 @@ export default function LiveScreen() {
     addItemByCode(value);
   };
 
+  const openReservationIssue = (
+    detail: string,
+    action: LiveReservationIssue['action'] = 'none',
+    options: Partial<Omit<LiveReservationIssue, 'detail' | 'action'>> = {}
+  ) => {
+    setReservationIssue({
+      action,
+      detail,
+      message: t('live.reservationIssueBody'),
+      title: t('live.reservationIssueTitle'),
+      tone: 'warning',
+      ...options,
+    });
+  };
+
+  const openReservationIssueFromCurrentState = () => {
+    if (!selectedLive || !operatorFlowEnabled) {
+      openReservationIssue(t('live.reserveMissingLive'));
+      return;
+    }
+
+    if (!activeItem) {
+      openReservationIssue(t('live.reserveMissingActiveItem'));
+      return;
+    }
+
+    if (activeItemBlockingReservationForValidation) {
+      openReservationIssue(t('live.activeItemAlreadyReservedReason'), 'none', {
+        message: t('live.activeItemReservedNextStepHelp'),
+        title: t('live.activeItemAlreadyReservedTitle'),
+      });
+      return;
+    }
+
+    if (!hasValidReservationPrice) {
+      openReservationIssue(t('live.reserveMissingPrice'));
+      return;
+    }
+
+    if (!selectedCustomer) {
+      openReservationIssue(t('live.reserveMissingCustomer'), 'customer');
+      return;
+    }
+
+    if (!liveChannelId) {
+      openReservationIssue(t('live.channelReason'));
+      return;
+    }
+
+    if (!mayReserveLive) {
+      openReservationIssue(t('live.liveOperatePermissionError'));
+    }
+  };
+
   const validateReservation = () => {
     if (!session) {
       Alert.alert(t('live.sessionTitle'), t('live.noActiveSession'));
@@ -2158,45 +2206,48 @@ export default function LiveScreen() {
     }
 
     if (!mayReserveLive) {
-      setReservationIssue(t('live.liveOperatePermissionError'));
+      openReservationIssue(t('live.liveOperatePermissionError'));
       return false;
     }
 
     if (!selectedLive || !isLiveOperable(selectedLive)) {
-      Alert.alert(t('live.title'), t('live.selectOpenLiveReason'));
+      openReservationIssue(t('live.selectOpenLiveReason'));
       return false;
     }
 
     if (!liveChannelId) {
-      Alert.alert(t('live.title'), t('live.channelDisabled'));
+      openReservationIssue(t('live.channelReason'));
       return false;
     }
 
     if (!activeItem) {
-      Alert.alert(t('live.title'), t('live.reserveMissingActiveItem'));
+      openReservationIssue(t('live.reserveMissingActiveItem'));
       return false;
     }
 
     if (activeItemBlockingReservationForValidation) {
-      setReservationIssue(t('live.activeItemAlreadyReservedReason'));
+      openReservationIssue(t('live.activeItemAlreadyReservedReason'), 'none', {
+        message: t('live.activeItemReservedNextStepHelp'),
+        title: t('live.activeItemAlreadyReservedTitle'),
+      });
       return false;
     }
 
     const availability = getItemLiveAvailability(activeItem);
     if (!availability.canGoOnAir) {
-      setReservationIssue(t('live.itemNotAvailableForReservation'));
+      openReservationIssue(availability.reason || t('live.itemNotAvailableForReservation'), 'item');
       return false;
     }
 
     const price = Number(priceText);
 
     if (!priceText.trim() || Number.isNaN(price) || price <= 0) {
-      Alert.alert(t('live.title'), t('live.reserveMissingPrice'));
+      openReservationIssue(t('live.reserveMissingPrice'));
       return false;
     }
 
     if (!selectedCustomer) {
-      Alert.alert(t('live.title'), t('live.selectCustomerReason'));
+      openReservationIssue(t('live.reserveMissingCustomer'), 'customer');
       return false;
     }
 
@@ -2205,7 +2256,7 @@ export default function LiveScreen() {
 
   const handleCreateReservation = async () => {
     if (reservationPendingReason) {
-      setReservationIssue(reservationPendingReason);
+      openReservationIssueFromCurrentState();
       return;
     }
 
@@ -2293,6 +2344,7 @@ export default function LiveScreen() {
       setSelectedItem((current) =>
         current?.id === reservedItemId ? null : current
       );
+      setReservationIssue(null);
       setSelectedCustomer(null);
       setScanInput('');
 
@@ -2315,33 +2367,55 @@ export default function LiveScreen() {
   };
 
   const handleReservationIssueAction = () => {
-    const issue = reservationIssue || '';
-    const normalizedIssue = normalize(issue);
+    const action = reservationIssue?.action ?? 'none';
     setReservationIssue(null);
 
-    if (normalizedIssue.includes('cliente') || normalizedIssue.includes('customer')) {
+    if (action === 'customer') {
       setIsCustomerModalVisible(true);
       return;
     }
 
-    if (
-      normalizedIssue.includes('prenda') ||
-      normalizedIssue.includes('item')
-    ) {
+    if (action === 'item') {
       setIsItemModalVisible(true);
     }
   };
 
   const reservationIssueActionLabel =
-    reservationIssue &&
-    (normalize(reservationIssue).includes('cliente') ||
-      normalize(reservationIssue).includes('customer'))
+    reservationIssue?.action === 'customer'
       ? t('live.selectCustomer')
-      : reservationIssue &&
-          (normalize(reservationIssue).includes('prenda') ||
-            normalize(reservationIssue).includes('item'))
+      : reservationIssue?.action === 'item'
         ? t('live.searchItem')
         : t('common.understood');
+  const renderReservationIssuePanel = () =>
+    reservationIssue ? (
+      <AppActionDialog
+        visible
+        mode="contextual"
+        title={reservationIssue.title ?? t('live.reservationIssueTitle')}
+        message={reservationIssue.message ?? t('live.reservationIssueBody')}
+        details={[reservationIssue.detail]}
+        variant={reservationIssue.tone ?? 'warning'}
+        actionLayout="primaryLeft"
+        primaryAction={{
+          label: reservationIssueActionLabel,
+          onPress:
+            reservationIssue.action === 'none'
+              ? () => setReservationIssue(null)
+              : handleReservationIssueAction,
+        }}
+        secondaryAction={
+          reservationIssue.action === 'none'
+            ? undefined
+            : {
+                label: t('common.close'),
+                onPress: () => setReservationIssue(null),
+                variant: 'secondary',
+              }
+        }
+        onClose={() => setReservationIssue(null)}
+        style={styles.reservationIssuePanel}
+      />
+    ) : null;
   const renderOperatorItemCard = (
     item: Item | null,
     options: {
@@ -4064,6 +4138,7 @@ export default function LiveScreen() {
                           : reservationPendingReason}
                       </AppText>
                     ) : null}
+                    {renderReservationIssuePanel()}
                     <AppButton
                       title={t('live.operatorReserveNow')}
                       variant={activeItemBlockingReservationForValidation ? 'neutral' : 'primary'}
@@ -5157,6 +5232,8 @@ export default function LiveScreen() {
             keyboardType="numeric"
           />
 
+          {renderReservationIssuePanel()}
+
           <AppButton
             title={t('live.reserveNow')}
             onPress={handleCreateReservation}
@@ -5650,35 +5727,6 @@ export default function LiveScreen() {
               onPress={confirmCloseLive}
               loading={isSavingLive}
               disabled={isSavingLive}
-            />
-          </View>
-        </View>
-      </AppBottomModal>
-
-      <AppBottomModal
-        visible={reservationIssue !== null}
-        title={t('live.reservationIssueTitle')}
-        onClose={() => setReservationIssue(null)}
-        showCancelButton={false}
-      >
-        <AppText>
-          {t('live.reservationIssueBody')}
-        </AppText>
-        <AppText color={theme.colors.warning} bold>
-          {reservationIssue}
-        </AppText>
-        <View style={styles.buttonRow}>
-          <View style={styles.buttonFill}>
-            <AppButton
-              title={t('common.close')}
-              variant="secondary"
-              onPress={() => setReservationIssue(null)}
-            />
-          </View>
-          <View style={styles.buttonFill}>
-            <AppButton
-              title={reservationIssueActionLabel}
-              onPress={handleReservationIssueAction}
             />
           </View>
         </View>
@@ -6342,22 +6390,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  noticeBackdrop: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  noticeDialog: {
-    borderWidth: 1,
-    elevation: 5,
-    gap: 14,
-    maxWidth: 420,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    width: '100%',
-  },
   recentRow: {
     borderBottomWidth: 1,
     gap: 8,
@@ -6399,6 +6431,9 @@ const styles = StyleSheet.create({
   },
   reservationRiskCard: {
     marginTop: 4,
+  },
+  reservationIssuePanel: {
+    marginTop: 8,
   },
   sectionSpacing: {
     marginTop: 12,

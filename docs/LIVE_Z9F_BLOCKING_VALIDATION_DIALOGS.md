@@ -78,3 +78,11 @@ No se modifica:
 ## GO/NO-GO
 
 GO si las validaciones tecnicas pasan y la corrida manual confirma que el bloqueo se entiende como guia operativa, no como error tecnico.
+
+## Continuidad LIVE-Z9F.1
+
+LIVE-Z9F.1 extiende `AppActionDialog` para soportar `modal`, `contextual` e `inline`.
+
+- `items-create` conserva el modo `modal` para listas de campos faltantes.
+- LIVE usa modo `contextual` para bloqueos operativos como `No se puede agregar apartado`.
+- `actionLayout` deja preparado el orden de acciones para una futura ergonomia diestro/zurdo, sin configurar ni persistir preferencia todavia.

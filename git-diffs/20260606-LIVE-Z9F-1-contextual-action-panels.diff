@@ -1,0 +1,852 @@
+﻿diff --git a/app/live.tsx b/app/live.tsx
+index eea573e..f1225b0 100644
+--- a/app/live.tsx
++++ b/app/live.tsx
+@@ -12,6 +12,7 @@ import {
+   LiveMetricCard,
+   LiveWarningCard,
+ } from '@/components/live/LiveCommerceCards';
++import AppActionDialog from '@/components/ui/AppActionDialog';
+ import AppBottomModal from '@/components/ui/AppBottomModal';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+@@ -77,7 +78,6 @@ import {
+   ActivityIndicator,
+   Alert,
+   FlatList,
+-  Modal,
+   Pressable,
+   StyleSheet,
+   View,
+@@ -95,6 +95,14 @@ type LiveNotice = {
+   tone: 'success' | 'warning' | 'danger';
+ };
+
++type LiveReservationIssue = {
++  detail: string;
++  action: 'customer' | 'item' | 'none';
++  title?: string;
++  message?: string;
++  tone?: 'info' | 'warning' | 'danger' | 'success';
++};
++
+ type AuthorizationRequestContext =
+   | 'price'
+   | 'release'
+@@ -386,38 +394,21 @@ function getLiveEventTone(eventType: string): ActivityFeedEvent['tone'] {
+ }
+
+ function LiveNoticeModal({ notice, onClose }: LiveNoticeModalProps) {
+-  const { theme } = useAppTheme();
+   const { t } = useTranslation('common');
+
+-  const color =
+-    notice?.tone === 'danger'
+-      ? theme.colors.danger
+-      : notice?.tone === 'warning'
+-        ? theme.colors.warning
+-        : theme.colors.success;
+-
+   return (
+-    <Modal visible={!!notice} transparent animationType="fade" onRequestClose={onClose}>
+-      <View style={[styles.noticeBackdrop, { backgroundColor: theme.colors.backdrop }]}>
+-        <View
+-          style={[
+-            styles.noticeDialog,
+-            {
+-              backgroundColor: theme.colors.modalBackground,
+-              borderColor: color,
+-              borderRadius: theme.radius.lg,
+-              padding: theme.spacing.lg,
+-            },
+-          ]}
+-        >
+-          <AppText variant="subtitle" bold color={color}>
+-            {notice?.title}
+-          </AppText>
+-          <AppText>{notice?.message}</AppText>
+-          <AppButton title={t('common.understood')} onPress={onClose} />
+-        </View>
+-      </View>
+-    </Modal>
++    <AppActionDialog
++      visible={!!notice}
++      mode="modal"
++      title={notice?.title ?? ''}
++      message={notice?.message ?? ''}
++      variant={notice?.tone ?? 'info'}
++      primaryAction={{
++        label: t('common.understood'),
++        onPress: onClose,
++      }}
++      onClose={onClose}
++    />
+   );
+ }
+
+@@ -444,7 +435,7 @@ export default function LiveScreen() {
+   const [cancelReservationToConfirm, setCancelReservationToConfirm] = useState<number | null>(null);
+   const [authorizationRequestContext, setAuthorizationRequestContext] =
+     useState<AuthorizationRequestContext | null>(null);
+-  const [reservationIssue, setReservationIssue] = useState<string | null>(null);
++  const [reservationIssue, setReservationIssue] = useState<LiveReservationIssue | null>(null);
+   const [showDemoMetrics, setShowDemoMetrics] = useState(true);
+   const [liveLayoutPreferences, setLiveLayoutPreferences] =
+     useState<LiveLayoutPreferences>(DEFAULT_LIVE_LAYOUT_PREFERENCES);
+@@ -1940,6 +1931,7 @@ export default function LiveScreen() {
+     setSelectedCustomer(customer);
+     setCustomerSearch('');
+     setIsCustomerModalVisible(false);
++    setReservationIssue(null);
+   };
+
+   const selectItem = (item: Item) => {
+@@ -1974,6 +1966,7 @@ export default function LiveScreen() {
+     setSelectedItem(item);
+     setItemSearch('');
+     setIsItemModalVisible(false);
++    setReservationIssue(null);
+
+     if (availability.warning) {
+       setLiveNotice({
+@@ -2034,6 +2027,7 @@ export default function LiveScreen() {
+       );
+       setActiveItemForReservation(activeItemFromLive(updated));
+       setSelectedItem(null);
++      setReservationIssue(null);
+       await updateLiveEvents(updated.id);
+       setLiveNotice({
+         title: isSwitchingPreparedItem
+@@ -2151,6 +2145,60 @@ export default function LiveScreen() {
+     addItemByCode(value);
+   };
+
++  const openReservationIssue = (
++    detail: string,
++    action: LiveReservationIssue['action'] = 'none',
++    options: Partial<Omit<LiveReservationIssue, 'detail' | 'action'>> = {}
++  ) => {
++    setReservationIssue({
++      action,
++      detail,
++      message: t('live.reservationIssueBody'),
++      title: t('live.reservationIssueTitle'),
++      tone: 'warning',
++      ...options,
++    });
++  };
++
++  const openReservationIssueFromCurrentState = () => {
++    if (!selectedLive || !operatorFlowEnabled) {
++      openReservationIssue(t('live.reserveMissingLive'));
++      return;
++    }
++
++    if (!activeItem) {
++      openReservationIssue(t('live.reserveMissingActiveItem'));
++      return;
++    }
++
++    if (activeItemBlockingReservationForValidation) {
++      openReservationIssue(t('live.activeItemAlreadyReservedReason'), 'none', {
++        message: t('live.activeItemReservedNextStepHelp'),
++        title: t('live.activeItemAlreadyReservedTitle'),
++      });
++      return;
++    }
++
++    if (!hasValidReservationPrice) {
++      openReservationIssue(t('live.reserveMissingPrice'));
++      return;
++    }
++
++    if (!selectedCustomer) {
++      openReservationIssue(t('live.reserveMissingCustomer'), 'customer');
++      return;
++    }
++
++    if (!liveChannelId) {
++      openReservationIssue(t('live.channelReason'));
++      return;
++    }
++
++    if (!mayReserveLive) {
++      openReservationIssue(t('live.liveOperatePermissionError'));
++    }
++  };
++
+   const validateReservation = () => {
+     if (!session) {
+       Alert.alert(t('live.sessionTitle'), t('live.noActiveSession'));
+@@ -2158,45 +2206,48 @@ export default function LiveScreen() {
+     }
+
+     if (!mayReserveLive) {
+-      setReservationIssue(t('live.liveOperatePermissionError'));
++      openReservationIssue(t('live.liveOperatePermissionError'));
+       return false;
+     }
+
+     if (!selectedLive || !isLiveOperable(selectedLive)) {
+-      Alert.alert(t('live.title'), t('live.selectOpenLiveReason'));
++      openReservationIssue(t('live.selectOpenLiveReason'));
+       return false;
+     }
+
+     if (!liveChannelId) {
+-      Alert.alert(t('live.title'), t('live.channelDisabled'));
++      openReservationIssue(t('live.channelReason'));
+       return false;
+     }
+
+     if (!activeItem) {
+-      Alert.alert(t('live.title'), t('live.reserveMissingActiveItem'));
++      openReservationIssue(t('live.reserveMissingActiveItem'));
+       return false;
+     }
+
+     if (activeItemBlockingReservationForValidation) {
+-      setReservationIssue(t('live.activeItemAlreadyReservedReason'));
++      openReservationIssue(t('live.activeItemAlreadyReservedReason'), 'none', {
++        message: t('live.activeItemReservedNextStepHelp'),
++        title: t('live.activeItemAlreadyReservedTitle'),
++      });
+       return false;
+     }
+
+     const availability = getItemLiveAvailability(activeItem);
+     if (!availability.canGoOnAir) {
+-      setReservationIssue(t('live.itemNotAvailableForReservation'));
++      openReservationIssue(availability.reason || t('live.itemNotAvailableForReservation'), 'item');
+       return false;
+     }
+
+     const price = Number(priceText);
+
+     if (!priceText.trim() || Number.isNaN(price) || price <= 0) {
+-      Alert.alert(t('live.title'), t('live.reserveMissingPrice'));
++      openReservationIssue(t('live.reserveMissingPrice'));
+       return false;
+     }
+
+     if (!selectedCustomer) {
+-      Alert.alert(t('live.title'), t('live.selectCustomerReason'));
++      openReservationIssue(t('live.reserveMissingCustomer'), 'customer');
+       return false;
+     }
+
+@@ -2205,7 +2256,7 @@ export default function LiveScreen() {
+
+   const handleCreateReservation = async () => {
+     if (reservationPendingReason) {
+-      setReservationIssue(reservationPendingReason);
++      openReservationIssueFromCurrentState();
+       return;
+     }
+
+@@ -2293,6 +2344,7 @@ export default function LiveScreen() {
+       setSelectedItem((current) =>
+         current?.id === reservedItemId ? null : current
+       );
++      setReservationIssue(null);
+       setSelectedCustomer(null);
+       setScanInput('');
+
+@@ -2315,33 +2367,55 @@ export default function LiveScreen() {
+   };
+
+   const handleReservationIssueAction = () => {
+-    const issue = reservationIssue || '';
+-    const normalizedIssue = normalize(issue);
++    const action = reservationIssue?.action ?? 'none';
+     setReservationIssue(null);
+
+-    if (normalizedIssue.includes('cliente') || normalizedIssue.includes('customer')) {
++    if (action === 'customer') {
+       setIsCustomerModalVisible(true);
+       return;
+     }
+
+-    if (
+-      normalizedIssue.includes('prenda') ||
+-      normalizedIssue.includes('item')
+-    ) {
++    if (action === 'item') {
+       setIsItemModalVisible(true);
+     }
+   };
+
+   const reservationIssueActionLabel =
+-    reservationIssue &&
+-    (normalize(reservationIssue).includes('cliente') ||
+-      normalize(reservationIssue).includes('customer'))
++    reservationIssue?.action === 'customer'
+       ? t('live.selectCustomer')
+-      : reservationIssue &&
+-          (normalize(reservationIssue).includes('prenda') ||
+-            normalize(reservationIssue).includes('item'))
++      : reservationIssue?.action === 'item'
+         ? t('live.searchItem')
+         : t('common.understood');
++  const renderReservationIssuePanel = () =>
++    reservationIssue ? (
++      <AppActionDialog
++        visible
++        mode="contextual"
++        title={reservationIssue.title ?? t('live.reservationIssueTitle')}
++        message={reservationIssue.message ?? t('live.reservationIssueBody')}
++        details={[reservationIssue.detail]}
++        variant={reservationIssue.tone ?? 'warning'}
++        actionLayout="primaryLeft"
++        primaryAction={{
++          label: reservationIssueActionLabel,
++          onPress:
++            reservationIssue.action === 'none'
++              ? () => setReservationIssue(null)
++              : handleReservationIssueAction,
++        }}
++        secondaryAction={
++          reservationIssue.action === 'none'
++            ? undefined
++            : {
++                label: t('common.close'),
++                onPress: () => setReservationIssue(null),
++                variant: 'secondary',
++              }
++        }
++        onClose={() => setReservationIssue(null)}
++        style={styles.reservationIssuePanel}
++      />
++    ) : null;
+   const renderOperatorItemCard = (
+     item: Item | null,
+     options: {
+@@ -4064,6 +4138,7 @@ export default function LiveScreen() {
+                           : reservationPendingReason}
+                       </AppText>
+                     ) : null}
++                    {renderReservationIssuePanel()}
+                     <AppButton
+                       title={t('live.operatorReserveNow')}
+                       variant={activeItemBlockingReservationForValidation ? 'neutral' : 'primary'}
+@@ -5157,6 +5232,8 @@ export default function LiveScreen() {
+             keyboardType="numeric"
+           />
+
++          {renderReservationIssuePanel()}
++
+           <AppButton
+             title={t('live.reserveNow')}
+             onPress={handleCreateReservation}
+@@ -5655,35 +5732,6 @@ export default function LiveScreen() {
+         </View>
+       </AppBottomModal>
+
+-      <AppBottomModal
+-        visible={reservationIssue !== null}
+-        title={t('live.reservationIssueTitle')}
+-        onClose={() => setReservationIssue(null)}
+-        showCancelButton={false}
+-      >
+-        <AppText>
+-          {t('live.reservationIssueBody')}
+-        </AppText>
+-        <AppText color={theme.colors.warning} bold>
+-          {reservationIssue}
+-        </AppText>
+-        <View style={styles.buttonRow}>
+-          <View style={styles.buttonFill}>
+-            <AppButton
+-              title={t('common.close')}
+-              variant="secondary"
+-              onPress={() => setReservationIssue(null)}
+-            />
+-          </View>
+-          <View style={styles.buttonFill}>
+-            <AppButton
+-              title={reservationIssueActionLabel}
+-              onPress={handleReservationIssueAction}
+-            />
+-          </View>
+-        </View>
+-      </AppBottomModal>
+-
+       <LiveNoticeModal
+         notice={liveNotice}
+         onClose={() => setLiveNotice(null)}
+@@ -6342,22 +6390,6 @@ const styles = StyleSheet.create({
+     flexDirection: 'row',
+     gap: 8,
+   },
+-  noticeBackdrop: {
+-    alignItems: 'center',
+-    flex: 1,
+-    justifyContent: 'center',
+-    padding: 20,
+-  },
+-  noticeDialog: {
+-    borderWidth: 1,
+-    elevation: 5,
+-    gap: 14,
+-    maxWidth: 420,
+-    shadowOffset: { width: 0, height: 3 },
+-    shadowOpacity: 0.18,
+-    shadowRadius: 8,
+-    width: '100%',
+-  },
+   recentRow: {
+     borderBottomWidth: 1,
+     gap: 8,
+@@ -6400,6 +6432,9 @@ const styles = StyleSheet.create({
+   reservationRiskCard: {
+     marginTop: 4,
+   },
++  reservationIssuePanel: {
++    marginTop: 8,
++  },
+   sectionSpacing: {
+     marginTop: 12,
+     gap: 8,
+diff --git a/components/ui/AppActionDialog.tsx b/components/ui/AppActionDialog.tsx
+index 9b1b63a..7a5d0c4 100644
+--- a/components/ui/AppActionDialog.tsx
++++ b/components/ui/AppActionDialog.tsx
+@@ -1,10 +1,12 @@
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import { ReactNode } from 'react';
+-import { Modal, Pressable, StyleSheet, View } from 'react-native';
++import { Modal, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+ import AppButton from './AppButton';
+ import AppText from './AppText';
+
+ type DialogVariant = 'info' | 'warning' | 'danger' | 'success';
++type DialogMode = 'modal' | 'contextual' | 'inline';
++type ActionLayout = 'default' | 'primaryRight' | 'primaryLeft';
+
+ type DialogAction = {
+   label: string;
+@@ -14,28 +16,40 @@ type DialogAction = {
+
+ type Props = {
+   visible: boolean;
++  mode?: DialogMode;
+   title: string;
+   message: string;
+   details?: string[];
+   variant?: DialogVariant;
+   primaryAction: DialogAction;
+   secondaryAction?: DialogAction;
++  actionLayout?: ActionLayout;
+   onClose: () => void;
+   children?: ReactNode;
++  style?: StyleProp<ViewStyle>;
+ };
+
+ export default function AppActionDialog({
+   visible,
++  mode = 'modal',
+   title,
+   message,
+   details = [],
+   variant = 'info',
+   primaryAction,
+   secondaryAction,
++  actionLayout = 'default',
+   onClose,
+   children,
++  style,
+ }: Props) {
+   const { theme } = useAppTheme();
++  const resolvedActionLayout =
++    actionLayout === 'default'
++      ? mode === 'contextual'
++        ? 'primaryLeft'
++        : 'primaryRight'
++      : actionLayout;
+   const toneColor =
+     variant === 'danger'
+       ? theme.colors.danger
+@@ -56,71 +70,92 @@ export default function AppActionDialog({
+           ? theme.colors.successBackground
+           : theme.colors.infoSoft;
+
+-  return (
+-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+-      <View style={[styles.backdrop, { backgroundColor: theme.colors.backdrop }]}>
+-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+-        <View
+-          style={[
+-            styles.dialog,
+-            {
+-              backgroundColor: theme.colors.modalBackground,
+-              borderColor: theme.colors.border,
+-              borderRadius: theme.radius.xl,
+-              padding: theme.spacing.lg,
+-              shadowColor: theme.colors.shadow,
+-            },
+-          ]}
+-        >
+-          <View
+-            style={[
+-              styles.toneBar,
+-              {
+-                backgroundColor: toneBackground,
+-                borderColor: toneColor,
+-                borderRadius: theme.radius.lg,
+-                padding: theme.spacing.md,
+-              },
+-            ]}
+-          >
+-            <AppText variant="subtitle" bold color={toneColor}>
+-              {title}
+-            </AppText>
+-            <AppText color={theme.colors.textSecondary}>{message}</AppText>
+-          </View>
++  if (!visible) {
++    return null;
++  }
+
+-          {details.length > 0 ? (
+-            <View style={styles.details}>
+-              {details.map((detail) => (
+-                <View key={detail} style={styles.detailRow}>
+-                  <View style={[styles.bullet, { backgroundColor: toneColor }]} />
+-                  <AppText style={styles.detailText}>{detail}</AppText>
+-                </View>
+-              ))}
+-            </View>
+-          ) : null}
++  const primaryButton = (
++    <View key="primary" style={styles.action}>
++      <AppButton
++        title={primaryAction.label}
++        variant={primaryAction.variant ?? 'primary'}
++        onPress={primaryAction.onPress}
++      />
++    </View>
++  );
++  const secondaryButton = secondaryAction ? (
++    <View key="secondary" style={styles.action}>
++      <AppButton
++        title={secondaryAction.label}
++        variant={secondaryAction.variant ?? 'secondary'}
++        onPress={secondaryAction.onPress}
++      />
++    </View>
++  ) : null;
++  const actions =
++    resolvedActionLayout === 'primaryLeft'
++      ? [primaryButton, secondaryButton]
++      : [secondaryButton, primaryButton];
+
+-          {children ? <View style={styles.children}>{children}</View> : null}
++  const content = (
++    <View
++      style={[
++        styles.dialogBase,
++        mode === 'modal' ? styles.dialog : styles.contextualPanel,
++        {
++          backgroundColor:
++            mode === 'inline' ? toneBackground : theme.colors.modalBackground,
++          borderColor: mode === 'modal' ? theme.colors.border : toneColor,
++          borderRadius: theme.radius.xl,
++          padding: theme.spacing.lg,
++          shadowColor: theme.colors.shadow,
++        },
++        style,
++      ]}
++    >
++      <View
++        style={[
++          styles.toneBar,
++          {
++            backgroundColor: toneBackground,
++            borderColor: toneColor,
++            borderRadius: theme.radius.lg,
++            padding: theme.spacing.md,
++          },
++        ]}
++      >
++        <AppText variant="subtitle" bold color={toneColor}>
++          {title}
++        </AppText>
++        <AppText color={theme.colors.textSecondary}>{message}</AppText>
++      </View>
+
+-          <View style={styles.actions}>
+-            {secondaryAction ? (
+-              <View style={styles.action}>
+-                <AppButton
+-                  title={secondaryAction.label}
+-                  variant={secondaryAction.variant ?? 'secondary'}
+-                  onPress={secondaryAction.onPress}
+-                />
+-              </View>
+-            ) : null}
+-            <View style={styles.action}>
+-              <AppButton
+-                title={primaryAction.label}
+-                variant={primaryAction.variant ?? 'primary'}
+-                onPress={primaryAction.onPress}
+-              />
++      {details.length > 0 ? (
++        <View style={styles.details}>
++          {details.map((detail) => (
++            <View key={detail} style={styles.detailRow}>
++              <View style={[styles.bullet, { backgroundColor: toneColor }]} />
++              <AppText style={styles.detailText}>{detail}</AppText>
+             </View>
+-          </View>
++          ))}
+         </View>
++      ) : null}
++
++      {children ? <View style={styles.children}>{children}</View> : null}
++
++      <View style={styles.actions}>{actions}</View>
++    </View>
++  );
++
++  if (mode !== 'modal') {
++    return content;
++  }
++
++  return (
++    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
++      <View style={[styles.backdrop, { backgroundColor: theme.colors.backdrop }]}>
++        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
++        {content}
+       </View>
+     </Modal>
+   );
+@@ -164,8 +199,11 @@ const styles = StyleSheet.create({
+     gap: 8,
+     marginTop: 16,
+   },
+-  dialog: {
++  contextualPanel: {
+     borderWidth: 1,
++    width: '100%',
++  },
++  dialog: {
+     elevation: 8,
+     maxWidth: 520,
+     shadowOffset: { width: 0, height: 18 },
+@@ -173,6 +211,9 @@ const styles = StyleSheet.create({
+     shadowRadius: 28,
+     width: '100%',
+   },
++  dialogBase: {
++    borderWidth: 1,
++  },
+   toneBar: {
+     borderWidth: 1,
+     gap: 6,
+diff --git a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+index 321cec2..8ed796b 100644
+--- a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
++++ b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+@@ -462,3 +462,7 @@ No se cambiaron backend, permisos, capacidades ni contratos de API.
+ # Nota LIVE-Z9F - Validaciones guiadas
+
+ LIVE-Z9F agrega un patron de dialogo accionable para validaciones bloqueantes de `Crear prenda rapida` desde LIVE. El objetivo es explicar que informacion falta y ofrecer una accion concreta para corregirla, sin cambiar backend, permisos, capacidades ni reglas LIVE.
++
++# Nota LIVE-Z9F.1 - Panel contextual operativo
++
++LIVE-Z9F.1 extiende el patron para que LIVE use paneles contextuales accionables en bloqueos de apartado. El operador permanece en la seccion de captura, ve que informacion falta y puede ejecutar la accion siguiente sin pasar por un modal centrado.
+diff --git a/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md b/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md
+index 9b2e9a0..d2715a3 100644
+--- a/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md
++++ b/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md
+@@ -86,3 +86,7 @@ LIVE-Z9E mejora la validacion de `Crear prenda rapida` cuando abre `/items-creat
+ ## Continuidad LIVE-Z9F
+
+ LIVE-Z9F agrega un dialogo accionable para validaciones bloqueantes de alta rapida de prendas. El flujo de prenda preparada no cambia; solo mejora la orientacion cuando falta informacion antes de crear la prenda.
++
++## Continuidad LIVE-Z9F.1
++
++Los bloqueos operativos de LIVE se alinean con `AppActionDialog` en modo contextual. La seleccion de la misma prenda al aire y las confirmaciones de prenda preparada conservan la logica de LIVE-Z9D, pero el estilo visual queda dentro del mismo sistema de paneles/dialogos.
+diff --git a/docs/LIVE_Z9E_QUICK_ITEM_VALIDATION.md b/docs/LIVE_Z9E_QUICK_ITEM_VALIDATION.md
+index f17b7fb..ce26cbd 100644
+--- a/docs/LIVE_Z9E_QUICK_ITEM_VALIDATION.md
++++ b/docs/LIVE_Z9E_QUICK_ITEM_VALIDATION.md
+@@ -78,3 +78,7 @@ LIVE-Z9F reemplaza el feedback principal de campos faltantes por un dialogo acci
+ - boton `Ir al primer campo`.
+
+ Los helpers inline por campo se mantienen. El resumen rojo superior deja de ser el feedback principal para evitar ruido visual duplicado.
++
++## Continuidad LIVE-Z9F.1
++
++El dialogo de `items-create` queda alineado al mismo componente reusable usado por LIVE. La pantalla mantiene modo modal porque el usuario esta corrigiendo un formulario con varios campos obligatorios; los bloqueos dentro de LIVE usan panel contextual para no interrumpir la operacion.
+diff --git a/docs/LIVE_Z9F_1_CONTEXTUAL_ACTION_PANELS.md b/docs/LIVE_Z9F_1_CONTEXTUAL_ACTION_PANELS.md
+new file mode 100644
+index 0000000..fd28f55
+--- /dev/null
++++ b/docs/LIVE_Z9F_1_CONTEXTUAL_ACTION_PANELS.md
+@@ -0,0 +1,86 @@
++# LIVE-Z9F.1 - Paneles accionables contextuales para bloqueos LIVE
++
++## Objetivo
++
++Unificar el patron visual de validaciones bloqueantes sin forzar el mismo modo de presentacion para todos los contextos.
++
++La decision UX queda asi:
++
++- LIVE y operacion en curso usan panel contextual accionable.
++- Formularios generales pueden usar dialogo modal cuando hay una lista de campos faltantes.
++- Errores de campo conservan helpers inline.
++- Confirmaciones simples se mantienen como aviso ligero si no requieren una decision operativa.
++
++## Cambios aplicados
++
++`AppActionDialog` ahora soporta:
++
++- `mode="modal"` para dialogos centrados con overlay.
++- `mode="contextual"` para panel ancho dentro del flujo operativo.
++- `mode="inline"` para futuros bloques dentro de formularios.
++- `actionLayout="default" | "primaryRight" | "primaryLeft"`.
++
++`actionLayout` deja preparada la ergonomia futura para invertir acciones en mobile/tablet segun mano dominante, pero no se persiste ninguna preferencia en esta fase.
++
++## LIVE
++
++En `/live`, el bloqueo `No se puede agregar apartado` deja de renderizarse como bottom modal y pasa a mostrarse como panel contextual dentro del bloque de captura/apartado.
++
++Casos cubiertos:
++
++- falta cliente/interesado;
++- falta prenda al aire;
++- prenda ya apartada;
++- precio invalido o faltante;
++- permisos/canal/live no disponible.
++
++Cuando falta cliente, el panel ofrece:
++
++- `Seleccionar cliente`;
++- `Cerrar`.
++
++Cuando el bloqueo solo requiere revisar el contexto, el panel ofrece `Entendido`.
++
++## Items Create
++
++`/items-create?returnTo=/live` conserva el dialogo modal agregado en LIVE-Z9F para campos faltantes:
++
++- tipo de prenda;
++- talla;
++- precio;
++- cantidad.
++
++El formulario mantiene helpers inline y no limpia datos capturados.
++
++## Sin cambios funcionales
++
++No se modificaron:
++
++- backend;
++- endpoints;
++- AUTH/RBAC;
++- pagos/caja/reportes/billing/IA;
++- reglas LIVE profundas;
++- permisos/capacidades;
++- persistencia backend.
++
++## Validacion manual esperada
++
++1. Entrar a `/live`.
++2. Intentar apartar sin cliente/interesado.
++3. Confirmar panel contextual dentro del flujo, no modal centrado.
++4. Confirmar acciones `Seleccionar cliente` y `Cerrar`.
++5. Intentar apartar sin prenda al aire.
++6. Confirmar panel contextual con `Entendido`.
++7. Validar prenda ya apartada.
++8. Validar prenda ya al aire desde selector.
++9. Entrar a `/items-create?returnTo=%2Flive`.
++10. Dejar campos faltantes y confirmar dialogo modal consistente.
++11. Validar helpers inline.
++12. Validar light/dark, presets visuales y mobile/tablet.
++
++## GO/NO-GO
++
++GO tecnico si pasan lint, TypeScript, export web, Maven test/package y `git diff --check`.
++
++GO visual pendiente de corrida manual para confirmar que el panel contextual se percibe como guia operativa y no como interrupcion.
+diff --git a/docs/LIVE_Z9F_BLOCKING_VALIDATION_DIALOGS.md b/docs/LIVE_Z9F_BLOCKING_VALIDATION_DIALOGS.md
+index 0a291d1..0b140b8 100644
+--- a/docs/LIVE_Z9F_BLOCKING_VALIDATION_DIALOGS.md
++++ b/docs/LIVE_Z9F_BLOCKING_VALIDATION_DIALOGS.md
+@@ -78,3 +78,11 @@ No se modifica:
+ ## GO/NO-GO
+
+ GO si las validaciones tecnicas pasan y la corrida manual confirma que el bloqueo se entiende como guia operativa, no como error tecnico.
++
++## Continuidad LIVE-Z9F.1
++
++LIVE-Z9F.1 extiende `AppActionDialog` para soportar `modal`, `contextual` e `inline`.
++
++- `items-create` conserva el modo `modal` para listas de campos faltantes.
++- LIVE usa modo `contextual` para bloqueos operativos como `No se puede agregar apartado`.
++- `actionLayout` deja preparado el orden de acciones para una futura ergonomia diestro/zurdo, sin configurar ni persistir preferencia todavia.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index 8851b9c..a2136ce 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -172,3 +172,15 @@ Agregar a la corrida manual las rutas visibles migradas:
+ - `/customer-package-detail?id=<id valido>`.
+
+ Confirmar AppShell/sidebar/drawer, active state correcto, ausencia de `Menu principal` legacy en rutas migradas, light/dark, presets visuales y responsive desktop/tablet/mobile.
++
++## Nota LIVE-Z9F.1
++
++Agregar a la corrida manual de LIVE:
++
++- intentar apartar sin cliente/interesado;
++- confirmar panel contextual `No se puede agregar apartado`;
++- confirmar acciones `Seleccionar cliente` y `Cerrar`;
++- intentar apartar sin prenda al aire;
++- confirmar panel contextual con `Entendido`;
++- validar que `items-create?returnTo=%2Flive` mantiene dialogo modal para campos faltantes;
++- validar light/dark, presets visuales y mobile/tablet.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index 0b86e93..bf26356 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -192,7 +192,7 @@
+     "activeItemReservationHelp": "The live item is the only item that can be held right now.",
+     "activeItemReservedHelp": "This item already has a hold. Switch it or remove it from live to continue.",
+     "activeItemReservedNextStepHelp": "This item already has a hold. Switch it or remove it from live to continue.",
+-    "activeItemAlreadyReservedTitle": "Item already reserved",
++    "activeItemAlreadyReservedTitle": "Item already held",
+     "activeItemAlreadyReservedReason": "This item already has an active hold. Switch or remove the item from live to create another hold.",
+     "activeItemReservedStatus": "Reserved / Held",
+     "activeItemReservedChip": "Reserved",
+@@ -504,7 +504,7 @@
+     "reservationIssueTitle": "Cannot add hold",
+     "reservationIssueBody": "Complete the missing information to add the hold.",
+     "reserveMissingLive": "Start a live session before registering holds.",
+-    "reserveMissingCustomer": "Select or create a customer/interested person before reserving.",
++    "reserveMissingCustomer": "Select or create a customer/interested person before creating the hold.",
+     "reserveMissingItem": "Select an item before reserving.",
+     "reserveMissingPrice": "Confirm a valid price of the item on air before reserving.",
+     "selectOpenLiveReason": "Select or create an open live.",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index b5cf6e6..7e62542 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -192,7 +192,7 @@
+     "activeItemReservationHelp": "La prenda al aire es la unica que se puede apartar en este momento.",
+     "activeItemReservedHelp": "Esta prenda ya fue apartada. Cambiala o retirala del aire para continuar.",
+     "activeItemReservedNextStepHelp": "Esta prenda ya fue apartada. Cambiala o retirala del aire para continuar.",
+-    "activeItemAlreadyReservedTitle": "Prenda ya reservada",
++    "activeItemAlreadyReservedTitle": "Prenda ya apartada",
+     "activeItemAlreadyReservedReason": "Esta prenda ya tiene un apartado activo. Cambia o retira la prenda del aire para registrar otro apartado.",
+     "activeItemReservedStatus": "Reservada / Apartada",
+     "activeItemReservedChip": "Reservada",
+@@ -504,7 +504,7 @@
+     "reservationIssueTitle": "No se puede agregar apartado",
+     "reservationIssueBody": "Falta completar informacion para poder agregar el apartado.",
+     "reserveMissingLive": "Inicia un en vivo antes de registrar apartados.",
+-    "reserveMissingCustomer": "Selecciona o crea un cliente/interesado antes de reservar.",
++    "reserveMissingCustomer": "Selecciona o crea un cliente/interesado antes de apartar.",
+     "reserveMissingItem": "Selecciona una prenda antes de reservar.",
+     "reserveMissingPrice": "Confirma un precio valido de la prenda al aire antes de reservar.",
+     "selectOpenLiveReason": "Selecciona o crea una transmisión abierta.",

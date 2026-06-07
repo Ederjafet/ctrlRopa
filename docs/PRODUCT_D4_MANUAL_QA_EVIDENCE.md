@@ -172,3 +172,15 @@ Agregar a la corrida manual las rutas visibles migradas:
 - `/customer-package-detail?id=<id valido>`.
 
 Confirmar AppShell/sidebar/drawer, active state correcto, ausencia de `Menu principal` legacy en rutas migradas, light/dark, presets visuales y responsive desktop/tablet/mobile.
+
+## Nota LIVE-Z9F.1
+
+Agregar a la corrida manual de LIVE:
+
+- intentar apartar sin cliente/interesado;
+- confirmar panel contextual `No se puede agregar apartado`;
+- confirmar acciones `Seleccionar cliente` y `Cerrar`;
+- intentar apartar sin prenda al aire;
+- confirmar panel contextual con `Entendido`;
+- validar que `items-create?returnTo=%2Flive` mantiene dialogo modal para campos faltantes;
+- validar light/dark, presets visuales y mobile/tablet.

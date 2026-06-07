@@ -78,3 +78,7 @@ LIVE-Z9F reemplaza el feedback principal de campos faltantes por un dialogo acci
 - boton `Ir al primer campo`.
 
 Los helpers inline por campo se mantienen. El resumen rojo superior deja de ser el feedback principal para evitar ruido visual duplicado.
+
+## Continuidad LIVE-Z9F.1
+
+El dialogo de `items-create` queda alineado al mismo componente reusable usado por LIVE. La pantalla mantiene modo modal porque el usuario esta corrigiendo un formulario con varios campos obligatorios; los bloqueos dentro de LIVE usan panel contextual para no interrumpir la operacion.

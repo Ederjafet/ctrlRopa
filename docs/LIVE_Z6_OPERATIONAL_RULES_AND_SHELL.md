@@ -462,3 +462,7 @@ No se cambiaron backend, permisos, capacidades ni contratos de API.
 # Nota LIVE-Z9F - Validaciones guiadas
 
 LIVE-Z9F agrega un patron de dialogo accionable para validaciones bloqueantes de `Crear prenda rapida` desde LIVE. El objetivo es explicar que informacion falta y ofrecer una accion concreta para corregirla, sin cambiar backend, permisos, capacidades ni reglas LIVE.
+
+# Nota LIVE-Z9F.1 - Panel contextual operativo
+
+LIVE-Z9F.1 extiende el patron para que LIVE use paneles contextuales accionables en bloqueos de apartado. El operador permanece en la seccion de captura, ve que informacion falta y puede ejecutar la accion siguiente sin pasar por un modal centrado.

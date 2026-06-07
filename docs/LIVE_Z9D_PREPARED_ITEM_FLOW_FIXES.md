@@ -86,3 +86,7 @@ LIVE-Z9E mejora la validacion de `Crear prenda rapida` cuando abre `/items-creat
 ## Continuidad LIVE-Z9F
 
 LIVE-Z9F agrega un dialogo accionable para validaciones bloqueantes de alta rapida de prendas. El flujo de prenda preparada no cambia; solo mejora la orientacion cuando falta informacion antes de crear la prenda.
+
+## Continuidad LIVE-Z9F.1
+
+Los bloqueos operativos de LIVE se alinean con `AppActionDialog` en modo contextual. La seleccion de la misma prenda al aire y las confirmaciones de prenda preparada conservan la logica de LIVE-Z9D, pero el estilo visual queda dentro del mismo sistema de paneles/dialogos.
