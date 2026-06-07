@@ -1,0 +1,17 @@
+ app/appearance.tsx                                 |  14 +
+ app/ui-kit.tsx                                     | 152 ++++-
+ components/ui/PaletteGeneratorCard.tsx             | 697 +++++++++++++++++++++
+ docs/PRODUCT_C2_1_PALETTE_CONTRAST_GENERATOR.md    | 190 ++++++
+ docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md            |  10 +
+ docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md              |  16 +
+ docs/PRODUCT_I18N_B1_GLOSSARY_RAW_KEYS.md          |   6 +
+ locales/en/common.json                             |  70 +++
+ locales/es/common.json                             |  70 +++
+ locales/fr/common.json                             |  70 +++
+ locales/ja/common.json                             |  70 +++
+ locales/ko/common.json                             |  70 +++
+ locales/pt-BR/common.json                          |  70 +++
+ locales/zh/common.json                             |  70 +++
+ ...te-contrast-generator-report-20260606-233619.md | 115 ++++
+ theme/colorUtils.ts                                | 245 ++++++++
+ 16 files changed, 1922 insertions(+), 13 deletions(-)
