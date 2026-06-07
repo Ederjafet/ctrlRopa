@@ -1,0 +1,15 @@
+ app/ui-kit.tsx                                     | 114 +++++++++++---
+ components/ui/PaletteGeneratorCard.tsx             |  97 +++++++-----
+ docs/PRODUCT_C2_1_PALETTE_CONTRAST_GENERATOR.md    |  17 +++
+ ...PRODUCT_C2_2_SIMPLIFIED_VISUAL_IDENTITY_FLOW.md | 164 +++++++++++++++++++++
+ docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md            |  10 ++
+ docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md              |  13 ++
+ locales/en/common.json                             |  23 +++
+ locales/es/common.json                             |  23 +++
+ locales/fr/common.json                             |  23 +++
+ locales/ja/common.json                             |  23 +++
+ locales/ko/common.json                             |  23 +++
+ locales/pt-BR/common.json                          |  23 +++
+ locales/zh/common.json                             |  23 +++
+ ...-visual-identity-flow-report-20260607-000123.md |  75 ++++++++++
+ 14 files changed, 590 insertions(+), 61 deletions(-)

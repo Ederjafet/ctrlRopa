@@ -345,3 +345,13 @@ Fecha: 2026-06-06
 PRODUCT-C2.1 agrega en `/ui-kit` un generador visual de paletas con color base, armonias, tints, shades, tones, contraste basico y mini preview real de UI. La aplicacion sigue sin persistencia backend por tenant: las paletas se aplican localmente usando los overrides de PRODUCT-C2.
 
 La validacion visual debe revisar que las paletas aplicadas conserven legibilidad en AppShell, LIVE, clientes, light/dark y responsive. Si el panel marca bajo contraste, QA debe tratarlo como advertencia antes de aceptar la combinacion.
+
+---
+
+## Continuidad PRODUCT-C2.2 - Identidad visual guiada
+
+Fecha: 2026-06-06
+
+PRODUCT-C2.2 simplifica `/ui-kit` para que el usuario vea primero un flujo de identidad visual guiado: plantilla activa, color base, paleta sugerida, contraste principal, preview real y acciones de aplicar/restaurar. El contenido avanzado del laboratorio visual queda colapsado por defecto.
+
+La validacion visual debe confirmar que la simplificacion no elimina el generador, no rompe los overrides locales, no oculta la restauracion de plantilla y mantiene disponible el modo avanzado para tokens, componentes, templates, variantes y detalles tecnicos.

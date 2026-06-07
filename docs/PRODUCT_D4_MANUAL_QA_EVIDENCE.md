@@ -261,3 +261,16 @@ Agregar a la corrida manual de sistema visual:
 - cambiar light/dark y revisar contraste;
 - volver a `/ui-kit` y restaurar plantilla;
 - abrir `/appearance` y confirmar que aparece acceso al generador avanzado sin romper campos de branding.
+
+## Nota PRODUCT-C2.2
+
+Agregar a la corrida manual de sistema visual:
+
+- abrir `/ui-kit`;
+- confirmar que la primera vista es un flujo guiado y no un listado largo de laboratorio;
+- confirmar plantilla activa, color base, paleta sugerida, contraste principal y preview real;
+- aplicar paleta localmente y abrir `/live` o `/customers` para validar efecto visual;
+- restaurar plantilla;
+- abrir detalles avanzados;
+- confirmar que tokens, componentes, templates y variantes siguen disponibles, pero no saturan la vista inicial;
+- repetir en light/dark y mobile/tablet.
