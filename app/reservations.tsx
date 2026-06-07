@@ -9,6 +9,10 @@ import AppOptionRow from '@/components/ui/AppOptionRow';
 import AppText from '@/components/ui/AppText';
 import EmptyState from '@/components/ui/EmptyState';
 import StatusBadge from '@/components/ui/StatusBadge';
+import {
+  getActionableApiError,
+  getActionableApiErrorMessage,
+} from '@/services/apiError';
 import { Box, getActiveBoxesByBranch } from '@/services/boxService';
 import {
   assignReservationToBox,
@@ -19,6 +23,7 @@ import {
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
 
 type ReservationFilter = 'ACTIVE' | 'WITHOUT_BOX';
@@ -84,6 +89,7 @@ function getReservationTone(status?: string): 'success' | 'warning' | 'danger' |
 export default function ReservationsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
+  const { t } = useTranslation('common');
   const returnTo = Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo;
   const isLiveContext = returnTo === '/live';
 
@@ -139,13 +145,13 @@ export default function ReservationsScreen() {
         setBoxes(boxData);
       } catch (error) {
         console.log('Error cargando reservaciones', error);
-        setErrorMessage('No se pudieron cargar los apartados.');
+        setErrorMessage(getActionableApiErrorMessage(error, t));
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
       }
     },
-    [filter]
+    [filter, t]
   );
 
   useFocusEffect(
@@ -202,7 +208,8 @@ export default function ReservationsScreen() {
       setSelectedReservation(null);
       await loadReservations(false);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'No se pudo asignar la caja.');
+      const copy = getActionableApiError(error, t);
+      Alert.alert(copy.title, copy.message, [{ text: copy.primaryActionLabel }]);
     } finally {
       setIsAssigningBox(false);
     }

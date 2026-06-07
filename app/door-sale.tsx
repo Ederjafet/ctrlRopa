@@ -8,6 +8,7 @@ import AppOptionRow from '@/components/ui/AppOptionRow';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 
+import { getActionableApiError } from '@/services/apiError';
 import { getPaymentMethods, PaymentMethod } from '@/services/catalogService';
 import {
   Customer,
@@ -68,6 +69,11 @@ export default function DoorSaleScreen() {
   const [isScannerVisible, setIsScannerVisible] = useState(false);
   const [validationIssue, setValidationIssue] = useState<SaleValidationIssue>(null);
 
+  const showActionableError = (error: unknown) => {
+    const copy = getActionableApiError(error, t);
+    Alert.alert(copy.title, copy.message, [{ text: copy.primaryActionLabel }]);
+  };
+
   useFocusEffect(
     useCallback(() => {
       checkAccessAndLoad();
@@ -86,7 +92,7 @@ export default function DoorSaleScreen() {
       setIsAllowed(true);
       await loadData();
     } catch (err: any) {
-      Alert.alert('Venta puerta', err?.message || 'No se pudo cargar venta puerta.');
+      showActionableError(err);
       setIsLoading(false);
     }
   };
@@ -116,20 +122,26 @@ export default function DoorSaleScreen() {
       setPaymentMethods(paymentData);
       await addPendingQuickItemsToCart(availableItems);
 
-      const errors = [itemResult, customerResult, paymentResult]
+      const errorCopies = [itemResult, customerResult, paymentResult]
         .filter((result) => result.status === 'rejected')
         .map((result) =>
           result.status === 'rejected'
-            ? result.reason?.message || 'No se pudo cargar un recurso.'
-            : ''
+            ? getActionableApiError(result.reason, t)
+            : null
         )
-        .filter(Boolean);
+        .filter(
+          (copy): copy is ReturnType<typeof getActionableApiError> => Boolean(copy)
+        );
 
-      if (errors.length > 0) {
-        Alert.alert('Venta puerta', errors.join('\n'));
+      if (errorCopies.length > 0) {
+        const [copy] = errorCopies;
+        const messages = errorCopies.map((entry) => entry.message);
+        Alert.alert(copy.title, Array.from(new Set(messages)).join('\n'), [
+          { text: copy.primaryActionLabel },
+        ]);
       }
     } catch (e: any) {
-      Alert.alert('Venta puerta', e.message || 'No se pudo cargar venta puerta.');
+      showActionableError(e);
     } finally {
       setIsLoading(false);
     }
@@ -371,7 +383,7 @@ export default function DoorSaleScreen() {
 
       await loadData();
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'No se pudo completar la venta.');
+      showActionableError(e);
     } finally {
       setIsSaving(false);
     }

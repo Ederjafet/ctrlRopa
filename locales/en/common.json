@@ -1318,5 +1318,48 @@
     "missingPasswordTitle": "Password required",
     "missingPasswordMessage": "Enter an initial password for the user.",
     "saveErrorTitle": "Could not save"
+  },
+  "errors": {
+    "connection": {
+      "title": "Could not connect to the server.",
+      "message": "Check your connection or try again."
+    },
+    "timeout": {
+      "title": "The server took too long to respond.",
+      "message": "Try again in a few seconds."
+    },
+    "sessionExpired": {
+      "title": "Your session expired.",
+      "message": "Sign in again to continue."
+    },
+    "forbidden": {
+      "title": "You do not have permission to perform this action.",
+      "message": "Ask your supervisor for access."
+    },
+    "notFound": {
+      "title": "The requested information was not found.",
+      "message": "It may have been removed or may no longer be available."
+    },
+    "conflict": {
+      "title": "The operation cannot be completed because the information changed.",
+      "message": "Refresh the screen and try again."
+    },
+    "validation": {
+      "title": "Review the entered data.",
+      "message": "Some information is missing or invalid."
+    },
+    "internal": {
+      "title": "The operation could not be completed.",
+      "message": "Try again. If it continues, report the case to support."
+    },
+    "unknown": {
+      "title": "The request could not be completed.",
+      "message": "Try again. If it continues, report the case to support."
+    },
+    "retry": "Retry",
+    "close": "Close",
+    "refresh": "Refresh",
+    "goToLogin": "Go to sign in",
+    "requestAccess": "Request access"
   }
 }

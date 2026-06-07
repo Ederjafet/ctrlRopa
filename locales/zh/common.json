@@ -1318,5 +1318,48 @@
     "missingPasswordTitle": "缺少密码",
     "missingPasswordMessage": "缺少密码",
     "saveErrorTitle": "保存错误"
+  },
+  "errors": {
+    "connection": {
+      "title": "无法连接到服务器。",
+      "message": "请检查连接或重试。"
+    },
+    "timeout": {
+      "title": "服务器响应时间过长。",
+      "message": "请稍后重试。"
+    },
+    "sessionExpired": {
+      "title": "会话已过期。",
+      "message": "请重新登录以继续。"
+    },
+    "forbidden": {
+      "title": "你没有权限执行此操作。",
+      "message": "请向主管申请访问权限。"
+    },
+    "notFound": {
+      "title": "未找到请求的信息。",
+      "message": "该信息可能已被删除或不再可用。"
+    },
+    "conflict": {
+      "title": "信息已更改，无法完成操作。",
+      "message": "请刷新页面后重试。"
+    },
+    "validation": {
+      "title": "请检查填写的数据。",
+      "message": "有信息缺失或无效。"
+    },
+    "internal": {
+      "title": "无法完成操作。",
+      "message": "请重试。如果问题仍然存在，请联系支持。"
+    },
+    "unknown": {
+      "title": "无法完成请求。",
+      "message": "请重试。如果问题仍然存在，请联系支持。"
+    },
+    "retry": "重试",
+    "close": "关闭",
+    "refresh": "刷新",
+    "goToLogin": "前往登录",
+    "requestAccess": "申请访问权限"
   }
 }

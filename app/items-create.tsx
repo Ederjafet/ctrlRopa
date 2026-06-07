@@ -10,6 +10,7 @@ import AppSelectorField from '@/components/ui/AppSelectorField';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 
+import { getActionableApiError } from '@/services/apiError';
 import {
   Batch,
   Brand,
@@ -133,6 +134,11 @@ export default function ItemsCreateScreen() {
   const [selector, setSelector] = useState<SelectorConfig | null>(null);
   const [selectorSearch, setSelectorSearch] = useState('');
 
+  const showActionableError = (error: unknown) => {
+    const copy = getActionableApiError(error, t);
+    Alert.alert(copy.title, copy.message, [{ text: copy.primaryActionLabel }]);
+  };
+
   useEffect(() => {
     loadCatalogs();
   }, []);
@@ -167,20 +173,26 @@ export default function ItemsCreateScreen() {
         }
       }
 
-      const errors = [bootstrapResult, batchResult]
+      const errorCopies = [bootstrapResult, batchResult]
         .filter((result) => result.status === 'rejected')
         .map((result) =>
           result.status === 'rejected'
-            ? result.reason?.message || 'No se pudo cargar un catálogo.'
-            : ''
+            ? getActionableApiError(result.reason, t)
+            : null
         )
-        .filter(Boolean);
+        .filter(
+          (copy): copy is ReturnType<typeof getActionableApiError> => Boolean(copy)
+        );
 
-      if (errors.length > 0) {
-        Alert.alert('Catálogos', errors.join('\n'));
+      if (errorCopies.length > 0) {
+        const [copy] = errorCopies;
+        const messages = errorCopies.map((entry) => entry.message);
+        Alert.alert(copy.title, Array.from(new Set(messages)).join('\n'), [
+          { text: copy.primaryActionLabel },
+        ]);
       }
     } catch (e: any) {
-      Alert.alert('Catálogos', e.message || 'No se pudieron cargar los catálogos.');
+      showActionableError(e);
     }
   };
 
@@ -385,7 +397,7 @@ export default function ItemsCreateScreen() {
 
       Alert.alert('Alta de prendas', message);
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'No se pudieron crear las prendas.');
+      showActionableError(e);
     } finally {
       setIsSaving(false);
     }

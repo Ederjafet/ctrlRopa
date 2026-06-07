@@ -1,0 +1,19 @@
+ app/customers.tsx                     |  27 +++-
+ app/door-reservation.tsx              |  35 +++--
+ app/door-sale.tsx                     |  32 ++--
+ app/items-create.tsx                  |  30 ++--
+ app/live.tsx                          |  48 +++---
+ app/reservations.tsx                  |  13 +-
+ app/users.tsx                         |  12 +-
+ docs/ERP_RIESGOS_OPERATIVOS.md        |   1 +
+ docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md |  13 ++
+ locales/en/common.json                |  43 ++++++
+ locales/es/common.json                |  43 ++++++
+ locales/fr/common.json                |  43 ++++++
+ locales/ja/common.json                |  43 ++++++
+ locales/ko/common.json                |  43 ++++++
+ locales/pt-BR/common.json             |  43 ++++++
+ locales/zh/common.json                |  43 ++++++
+ services/apiClient.ts                 |  13 +-
+ services/apiError.ts                  | 277 ++++++++++++++++++++++++++++++++--
+ 18 files changed, 723 insertions(+), 79 deletions(-)

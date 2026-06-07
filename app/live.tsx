@@ -25,6 +25,7 @@ import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { hasEffectivePermission } from '@/services/accessControl';
+import { getActionableApiError } from '@/services/apiError';
 import { ApiError } from '@/services/apiClient';
 import { Customer, getCustomersByBranch } from '@/services/customerService';
 import { getItemsByBranch, Item } from '@/services/itemService';
@@ -135,13 +136,13 @@ function isForbiddenError(error: unknown) {
 function resolveLoadIssue(
   error: unknown,
   fallbackMessage: string,
-  forbiddenMessage: string
+  forbiddenMessage: string,
+  t?: (key: string) => unknown
 ) {
   if (isForbiddenError(error)) return forbiddenMessage;
 
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
+  const copy = getActionableApiError(error, t);
+  if (copy.message) return copy.message;
 
   return fallbackMessage;
 }
@@ -504,6 +505,7 @@ export default function LiveScreen() {
   const [isCustomerModalVisible, setIsCustomerModalVisible] = useState(false);
   const [isItemModalVisible, setIsItemModalVisible] = useState(false);
   const [isScannerVisible, setIsScannerVisible] = useState(false);
+  const getActionableMessage = (error: unknown) => getActionableApiError(error, t).message;
   const refreshLiveLayoutPreferences = useCallback(async (userId?: number | null) => {
     try {
       setLiveLayoutPreferences(await getLiveLayoutPreferences(userId));
@@ -543,7 +545,7 @@ export default function LiveScreen() {
     } catch (err: any) {
       Alert.alert(
         t('live.title'),
-        resolveLoadIssue(err, t('live.loadingError'), t('live.accessDenied'))
+        resolveLoadIssue(err, t('live.loadingError'), t('live.accessDenied'), t)
       );
       setIsLoading(false);
     }
@@ -587,7 +589,8 @@ export default function LiveScreen() {
           ? resolveLoadIssue(
               liveResult.reason,
               t('live.liveLoadError'),
-              t('live.accessDenied')
+              t('live.accessDenied'),
+              t
             )
           : null;
 
@@ -599,7 +602,8 @@ export default function LiveScreen() {
           ? resolveLoadIssue(
               customerResult.reason,
               t('live.customerLoadError'),
-              t('live.customerPermissionError')
+              t('live.customerPermissionError'),
+              t
             )
           : null
       );
@@ -610,7 +614,8 @@ export default function LiveScreen() {
           ? resolveLoadIssue(
               itemResult.reason,
               t('live.itemLoadError'),
-              t('live.itemPermissionError')
+              t('live.itemPermissionError'),
+              t
             )
           : null
       );
@@ -619,7 +624,8 @@ export default function LiveScreen() {
           ? resolveLoadIssue(
               reservationResult.reason,
               t('live.reservationLoadError'),
-              t('live.reservationPermissionError')
+              t('live.reservationPermissionError'),
+              t
             )
           : null
       );
@@ -707,7 +713,7 @@ export default function LiveScreen() {
     } catch (err: any) {
       Alert.alert(
         t('live.title'),
-        resolveLoadIssue(err, t('live.loadingError'), t('live.accessDenied'))
+        resolveLoadIssue(err, t('live.loadingError'), t('live.accessDenied'), t)
       );
     } finally {
       setIsLoading(false);
@@ -1591,7 +1597,8 @@ export default function LiveScreen() {
           resolveLoadIssue(
             reservationResult.reason,
             t('live.reservationLoadError'),
-            t('live.reservationPermissionError')
+            t('live.reservationPermissionError'),
+            t
           )
         );
       }
@@ -1617,7 +1624,8 @@ export default function LiveScreen() {
       const message = resolveLoadIssue(
         error,
         t('live.liveRefreshError'),
-        t('live.accessDenied')
+        t('live.accessDenied'),
+        t
       );
       setLiveRefreshIssue(message);
 
@@ -1773,7 +1781,7 @@ export default function LiveScreen() {
     } catch (err: any) {
       setLiveNotice({
         title: t('live.operationalStatusUpdateErrorTitle'),
-        message: err?.message || t('live.operationalStatusUpdateError'),
+        message: getActionableMessage(err),
         tone: 'danger',
       });
     } finally {
@@ -1913,7 +1921,7 @@ export default function LiveScreen() {
     } catch (err: any) {
       setLiveNotice({
         title: t('live.liveCreateErrorTitle'),
-        message: err?.message || t('live.liveCreateError'),
+        message: getActionableMessage(err),
         tone: 'danger',
       });
     } finally {
@@ -1996,7 +2004,7 @@ export default function LiveScreen() {
     } catch (err: any) {
       setLiveNotice({
         title: t('live.liveActivationErrorTitle'),
-        message: err?.message || t('live.liveActivationError'),
+        message: getActionableMessage(err),
         tone: 'danger',
       });
     } finally {
@@ -2033,7 +2041,7 @@ export default function LiveScreen() {
     } catch (err: any) {
       setLiveNotice({
         title: t('live.liveActivationErrorTitle'),
-        message: err?.message || t('live.liveActivationError'),
+        message: getActionableMessage(err),
         tone: 'danger',
       });
     } finally {
@@ -2085,7 +2093,7 @@ export default function LiveScreen() {
     } catch (err: any) {
       setLiveNotice({
         title: t('live.liveCloseErrorTitle'),
-        message: err?.message || t('live.liveCloseError'),
+        message: getActionableMessage(err),
         tone: 'danger',
       });
     } finally {
@@ -2218,7 +2226,7 @@ export default function LiveScreen() {
     } catch (err: any) {
       setLiveNotice({
         title: t('live.activeProductUpdateErrorTitle'),
-        message: err?.message || t('live.activeProductUpdateError'),
+        message: getActionableMessage(err),
         tone: 'danger',
       });
     } finally {
@@ -2278,7 +2286,7 @@ export default function LiveScreen() {
     } catch (err: any) {
       setLiveNotice({
         title: t('live.activeProductUpdateErrorTitle'),
-        message: err?.message || t('live.activeProductUpdateError'),
+        message: getActionableMessage(err),
         tone: 'danger',
       });
     } finally {
@@ -2533,7 +2541,7 @@ export default function LiveScreen() {
     } catch (err: any) {
       setLiveNotice({
         title: t('live.reservationCreateErrorTitle'),
-        message: err?.message || t('live.reservationCreateError'),
+        message: getActionableMessage(err),
         tone: 'danger',
       });
     } finally {

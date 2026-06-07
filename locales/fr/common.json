@@ -1318,5 +1318,48 @@
     "missingPasswordTitle": "Manquant mot de passe",
     "missingPasswordMessage": "Manquant mot de passe",
     "saveErrorTitle": "Enregistrer erreur"
+  },
+  "errors": {
+    "connection": {
+      "title": "Impossible de se connecter au serveur.",
+      "message": "Vérifiez votre connexion ou réessayez."
+    },
+    "timeout": {
+      "title": "Le serveur a mis trop de temps à répondre.",
+      "message": "Réessayez dans quelques secondes."
+    },
+    "sessionExpired": {
+      "title": "Votre session a expiré.",
+      "message": "Reconnectez-vous pour continuer."
+    },
+    "forbidden": {
+      "title": "Vous n'avez pas l'autorisation d'effectuer cette action.",
+      "message": "Demandez l’accès à votre superviseur."
+    },
+    "notFound": {
+      "title": "Les informations demandées sont introuvables.",
+      "message": "Elles ont peut-être été supprimées ou ne sont plus disponibles."
+    },
+    "conflict": {
+      "title": "L’opération ne peut pas être terminée car les informations ont changé.",
+      "message": "Actualisez l’écran et réessayez."
+    },
+    "validation": {
+      "title": "Vérifiez les données saisies.",
+      "message": "Certaines informations sont manquantes ou invalides."
+    },
+    "internal": {
+      "title": "Impossible de terminer l’opération.",
+      "message": "Réessayez. Si le problème persiste, signalez le cas au support."
+    },
+    "unknown": {
+      "title": "Impossible de terminer la demande.",
+      "message": "Réessayez. Si le problème persiste, signalez le cas au support."
+    },
+    "retry": "Réessayer",
+    "close": "Fermer",
+    "refresh": "Actualiser",
+    "goToLogin": "Aller à la connexion",
+    "requestAccess": "Demander l’accès"
   }
 }

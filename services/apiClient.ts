@@ -41,12 +41,13 @@ export class SessionRedirectError extends ApiError {
 
 function friendlyStatusMessage(status: number): string {
   if (status === 0) return 'No se pudo conectar con el servidor. Revisa tu conexion o intenta nuevamente.';
-  if (status === 400) return 'Revisa la información capturada e intenta de nuevo.';
-  if (status === 401) return 'Tu sesión expiró. Inicia sesión nuevamente.';
-  if (status === 403) return 'No tienes permisos para realizar esta acción.';
-  if (status === 404) return 'No se encontró la información solicitada.';
-  if (status === 409) return 'La acción no se puede completar por el estado actual.';
-  if (status >= 500) return 'Ocurrió un error del servidor. Intenta de nuevo más tarde.';
+  if (status === 400 || status === 422) return 'Revisa los datos capturados. Hay informacion pendiente o invalida.';
+  if (status === 401) return 'Tu sesion expiro. Vuelve a iniciar sesion para continuar.';
+  if (status === 403) return 'No tienes permiso para realizar esta accion. Solicita acceso a tu supervisor.';
+  if (status === 404) return 'No se encontro la informacion solicitada. Puede haber sido eliminada o ya no estar disponible.';
+  if (status === 408 || status === 504) return 'El servidor tardo demasiado en responder. Intenta nuevamente en unos segundos.';
+  if (status === 409) return 'La operacion no se puede completar porque la informacion cambio. Actualiza la pantalla e intenta nuevamente.';
+  if (status >= 500) return 'No se pudo completar la operacion. Intenta nuevamente. Si continua, reporta el caso a soporte.';
   return `No se pudo completar la solicitud (${status}).`;
 }
 

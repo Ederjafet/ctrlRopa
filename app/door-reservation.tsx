@@ -8,6 +8,7 @@ import AppOptionRow from '@/components/ui/AppOptionRow';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 
+import { getActionableApiError } from '@/services/apiError';
 import { getPaymentMethods, PaymentMethod } from '@/services/catalogService';
 import { Customer, getCustomersByBranch } from '@/services/customerService';
 import { getItemsByBranch, Item } from '@/services/itemService';
@@ -75,6 +76,11 @@ export default function DoorReservationScreen() {
   const [validationIssue, setValidationIssue] =
     useState<ReservationValidationIssue>(null);
 
+  const showActionableError = (error: unknown) => {
+    const copy = getActionableApiError(error, t);
+    Alert.alert(copy.title, copy.message, [{ text: copy.primaryActionLabel }]);
+  };
+
   useFocusEffect(
     useCallback(() => {
       checkAccessAndLoad();
@@ -96,10 +102,7 @@ export default function DoorReservationScreen() {
       setIsAllowed(true);
       await loadData();
     } catch (err: any) {
-      Alert.alert(
-        'Apartado puerta',
-        err?.message || 'No se pudo cargar apartado puerta.'
-      );
+      showActionableError(err);
       setIsLoading(false);
     }
   };
@@ -136,20 +139,26 @@ export default function DoorReservationScreen() {
       setPaymentMethods(paymentData);
       await addPendingQuickItemsToCart(availableItems);
 
-      const errors = [itemResult, customerResult, paymentResult]
+      const errorCopies = [itemResult, customerResult, paymentResult]
         .filter((result) => result.status === 'rejected')
         .map((result) =>
           result.status === 'rejected'
-            ? result.reason?.message || 'No se pudo cargar un recurso.'
-            : ''
+            ? getActionableApiError(result.reason, t)
+            : null
         )
-        .filter(Boolean);
+        .filter(
+          (copy): copy is ReturnType<typeof getActionableApiError> => Boolean(copy)
+        );
 
-      if (errors.length > 0) {
-        Alert.alert('Apartado puerta', errors.join('\n'));
+      if (errorCopies.length > 0) {
+        const [copy] = errorCopies;
+        const messages = errorCopies.map((entry) => entry?.message ?? '');
+        Alert.alert(copy?.title ?? t('errors.unknown.title'), Array.from(new Set(messages)).join('\n'), [
+          { text: copy.primaryActionLabel },
+        ]);
       }
     } catch (e: any) {
-      Alert.alert('Apartado puerta', e.message || 'No se pudo cargar apartado puerta.');
+      showActionableError(e);
     } finally {
       setIsLoading(false);
     }
@@ -427,7 +436,7 @@ export default function DoorReservationScreen() {
 
       await loadData();
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'No se pudo crear el apartado.');
+      showActionableError(e);
     } finally {
       setIsSaving(false);
     }
