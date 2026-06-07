@@ -607,7 +607,16 @@
     "preparedItemNowLiveTitle": "준비됨 상품 지금 LIVE",
     "preparedItemNowLiveMessage": "준비됨 상품 지금 LIVE",
     "preparedItemRemovedTitle": "준비됨 상품 항목",
-    "preparedItemRemovedMessage": "준비됨 상품 항목"
+    "preparedItemRemovedMessage": "준비됨 상품 항목",
+    "itemFilterAvailable": "사용 가능",
+    "itemFilterReserved": "예약됨",
+    "itemFilterUnavailable": "판매됨 / 사용 불가",
+    "itemFilterAll": "전체",
+    "showUnavailableItems": "사용 불가 표시",
+    "hideUnavailableItems": "사용 불가 숨기기",
+    "itemAvailabilityFilterHelp": "LIVE 운영에서는 기본적으로 사용 가능한 상품을 표시합니다.",
+    "noItemsAvailableWithFilters": "이 필터에 맞는 사용 가능한 상품이 없습니다.",
+    "noItemSearchResults": "이 검색 결과가 없습니다."
   },
   "payments": {
     "title": "Payments / Collections",

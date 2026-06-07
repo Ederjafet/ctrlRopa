@@ -607,7 +607,16 @@
     "preparedItemNowLiveTitle": "Preparado peça agora LIVE",
     "preparedItemNowLiveMessage": "Preparado peça agora LIVE",
     "preparedItemRemovedTitle": "Preparado peça campo",
-    "preparedItemRemovedMessage": "Preparado peça campo"
+    "preparedItemRemovedMessage": "Preparado peça campo",
+    "itemFilterAvailable": "Disponiveis",
+    "itemFilterReserved": "Reservadas",
+    "itemFilterUnavailable": "Vendidas / indisponiveis",
+    "itemFilterAll": "Todas",
+    "showUnavailableItems": "Mostrar indisponiveis",
+    "hideUnavailableItems": "Ocultar indisponiveis",
+    "itemAvailabilityFilterHelp": "Por padrao, itens disponiveis sao exibidos para a operacao LIVE.",
+    "noItemsAvailableWithFilters": "Nao ha itens disponiveis com esses filtros.",
+    "noItemSearchResults": "Nao ha resultados para esta busca."
   },
   "payments": {
     "title": "Payments / Collections",

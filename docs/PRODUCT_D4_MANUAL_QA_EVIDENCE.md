@@ -338,3 +338,20 @@ Agregar a la corrida manual de sistema visual:
 - confirmar que no aparece warning `Encountered two children with the same key`;
 - aplicar color y confirmar que la paleta/preview se actualizan;
 - validar light/dark y mobile/tablet.
+
+## Nota LIVE-Z9I
+
+Agregar a la corrida manual de LIVE:
+
+- entrar con `qa.admin`;
+- abrir `/live`;
+- abrir `Buscar prenda`;
+- confirmar filtro por defecto `Disponibles`;
+- confirmar que vendidas/reservadas no aparecen por defecto;
+- cambiar a `Todas`;
+- confirmar que vendidas/reservadas aparecen con motivo;
+- cambiar a `Apartadas` y `Vendidas / no disponibles`;
+- buscar por codigo, tipo, marca o talla;
+- confirmar que la busqueda conserva el filtro activo;
+- intentar seleccionar una vendida/no disponible y confirmar bloqueo claro;
+- validar light/dark y mobile/tablet.

@@ -90,3 +90,7 @@ LIVE-Z9F agrega un dialogo accionable para validaciones bloqueantes de alta rapi
 ## Continuidad LIVE-Z9F.1
 
 Los bloqueos operativos de LIVE se alinean con `AppActionDialog` en modo contextual. La seleccion de la misma prenda al aire y las confirmaciones de prenda preparada conservan la logica de LIVE-Z9D, pero el estilo visual queda dentro del mismo sistema de paneles/dialogos.
+
+## Continuidad LIVE-Z9I
+
+LIVE-Z9I agrega filtros de disponibilidad en el selector `Buscar prenda`. Al preparar una prenda para cambio, el selector abre por defecto en `Disponibles`, pero permite revisar `Apartadas`, `Vendidas / no disponibles` o `Todas` sin cambiar la regla que bloquea prendas no operables.

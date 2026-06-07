@@ -607,7 +607,16 @@
     "preparedItemNowLiveTitle": "The prepared item is now live",
     "preparedItemNowLiveMessage": "The prepared item is now live and ready for holds.",
     "preparedItemRemovedTitle": "Prepared item removed",
-    "preparedItemRemovedMessage": "The prepared item was removed."
+    "preparedItemRemovedMessage": "The prepared item was removed.",
+    "itemFilterAvailable": "Available",
+    "itemFilterReserved": "On hold",
+    "itemFilterUnavailable": "Sold / unavailable",
+    "itemFilterAll": "All",
+    "showUnavailableItems": "Show unavailable",
+    "hideUnavailableItems": "Hide unavailable",
+    "itemAvailabilityFilterHelp": "Available items are shown by default for Live operation.",
+    "noItemsAvailableWithFilters": "No items available with those filters.",
+    "noItemSearchResults": "No results for this search."
   },
   "payments": {
     "title": "Payments / Collections",

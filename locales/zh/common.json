@@ -607,7 +607,16 @@
     "preparedItemNowLiveTitle": "已准备商品现在LIVE",
     "preparedItemNowLiveMessage": "已准备商品现在LIVE",
     "preparedItemRemovedTitle": "已准备商品项目",
-    "preparedItemRemovedMessage": "已准备商品项目"
+    "preparedItemRemovedMessage": "已准备商品项目",
+    "itemFilterAvailable": "可用",
+    "itemFilterReserved": "已预留",
+    "itemFilterUnavailable": "已售 / 不可用",
+    "itemFilterAll": "全部",
+    "showUnavailableItems": "显示不可用",
+    "hideUnavailableItems": "隐藏不可用",
+    "itemAvailabilityFilterHelp": "LIVE 操作默认显示可用商品。",
+    "noItemsAvailableWithFilters": "没有符合这些筛选条件的可用商品。",
+    "noItemSearchResults": "此搜索没有结果。"
   },
   "payments": {
     "title": "Payments / Collections",

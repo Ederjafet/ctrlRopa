@@ -81,3 +81,7 @@ LIVE-Z9H agrega refresh controlado para que el vendedor con flujo de apartados n
 GO tecnico si pasan lint, TypeScript, export web, Maven test/package y `git diff --check`.
 
 GO visual pendiente de corrida manual multiusuario.
+
+## Continuidad LIVE-Z9I
+
+LIVE-Z9I mantiene la matriz de capacidades: ver el selector de prendas sigue dependiendo de `VIEW_INVENTORY` y operar LIVE sigue dependiendo de permisos reales. Los nuevos filtros solo cambian visibilidad dentro del selector; no conceden acciones ni permiten seleccionar prendas bloqueadas.

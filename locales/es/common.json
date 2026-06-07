@@ -607,7 +607,16 @@
     "preparedItemNowLiveTitle": "La prenda preparada paso al aire",
     "preparedItemNowLiveMessage": "La prenda preparada paso al aire y quedo lista para apartados.",
     "preparedItemRemovedTitle": "Prenda preparada retirada",
-    "preparedItemRemovedMessage": "La prenda preparada fue retirada."
+    "preparedItemRemovedMessage": "La prenda preparada fue retirada.",
+    "itemFilterAvailable": "Disponibles",
+    "itemFilterReserved": "Apartadas",
+    "itemFilterUnavailable": "Vendidas / no disponibles",
+    "itemFilterAll": "Todas",
+    "showUnavailableItems": "Mostrar no disponibles",
+    "hideUnavailableItems": "Ocultar no disponibles",
+    "itemAvailabilityFilterHelp": "Por defecto se muestran prendas disponibles para operar LIVE.",
+    "noItemsAvailableWithFilters": "No hay prendas disponibles con esos filtros.",
+    "noItemSearchResults": "No hay resultados para esta busqueda."
   },
   "payments": {
     "title": "Pagos / Cobros",
