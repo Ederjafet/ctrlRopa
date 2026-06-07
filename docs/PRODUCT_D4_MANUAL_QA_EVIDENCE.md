@@ -141,3 +141,23 @@ Agregar a la corrida manual:
 - `/system-sessions`.
 
 Confirmar AppShell/sidebar/drawer, active state correcto, ausencia de `Menu principal` legacy, idioma Espanol/English, light/dark y mobile/drawer.
+
+## Nota PRODUCT-D6.6
+
+Agregar a la corrida manual las rutas visibles migradas:
+
+- `/customers`;
+- `/customers-create`;
+- `/customers/<id valido>`;
+- `/customer-addresses-create?customerId=<id valido>`;
+- `/reservations`;
+- `/users`;
+- `/items/<id valido>`;
+- `/batch-form`;
+- `/batch-detail?id=<id valido>`;
+- `/customer-orders`;
+- `/customer-order-detail?id=<id valido>`;
+- `/customer-packages`;
+- `/customer-package-detail?id=<id valido>`.
+
+Confirmar AppShell/sidebar/drawer, active state correcto, ausencia de `Menu principal` legacy en rutas migradas, light/dark, presets visuales y responsive desktop/tablet/mobile.

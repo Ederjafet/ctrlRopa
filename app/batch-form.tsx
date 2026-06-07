@@ -1,10 +1,9 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { createBatch } from '@/services/batchService';
@@ -95,8 +94,18 @@ export default function BatchFormScreen() {
 
   return (
     <>
-      <AppScreen>
-        <AppBackButton fallbackRoute="/batches" />
+      <AppShellPage
+        title="Nuevo lote"
+        subtitle="Registro de recepcion y clasificacion"
+        activeRoute="batches"
+        rightContent={
+          <AppButton
+            title="Volver"
+            variant="secondary"
+            onPress={() => router.replace('/batches' as any)}
+          />
+        }
+      >
 
       {canManageInventory === false ? (
         <AppCard style={{ borderColor: theme.colors.warning }}>
@@ -109,10 +118,6 @@ export default function BatchFormScreen() {
           </AppText>
         </AppCard>
       ) : null}
-
-      <AppText variant="title" bold>
-        Nuevo lote
-      </AppText>
 
       {canManageInventory === true ? (
       <AppCard>
@@ -162,7 +167,7 @@ export default function BatchFormScreen() {
         disabled={saving}
       />
       ) : null}
-      </AppScreen>
+      </AppShellPage>
 
       <AppBottomModal
         visible={isSupplierModalVisible}

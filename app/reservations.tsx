@@ -1,11 +1,11 @@
 import AppShell from '@/components/layout/AppShell';
+import AppShellPage from '@/components/layout/AppShellPage';
 import { buildMainNavSections, getSessionScopeLabel } from '@/components/layout/appNavigation';
 import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import EmptyState from '@/components/ui/EmptyState';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -210,12 +210,16 @@ export default function ReservationsScreen() {
 
   if (isLoading) {
     return (
-      <AppScreen scroll={false}>
+      <AppShellPage
+        title="Reservas"
+        subtitle="Apartados activos, cajas y seguimiento"
+        activeRoute="reservations"
+      >
         <View style={styles.loadingContainer}>
           <ActivityIndicator />
           <AppText style={styles.loadingText}>Cargando apartados...</AppText>
         </View>
-      </AppScreen>
+      </AppShellPage>
     );
   }
 

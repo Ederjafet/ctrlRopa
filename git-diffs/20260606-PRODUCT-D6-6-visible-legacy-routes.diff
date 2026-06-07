@@ -1,0 +1,961 @@
+﻿diff --git a/app/batch-detail.tsx b/app/batch-detail.tsx
+index 999eabb..289b66e 100644
+--- a/app/batch-detail.tsx
++++ b/app/batch-detail.tsx
+@@ -1,9 +1,8 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppBottomModal from '@/components/ui/AppBottomModal';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import {
+@@ -374,9 +373,13 @@ export default function BatchDetailScreen() {
+
+   if (loading || !batch) {
+     return (
+-      <AppScreen>
++      <AppShellPage
++        title="Detalle de lote"
++        subtitle="Recepcion, clasificacion y cierre"
++        activeRoute="batches"
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+@@ -390,12 +393,18 @@ export default function BatchDetailScreen() {
+
+   return (
+     <>
+-      <AppScreen>
+-        <AppBackButton fallbackRoute="/batches" />
+-
+-        <AppText variant="title" bold>
+-          Lote {batch.folio}
+-        </AppText>
++      <AppShellPage
++        title={`Lote ${batch.folio}`}
++        subtitle="Recepcion, clasificacion y cierre"
++        activeRoute="batches"
++        rightContent={
++          <AppButton
++            title="Volver"
++            variant="secondary"
++            onPress={() => router.replace('/batches' as any)}
++          />
++        }
++      >
+
+         <AppCard>
+           <View style={styles.headerRow}>
+@@ -580,7 +589,7 @@ export default function BatchDetailScreen() {
+             </View>
+           </View>
+         </AppCard>
+-      </AppScreen>
++      </AppShellPage>
+
+       <AppBottomModal
+         visible={showReceiveModal}
+diff --git a/app/batch-form.tsx b/app/batch-form.tsx
+index aa5e95b..e8b0935 100644
+--- a/app/batch-form.tsx
++++ b/app/batch-form.tsx
+@@ -1,10 +1,9 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppBottomModal from '@/components/ui/AppBottomModal';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+ import AppOptionRow from '@/components/ui/AppOptionRow';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import { createBatch } from '@/services/batchService';
+@@ -95,8 +94,18 @@ export default function BatchFormScreen() {
+
+   return (
+     <>
+-      <AppScreen>
+-        <AppBackButton fallbackRoute="/batches" />
++      <AppShellPage
++        title="Nuevo lote"
++        subtitle="Registro de recepcion y clasificacion"
++        activeRoute="batches"
++        rightContent={
++          <AppButton
++            title="Volver"
++            variant="secondary"
++            onPress={() => router.replace('/batches' as any)}
++          />
++        }
++      >
+
+       {canManageInventory === false ? (
+         <AppCard style={{ borderColor: theme.colors.warning }}>
+@@ -110,10 +119,6 @@ export default function BatchFormScreen() {
+         </AppCard>
+       ) : null}
+
+-      <AppText variant="title" bold>
+-        Nuevo lote
+-      </AppText>
+-
+       {canManageInventory === true ? (
+       <AppCard>
+         <AppText variant="subtitle" bold>
+@@ -162,7 +167,7 @@ export default function BatchFormScreen() {
+         disabled={saving}
+       />
+       ) : null}
+-      </AppScreen>
++      </AppShellPage>
+
+       <AppBottomModal
+         visible={isSupplierModalVisible}
+diff --git a/app/customer-addresses-create.tsx b/app/customer-addresses-create.tsx
+index 945d999..4003b28 100644
+--- a/app/customer-addresses-create.tsx
++++ b/app/customer-addresses-create.tsx
+@@ -1,8 +1,7 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+
+ import { createCustomerAddress } from '@/services/customerAddressService';
+@@ -87,9 +86,18 @@ export default function CustomerAddressesCreateScreen() {
+   };
+
+   return (
+-    <AppScreen>
+-      <AppBackButton fallbackRoute={`/customers/${customerId}`} preferHistory={false} />
+-
++    <AppShellPage
++      title="Nueva direccion"
++      subtitle="Datos de entrega del cliente"
++      activeRoute="customers"
++      rightContent={
++        <AppButton
++          title="Volver"
++          variant="secondary"
++          onPress={() => router.replace(`/customers/${customerId}` as any)}
++        />
++      }
++    >
+       <AppText variant="title" bold>
+         Nueva dirección
+       </AppText>
+@@ -150,6 +158,6 @@ export default function CustomerAddressesCreateScreen() {
+           loading={isSaving}
+         />
+       </AppCard>
+-    </AppScreen>
++    </AppShellPage>
+   );
+ }
+diff --git a/app/customer-addresses/[id].tsx b/app/customer-addresses/[id].tsx
+index 4352945..8e617b2 100644
+--- a/app/customer-addresses/[id].tsx
++++ b/app/customer-addresses/[id].tsx
+@@ -1,8 +1,7 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+
+ import {
+@@ -156,16 +155,29 @@ export default function CustomerAddressDetailScreen() {
+
+   if (isLoading || !address) {
+     return (
+-      <AppScreen>
++      <AppShellPage
++        title="Direccion"
++        subtitle="Editar direccion del cliente"
++        activeRoute="customers"
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+   return (
+-    <AppScreen>
+-      <AppBackButton fallbackRoute={`/customers/${customerId}`} preferHistory={false} />
+-
++    <AppShellPage
++      title="Direccion"
++      subtitle="Editar direccion del cliente"
++      activeRoute="customers"
++      rightContent={
++        <AppButton
++          title="Volver"
++          variant="secondary"
++          onPress={() => router.replace(`/customers/${customerId}` as any)}
++        />
++      }
++    >
+       <AppText variant="title" bold>
+         Dirección
+       </AppText>
+@@ -202,6 +214,6 @@ export default function CustomerAddressDetailScreen() {
+         onPress={handleDeactivate}
+         loading={isDeleting}
+       />
+-    </AppScreen>
++    </AppShellPage>
+   );
+ }
+diff --git a/app/customer-order-detail.tsx b/app/customer-order-detail.tsx
+index c395dac..43e27c2 100644
+--- a/app/customer-order-detail.tsx
++++ b/app/customer-order-detail.tsx
+@@ -1,7 +1,6 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import {
+@@ -142,9 +141,13 @@ export default function CustomerOrderDetailScreen() {
+
+   if (isLoading || !detail) {
+     return (
+-      <AppScreen>
++      <AppShellPage
++        title="Detalle de pedido"
++        subtitle="Resumen financiero y prendas"
++        activeRoute="customers"
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+@@ -156,13 +159,18 @@ export default function CustomerOrderDetailScreen() {
+   const isClosed = detail.status === 'CLOSED' || settlement?.status === 'CLOSED';
+
+   return (
+-    <AppScreen>
+-      <AppBackButton fallbackRoute={fallbackRoute} />
+-
+-      <AppText variant="title" bold>
+-        Pedido #{detail.id}
+-      </AppText>
+-
++    <AppShellPage
++      title={`Pedido #${detail.id}`}
++      subtitle="Resumen financiero y prendas"
++      activeRoute="customers"
++      rightContent={
++        <AppButton
++          title="Volver"
++          variant="secondary"
++          onPress={() => router.replace(fallbackRoute as any)}
++        />
++      }
++    >
+       <AppCard>
+         <View style={styles.summaryRow}>
+           <AppText bold>Cliente</AppText>
+@@ -295,7 +303,7 @@ export default function CustomerOrderDetailScreen() {
+           </View>
+         </AppCard>
+       ) : null}
+-    </AppScreen>
++    </AppShellPage>
+   );
+ }
+
+diff --git a/app/customer-orders.tsx b/app/customer-orders.tsx
+index b29a8ac..e30ab2c 100644
+--- a/app/customer-orders.tsx
++++ b/app/customer-orders.tsx
+@@ -1,9 +1,8 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+ import AppOptionRow from '@/components/ui/AppOptionRow';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import { Customer, getCustomerById, getCustomersByBranch } from '@/services/customerService';
+@@ -118,21 +117,23 @@ export default function CustomerOrdersScreen() {
+
+   if (isLoading) {
+     return (
+-      <AppScreen>
++      <AppShellPage
++        title="Pedidos"
++        subtitle="Pedidos y seguimiento por cliente"
++        activeRoute="customers"
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+   if (!selectedCustomerId) {
+     return (
+-      <AppScreen>
+-        <AppBackButton fallbackRoute="/" />
+-
+-        <AppText variant="title" bold>
+-          Pedidos
+-        </AppText>
+-
++      <AppShellPage
++        title="Pedidos"
++        subtitle="Pedidos y seguimiento por cliente"
++        activeRoute="customers"
++      >
+         <AppCard>
+           <AppText variant="subtitle" bold>
+             Selecciona cliente
+@@ -165,18 +166,23 @@ export default function CustomerOrdersScreen() {
+             ))
+           )}
+         </AppCard>
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+   return (
+-    <AppScreen>
+-      <AppBackButton fallbackRoute={returnRoute || '/customer-orders'} />
+-
+-      <AppText variant="title" bold>
+-        Pedidos del cliente
+-      </AppText>
+-
++    <AppShellPage
++      title="Pedidos del cliente"
++      subtitle="Pedido activo e historial comercial"
++      activeRoute="customers"
++      rightContent={
++        <AppButton
++          title="Volver"
++          variant="secondary"
++          onPress={() => router.replace((returnRoute || '/customer-orders') as any)}
++        />
++      }
++    >
+       <AppCard>
+         <AppText variant="subtitle" bold>
+           {customer?.name || 'Cliente'}
+@@ -267,7 +273,7 @@ export default function CustomerOrdersScreen() {
+           ))
+         )}
+       </AppCard>
+-    </AppScreen>
++    </AppShellPage>
+   );
+ }
+
+diff --git a/app/customer-package-detail.tsx b/app/customer-package-detail.tsx
+index 3324810..dc03678 100644
+--- a/app/customer-package-detail.tsx
++++ b/app/customer-package-detail.tsx
+@@ -1,11 +1,10 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppBottomModal from '@/components/ui/AppBottomModal';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+ import AppNoticeDropdown from '@/components/ui/AppNoticeDropdown';
+ import AppOptionRow from '@/components/ui/AppOptionRow';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import {
+@@ -329,9 +328,13 @@ export default function CustomerPackageDetailScreen() {
+
+   if (isLoading || !detail) {
+     return (
+-      <AppScreen>
++      <AppShellPage
++        title="Detalle de paquete"
++        subtitle="Preparacion, etiqueta y prendas"
++        activeRoute="customers"
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+@@ -339,13 +342,18 @@ export default function CustomerPackageDetailScreen() {
+   const shipments = detail.shipments ?? [];
+
+   return (
+-    <AppScreen>
+-      <AppBackButton fallbackRoute={fallbackRoute} />
+-
+-      <AppText variant="title" bold>
+-        Paquete {detail.folio}
+-      </AppText>
+-
++    <AppShellPage
++      title={`Paquete ${detail.folio}`}
++      subtitle="Preparacion, etiqueta y prendas"
++      activeRoute="customers"
++      rightContent={
++        <AppButton
++          title="Volver"
++          variant="secondary"
++          onPress={() => router.replace(fallbackRoute as any)}
++        />
++      }
++    >
+       {notice ? (
+         <AppNoticeDropdown
+           title={notice.title}
+@@ -569,7 +577,7 @@ export default function CustomerPackageDetailScreen() {
+           disabled={isWorking}
+         />
+       </AppBottomModal>
+-    </AppScreen>
++    </AppShellPage>
+   );
+ }
+
+diff --git a/app/customer-packages.tsx b/app/customer-packages.tsx
+index c7ef962..c36a763 100644
+--- a/app/customer-packages.tsx
++++ b/app/customer-packages.tsx
+@@ -1,10 +1,9 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppBottomModal from '@/components/ui/AppBottomModal';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+ import AppOptionRow from '@/components/ui/AppOptionRow';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import { Customer, getCustomerById, getCustomersByBranch } from '@/services/customerService';
+@@ -140,21 +139,23 @@ export default function CustomerPackagesScreen() {
+
+   if (isLoading) {
+     return (
+-      <AppScreen>
++      <AppShellPage
++        title="Paquetes"
++        subtitle="Preparacion y seguimiento por cliente"
++        activeRoute="customers"
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+   if (!selectedCustomerId) {
+     return (
+-      <AppScreen>
+-        <AppBackButton fallbackRoute="/" />
+-
+-        <AppText variant="title" bold>
+-          Paquetes
+-        </AppText>
+-
++      <AppShellPage
++        title="Paquetes"
++        subtitle="Preparacion y seguimiento por cliente"
++        activeRoute="customers"
++      >
+         <AppCard>
+           <AppText variant="subtitle" bold>
+             Selecciona cliente
+@@ -187,7 +188,7 @@ export default function CustomerPackagesScreen() {
+             ))
+           )}
+         </AppCard>
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+@@ -214,13 +215,18 @@ export default function CustomerPackagesScreen() {
+   );
+
+   return (
+-    <AppScreen>
+-      <AppBackButton fallbackRoute="/customer-packages" />
+-
+-      <AppText variant="title" bold>
+-        Paquetes del cliente
+-      </AppText>
+-
++    <AppShellPage
++      title="Paquetes del cliente"
++      subtitle="Preparacion e historial de entrega"
++      activeRoute="customers"
++      rightContent={
++        <AppButton
++          title="Volver"
++          variant="secondary"
++          onPress={() => router.replace('/customer-packages' as any)}
++        />
++      }
++    >
+       <AppCard>
+         <AppText variant="subtitle" bold>
+           {customer?.name || 'Cliente'}
+@@ -280,7 +286,7 @@ export default function CustomerPackagesScreen() {
+           disabled={isCreating}
+         />
+       </AppBottomModal>
+-    </AppScreen>
++    </AppShellPage>
+   );
+ }
+
+diff --git a/app/customers-create.tsx b/app/customers-create.tsx
+index db42a53..f526123 100644
+--- a/app/customers-create.tsx
++++ b/app/customers-create.tsx
+@@ -1,10 +1,8 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+ import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
+-import AppScreen from '@/components/ui/AppScreen';
+-import AppText from '@/components/ui/AppText';
+
+ import { canAccessByPermission } from '@/services/accessControl';
+ import { createCustomer } from '@/services/customerService';
+@@ -97,20 +95,29 @@ export default function CustomersCreateScreen() {
+
+   if (isCheckingAccess) {
+     return (
+-      <AppScreen>
++      <AppShellPage
++        title="Nuevo cliente"
++        subtitle="Alta de cliente en la sucursal activa"
++        activeRoute="customers"
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+   return (
+-    <AppScreen>
+-      <AppBackButton fallbackRoute={returnRoute} preferHistory={false} />
+-
+-      <AppText variant="title" bold>
+-        Nuevo cliente
+-      </AppText>
+-
++    <AppShellPage
++      title="Nuevo cliente"
++      subtitle="Alta de cliente en la sucursal activa"
++      activeRoute="customers"
++      rightContent={
++        <AppButton
++          title="Volver"
++          variant="secondary"
++          onPress={() => router.replace(returnRoute as any)}
++        />
++      }
++    >
+       <AppCard>
+         <AppResponsiveGrid tabletColumns={2} desktopColumns={2}>
+         <AppInput
+@@ -144,6 +151,6 @@ export default function CustomersCreateScreen() {
+           loading={isSaving}
+         />
+       </AppCard>
+-    </AppScreen>
++    </AppShellPage>
+   );
+ }
+diff --git a/app/customers.tsx b/app/customers.tsx
+index c21c07b..0e89bfa 100644
+--- a/app/customers.tsx
++++ b/app/customers.tsx
+@@ -1,9 +1,9 @@
+ import AppShell from '@/components/layout/AppShell';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import { buildMainNavSections, getSessionScopeLabel } from '@/components/layout/appNavigation';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import EmptyState from '@/components/ui/EmptyState';
+ import StatusBadge from '@/components/ui/StatusBadge';
+@@ -85,9 +85,13 @@ export default function CustomersScreen() {
+
+   if (isLoading) {
+     return (
+-      <AppScreen scroll={false}>
++      <AppShellPage
++        title="Clientes"
++        subtitle="Seguimiento comercial y datos de contacto"
++        activeRoute="customers"
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+diff --git a/app/customers/[id].tsx b/app/customers/[id].tsx
+index 4c0c953..d041b82 100644
+--- a/app/customers/[id].tsx
++++ b/app/customers/[id].tsx
+@@ -1,8 +1,7 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+
+ import {
+@@ -221,22 +220,31 @@ export default function CustomerDetailScreen() {
+
+   if (isLoading || !customer) {
+     return (
+-      <AppScreen>
++      <AppShellPage
++        title="Cliente"
++        subtitle="Detalle comercial y direcciones"
++        activeRoute="customers"
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+   const isInactive = customer.status === 'INACTIVE';
+
+   return (
+-    <AppScreen>
+-      <AppBackButton fallbackRoute="/customers" preferHistory={false} />
+-
+-      <AppText variant="title" bold>
+-        Cliente
+-      </AppText>
+-
++    <AppShellPage
++      title="Cliente"
++      subtitle="Detalle comercial y direcciones"
++      activeRoute="customers"
++      rightContent={
++        <AppButton
++          title="Volver"
++          variant="secondary"
++          onPress={() => router.replace('/customers' as any)}
++        />
++      }
++    >
+       <AppCard>
+         <View style={styles.statusRow}>
+           <AppText bold>Estado</AppText>
+@@ -379,7 +387,7 @@ export default function CustomerDetailScreen() {
+         loading={isChangingStatus}
+       />
+       ) : null}
+-    </AppScreen>
++    </AppShellPage>
+   );
+ }
+
+diff --git a/app/items/[id].tsx b/app/items/[id].tsx
+index 15378d2..8c40fc8 100644
+--- a/app/items/[id].tsx
++++ b/app/items/[id].tsx
+@@ -1,11 +1,10 @@
+ import ItemLabel from '@/components/items/ItemLabel';
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppBottomModal from '@/components/ui/AppBottomModal';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+ import AppOptionRow from '@/components/ui/AppOptionRow';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppSelectorField from '@/components/ui/AppSelectorField';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+@@ -31,7 +30,7 @@ import { getItemStatusLabel } from '@/services/itemLabels';
+ import { printItemLabel } from '@/services/printService';
+ import { getSession } from '@/services/sessionStorage';
+
+-import { useLocalSearchParams } from 'expo-router';
++import { useLocalSearchParams, useRouter } from 'expo-router';
+ import { useEffect, useMemo, useState } from 'react';
+ import {
+   ActivityIndicator,
+@@ -53,6 +52,7 @@ type SelectorConfig = {
+ };
+
+ export default function ItemDetailScreen() {
++  const router = useRouter();
+   const { id, returnTo } = useLocalSearchParams<{
+     id?: string | string[];
+     returnTo?: string | string[];
+@@ -229,18 +229,29 @@ export default function ItemDetailScreen() {
+
+   if (isLoading || !item) {
+     return (
+-      <AppScreen scroll={false}>
++      <AppShellPage
++        title="Detalle de prenda"
++        subtitle="Inventario y etiqueta QR"
++        activeRoute="items"
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+   return (
+-    <AppScreen>
+-      <AppBackButton fallbackRoute={returnRoute || '/items'} />
+-      <AppText variant="title" bold>
+-        Detalle de prenda
+-      </AppText>
++    <AppShellPage
++      title="Detalle de prenda"
++      subtitle="Inventario y etiqueta QR"
++      activeRoute="items"
++      rightContent={
++        <AppButton
++          title="Volver"
++          variant="secondary"
++          onPress={() => router.replace((returnRoute || '/items') as any)}
++        />
++      }
++    >
+
+       <AppCard>
+         <AppText bold>Código</AppText>
+@@ -419,7 +430,7 @@ export default function ItemDetailScreen() {
+           />
+         </View>
+       </AppBottomModal>
+-    </AppScreen>
++    </AppShellPage>
+   );
+ }
+
+diff --git a/app/reservations.tsx b/app/reservations.tsx
+index 40b554a..47c48ed 100644
+--- a/app/reservations.tsx
++++ b/app/reservations.tsx
+@@ -1,11 +1,11 @@
+ import AppShell from '@/components/layout/AppShell';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import { buildMainNavSections, getSessionScopeLabel } from '@/components/layout/appNavigation';
+ import AppBottomModal from '@/components/ui/AppBottomModal';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+ import AppOptionRow from '@/components/ui/AppOptionRow';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import EmptyState from '@/components/ui/EmptyState';
+ import StatusBadge from '@/components/ui/StatusBadge';
+@@ -210,12 +210,16 @@ export default function ReservationsScreen() {
+
+   if (isLoading) {
+     return (
+-      <AppScreen scroll={false}>
++      <AppShellPage
++        title="Reservas"
++        subtitle="Apartados activos, cajas y seguimiento"
++        activeRoute="reservations"
++      >
+         <View style={styles.loadingContainer}>
+           <ActivityIndicator />
+           <AppText style={styles.loadingText}>Cargando apartados...</AppText>
+         </View>
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+diff --git a/app/users.tsx b/app/users.tsx
+index 6ea4ec6..0152f41 100644
+--- a/app/users.tsx
++++ b/app/users.tsx
+@@ -1,9 +1,9 @@
+ import AppShell from '@/components/layout/AppShell';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import { buildMainNavSections, getSessionScopeLabel } from '@/components/layout/appNavigation';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import EmptyState from '@/components/ui/EmptyState';
+ import StatusBadge from '@/components/ui/StatusBadge';
+@@ -134,9 +134,13 @@ export default function UsersScreen() {
+
+   if (isLoading) {
+     return (
+-      <AppScreen scroll={false}>
++      <AppShellPage
++        title="Usuarios"
++        subtitle="Administracion de accesos y estado operativo"
++        activeRoute="users"
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+diff --git a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+index 7ab72ef..cfad200 100644
+--- a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
++++ b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+@@ -303,3 +303,11 @@ La fase no cambia tokens ni reglas de negocio. Aplica `AppShellPage`, sidebar/dr
+ Fecha: 2026-06-06
+
+ PRODUCT-D6.5 audita automaticamente rutas `app/*.tsx`, migra `/system-security` y `/system-sessions` a `AppShellPage`, y deja inventario documentado de rutas legacy restantes para priorizacion posterior.
++
++---
++
++## Continuidad PRODUCT-D6.6 - Rutas visibles restantes
++
++Fecha: 2026-06-06
++
++PRODUCT-D6.6 extiende el AppShell premium a rutas visibles de clientes, apartados/reservas, usuarios, inventario/lotes, pedidos y paquetes de cliente. La fase no cambia tokens ni reglas de negocio; reduce pantallas legacy y deja pendiente una limpieza de i18n profundo por dominio.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index 45ff7e8..bc13beb 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -141,3 +141,23 @@ Agregar a la corrida manual:
+ - `/system-sessions`.
+
+ Confirmar AppShell/sidebar/drawer, active state correcto, ausencia de `Menu principal` legacy, idioma Espanol/English, light/dark y mobile/drawer.
++
++## Nota PRODUCT-D6.6
++
++Agregar a la corrida manual las rutas visibles migradas:
++
++- `/customers`;
++- `/customers-create`;
++- `/customers/<id valido>`;
++- `/customer-addresses-create?customerId=<id valido>`;
++- `/reservations`;
++- `/users`;
++- `/items/<id valido>`;
++- `/batch-form`;
++- `/batch-detail?id=<id valido>`;
++- `/customer-orders`;
++- `/customer-order-detail?id=<id valido>`;
++- `/customer-packages`;
++- `/customer-package-detail?id=<id valido>`.
++
++Confirmar AppShell/sidebar/drawer, active state correcto, ausencia de `Menu principal` legacy en rutas migradas, light/dark, presets visuales y responsive desktop/tablet/mobile.
+diff --git a/docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md b/docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md
+index 7f036a9..43bcf81 100644
+--- a/docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md
++++ b/docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md
+@@ -161,6 +161,10 @@ Decision PRODUCT-D5:
+ - Algunas pantallas adicionales existentes no se agregaron al menu para no ampliar alcance sin QA por permisos.
+ - La traduccion completa de todos los formularios legacy sigue pendiente.
+
++## Seguimiento PRODUCT-D6.6
++
++PRODUCT-D6.6 migra rutas visibles/operativas profundas asociadas a clientes, apartados, usuarios, inventario/lotes, pedidos y paquetes de cliente. El menu categorizado se mantiene como fuente global; las rutas hijas usan `activeRoute` del padre logico para no crear nuevas opciones ni permisos.
++
+ ## GO/NO-GO
+
+ GO tecnico condicionado a validaciones automatizadas.
+diff --git a/docs/PRODUCT_D6_3_LEGACY_PREMIUM_MIGRATION.md b/docs/PRODUCT_D6_3_LEGACY_PREMIUM_MIGRATION.md
+index 91b45ca..72f5020 100644
+--- a/docs/PRODUCT_D6_3_LEGACY_PREMIUM_MIGRATION.md
++++ b/docs/PRODUCT_D6_3_LEGACY_PREMIUM_MIGRATION.md
+@@ -85,6 +85,10 @@ Las rutas de caja (`cash-closures`, `cash-closure-detail`) se documentan como le
+
+ PRODUCT-D6.5 complementa esta migracion con una auditoria automatica de rutas `app/*.tsx` y migra `/system-security` y `/system-sessions`, que QA observo con layout legacy.
+
++## Nota PRODUCT-D6.6
++
++PRODUCT-D6.6 avanza sobre rutas visibles/operativas restantes de clientes, apartados, usuarios, inventario/lotes, pedidos y paquetes de cliente. La estrategia mantiene `AppShellPage`, `activeRoute` logico y no cambia servicios, formularios, permisos ni endpoints.
++
+ ## Riesgos pendientes
+
+ - Algunas tablas de reportes muestran estados/codigos que vienen del backend; se mantienen como datos tecnicos.
+diff --git a/docs/PRODUCT_D6_4_OPERATIONAL_LEGACY_APPSHELL.md b/docs/PRODUCT_D6_4_OPERATIONAL_LEGACY_APPSHELL.md
+index 5f99c72..f4fb6bc 100644
+--- a/docs/PRODUCT_D6_4_OPERATIONAL_LEGACY_APPSHELL.md
++++ b/docs/PRODUCT_D6_4_OPERATIONAL_LEGACY_APPSHELL.md
+@@ -71,10 +71,20 @@ PRODUCT-D6.5 ejecuto una auditoria automatica sobre `app/*.tsx` y migro dos ruta
+
+ El inventario completo de rutas legacy restantes queda documentado en `docs/PRODUCT_D6_5_LEGACY_ROUTE_AUDIT.md`.
+
++## Nota PRODUCT-D6.6
++
++PRODUCT-D6.6 migro las rutas hijas visibles que habian quedado pendientes en inventario/lotes:
++
++- `/items/[id]`
++- `/batch-form`
++- `/batch-detail`
++
++Estas rutas ahora usan `AppShellPage`, conservan la logica de inventario/lotes y mantienen `activeRoute` bajo Inventario/Lotes.
++
+ ## Riesgos pendientes
+
+ - Algunas alertas historicas y textos secundarios de flujo operativo siguen hardcodeados; no se tocaron para evitar cambios funcionales fuera de la migracion visual.
+-- `batch-form`, `batch-detail` e `items/[id]` siguen como rutas hijas con patron legacy. Se recomienda evaluarlas en una fase posterior si QA las marca como parte del recorrido visual.
++- Las rutas hijas `batch-form`, `batch-detail` e `items/[id]` fueron migradas en PRODUCT-D6.6.
+ - Las rutas de caja siguen legacy por alcance y requieren una fase separada si se decide migrarlas.
+
+ ## Validacion manual esperada
+diff --git a/docs/PRODUCT_D6_5_LEGACY_ROUTE_AUDIT.md b/docs/PRODUCT_D6_5_LEGACY_ROUTE_AUDIT.md
+index c05e1d0..2fe2ec6 100644
+--- a/docs/PRODUCT_D6_5_LEGACY_ROUTE_AUDIT.md
++++ b/docs/PRODUCT_D6_5_LEGACY_ROUTE_AUDIT.md
+@@ -137,3 +137,14 @@ No se traducen codigos tecnicos, datos retornados por backend ni identificadores
+ ## GO/NO-GO
+
+ GO tecnico condicionado a validaciones automaticas completas y a corrida visual manual de `/system-security` y `/system-sessions`.
++
++## Seguimiento PRODUCT-D6.6
++
++PRODUCT-D6.6 tomo este inventario como base y migro rutas visibles/operativas adicionales:
++
++- `customers`, `customers-create`, `customers/[id]`, `customer-addresses-create`, `customer-addresses/[id]`
++- `reservations` en estado de carga y `users` en estado de carga
++- `items/[id]`, `batch-form`, `batch-detail`
++- `customer-orders`, `customer-order-detail`, `customer-packages`, `customer-package-detail`
++
++Despues de D6.6, el conteo top-level con patron legacy baja a 33 rutas. Las rutas restantes pertenecen principalmente a auth/especiales, caja/pagos o dominios amplios pendientes de una fase dedicada.

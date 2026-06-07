@@ -1,8 +1,7 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 
 import {
@@ -221,22 +220,31 @@ export default function CustomerDetailScreen() {
 
   if (isLoading || !customer) {
     return (
-      <AppScreen>
+      <AppShellPage
+        title="Cliente"
+        subtitle="Detalle comercial y direcciones"
+        activeRoute="customers"
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   const isInactive = customer.status === 'INACTIVE';
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute="/customers" preferHistory={false} />
-
-      <AppText variant="title" bold>
-        Cliente
-      </AppText>
-
+    <AppShellPage
+      title="Cliente"
+      subtitle="Detalle comercial y direcciones"
+      activeRoute="customers"
+      rightContent={
+        <AppButton
+          title="Volver"
+          variant="secondary"
+          onPress={() => router.replace('/customers' as any)}
+        />
+      }
+    >
       <AppCard>
         <View style={styles.statusRow}>
           <AppText bold>Estado</AppText>
@@ -379,7 +387,7 @@ export default function CustomerDetailScreen() {
         loading={isChangingStatus}
       />
       ) : null}
-    </AppScreen>
+    </AppShellPage>
   );
 }
 

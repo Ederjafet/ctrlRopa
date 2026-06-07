@@ -1,10 +1,8 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
-import AppScreen from '@/components/ui/AppScreen';
-import AppText from '@/components/ui/AppText';
 
 import { canAccessByPermission } from '@/services/accessControl';
 import { createCustomer } from '@/services/customerService';
@@ -97,20 +95,29 @@ export default function CustomersCreateScreen() {
 
   if (isCheckingAccess) {
     return (
-      <AppScreen>
+      <AppShellPage
+        title="Nuevo cliente"
+        subtitle="Alta de cliente en la sucursal activa"
+        activeRoute="customers"
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute={returnRoute} preferHistory={false} />
-
-      <AppText variant="title" bold>
-        Nuevo cliente
-      </AppText>
-
+    <AppShellPage
+      title="Nuevo cliente"
+      subtitle="Alta de cliente en la sucursal activa"
+      activeRoute="customers"
+      rightContent={
+        <AppButton
+          title="Volver"
+          variant="secondary"
+          onPress={() => router.replace(returnRoute as any)}
+        />
+      }
+    >
       <AppCard>
         <AppResponsiveGrid tabletColumns={2} desktopColumns={2}>
         <AppInput
@@ -144,6 +151,6 @@ export default function CustomersCreateScreen() {
           loading={isSaving}
         />
       </AppCard>
-    </AppScreen>
+    </AppShellPage>
   );
 }

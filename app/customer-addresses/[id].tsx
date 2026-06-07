@@ -1,8 +1,7 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 
 import {
@@ -156,16 +155,29 @@ export default function CustomerAddressDetailScreen() {
 
   if (isLoading || !address) {
     return (
-      <AppScreen>
+      <AppShellPage
+        title="Direccion"
+        subtitle="Editar direccion del cliente"
+        activeRoute="customers"
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute={`/customers/${customerId}`} preferHistory={false} />
-
+    <AppShellPage
+      title="Direccion"
+      subtitle="Editar direccion del cliente"
+      activeRoute="customers"
+      rightContent={
+        <AppButton
+          title="Volver"
+          variant="secondary"
+          onPress={() => router.replace(`/customers/${customerId}` as any)}
+        />
+      }
+    >
       <AppText variant="title" bold>
         Dirección
       </AppText>
@@ -202,6 +214,6 @@ export default function CustomerAddressDetailScreen() {
         onPress={handleDeactivate}
         loading={isDeleting}
       />
-    </AppScreen>
+    </AppShellPage>
   );
 }

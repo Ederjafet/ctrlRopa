@@ -303,3 +303,11 @@ La fase no cambia tokens ni reglas de negocio. Aplica `AppShellPage`, sidebar/dr
 Fecha: 2026-06-06
 
 PRODUCT-D6.5 audita automaticamente rutas `app/*.tsx`, migra `/system-security` y `/system-sessions` a `AppShellPage`, y deja inventario documentado de rutas legacy restantes para priorizacion posterior.
+
+---
+
+## Continuidad PRODUCT-D6.6 - Rutas visibles restantes
+
+Fecha: 2026-06-06
+
+PRODUCT-D6.6 extiende el AppShell premium a rutas visibles de clientes, apartados/reservas, usuarios, inventario/lotes, pedidos y paquetes de cliente. La fase no cambia tokens ni reglas de negocio; reduce pantallas legacy y deja pendiente una limpieza de i18n profundo por dominio.

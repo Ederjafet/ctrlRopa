@@ -1,7 +1,6 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import {
@@ -142,9 +141,13 @@ export default function CustomerOrderDetailScreen() {
 
   if (isLoading || !detail) {
     return (
-      <AppScreen>
+      <AppShellPage
+        title="Detalle de pedido"
+        subtitle="Resumen financiero y prendas"
+        activeRoute="customers"
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
@@ -156,13 +159,18 @@ export default function CustomerOrderDetailScreen() {
   const isClosed = detail.status === 'CLOSED' || settlement?.status === 'CLOSED';
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute={fallbackRoute} />
-
-      <AppText variant="title" bold>
-        Pedido #{detail.id}
-      </AppText>
-
+    <AppShellPage
+      title={`Pedido #${detail.id}`}
+      subtitle="Resumen financiero y prendas"
+      activeRoute="customers"
+      rightContent={
+        <AppButton
+          title="Volver"
+          variant="secondary"
+          onPress={() => router.replace(fallbackRoute as any)}
+        />
+      }
+    >
       <AppCard>
         <View style={styles.summaryRow}>
           <AppText bold>Cliente</AppText>
@@ -295,7 +303,7 @@ export default function CustomerOrderDetailScreen() {
           </View>
         </AppCard>
       ) : null}
-    </AppScreen>
+    </AppShellPage>
   );
 }
 

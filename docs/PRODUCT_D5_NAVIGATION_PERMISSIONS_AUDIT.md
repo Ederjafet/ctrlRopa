@@ -161,6 +161,10 @@ Decision PRODUCT-D5:
 - Algunas pantallas adicionales existentes no se agregaron al menu para no ampliar alcance sin QA por permisos.
 - La traduccion completa de todos los formularios legacy sigue pendiente.
 
+## Seguimiento PRODUCT-D6.6
+
+PRODUCT-D6.6 migra rutas visibles/operativas profundas asociadas a clientes, apartados, usuarios, inventario/lotes, pedidos y paquetes de cliente. El menu categorizado se mantiene como fuente global; las rutas hijas usan `activeRoute` del padre logico para no crear nuevas opciones ni permisos.
+
 ## GO/NO-GO
 
 GO tecnico condicionado a validaciones automatizadas.
