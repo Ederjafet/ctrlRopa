@@ -1,0 +1,1455 @@
+diff --git a/app/ui-kit.tsx b/app/ui-kit.tsx
+index 937166e..26395b4 100644
+--- a/app/ui-kit.tsx
++++ b/app/ui-kit.tsx
+@@ -21,7 +21,15 @@ import StatusBadge from '@/components/ui/StatusBadge';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import { isAdmin, isNoAccess } from '@/services/accessControl';
+ import { ensureSessionActive, getSession, UserSession } from '@/services/sessionStorage';
+-import { HarmonyType, SemanticPalette } from '@/theme/colorUtils';
++import {
++  HarmonyType,
++  SemanticPalette,
++  generateSemanticPalette,
++  getContrastRatio as getPaletteContrastRatio,
++  getContrastStatus as getPaletteContrastStatus,
++  getReadableTextColor,
++  normalizeHexColor,
++} from '@/theme/colorUtils';
+ import { designTokens, viewVariants } from '@/theme/designTokens';
+ import {
+   DesignPresetColors,
+@@ -108,6 +116,20 @@ export default function UiKitPreview() {
+     }
+     return warnings;
+   }, [editorValues.background, editorValues.surface, theme.colors.textPrimary]);
++  const generatedPalette = useMemo(
++    () => generateSemanticPalette(normalizeHexColor(paletteBaseColor), paletteHarmony, activeScheme),
++    [activeScheme, paletteBaseColor, paletteHarmony],
++  );
++  const generatedPaletteHasLowContrast = useMemo(() => {
++    const textOnBackground = activeScheme === 'dark' ? '#F8FAFC' : '#0F172A';
++    const ratios = [
++      getPaletteContrastRatio(getReadableTextColor(generatedPalette.primary), generatedPalette.primary),
++      getPaletteContrastRatio(textOnBackground, generatedPalette.background),
++      getPaletteContrastRatio(getReadableTextColor(generatedPalette.danger), generatedPalette.danger),
++    ];
++
++    return ratios.some((ratio) => getPaletteContrastStatus(ratio) === 'low');
++  }, [activeScheme, generatedPalette]);
+
+   useEffect(() => {
+     let cancelled = false;
+@@ -211,7 +233,7 @@ export default function UiKitPreview() {
+     return (
+       <View style={[styles.loadingScreen, { backgroundColor: theme.colors.background }]}>
+         <ActivityIndicator />
+-        <AppText color={theme.colors.mutedText}>Cargando UI Kit...</AppText>
++        <AppText color={theme.colors.mutedText}>{t('paletteGenerator.loading')}</AppText>
+       </View>
+     );
+   }
+@@ -223,17 +245,17 @@ export default function UiKitPreview() {
+   if (!isAdmin(session) || isNoAccess(session)) {
+     return (
+       <AppShell
+-        title="UI Kit"
+-        subtitle="Catalogo interno de componentes y templates"
+-        contextTitle="Catalogo UI"
+-        contextSubtitle="Componentes, tokens y templates internos"
++        title={t('paletteGenerator.appDesignTitle')}
++        subtitle={t('paletteGenerator.appDesignSubtitle')}
++        contextTitle={t('paletteGenerator.technicalReferenceTitle')}
++        contextSubtitle={t('paletteGenerator.technicalReferenceSubtitle')}
+         activeRoute="ui-kit"
+         session={session}
+         navSections={navSections}
+       >
+         <EmptyState
+-          title="Acceso restringido"
+-          message="El catalogo UI Kit es una vista interna para administracion y desarrollo."
++          title={t('paletteGenerator.restrictedTitle')}
++          message={t('paletteGenerator.restrictedMessage')}
+           icon="lock"
+         />
+       </AppShell>
+@@ -242,17 +264,17 @@ export default function UiKitPreview() {
+
+   return (
+     <AppShell
+-      title="UI Kit"
+-      subtitle="Catalogo interno de componentes y templates"
+-      contextTitle="Catalogo UI"
+-      contextSubtitle="Componentes, tokens y templates internos"
++      title={t('paletteGenerator.appDesignTitle')}
++      subtitle={t('paletteGenerator.appDesignSubtitle')}
++      contextTitle={t('paletteGenerator.technicalReferenceTitle')}
++      contextSubtitle={t('paletteGenerator.technicalReferenceSubtitle')}
+       activeRoute="ui-kit"
+       session={session}
+       navSections={navSections}
+     >
+       <SectionHeader
+-        title={t('paletteGenerator.flowTitle')}
+-        subtitle={t('paletteGenerator.flowSubtitle')}
++        title={t('paletteGenerator.appDesignTitle')}
++        subtitle={t('paletteGenerator.appDesignSubtitle')}
+       />
+       <AppCard variant="info" style={styles.guidedFlowCard}>
+         {[
+@@ -276,13 +298,17 @@ export default function UiKitPreview() {
+                 {String(index + 1)}
+               </AppText>
+             </View>
+-            <AppText variant="caption" bold>
++            <AppText variant="caption" bold style={styles.flowStepText}>
+               {step}
+             </AppText>
+           </View>
+         ))}
+       </AppCard>
+
++      <SectionHeader
++        title={t('paletteGenerator.templateSectionTitle')}
++        subtitle={t('paletteGenerator.templateSectionHelp')}
++      />
+       <View style={styles.previewCard}>
+         <View style={styles.themePreviewHeader}>
+           <View style={styles.previewTextBlock}>
+@@ -331,10 +357,6 @@ export default function UiKitPreview() {
+         </AppResponsiveGrid>
+       </View>
+
+-      <SectionHeader
+-        title={t('paletteGenerator.sectionTitle')}
+-        subtitle={t('paletteGenerator.sectionSubtitle')}
+-      />
+       <PaletteGeneratorCard
+         activeScheme={activeScheme}
+         advancedMode={showAdvancedDetails}
+@@ -347,6 +369,7 @@ export default function UiKitPreview() {
+         }}
+         onHarmonyChange={setPaletteHarmony}
+         onTokenChange={updateEditorToken}
++        showApplyAction={false}
+       />
+
+       {identityFeedback ? (
+@@ -357,25 +380,61 @@ export default function UiKitPreview() {
+         </AppCard>
+       ) : null}
+
+-      <View style={styles.buttonRow}>
+-        <AppButton
+-          title={t('paletteGenerator.restoreTemplate')}
+-          variant="neutral"
+-          onPress={restoreActivePreset}
+-        />
+-        <AppButton
+-          title={
+-            showAdvancedDetails
+-              ? t('paletteGenerator.hideTechnicalDetails')
+-              : t('paletteGenerator.showTechnicalDetails')
+-          }
+-          variant="secondary"
+-          onPress={() => setShowAdvancedDetails((current) => !current)}
+-        />
+-      </View>
++      <SectionHeader
++        title={t('paletteGenerator.applyChangesTitle')}
++        subtitle={t('paletteGenerator.applyChangesHelp')}
++      />
++      <AppCard variant="elevated" style={styles.applyCard}>
++        {generatedPaletteHasLowContrast ? (
++          <View
++            style={[
++              styles.applyWarning,
++              {
++                backgroundColor: theme.colors.warningBackground,
++                borderColor: theme.colors.warning,
++              },
++            ]}
++          >
++            <AppText bold color={theme.colors.warning}>
++              {t('paletteGenerator.lowContrast')}
++            </AppText>
++            <AppText variant="caption" color={theme.colors.textSecondary}>
++              {t('paletteGenerator.lowContrastApplyWarning')}
++            </AppText>
++          </View>
++        ) : null}
++        <View style={styles.buttonRow}>
++          <AppButton
++            title={t('paletteGenerator.applyLocal')}
++            variant="primary"
++            onPress={() => applyGeneratedPalette(generatedPalette)}
++          />
++          <AppButton
++            title={t('paletteGenerator.restoreTemplate')}
++            variant="neutral"
++            onPress={restoreActivePreset}
++          />
++          <AppButton
++            title={
++              showAdvancedDetails
++                ? t('paletteGenerator.hideAdvancedOptions')
++                : t('paletteGenerator.showAdvancedOptions')
++            }
++            variant="secondary"
++            onPress={() => setShowAdvancedDetails((current) => !current)}
++          />
++        </View>
++        <AppText variant="caption" color={theme.colors.mutedText}>
++          {t('paletteGenerator.localStorageHelp')}
++        </AppText>
++      </AppCard>
+
+       {showAdvancedDetails ? (
+         <>
++      <SectionHeader
++        title={t('paletteGenerator.advancedOptionsTitle')}
++        subtitle={t('paletteGenerator.advancedOptionsHelp')}
++      />
+       <SectionHeader
+         title={t('paletteGenerator.controlledEditorTitle')}
+         subtitle={t('paletteGenerator.controlledEditorSubtitle')}
+@@ -916,6 +975,15 @@ function PresetMiniPreview({ colors }: { colors: DesignPresetColors }) {
+ }
+
+ const styles = StyleSheet.create({
++  applyCard: {
++    gap: designTokens.spacing.sm,
++  },
++  applyWarning: {
++    borderRadius: designTokens.radius.lg,
++    borderWidth: 1,
++    gap: designTokens.spacing.xs,
++    padding: designTokens.spacing.md,
++  },
+   buttonRow: {
+     alignItems: 'center',
+     flexDirection: 'row',
+@@ -956,6 +1024,10 @@ const styles = StyleSheet.create({
+     justifyContent: 'center',
+     width: 24,
+   },
++  flowStepText: {
++    flexShrink: 1,
++    minWidth: 0,
++  },
+   guidedFlowCard: {
+     alignItems: 'center',
+     flexDirection: 'row',
+diff --git a/components/ui/PaletteGeneratorCard.tsx b/components/ui/PaletteGeneratorCard.tsx
+index 2584513..3a61448 100644
+--- a/components/ui/PaletteGeneratorCard.tsx
++++ b/components/ui/PaletteGeneratorCard.tsx
+@@ -33,6 +33,7 @@ type Props = {
+   onBaseColorChange: (value: string) => void;
+   onHarmonyChange: (harmony: HarmonyType) => void;
+   onTokenChange: (key: EditableVisualTokenKey, value: string) => void;
++  showApplyAction?: boolean;
+ };
+
+ type ContrastStatus = ReturnType<typeof getContrastStatus>;
+@@ -51,6 +52,7 @@ export default function PaletteGeneratorCard({
+   onBaseColorChange,
+   onHarmonyChange,
+   onTokenChange,
++  showApplyAction = true,
+ }: Props) {
+   const { theme } = useAppTheme();
+   const { t } = useTranslation();
+@@ -160,10 +162,10 @@ export default function PaletteGeneratorCard({
+       <View style={styles.headerRow}>
+         <View style={styles.flexBlock}>
+           <AppText variant="subtitle" bold>
+-            {t('paletteGenerator.title')}
++            {t('paletteGenerator.brandColorTitle')}
+           </AppText>
+           <AppText variant="caption" color={theme.colors.mutedText}>
+-            {t('paletteGenerator.subtitle')}
++            {t('paletteGenerator.brandColorHelp')}
+           </AppText>
+         </View>
+         <View
+@@ -179,7 +181,10 @@ export default function PaletteGeneratorCard({
+
+       <View style={styles.generatorGrid}>
+         <View style={styles.controlColumn}>
+-          <AppText bold>{t('paletteGenerator.baseColor')}</AppText>
++          <AppText bold>{t('paletteGenerator.brandColorTitle')}</AppText>
++          <AppText variant="caption" color={theme.colors.mutedText}>
++            {t('paletteGenerator.baseColorHelp')}
++          </AppText>
+           <View style={styles.baseInputRow}>
+             {webColorInput}
+             <AppInput
+@@ -264,16 +269,18 @@ export default function PaletteGeneratorCard({
+       <View style={styles.sectionBlock}>
+         <View style={styles.headerRow}>
+           <View style={styles.flexBlock}>
+-            <AppText bold>{t('paletteGenerator.suggestedPalette')}</AppText>
++            <AppText bold>{t('paletteGenerator.appPaletteTitle')}</AppText>
+             <AppText variant="caption" color={theme.colors.mutedText}>
+-              {t('paletteGenerator.suggestedPaletteHelp')}
++              {t('paletteGenerator.appPaletteHelp')}
+             </AppText>
+           </View>
+-          <AppButton
+-            title={t('paletteGenerator.applyLocal')}
+-            variant="primary"
+-            onPress={() => onApplyPalette(palette)}
+-          />
++          {showApplyAction ? (
++            <AppButton
++              title={t('paletteGenerator.applyLocal')}
++              variant="primary"
++              onPress={() => onApplyPalette(palette)}
++            />
++          ) : null}
+         </View>
+         <View style={styles.tokenGrid}>
+           {tokenEntries.map(([key, color]) => (
+@@ -301,10 +308,10 @@ export default function PaletteGeneratorCard({
+       <View style={styles.generatorGrid}>
+         <View style={styles.controlColumn}>
+           <AppText bold>
+-            {advancedMode ? t('paletteGenerator.contrastTitle') : t('paletteGenerator.mainContrast')}
++            {advancedMode ? t('paletteGenerator.contrastTitle') : t('paletteGenerator.legibilityTitle')}
+           </AppText>
+           <AppText variant="caption" color={theme.colors.mutedText}>
+-            {advancedMode ? t('paletteGenerator.contrastHelp') : t('paletteGenerator.mainContrastHelp')}
++            {advancedMode ? t('paletteGenerator.contrastHelp') : t('paletteGenerator.legibilityHelp')}
+           </AppText>
+           {hasLowContrast ? (
+             <View
+@@ -472,7 +479,10 @@ function UiPreview({ activeScheme, palette }: { activeScheme: 'light' | 'dark';
+
+   return (
+     <View style={styles.controlColumn}>
+-      <AppText bold>{t('paletteGenerator.previewTitle')}</AppText>
++      <AppText bold>{t('paletteGenerator.appPreviewTitle')}</AppText>
++      <AppText variant="caption" color={mutedColor}>
++        {t('paletteGenerator.appPreviewHelp')}
++      </AppText>
+       <View style={[styles.uiPreviewCanvas, { backgroundColor: palette.background }]}>
+         <View style={[styles.previewSidebar, { backgroundColor: palette.primary }]}>
+           <View style={[styles.previewSidebarLine, { backgroundColor: primaryText }]} />
+diff --git a/docs/PRODUCT_C2_1_PALETTE_CONTRAST_GENERATOR.md b/docs/PRODUCT_C2_1_PALETTE_CONTRAST_GENERATOR.md
+index 9729026..b1b6454 100644
+--- a/docs/PRODUCT_C2_1_PALETTE_CONTRAST_GENERATOR.md
++++ b/docs/PRODUCT_C2_1_PALETTE_CONTRAST_GENERATOR.md
+@@ -205,3 +205,13 @@ PRODUCT-C2.2 conserva el generador de paletas, armonias, contraste y preview de
+ 6. Aplicar o restaurar.
+
+ Las secciones largas de tokens, escalas completas, componentes, templates, variantes y ratios tecnicos quedan disponibles en detalles avanzados. El cambio no elimina capacidades; reduce la carga visual inicial para QA y clientes.
++
++---
++
++## Continuidad PRODUCT-C2.3 - Flujo de diseno de aplicacion
++
++Fecha: 2026-06-07
++
++PRODUCT-C2.3 mantiene el generador tecnico de PRODUCT-C2.1, pero cambia el lenguaje de la experiencia principal a `Diseno de la aplicacion`. El color base pasa a explicarse como color principal de marca, la paleta sugerida usa nombres entendibles y la accion de aplicar/restaurar queda al final del flujo.
++
++El generador avanzado sigue disponible, pero deja de ser el mensaje principal para usuario final.
+diff --git a/docs/PRODUCT_C2_2_SIMPLIFIED_VISUAL_IDENTITY_FLOW.md b/docs/PRODUCT_C2_2_SIMPLIFIED_VISUAL_IDENTITY_FLOW.md
+index c0f7fac..d5468c0 100644
+--- a/docs/PRODUCT_C2_2_SIMPLIFIED_VISUAL_IDENTITY_FLOW.md
++++ b/docs/PRODUCT_C2_2_SIMPLIFIED_VISUAL_IDENTITY_FLOW.md
+@@ -162,3 +162,22 @@ Las traducciones nuevas son base tecnica y requieren revision humana/nativa ante
+ - No se agregan fuentes externas.
+ - La validacion de contraste sigue siendo basica.
+ - Las traducciones nuevas requieren revision nativa.
++
++---
++
++## Continuidad PRODUCT-C2.3 - Diseno de la aplicacion
++
++Fecha: 2026-06-07
++
++PRODUCT-C2.3 conserva la simplificacion de PRODUCT-C2.2, pero cambia el enfoque visible: `/ui-kit` ya no se presenta primero como laboratorio o catalogo tecnico, sino como `Diseno de la aplicacion`.
++
++La vista principal queda organizada como secuencia accionable para usuario admin:
++
++1. elegir plantilla visual;
++2. elegir color principal;
++3. revisar paleta sugerida;
++4. revisar contraste y legibilidad;
++5. mirar la vista previa;
++6. aplicar o restaurar cambios.
++
++El UI Kit tecnico, tokens, componentes, templates, variantes y detalles de contraste siguen disponibles en opciones avanzadas.
+diff --git a/docs/PRODUCT_C2_3_GUIDED_APP_DESIGN_FLOW.md b/docs/PRODUCT_C2_3_GUIDED_APP_DESIGN_FLOW.md
+new file mode 100644
+index 0000000..31164f6
+--- /dev/null
++++ b/docs/PRODUCT_C2_3_GUIDED_APP_DESIGN_FLOW.md
+@@ -0,0 +1,131 @@
++# PRODUCT-C2.3 - Guided app design flow
++
++Fecha: 2026-06-07
++
++## Objetivo
++
++PRODUCT-C2.3 cambia el enfoque principal de `/ui-kit`: deja de presentarse como catalogo tecnico y pasa a comunicar claramente que es la pantalla de `Diseno de la aplicacion`.
++
++La ruta sigue siendo `/ui-kit`, pero la experiencia visible para usuario admin queda orientada a configurar colores y apariencia del sistema.
++
++## Problema detectado
++
++PRODUCT-C2.2 redujo carga visual, pero la pantalla todavia se percibia como laboratorio tecnico:
++
++- el encabezado principal seguia diciendo `UI Kit`;
++- el contexto hablaba de catalogo interno;
++- el usuario no veia con claridad que estaba cambiando colores de la aplicacion;
++- algunos labels visibles seguian cerca de tokens tecnicos;
++- aplicar/restaurar no cerraba la secuencia como paso final.
++
++## Flujo guiado aplicado
++
++La experiencia principal ahora sigue una secuencia accionable:
++
++1. Elige una plantilla visual.
++2. Elige el color principal.
++3. Revisa la paleta sugerida.
++4. Revisa contraste y legibilidad.
++5. Mira la vista previa.
++6. Aplica o restaura cambios.
++
++El stepper se mantiene simple, numerado y compatible con textos largos.
++
++## Visible por defecto
++
++Queda visible en la vista principal:
++
++- titulo `Diseno de la aplicacion`;
++- subtitulo de configuracion visual;
++- pasos guiados;
++- plantilla visual activa;
++- selector compacto de plantillas;
++- color principal de marca;
++- armonia;
++- paleta sugerida para la aplicacion;
++- contraste y legibilidad;
++- vista previa de la aplicacion;
++- aplicar paleta localmente;
++- restaurar plantilla;
++- ver opciones avanzadas.
++
++## Modo avanzado
++
++Queda cerrado por defecto y conserva:
++
++- tokens tecnicos;
++- editor controlado HEX;
++- RGB/HSL;
++- swatches rapidos;
++- tints/shades/tones;
++- contraste detallado;
++- componentes UI;
++- panel LIVE de referencia;
++- templates;
++- variantes visuales.
++
++El texto aclara que estas opciones son utiles para desarrollo o ajustes finos y no son necesarias para configurar la apariencia basica.
++
++## /appearance vs /ui-kit
++
++`/appearance` se mantiene como pantalla de branding y configuracion visual simple.
++
++La tarjeta de acceso ahora comunica:
++
++- `Diseno de la aplicacion`;
++- configuracion de colores, plantilla visual y preview;
++- boton `Abrir editor visual`.
++
++No se duplica el generador en `/appearance`.
++
++## I18N
++
++Se agregaron y ajustaron claves `paletteGenerator.*` en:
++
++- `es`;
++- `en`;
++- `pt-BR`;
++- `fr`;
++- `ja`;
++- `zh`;
++- `ko`.
++
++Auditoria local de estructura:
++
++```text
++es: leaves=1194 missing=0 extra=0
++en: leaves=1194 missing=0 extra=0
++pt-BR: leaves=1194 missing=0 extra=0
++fr: leaves=1194 missing=0 extra=0
++ja: leaves=1194 missing=0 extra=0
++zh: leaves=1194 missing=0 extra=0
++ko: leaves=1194 missing=0 extra=0
++```
++
++## Validacion manual esperada
++
++1. Entrar con `qa.admin`.
++2. Abrir `/ui-kit`.
++3. Confirmar que el titulo comunica `Diseno de la aplicacion`.
++4. Confirmar que el stepper explica la secuencia.
++5. Elegir plantilla.
++6. Elegir color principal.
++7. Revisar paleta sugerida.
++8. Revisar contraste y legibilidad.
++9. Ver preview.
++10. Aplicar paleta localmente.
++11. Abrir `/live` o `/customers` y confirmar aplicacion visual.
++12. Volver a `/ui-kit`.
++13. Restaurar plantilla.
++14. Abrir opciones avanzadas.
++15. Confirmar que tokens/componentes/templates siguen disponibles sin saturar por defecto.
++16. Abrir `/appearance` y confirmar tarjeta `Diseno de la aplicacion`.
++
++## Limitaciones
++
++- No hay persistencia backend ni por tenant.
++- No se elimina el UI Kit tecnico; queda como modo avanzado.
++- No se instalan librerias externas.
++- No se agregan fuentes externas.
++- La validacion de contraste sigue siendo basica.
++- Las traducciones nuevas requieren revision nativa.
+diff --git a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+index 4603a54..e8281ca 100644
+--- a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
++++ b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+@@ -355,3 +355,13 @@ Fecha: 2026-06-06
+ PRODUCT-C2.2 simplifica `/ui-kit` para que el usuario vea primero un flujo de identidad visual guiado: plantilla activa, color base, paleta sugerida, contraste principal, preview real y acciones de aplicar/restaurar. El contenido avanzado del laboratorio visual queda colapsado por defecto.
+
+ La validacion visual debe confirmar que la simplificacion no elimina el generador, no rompe los overrides locales, no oculta la restauracion de plantilla y mantiene disponible el modo avanzado para tokens, componentes, templates, variantes y detalles tecnicos.
++
++---
++
++## Continuidad PRODUCT-C2.3 - Diseno visual de la aplicacion
++
++Fecha: 2026-06-07
++
++PRODUCT-C2.3 reposiciona `/ui-kit` como pantalla de `Diseno de la aplicacion`: la configuracion visible ahora explica que se cambia la plantilla visual, el color principal, la paleta sugerida, contraste, legibilidad y preview antes de aplicar cambios locales.
++
++El sistema visual premium conserva presets, light/dark, overrides locales y modo avanzado. QA debe validar que el usuario entienda la secuencia sin abrir opciones tecnicas.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index 8ecb937..94ae848 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -274,3 +274,20 @@ Agregar a la corrida manual de sistema visual:
+ - abrir detalles avanzados;
+ - confirmar que tokens, componentes, templates y variantes siguen disponibles, pero no saturan la vista inicial;
+ - repetir en light/dark y mobile/tablet.
++
++## Nota PRODUCT-C2.3
++
++Agregar a la corrida manual de sistema visual:
++
++- abrir `/ui-kit`;
++- confirmar que el encabezado principal dice `Diseno de la aplicacion`;
++- confirmar que los pasos explican la secuencia completa;
++- elegir plantilla visual;
++- elegir color principal de marca;
++- revisar paleta sugerida con nombres entendibles;
++- revisar contraste y legibilidad;
++- confirmar que la vista previa aparece antes de aplicar cambios;
++- aplicar paleta localmente;
++- restaurar plantilla;
++- abrir opciones avanzadas y confirmar que el contenido tecnico no satura por defecto;
++- abrir `/appearance` y confirmar tarjeta `Diseno de la aplicacion` con boton `Abrir editor visual`.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index a7fe10a..f2e95b8 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -1083,18 +1083,27 @@
+     "saveChanges": "Save changes"
+   },
+   "paletteGenerator": {
++    "loading": "Loading application design...",
++    "appDesignTitle": "Application design",
++    "appDesignSubtitle": "Configure the visual template, colors, and preview of your system.",
++    "technicalReferenceTitle": "Internal UI Kit",
++    "technicalReferenceSubtitle": "Technical tool for components, colors, and visual templates.",
++    "restrictedTitle": "Restricted access",
++    "restrictedMessage": "Application design is an internal view for administration and development.",
+     "sectionTitle": "Visual palette generator",
+     "sectionSubtitle": "Choose a base color and review harmonies, variations, contrast, and preview before applying.",
+     "flowTitle": "Visual identity flow",
+     "flowSubtitle": "Follow these steps: template, base color, palette, contrast, preview, and local application.",
+     "flowSteps": {
+-      "template": "Visual template",
+-      "baseColor": "Base color",
+-      "palette": "Suggested palette",
+-      "contrast": "Contrast",
+-      "preview": "Preview",
+-      "apply": "Apply / restore"
++      "template": "Choose a visual template",
++      "baseColor": "Choose the main color",
++      "palette": "Review the suggested palette",
++      "contrast": "Review contrast and readability",
++      "preview": "Check the preview",
++      "apply": "Apply or restore changes"
+     },
++    "templateSectionTitle": "Choose a visual template",
++    "templateSectionHelp": "Select a visual base for your system. Then you can adjust the main color.",
+     "activeTemplate": "Active visual template",
+     "localConfigHelp": "This configuration is saved locally in this phase.",
+     "templateActive": "Active",
+@@ -1104,7 +1113,10 @@
+     "controlledEditorSubtitle": "Customize the main semantic tokens of the active template.",
+     "title": "Palette generator",
+     "subtitle": "Create a coherent palette from a base color without touching backend.",
++    "brandColorTitle": "Main brand color",
++    "brandColorHelp": "Choose the color that identifies your business. The system will propose a palette for buttons, accents, and states from it.",
+     "baseColor": "Base color",
++    "baseColorHelp": "Use the visual picker or type the HEX value of the main color.",
+     "invalidHex": "Use a valid HEX format. Example: #2563EB",
+     "quickSwatches": "Quick swatches",
+     "harmony": "Color harmony",
+@@ -1121,6 +1133,8 @@
+     "tones": "Tones / desaturated",
+     "suggestedPalette": "Suggested palette",
+     "suggestedPaletteHelp": "Tap a token to load it into the editor or apply the full palette locally.",
++    "appPaletteTitle": "Suggested palette for the application",
++    "appPaletteHelp": "The system proposes colors for buttons, accents, alerts, background, and cards.",
+     "applyLocal": "Apply palette locally",
+     "appliedFeedback": "Palette applied locally.",
+     "manualAppliedFeedback": "Customization applied locally.",
+@@ -1129,40 +1143,52 @@
+     "restoreTemplate": "Restore template",
+     "showTechnicalDetails": "View technical details",
+     "hideTechnicalDetails": "Hide technical details",
++    "showAdvancedOptions": "View advanced options",
++    "hideAdvancedOptions": "Hide advanced options",
++    "applyChangesTitle": "Apply changes",
++    "applyChangesHelp": "In this phase changes are saved locally on this device. They do not modify backend or tenant configuration.",
++    "localStorageHelp": "These changes are saved locally on this device.",
++    "advancedOptionsTitle": "Advanced options",
++    "advancedOptionsHelp": "These options are useful for development or fine tuning. They are not required to configure the basic appearance.",
+     "contrastTitle": "Basic contrast",
+     "contrastHelp": "Approximate WCAG contrast review for text, buttons, and surfaces.",
+     "mainContrast": "Main contrast",
+     "mainContrastHelp": "Summary of the contrasts that most affect buttons, background, and reserved status.",
++    "legibilityTitle": "Contrast and readability",
++    "legibilityHelp": "Before applying the palette, check that text and buttons are easy to read.",
+     "lowContrast": "Low contrast",
+     "reviewBeforeApply": "Review this color before applying it.",
++    "lowContrastApplyWarning": "This palette has contrasts that should be reviewed before applying it.",
+     "recommendedText": "Recommended text:",
+     "lightText": "light",
+     "darkText": "dark",
+     "contrastStatuses": {
+-      "ok": "Contrast OK",
+-      "low": "Low contrast",
++      "ok": "Correct",
++      "low": "Review",
+       "review": "Review"
+     },
+     "contrast": {
+-      "primaryLight": "Light text on primary",
+-      "primaryDark": "Dark text on primary",
++      "primaryLight": "Light text on main color",
++      "primaryDark": "Dark text on main color",
+       "accent": "Text on accent",
+-      "danger": "Text on danger",
+-      "background": "Primary text on background",
+-      "surface": "Primary text on surface",
+-      "button": "Primary button with text"
++      "danger": "Reserved status",
++      "background": "Text on background",
++      "surface": "Text on cards",
++      "button": "Main button"
+     },
+     "tokens": {
+-      "primary": "Primary",
++      "primary": "Main",
+       "secondary": "Secondary",
+       "accent": "Accent",
+       "success": "Success",
+       "warning": "Warning",
+       "danger": "Danger / reserved",
+       "background": "Background",
+-      "surface": "Surface"
++      "surface": "Cards"
+     },
+     "previewTitle": "Real UI preview",
++    "appPreviewTitle": "Application preview",
++    "appPreviewHelp": "This is how colors will look when applied to real screens in the system.",
+     "previewCardTitle": "Operational panel",
+     "previewCardText": "Buttons, badges, and input use the suggested palette.",
+     "previewPrimaryButton": "Primary",
+@@ -1171,9 +1197,9 @@
+     "previewActiveBadge": "Active",
+     "previewReservedBadge": "Reserved",
+     "previewNotice": "Sample operational notice.",
+-    "appearanceCardTitle": "Advanced palette generator",
+-    "appearanceCardHelp": "Create harmonies, variations, and contrast from UI Kit. Application remains local in this phase.",
+-    "openGenerator": "Open generator in UI Kit"
++    "appearanceCardTitle": "Application design",
++    "appearanceCardHelp": "Configure colors, visual template, and preview without duplicating the generator on this screen.",
++    "openGenerator": "Open visual editor"
+   },
+   "usersForm": {
+     "newTitle": "New user",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index fcb5c75..6433eef 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -1083,18 +1083,27 @@
+     "saveChanges": "Guardar cambios"
+   },
+   "paletteGenerator": {
++    "loading": "Cargando diseno de la aplicacion...",
++    "appDesignTitle": "Diseno de la aplicacion",
++    "appDesignSubtitle": "Configura la plantilla visual, los colores y la vista previa de tu sistema.",
++    "technicalReferenceTitle": "UI Kit interno",
++    "technicalReferenceSubtitle": "Herramienta tecnica para componentes, colores y plantillas visuales.",
++    "restrictedTitle": "Acceso restringido",
++    "restrictedMessage": "El diseno de la aplicacion es una vista interna para administracion y desarrollo.",
+     "sectionTitle": "Generador visual de paletas",
+     "sectionSubtitle": "Elige un color base y revisa armonias, variaciones, contraste y preview antes de aplicar.",
+     "flowTitle": "Flujo de identidad visual",
+     "flowSubtitle": "Sigue estos pasos: plantilla, color base, paleta, contraste, vista previa y aplicacion local.",
+     "flowSteps": {
+-      "template": "Plantilla visual",
+-      "baseColor": "Color base",
+-      "palette": "Paleta sugerida",
+-      "contrast": "Contraste",
+-      "preview": "Vista previa",
+-      "apply": "Aplicar / restaurar"
++      "template": "Elige una plantilla visual",
++      "baseColor": "Elige el color principal",
++      "palette": "Revisa la paleta sugerida",
++      "contrast": "Revisa contraste y legibilidad",
++      "preview": "Mira la vista previa",
++      "apply": "Aplica o restaura cambios"
+     },
++    "templateSectionTitle": "Elige una plantilla visual",
++    "templateSectionHelp": "Selecciona una base visual para tu sistema. Despues puedes ajustar el color principal.",
+     "activeTemplate": "Plantilla visual activa",
+     "localConfigHelp": "Esta configuracion se guarda localmente en esta fase.",
+     "templateActive": "Activa",
+@@ -1104,7 +1113,10 @@
+     "controlledEditorSubtitle": "Personaliza tokens semanticos principales de la plantilla activa.",
+     "title": "Generador de paleta",
+     "subtitle": "Crea una paleta coherente desde un color base sin tocar backend.",
++    "brandColorTitle": "Color principal de marca",
++    "brandColorHelp": "Elige el color que identificara a tu negocio. A partir de este color se propone una paleta para botones, acentos y estados.",
+     "baseColor": "Color base",
++    "baseColorHelp": "Usa el selector visual o escribe el HEX del color principal.",
+     "invalidHex": "Usa formato HEX valido. Ejemplo: #2563EB",
+     "quickSwatches": "Muestras rapidas",
+     "harmony": "Armonia de color",
+@@ -1121,6 +1133,8 @@
+     "tones": "Tones / desaturados",
+     "suggestedPalette": "Paleta sugerida",
+     "suggestedPaletteHelp": "Toca un token para cargarlo en el editor o aplica toda la paleta localmente.",
++    "appPaletteTitle": "Paleta sugerida para la aplicacion",
++    "appPaletteHelp": "El sistema propone colores para botones, acentos, alertas, fondo y tarjetas.",
+     "applyLocal": "Aplicar paleta localmente",
+     "appliedFeedback": "Paleta aplicada localmente.",
+     "manualAppliedFeedback": "Personalizacion aplicada localmente.",
+@@ -1129,40 +1143,52 @@
+     "restoreTemplate": "Restaurar plantilla",
+     "showTechnicalDetails": "Ver detalles tecnicos",
+     "hideTechnicalDetails": "Ocultar detalles tecnicos",
++    "showAdvancedOptions": "Ver opciones avanzadas",
++    "hideAdvancedOptions": "Ocultar opciones avanzadas",
++    "applyChangesTitle": "Aplicar cambios",
++    "applyChangesHelp": "En esta fase los cambios se guardan localmente en este dispositivo. No modifican el backend ni el tenant.",
++    "localStorageHelp": "Estos cambios se guardan localmente en este dispositivo.",
++    "advancedOptionsTitle": "Opciones avanzadas",
++    "advancedOptionsHelp": "Estas opciones son utiles para desarrollo o ajustes finos. No son necesarias para configurar la apariencia basica.",
+     "contrastTitle": "Contraste basico",
+     "contrastHelp": "Revision aproximada de contraste WCAG para texto, botones y superficies.",
+     "mainContrast": "Contraste principal",
+     "mainContrastHelp": "Resumen de los contrastes que mas afectan botones, fondo y estado reservado.",
++    "legibilityTitle": "Contraste y legibilidad",
++    "legibilityHelp": "Antes de aplicar la paleta, revisa que los textos y botones sean faciles de leer.",
+     "lowContrast": "Contraste bajo",
+     "reviewBeforeApply": "Revisa este color antes de aplicarlo.",
++    "lowContrastApplyWarning": "La paleta tiene contrastes que conviene revisar antes de aplicarla.",
+     "recommendedText": "Texto recomendado:",
+     "lightText": "claro",
+     "darkText": "oscuro",
+     "contrastStatuses": {
+-      "ok": "Contraste correcto",
+-      "low": "Contraste bajo",
++      "ok": "Correcto",
++      "low": "Revisar",
+       "review": "Revisar"
+     },
+     "contrast": {
+-      "primaryLight": "Texto claro sobre primary",
+-      "primaryDark": "Texto oscuro sobre primary",
+-      "accent": "Texto sobre accent",
+-      "danger": "Texto sobre danger",
+-      "background": "Texto principal sobre background",
+-      "surface": "Texto principal sobre surface",
+-      "button": "Boton primario con texto"
++      "primaryLight": "Texto claro sobre color principal",
++      "primaryDark": "Texto oscuro sobre color principal",
++      "accent": "Texto sobre acento",
++      "danger": "Estado reservado",
++      "background": "Texto sobre fondo",
++      "surface": "Texto sobre tarjetas",
++      "button": "Boton principal"
+     },
+     "tokens": {
+-      "primary": "Primario",
++      "primary": "Principal",
+       "secondary": "Secundario",
+       "accent": "Acento",
+       "success": "Exito",
+       "warning": "Advertencia",
+       "danger": "Peligro / reservado",
+       "background": "Fondo",
+-      "surface": "Superficie"
++      "surface": "Tarjetas"
+     },
+     "previewTitle": "Preview real de UI",
++    "appPreviewTitle": "Vista previa de la aplicacion",
++    "appPreviewHelp": "Asi se veran los colores aplicados en pantallas reales del sistema.",
+     "previewCardTitle": "Panel operativo",
+     "previewCardText": "Botones, badges e input usan la paleta sugerida.",
+     "previewPrimaryButton": "Primario",
+@@ -1171,9 +1197,9 @@
+     "previewActiveBadge": "Activo",
+     "previewReservedBadge": "Reservada",
+     "previewNotice": "Aviso operativo de ejemplo.",
+-    "appearanceCardTitle": "Generador avanzado de paletas",
+-    "appearanceCardHelp": "Crea armonias, variaciones y contraste desde UI Kit. La aplicacion sigue siendo local en esta fase.",
+-    "openGenerator": "Abrir generador en UI Kit"
++    "appearanceCardTitle": "Diseno de la aplicacion",
++    "appearanceCardHelp": "Configura colores, plantilla visual y vista previa sin duplicar el generador en esta pantalla.",
++    "openGenerator": "Abrir editor visual"
+   },
+   "usersForm": {
+     "newTitle": "Nuevo usuario",
+diff --git a/locales/fr/common.json b/locales/fr/common.json
+index 0c6c3b8..0dfd5e0 100644
+--- a/locales/fr/common.json
++++ b/locales/fr/common.json
+@@ -1088,12 +1088,12 @@
+     "flowTitle": "Flux d'identité visuelle",
+     "flowSubtitle": "Suivez ces étapes : modèle, couleur de base, palette, contraste, aperçu et application locale.",
+     "flowSteps": {
+-      "template": "Modèle visuel",
+-      "baseColor": "Couleur de base",
+-      "palette": "Palette suggérée",
+-      "contrast": "Contraste",
+-      "preview": "Aperçu",
+-      "apply": "Appliquer / restaurer"
++      "template": "Choisissez un modele visuel",
++      "baseColor": "Choisissez la couleur principale",
++      "palette": "Verifiez la palette suggeree",
++      "contrast": "Verifiez contraste et lisibilite",
++      "preview": "Regardez l apercu",
++      "apply": "Appliquer ou restaurer"
+     },
+     "activeTemplate": "Modèle visuel actif",
+     "localConfigHelp": "Cette configuration est enregistrée localement dans cette phase.",
+@@ -1139,28 +1139,28 @@
+     "lightText": "clair",
+     "darkText": "sombre",
+     "contrastStatuses": {
+-      "ok": "Contraste correct",
+-      "low": "Contraste faible",
+-      "review": "À vérifier"
++      "ok": "Correct",
++      "low": "Verifier",
++      "review": "Verifier"
+     },
+     "contrast": {
+-      "primaryLight": "Texte clair sur primary",
+-      "primaryDark": "Texte sombre sur primary",
++      "primaryLight": "Texte clair sur couleur principale",
++      "primaryDark": "Texte sombre sur couleur principale",
+       "accent": "Texte sur accent",
+-      "danger": "Texte sur danger",
+-      "background": "Texte principal sur background",
+-      "surface": "Texte principal sur surface",
+-      "button": "Bouton primaire avec texte"
++      "danger": "Etat reserve",
++      "background": "Texte sur fond",
++      "surface": "Texte sur cartes",
++      "button": "Bouton principal"
+     },
+     "tokens": {
+-      "primary": "Primaire",
++      "primary": "Principal",
+       "secondary": "Secondaire",
+       "accent": "Accent",
+-      "success": "Succès",
++      "success": "Succes",
+       "warning": "Avertissement",
+-      "danger": "Danger / réservé",
++      "danger": "Danger / reserve",
+       "background": "Fond",
+-      "surface": "Surface"
++      "surface": "Cartes"
+     },
+     "previewTitle": "Aperçu réel de l'UI",
+     "previewCardTitle": "Panneau opérationnel",
+@@ -1171,9 +1171,35 @@
+     "previewActiveBadge": "Actif",
+     "previewReservedBadge": "Réservé",
+     "previewNotice": "Avis opérationnel d'exemple.",
+-    "appearanceCardTitle": "Générateur avancé de palettes",
+-    "appearanceCardHelp": "Créez des harmonies, variations et contrastes depuis UI Kit. L'application reste locale dans cette phase.",
+-    "openGenerator": "Ouvrir le générateur dans UI Kit"
++    "appearanceCardTitle": "Conception de l'application",
++    "appearanceCardHelp": "Configurez les couleurs, le modele visuel et l apercu sans dupliquer le generateur sur cet ecran.",
++    "openGenerator": "Ouvrir l'editeur visuel",
++    "loading": "Chargement de la conception de l'application...",
++    "appDesignTitle": "Conception de l'application",
++    "appDesignSubtitle": "Configurez le modele visuel, les couleurs et l'apercu de votre systeme.",
++    "technicalReferenceTitle": "UI Kit interne",
++    "technicalReferenceSubtitle": "Outil technique pour les composants, les couleurs et les modeles visuels.",
++    "restrictedTitle": "Acces restreint",
++    "restrictedMessage": "La conception de l'application est une vue interne pour l'administration et le developpement.",
++    "templateSectionTitle": "Choisissez un modele visuel",
++    "templateSectionHelp": "Selectionnez une base visuelle pour votre systeme. Vous pourrez ensuite ajuster la couleur principale.",
++    "brandColorTitle": "Couleur principale de marque",
++    "brandColorHelp": "Choisissez la couleur qui identifie votre activite. Le systeme proposera une palette pour les boutons, les accents et les etats.",
++    "baseColorHelp": "Utilisez le selecteur visuel ou saisissez le HEX de la couleur principale.",
++    "appPaletteTitle": "Palette suggeree pour l'application",
++    "appPaletteHelp": "Le systeme propose des couleurs pour les boutons, les accents, les alertes, le fond et les cartes.",
++    "showAdvancedOptions": "Voir les options avancees",
++    "hideAdvancedOptions": "Masquer les options avancees",
++    "applyChangesTitle": "Appliquer les modifications",
++    "applyChangesHelp": "Dans cette phase, les changements sont enregistres localement sur cet appareil. Ils ne modifient ni le backend ni le tenant.",
++    "localStorageHelp": "Ces changements sont enregistres localement sur cet appareil.",
++    "advancedOptionsTitle": "Options avancees",
++    "advancedOptionsHelp": "Ces options sont utiles au developpement ou aux ajustements fins. Elles ne sont pas necessaires pour configurer l'apparence de base.",
++    "legibilityTitle": "Contraste et lisibilite",
++    "legibilityHelp": "Avant d appliquer la palette, verifiez que les textes et les boutons sont faciles a lire.",
++    "lowContrastApplyWarning": "Cette palette contient des contrastes a verifier avant application.",
++    "appPreviewTitle": "Apercu de l'application",
++    "appPreviewHelp": "Voici comment les couleurs apparaitront dans les ecrans reels du systeme."
+   },
+   "usersForm": {
+     "newTitle": "Nouveau",
+diff --git a/locales/ja/common.json b/locales/ja/common.json
+index 7c4703c..18f1aec 100644
+--- a/locales/ja/common.json
++++ b/locales/ja/common.json
+@@ -1088,12 +1088,12 @@
+     "flowTitle": "ビジュアルIDフロー",
+     "flowSubtitle": "テンプレート、ベースカラー、パレット、コントラスト、プレビュー、適用の順で進めます。",
+     "flowSteps": {
+-      "template": "テンプレート",
+-      "baseColor": "ベースカラー",
+-      "palette": "おすすめパレット",
+-      "contrast": "コントラスト",
+-      "preview": "プレビュー",
+-      "apply": "適用 / 復元"
++      "template": "??????????????",
++      "baseColor": "?????????",
++      "palette": "?????????",
++      "contrast": "???????????????",
++      "preview": "????????",
++      "apply": "???????"
+     },
+     "activeTemplate": "有効なテンプレート",
+     "localConfigHelp": "この設定はこの段階ではローカルに保存されます。",
+@@ -1139,28 +1139,28 @@
+     "lightText": "明るい",
+     "darkText": "暗い",
+     "contrastStatuses": {
+-      "ok": "コントラストOK",
+-      "low": "低コントラスト",
+-      "review": "確認"
++      "ok": "??",
++      "low": "??",
++      "review": "??"
+     },
+     "contrast": {
+-      "primaryLight": "primary上の明るいテキスト",
+-      "primaryDark": "primary上の暗いテキスト",
+-      "accent": "accent上のテキスト",
+-      "danger": "danger上のテキスト",
+-      "background": "background上の主テキスト",
+-      "surface": "surface上の主テキスト",
+-      "button": "テキスト付き主ボタン"
++      "primaryLight": "???????????????",
++      "primaryDark": "??????????????",
++      "accent": "???????????",
++      "danger": "??????",
++      "background": "????????",
++      "surface": "?????????",
++      "button": "??????"
+     },
+     "tokens": {
+-      "primary": "プライマリ",
+-      "secondary": "セカンダリ",
+-      "accent": "アクセント",
+-      "success": "成功",
+-      "warning": "警告",
+-      "danger": "危険 / 予約済み",
+-      "background": "背景",
+-      "surface": "サーフェス"
++      "primary": "???",
++      "secondary": "?????",
++      "accent": "?????",
++      "success": "??",
++      "warning": "??",
++      "danger": "?? / ????",
++      "background": "??",
++      "surface": "???"
+     },
+     "previewTitle": "実UIプレビュー",
+     "previewCardTitle": "運用パネル",
+@@ -1171,9 +1171,35 @@
+     "previewActiveBadge": "有効",
+     "previewReservedBadge": "予約済み",
+     "previewNotice": "サンプル運用通知。",
+-    "appearanceCardTitle": "高度なパレット生成",
+-    "appearanceCardHelp": "UIキットで調和、バリエーション、コントラストを作成します。この段階では適用はローカルのみです。",
+-    "openGenerator": "UIキットで生成を開く"
++    "appearanceCardTitle": "????????",
++    "appearanceCardHelp": "?????????????????????????????????????",
++    "openGenerator": "?????????????",
++    "loading": "?????????????...",
++    "appDesignTitle": "????????",
++    "appDesignSubtitle": "???????????????????????????????",
++    "technicalReferenceTitle": "?? UI Kit",
++    "technicalReferenceSubtitle": "??????????????????????????????",
++    "restrictedTitle": "??????",
++    "restrictedMessage": "????????????????????????",
++    "templateSectionTitle": "??????????????",
++    "templateSectionHelp": "???????????????????????????????????",
++    "brandColorTitle": "???????????",
++    "brandColorHelp": "?????????????????????????????????????????????",
++    "baseColorHelp": "????????????HEX???????????????",
++    "appPaletteTitle": "???????????",
++    "appPaletteHelp": "???????????????????????????????",
++    "showAdvancedOptions": "???????????",
++    "hideAdvancedOptions": "????????????",
++    "applyChangesTitle": "?????",
++    "applyChangesHelp": "????????????????????????????????????????????????",
++    "localStorageHelp": "?????????????????????????",
++    "advancedOptionsTitle": "????????",
++    "advancedOptionsHelp": "???????????????????????????????????",
++    "legibilityTitle": "????????????",
++    "legibilityHelp": "???????????????????????????????",
++    "lowContrastApplyWarning": "?????????????????????????????",
++    "appPreviewTitle": "?????????",
++    "appPreviewHelp": "?????????????????????"
+   },
+   "usersForm": {
+     "newTitle": "新規",
+diff --git a/locales/ko/common.json b/locales/ko/common.json
+index 3ee70f6..915a38a 100644
+--- a/locales/ko/common.json
++++ b/locales/ko/common.json
+@@ -1088,12 +1088,12 @@
+     "flowTitle": "시각 아이덴티티 흐름",
+     "flowSubtitle": "템플릿, 기본 색상, 팔레트, 대비, 미리보기, 로컬 적용 순서로 진행합니다.",
+     "flowSteps": {
+-      "template": "시각 템플릿",
+-      "baseColor": "기본 색상",
+-      "palette": "추천 팔레트",
+-      "contrast": "대비",
+-      "preview": "미리보기",
+-      "apply": "적용 / 복원"
++      "template": "?? ??? ??",
++      "baseColor": "?? ?? ??",
++      "palette": "?? ??? ??",
++      "contrast": "??? ??? ??",
++      "preview": "?? ?? ??",
++      "apply": "?? ?? ??"
+     },
+     "activeTemplate": "활성 시각 템플릿",
+     "localConfigHelp": "이 설정은 이 단계에서 로컬로 저장됩니다.",
+@@ -1139,28 +1139,28 @@
+     "lightText": "밝게",
+     "darkText": "어둡게",
+     "contrastStatuses": {
+-      "ok": "대비 양호",
+-      "low": "낮은 대비",
+-      "review": "검토"
++      "ok": "??",
++      "low": "??",
++      "review": "??"
+     },
+     "contrast": {
+-      "primaryLight": "primary 위 밝은 텍스트",
+-      "primaryDark": "primary 위 어두운 텍스트",
+-      "accent": "accent 위 텍스트",
+-      "danger": "danger 위 텍스트",
+-      "background": "background 위 기본 텍스트",
+-      "surface": "surface 위 기본 텍스트",
+-      "button": "텍스트가 있는 기본 버튼"
++      "primaryLight": "?? ?? ? ?? ???",
++      "primaryDark": "?? ?? ? ??? ???",
++      "accent": "??? ? ???",
++      "danger": "?? ??",
++      "background": "?? ? ???",
++      "surface": "?? ? ???",
++      "button": "?? ??"
+     },
+     "tokens": {
+-      "primary": "기본",
+-      "secondary": "보조",
+-      "accent": "강조",
+-      "success": "성공",
+-      "warning": "경고",
+-      "danger": "위험 / 예약됨",
+-      "background": "배경",
+-      "surface": "표면"
++      "primary": "??",
++      "secondary": "??",
++      "accent": "??",
++      "success": "??",
++      "warning": "??",
++      "danger": "?? / ???",
++      "background": "??",
++      "surface": "??"
+     },
+     "previewTitle": "실제 UI 미리보기",
+     "previewCardTitle": "운영 패널",
+@@ -1171,9 +1171,35 @@
+     "previewActiveBadge": "활성",
+     "previewReservedBadge": "예약됨",
+     "previewNotice": "예시 운영 알림.",
+-    "appearanceCardTitle": "고급 팔레트 생성기",
+-    "appearanceCardHelp": "UI Kit에서 조화, 변형, 대비를 만듭니다. 이 단계에서는 로컬로만 적용됩니다.",
+-    "openGenerator": "UI Kit에서 생성기 열기"
++    "appearanceCardTitle": "? ???",
++    "appearanceCardHelp": "? ???? ???? ???? ?? ??, ?? ???, ?? ??? ?????.",
++    "openGenerator": "?? ??? ??",
++    "loading": "? ???? ???? ?...",
++    "appDesignTitle": "? ???",
++    "appDesignSubtitle": "???? ?? ???, ??? ?? ??? ?????.",
++    "technicalReferenceTitle": "?? UI Kit",
++    "technicalReferenceSubtitle": "????, ??, ?? ???? ?? ?? ?????.",
++    "restrictedTitle": "?? ??",
++    "restrictedMessage": "? ???? ??? ??? ?? ?? ?????.",
++    "templateSectionTitle": "?? ??? ??",
++    "templateSectionHelp": "???? ?? ??? ?????. ?? ?? ??? ??? ? ????.",
++    "brandColorTitle": "??? ?? ??",
++    "brandColorHelp": "????? ???? ??? ?????. ? ???? ??, ??, ?? ?? ???? ?????.",
++    "baseColorHelp": "?? ??? ?? HEX ??? ?? ??? ?????.",
++    "appPaletteTitle": "? ?? ???",
++    "appPaletteHelp": "???? ??, ??, ??, ??, ?? ??? ?????.",
++    "showAdvancedOptions": "?? ?? ??",
++    "hideAdvancedOptions": "?? ?? ???",
++    "applyChangesTitle": "?? ??",
++    "applyChangesHelp": "? ??? ?? ??? ? ??? ??? ?????. ???? ??? ??? ???? ????.",
++    "localStorageHelp": "? ?? ??? ? ??? ??? ?????.",
++    "advancedOptionsTitle": "?? ??",
++    "advancedOptionsHelp": "?? ?? ?? ??? ??? ?????. ?? ?? ???? ???? ????.",
++    "legibilityTitle": "??? ???",
++    "legibilityHelp": "???? ???? ?? ???? ??? ?? ??? ?????.",
++    "lowContrastApplyWarning": "? ????? ?? ?? ???? ? ??? ????.",
++    "appPreviewTitle": "? ?? ??",
++    "appPreviewHelp": "?? ??? ??? ??? ??? ?? ?????."
+   },
+   "usersForm": {
+     "newTitle": "새",
+diff --git a/locales/pt-BR/common.json b/locales/pt-BR/common.json
+index 0b8669f..62af3f6 100644
+--- a/locales/pt-BR/common.json
++++ b/locales/pt-BR/common.json
+@@ -1088,12 +1088,12 @@
+     "flowTitle": "Fluxo de identidade visual",
+     "flowSubtitle": "Siga estes passos: modelo, cor base, paleta, contraste, prévia e aplicação local.",
+     "flowSteps": {
+-      "template": "Modelo visual",
+-      "baseColor": "Cor base",
+-      "palette": "Paleta sugerida",
+-      "contrast": "Contraste",
+-      "preview": "Prévia",
+-      "apply": "Aplicar / restaurar"
++      "template": "Escolha um modelo visual",
++      "baseColor": "Escolha a cor principal",
++      "palette": "Revise a paleta sugerida",
++      "contrast": "Revise contraste e legibilidade",
++      "preview": "Veja a previa",
++      "apply": "Aplique ou restaure alteracoes"
+     },
+     "activeTemplate": "Modelo visual ativo",
+     "localConfigHelp": "Esta configuração é salva localmente nesta fase.",
+@@ -1139,28 +1139,28 @@
+     "lightText": "claro",
+     "darkText": "escuro",
+     "contrastStatuses": {
+-      "ok": "Contraste correto",
+-      "low": "Baixo contraste",
++      "ok": "Correto",
++      "low": "Revisar",
+       "review": "Revisar"
+     },
+     "contrast": {
+-      "primaryLight": "Texto claro sobre primary",
+-      "primaryDark": "Texto escuro sobre primary",
+-      "accent": "Texto sobre accent",
+-      "danger": "Texto sobre danger",
+-      "background": "Texto principal sobre background",
+-      "surface": "Texto principal sobre surface",
+-      "button": "Botão primário com texto"
++      "primaryLight": "Texto claro sobre cor principal",
++      "primaryDark": "Texto escuro sobre cor principal",
++      "accent": "Texto sobre acento",
++      "danger": "Estado reservado",
++      "background": "Texto sobre fundo",
++      "surface": "Texto sobre cartoes",
++      "button": "Botao principal"
+     },
+     "tokens": {
+-      "primary": "Primário",
+-      "secondary": "Secundário",
++      "primary": "Principal",
++      "secondary": "Secundario",
+       "accent": "Acento",
+       "success": "Sucesso",
+-      "warning": "Advertência",
++      "warning": "Advertencia",
+       "danger": "Perigo / reservado",
+       "background": "Fundo",
+-      "surface": "Superfície"
++      "surface": "Cartoes"
+     },
+     "previewTitle": "Prévia real da UI",
+     "previewCardTitle": "Painel operacional",
+@@ -1171,9 +1171,35 @@
+     "previewActiveBadge": "Ativo",
+     "previewReservedBadge": "Reservado",
+     "previewNotice": "Aviso operacional de exemplo.",
+-    "appearanceCardTitle": "Gerador avançado de paletas",
+-    "appearanceCardHelp": "Crie harmonias, variações e contraste a partir do UI Kit. A aplicação permanece local nesta fase.",
+-    "openGenerator": "Abrir gerador no UI Kit"
++    "appearanceCardTitle": "Design do aplicativo",
++    "appearanceCardHelp": "Configure cores, modelo visual e previa sem duplicar o gerador nesta tela.",
++    "openGenerator": "Abrir editor visual",
++    "loading": "Carregando design do aplicativo...",
++    "appDesignTitle": "Design do aplicativo",
++    "appDesignSubtitle": "Configure o modelo visual, as cores e a previa do seu sistema.",
++    "technicalReferenceTitle": "UI Kit interno",
++    "technicalReferenceSubtitle": "Ferramenta tecnica para componentes, cores e modelos visuais.",
++    "restrictedTitle": "Acesso restrito",
++    "restrictedMessage": "O design do aplicativo e uma visualizacao interna para administracao e desenvolvimento.",
++    "templateSectionTitle": "Escolha um modelo visual",
++    "templateSectionHelp": "Selecione uma base visual para o sistema. Depois voce pode ajustar a cor principal.",
++    "brandColorTitle": "Cor principal da marca",
++    "brandColorHelp": "Escolha a cor que identifica seu negocio. A partir dela o sistema propoe uma paleta para botoes, acentos e estados.",
++    "baseColorHelp": "Use o seletor visual ou digite o HEX da cor principal.",
++    "appPaletteTitle": "Paleta sugerida para o aplicativo",
++    "appPaletteHelp": "O sistema propoe cores para botoes, acentos, alertas, fundo e cartoes.",
++    "showAdvancedOptions": "Ver opcoes avancadas",
++    "hideAdvancedOptions": "Ocultar opcoes avancadas",
++    "applyChangesTitle": "Aplicar alteracoes",
++    "applyChangesHelp": "Nesta fase, as alteracoes sao salvas localmente neste dispositivo. Elas nao modificam o backend nem o tenant.",
++    "localStorageHelp": "Estas alteracoes sao salvas localmente neste dispositivo.",
++    "advancedOptionsTitle": "Opcoes avancadas",
++    "advancedOptionsHelp": "Estas opcoes sao uteis para desenvolvimento ou ajustes finos. Nao sao necessarias para configurar a aparencia basica.",
++    "legibilityTitle": "Contraste e legibilidade",
++    "legibilityHelp": "Antes de aplicar a paleta, revise se textos e botoes sao faceis de ler.",
++    "lowContrastApplyWarning": "Esta paleta tem contrastes que devem ser revisados antes de aplicar.",
++    "appPreviewTitle": "Previa do aplicativo",
++    "appPreviewHelp": "Assim as cores ficarao quando aplicadas em telas reais do sistema."
+   },
+   "usersForm": {
+     "newTitle": "Novo",
+diff --git a/locales/zh/common.json b/locales/zh/common.json
+index 39c1181..7a4e123 100644
+--- a/locales/zh/common.json
++++ b/locales/zh/common.json
+@@ -1088,12 +1088,12 @@
+     "flowTitle": "视觉身份流程",
+     "flowSubtitle": "按模板、基础色、调色板、对比度、预览和本地应用的顺序操作。",
+     "flowSteps": {
+-      "template": "视觉模板",
+-      "baseColor": "基础色",
+-      "palette": "建议调色板",
+-      "contrast": "对比度",
+-      "preview": "预览",
+-      "apply": "应用 / 恢复"
++      "template": "??????",
++      "baseColor": "?????",
++      "palette": "???????",
++      "contrast": "?????????",
++      "preview": "????",
++      "apply": "???????"
+     },
+     "activeTemplate": "当前视觉模板",
+     "localConfigHelp": "此配置在本阶段仅本地保存。",
+@@ -1139,28 +1139,28 @@
+     "lightText": "浅色",
+     "darkText": "深色",
+     "contrastStatuses": {
+-      "ok": "对比度正常",
+-      "low": "低对比度",
+-      "review": "检查"
++      "ok": "??",
++      "low": "??",
++      "review": "??"
+     },
+     "contrast": {
+-      "primaryLight": "primary上的浅色文本",
+-      "primaryDark": "primary上的深色文本",
+-      "accent": "accent上的文本",
+-      "danger": "danger上的文本",
+-      "background": "background上的主文本",
+-      "surface": "surface上的主文本",
+-      "button": "带文本的主按钮"
++      "primaryLight": "????????",
++      "primaryDark": "????????",
++      "accent": "???????",
++      "danger": "????",
++      "background": "??????",
++      "surface": "??????",
++      "button": "???"
+     },
+     "tokens": {
+-      "primary": "主色",
+-      "secondary": "次色",
+-      "accent": "强调色",
+-      "success": "成功",
+-      "warning": "警告",
+-      "danger": "危险 / 已预留",
+-      "background": "背景",
+-      "surface": "表面"
++      "primary": "??",
++      "secondary": "??",
++      "accent": "???",
++      "success": "??",
++      "warning": "??",
++      "danger": "?? / ???",
++      "background": "??",
++      "surface": "??"
+     },
+     "previewTitle": "真实UI预览",
+     "previewCardTitle": "运营面板",
+@@ -1171,9 +1171,35 @@
+     "previewActiveBadge": "启用",
+     "previewReservedBadge": "已预留",
+     "previewNotice": "示例运营提示。",
+-    "appearanceCardTitle": "高级调色板生成器",
+-    "appearanceCardHelp": "在UI Kit中创建和谐配色、变化和对比度。本阶段仅本地应用。",
+-    "openGenerator": "在UI Kit中打开生成器"
++    "appearanceCardTitle": "????",
++    "appearanceCardHelp": "????????????????????????",
++    "openGenerator": "???????",
++    "loading": "????????...",
++    "appDesignTitle": "????",
++    "appDesignSubtitle": "????????????????",
++    "technicalReferenceTitle": "?? UI Kit",
++    "technicalReferenceSubtitle": "??????????????????",
++    "restrictedTitle": "????",
++    "restrictedMessage": "??????????????????",
++    "templateSectionTitle": "??????",
++    "templateSectionHelp": "??????????????????????",
++    "brandColorTitle": "?????",
++    "brandColorHelp": "??????????????????????????????",
++    "baseColorHelp": "??????????????HEX??",
++    "appPaletteTitle": "???????",
++    "appPaletteHelp": "????????????????????????",
++    "showAdvancedOptions": "??????",
++    "hideAdvancedOptions": "??????",
++    "applyChangesTitle": "????",
++    "applyChangesHelp": "?????????????????????????????",
++    "localStorageHelp": "??????????????",
++    "advancedOptionsTitle": "????",
++    "advancedOptionsHelp": "???????????????????????????",
++    "legibilityTitle": "???????",
++    "legibilityHelp": "????????????????????",
++    "lowContrastApplyWarning": "??????????????????",
++    "appPreviewTitle": "????",
++    "appPreviewHelp": "????????????????????"
+   },
+   "usersForm": {
+     "newTitle": "新建",
+diff --git a/qa-reports/PRODUCT-C2-3-guided-app-design-flow-report-20260607-092549.md b/qa-reports/PRODUCT-C2-3-guided-app-design-flow-report-20260607-092549.md
+new file mode 100644
+index 0000000..5df82f4
+--- /dev/null
++++ b/qa-reports/PRODUCT-C2-3-guided-app-design-flow-report-20260607-092549.md
+@@ -0,0 +1,82 @@
++# PRODUCT-C2.3 - Guided app design flow report
++
++Fecha: 2026-06-07 09:25:49
++
++## Resumen
++
++PRODUCT-C2.3 reposiciona `/ui-kit` como pantalla de `Diseno de la aplicacion`. La experiencia principal ahora comunica que el usuario esta configurando la plantilla visual, el color principal, la paleta sugerida, contraste, legibilidad y vista previa del sistema.
++
++## Cambios principales
++
++- El AppShell de `/ui-kit` usa titulo y subtitulo orientados a diseno de aplicacion.
++- `UI Kit` queda como referencia tecnica secundaria.
++- El stepper se vuelve accionable: elegir plantilla, color principal, paleta, contraste, preview y aplicar/restaurar.
++- La seccion de plantillas explica que son la base visual.
++- El generador habla de color principal de marca y paleta sugerida para la aplicacion.
++- La paleta visible usa labels de usuario final, no tokens tecnicos.
++- El contraste visible se presenta como contraste y legibilidad.
++- La preview se presenta como vista previa de la aplicacion.
++- Aplicar/restaurar queda como cierre del flujo.
++- Opciones avanzadas conservan editor HEX, tokens, componentes, templates y variantes.
++- `/appearance` mantiene branding y actualiza la tarjeta hacia `Diseno de la aplicacion` / `Abrir editor visual`.
++
++## I18N
++
++Se agregaron y ajustaron claves `paletteGenerator.*` en:
++
++- `es`
++- `en`
++- `pt-BR`
++- `fr`
++- `ja`
++- `zh`
++- `ko`
++
++Auditoria de estructura:
++
++```text
++es: leaves=1194 missing=0 extra=0
++en: leaves=1194 missing=0 extra=0
++pt-BR: leaves=1194 missing=0 extra=0
++fr: leaves=1194 missing=0 extra=0
++ja: leaves=1194 missing=0 extra=0
++zh: leaves=1194 missing=0 extra=0
++ko: leaves=1194 missing=0 extra=0
++```
++
++## Validaciones ejecutadas
++
++- `npm.cmd run lint` - PASS con 53 warnings existentes.
++- `npx.cmd tsc --noEmit` - PASS.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export` - PASS.
++- `backend/control-ropa/.mvnw.cmd test` - PASS, 73 tests.
++- `backend/control-ropa/.mvnw.cmd -q -DskipTests package` - PASS.
++- `git --no-pager diff --check` - PASS.
++
++## Validacion manual esperada
++
++1. Abrir `/ui-kit`.
++2. Confirmar titulo `Diseno de la aplicacion`.
++3. Confirmar secuencia logica en pasos.
++4. Elegir plantilla visual.
++5. Elegir color principal de marca.
++6. Revisar paleta sugerida.
++7. Revisar contraste y legibilidad.
++8. Confirmar vista previa antes de aplicar.
++9. Aplicar paleta localmente.
++10. Restaurar plantilla.
++11. Abrir opciones avanzadas.
++12. Confirmar que el contenido tecnico no satura por defecto.
++13. Abrir `/appearance`.
++14. Confirmar tarjeta `Diseno de la aplicacion` y boton `Abrir editor visual`.
++
++## Riesgos y pendientes
++
++- No hay persistencia backend ni por tenant.
++- Las traducciones nuevas requieren revision humana/nativa.
++- La validacion de contraste sigue siendo basica.
++- QA visual debe confirmar desktop/tablet/mobile y light/dark en navegador.
++
++## Resultado
++
++GO tecnico para QA visual/manual.

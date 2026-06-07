@@ -21,7 +21,15 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { isAdmin, isNoAccess } from '@/services/accessControl';
 import { ensureSessionActive, getSession, UserSession } from '@/services/sessionStorage';
-import { HarmonyType, SemanticPalette } from '@/theme/colorUtils';
+import {
+  HarmonyType,
+  SemanticPalette,
+  generateSemanticPalette,
+  getContrastRatio as getPaletteContrastRatio,
+  getContrastStatus as getPaletteContrastStatus,
+  getReadableTextColor,
+  normalizeHexColor,
+} from '@/theme/colorUtils';
 import { designTokens, viewVariants } from '@/theme/designTokens';
 import {
   DesignPresetColors,
@@ -108,6 +116,20 @@ export default function UiKitPreview() {
     }
     return warnings;
   }, [editorValues.background, editorValues.surface, theme.colors.textPrimary]);
+  const generatedPalette = useMemo(
+    () => generateSemanticPalette(normalizeHexColor(paletteBaseColor), paletteHarmony, activeScheme),
+    [activeScheme, paletteBaseColor, paletteHarmony],
+  );
+  const generatedPaletteHasLowContrast = useMemo(() => {
+    const textOnBackground = activeScheme === 'dark' ? '#F8FAFC' : '#0F172A';
+    const ratios = [
+      getPaletteContrastRatio(getReadableTextColor(generatedPalette.primary), generatedPalette.primary),
+      getPaletteContrastRatio(textOnBackground, generatedPalette.background),
+      getPaletteContrastRatio(getReadableTextColor(generatedPalette.danger), generatedPalette.danger),
+    ];
+
+    return ratios.some((ratio) => getPaletteContrastStatus(ratio) === 'low');
+  }, [activeScheme, generatedPalette]);
 
   useEffect(() => {
     let cancelled = false;
@@ -211,7 +233,7 @@ export default function UiKitPreview() {
     return (
       <View style={[styles.loadingScreen, { backgroundColor: theme.colors.background }]}>
         <ActivityIndicator />
-        <AppText color={theme.colors.mutedText}>Cargando UI Kit...</AppText>
+        <AppText color={theme.colors.mutedText}>{t('paletteGenerator.loading')}</AppText>
       </View>
     );
   }
@@ -223,17 +245,17 @@ export default function UiKitPreview() {
   if (!isAdmin(session) || isNoAccess(session)) {
     return (
       <AppShell
-        title="UI Kit"
-        subtitle="Catalogo interno de componentes y templates"
-        contextTitle="Catalogo UI"
-        contextSubtitle="Componentes, tokens y templates internos"
+        title={t('paletteGenerator.appDesignTitle')}
+        subtitle={t('paletteGenerator.appDesignSubtitle')}
+        contextTitle={t('paletteGenerator.technicalReferenceTitle')}
+        contextSubtitle={t('paletteGenerator.technicalReferenceSubtitle')}
         activeRoute="ui-kit"
         session={session}
         navSections={navSections}
       >
         <EmptyState
-          title="Acceso restringido"
-          message="El catalogo UI Kit es una vista interna para administracion y desarrollo."
+          title={t('paletteGenerator.restrictedTitle')}
+          message={t('paletteGenerator.restrictedMessage')}
           icon="lock"
         />
       </AppShell>
@@ -242,17 +264,17 @@ export default function UiKitPreview() {
 
   return (
     <AppShell
-      title="UI Kit"
-      subtitle="Catalogo interno de componentes y templates"
-      contextTitle="Catalogo UI"
-      contextSubtitle="Componentes, tokens y templates internos"
+      title={t('paletteGenerator.appDesignTitle')}
+      subtitle={t('paletteGenerator.appDesignSubtitle')}
+      contextTitle={t('paletteGenerator.technicalReferenceTitle')}
+      contextSubtitle={t('paletteGenerator.technicalReferenceSubtitle')}
       activeRoute="ui-kit"
       session={session}
       navSections={navSections}
     >
       <SectionHeader
-        title={t('paletteGenerator.flowTitle')}
-        subtitle={t('paletteGenerator.flowSubtitle')}
+        title={t('paletteGenerator.appDesignTitle')}
+        subtitle={t('paletteGenerator.appDesignSubtitle')}
       />
       <AppCard variant="info" style={styles.guidedFlowCard}>
         {[
@@ -276,13 +298,17 @@ export default function UiKitPreview() {
                 {String(index + 1)}
               </AppText>
             </View>
-            <AppText variant="caption" bold>
+            <AppText variant="caption" bold style={styles.flowStepText}>
               {step}
             </AppText>
           </View>
         ))}
       </AppCard>
 
+      <SectionHeader
+        title={t('paletteGenerator.templateSectionTitle')}
+        subtitle={t('paletteGenerator.templateSectionHelp')}
+      />
       <View style={styles.previewCard}>
         <View style={styles.themePreviewHeader}>
           <View style={styles.previewTextBlock}>
@@ -331,10 +357,6 @@ export default function UiKitPreview() {
         </AppResponsiveGrid>
       </View>
 
-      <SectionHeader
-        title={t('paletteGenerator.sectionTitle')}
-        subtitle={t('paletteGenerator.sectionSubtitle')}
-      />
       <PaletteGeneratorCard
         activeScheme={activeScheme}
         advancedMode={showAdvancedDetails}
@@ -347,6 +369,7 @@ export default function UiKitPreview() {
         }}
         onHarmonyChange={setPaletteHarmony}
         onTokenChange={updateEditorToken}
+        showApplyAction={false}
       />
 
       {identityFeedback ? (
@@ -357,25 +380,61 @@ export default function UiKitPreview() {
         </AppCard>
       ) : null}
 
-      <View style={styles.buttonRow}>
-        <AppButton
-          title={t('paletteGenerator.restoreTemplate')}
-          variant="neutral"
-          onPress={restoreActivePreset}
-        />
-        <AppButton
-          title={
-            showAdvancedDetails
-              ? t('paletteGenerator.hideTechnicalDetails')
-              : t('paletteGenerator.showTechnicalDetails')
-          }
-          variant="secondary"
-          onPress={() => setShowAdvancedDetails((current) => !current)}
-        />
-      </View>
+      <SectionHeader
+        title={t('paletteGenerator.applyChangesTitle')}
+        subtitle={t('paletteGenerator.applyChangesHelp')}
+      />
+      <AppCard variant="elevated" style={styles.applyCard}>
+        {generatedPaletteHasLowContrast ? (
+          <View
+            style={[
+              styles.applyWarning,
+              {
+                backgroundColor: theme.colors.warningBackground,
+                borderColor: theme.colors.warning,
+              },
+            ]}
+          >
+            <AppText bold color={theme.colors.warning}>
+              {t('paletteGenerator.lowContrast')}
+            </AppText>
+            <AppText variant="caption" color={theme.colors.textSecondary}>
+              {t('paletteGenerator.lowContrastApplyWarning')}
+            </AppText>
+          </View>
+        ) : null}
+        <View style={styles.buttonRow}>
+          <AppButton
+            title={t('paletteGenerator.applyLocal')}
+            variant="primary"
+            onPress={() => applyGeneratedPalette(generatedPalette)}
+          />
+          <AppButton
+            title={t('paletteGenerator.restoreTemplate')}
+            variant="neutral"
+            onPress={restoreActivePreset}
+          />
+          <AppButton
+            title={
+              showAdvancedDetails
+                ? t('paletteGenerator.hideAdvancedOptions')
+                : t('paletteGenerator.showAdvancedOptions')
+            }
+            variant="secondary"
+            onPress={() => setShowAdvancedDetails((current) => !current)}
+          />
+        </View>
+        <AppText variant="caption" color={theme.colors.mutedText}>
+          {t('paletteGenerator.localStorageHelp')}
+        </AppText>
+      </AppCard>
 
       {showAdvancedDetails ? (
         <>
+      <SectionHeader
+        title={t('paletteGenerator.advancedOptionsTitle')}
+        subtitle={t('paletteGenerator.advancedOptionsHelp')}
+      />
       <SectionHeader
         title={t('paletteGenerator.controlledEditorTitle')}
         subtitle={t('paletteGenerator.controlledEditorSubtitle')}
@@ -916,6 +975,15 @@ function PresetMiniPreview({ colors }: { colors: DesignPresetColors }) {
 }
 
 const styles = StyleSheet.create({
+  applyCard: {
+    gap: designTokens.spacing.sm,
+  },
+  applyWarning: {
+    borderRadius: designTokens.radius.lg,
+    borderWidth: 1,
+    gap: designTokens.spacing.xs,
+    padding: designTokens.spacing.md,
+  },
   buttonRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -955,6 +1023,10 @@ const styles = StyleSheet.create({
     height: 24,
     justifyContent: 'center',
     width: 24,
+  },
+  flowStepText: {
+    flexShrink: 1,
+    minWidth: 0,
   },
   guidedFlowCard: {
     alignItems: 'center',

@@ -274,3 +274,20 @@ Agregar a la corrida manual de sistema visual:
 - abrir detalles avanzados;
 - confirmar que tokens, componentes, templates y variantes siguen disponibles, pero no saturan la vista inicial;
 - repetir en light/dark y mobile/tablet.
+
+## Nota PRODUCT-C2.3
+
+Agregar a la corrida manual de sistema visual:
+
+- abrir `/ui-kit`;
+- confirmar que el encabezado principal dice `Diseno de la aplicacion`;
+- confirmar que los pasos explican la secuencia completa;
+- elegir plantilla visual;
+- elegir color principal de marca;
+- revisar paleta sugerida con nombres entendibles;
+- revisar contraste y legibilidad;
+- confirmar que la vista previa aparece antes de aplicar cambios;
+- aplicar paleta localmente;
+- restaurar plantilla;
+- abrir opciones avanzadas y confirmar que el contenido tecnico no satura por defecto;
+- abrir `/appearance` y confirmar tarjeta `Diseno de la aplicacion` con boton `Abrir editor visual`.

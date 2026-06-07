@@ -33,6 +33,7 @@ type Props = {
   onBaseColorChange: (value: string) => void;
   onHarmonyChange: (harmony: HarmonyType) => void;
   onTokenChange: (key: EditableVisualTokenKey, value: string) => void;
+  showApplyAction?: boolean;
 };
 
 type ContrastStatus = ReturnType<typeof getContrastStatus>;
@@ -51,6 +52,7 @@ export default function PaletteGeneratorCard({
   onBaseColorChange,
   onHarmonyChange,
   onTokenChange,
+  showApplyAction = true,
 }: Props) {
   const { theme } = useAppTheme();
   const { t } = useTranslation();
@@ -160,10 +162,10 @@ export default function PaletteGeneratorCard({
       <View style={styles.headerRow}>
         <View style={styles.flexBlock}>
           <AppText variant="subtitle" bold>
-            {t('paletteGenerator.title')}
+            {t('paletteGenerator.brandColorTitle')}
           </AppText>
           <AppText variant="caption" color={theme.colors.mutedText}>
-            {t('paletteGenerator.subtitle')}
+            {t('paletteGenerator.brandColorHelp')}
           </AppText>
         </View>
         <View
@@ -179,7 +181,10 @@ export default function PaletteGeneratorCard({
 
       <View style={styles.generatorGrid}>
         <View style={styles.controlColumn}>
-          <AppText bold>{t('paletteGenerator.baseColor')}</AppText>
+          <AppText bold>{t('paletteGenerator.brandColorTitle')}</AppText>
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            {t('paletteGenerator.baseColorHelp')}
+          </AppText>
           <View style={styles.baseInputRow}>
             {webColorInput}
             <AppInput
@@ -264,16 +269,18 @@ export default function PaletteGeneratorCard({
       <View style={styles.sectionBlock}>
         <View style={styles.headerRow}>
           <View style={styles.flexBlock}>
-            <AppText bold>{t('paletteGenerator.suggestedPalette')}</AppText>
+            <AppText bold>{t('paletteGenerator.appPaletteTitle')}</AppText>
             <AppText variant="caption" color={theme.colors.mutedText}>
-              {t('paletteGenerator.suggestedPaletteHelp')}
+              {t('paletteGenerator.appPaletteHelp')}
             </AppText>
           </View>
-          <AppButton
-            title={t('paletteGenerator.applyLocal')}
-            variant="primary"
-            onPress={() => onApplyPalette(palette)}
-          />
+          {showApplyAction ? (
+            <AppButton
+              title={t('paletteGenerator.applyLocal')}
+              variant="primary"
+              onPress={() => onApplyPalette(palette)}
+            />
+          ) : null}
         </View>
         <View style={styles.tokenGrid}>
           {tokenEntries.map(([key, color]) => (
@@ -301,10 +308,10 @@ export default function PaletteGeneratorCard({
       <View style={styles.generatorGrid}>
         <View style={styles.controlColumn}>
           <AppText bold>
-            {advancedMode ? t('paletteGenerator.contrastTitle') : t('paletteGenerator.mainContrast')}
+            {advancedMode ? t('paletteGenerator.contrastTitle') : t('paletteGenerator.legibilityTitle')}
           </AppText>
           <AppText variant="caption" color={theme.colors.mutedText}>
-            {advancedMode ? t('paletteGenerator.contrastHelp') : t('paletteGenerator.mainContrastHelp')}
+            {advancedMode ? t('paletteGenerator.contrastHelp') : t('paletteGenerator.legibilityHelp')}
           </AppText>
           {hasLowContrast ? (
             <View
@@ -472,7 +479,10 @@ function UiPreview({ activeScheme, palette }: { activeScheme: 'light' | 'dark'; 
 
   return (
     <View style={styles.controlColumn}>
-      <AppText bold>{t('paletteGenerator.previewTitle')}</AppText>
+      <AppText bold>{t('paletteGenerator.appPreviewTitle')}</AppText>
+      <AppText variant="caption" color={mutedColor}>
+        {t('paletteGenerator.appPreviewHelp')}
+      </AppText>
       <View style={[styles.uiPreviewCanvas, { backgroundColor: palette.background }]}>
         <View style={[styles.previewSidebar, { backgroundColor: palette.primary }]}>
           <View style={[styles.previewSidebarLine, { backgroundColor: primaryText }]} />
