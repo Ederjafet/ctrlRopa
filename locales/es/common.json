@@ -1096,7 +1096,7 @@
     "flowSubtitle": "Sigue estos pasos: plantilla, color base, paleta, contraste, vista previa y aplicacion local.",
     "flowSteps": {
       "template": "Elige una plantilla visual",
-      "baseColor": "Elige el color principal",
+      "baseColor": "Colores de marca",
       "palette": "Revisa la paleta sugerida",
       "contrast": "Revisa contraste y legibilidad",
       "preview": "Mira la vista previa",
@@ -1174,7 +1174,8 @@
       "danger": "Estado reservado",
       "background": "Texto sobre fondo",
       "surface": "Texto sobre tarjetas",
-      "button": "Boton principal"
+      "button": "Boton principal",
+      "secondary": "Color secundario"
     },
     "tokens": {
       "primary": "Principal",
@@ -1198,8 +1199,26 @@
     "previewReservedBadge": "Reservada",
     "previewNotice": "Aviso operativo de ejemplo.",
     "appearanceCardTitle": "Diseno de la aplicacion",
-    "appearanceCardHelp": "Configura colores, plantilla visual y vista previa sin duplicar el generador en esta pantalla.",
-    "openGenerator": "Abrir editor visual"
+    "appearanceCardHelp": "Configura plantilla visual, colores de marca y vista previa sin duplicar el generador en esta pantalla.",
+    "openGenerator": "Abrir editor visual",
+    "brandColorsTitle": "Colores de marca",
+    "brandColorsHelp": "Puedes usar solo un color principal o agregar colores secundario y acento si tu marca los tiene.",
+    "brandColorPrimary": "Color principal",
+    "brandColorPrimaryHelp": "Se usa para navegacion, botones principales y acciones clave.",
+    "brandColorSecondary": "Color secundario",
+    "brandColorSecondaryHelp": "Se usa para contraste, fondos fuertes o botones secundarios.",
+    "brandColorAccent": "Color de acento",
+    "brandColorAccentHelp": "Se usa para resaltar elementos, estados o llamadas de atencion.",
+    "changeColor": "Cambiar color",
+    "chooseColor": "Elegir color",
+    "chooseColorHelp": "Selecciona una muestra, ajusta el HEX o usa una variacion generada.",
+    "applyColor": "Aplicar color",
+    "useThisColor": "Usar este color",
+    "restoreOriginalColor": "Restaurar color original",
+    "automaticColor": "Automatico",
+    "useAutomaticColor": "Usar automatico",
+    "suggestedSwatches": "Muestras sugeridas",
+    "colorVariations": "Variaciones del color"
   },
   "usersForm": {
     "newTitle": "Nuevo usuario",

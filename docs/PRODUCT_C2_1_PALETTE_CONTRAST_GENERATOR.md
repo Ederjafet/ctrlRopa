@@ -215,3 +215,13 @@ Fecha: 2026-06-07
 PRODUCT-C2.3 mantiene el generador tecnico de PRODUCT-C2.1, pero cambia el lenguaje de la experiencia principal a `Diseno de la aplicacion`. El color base pasa a explicarse como color principal de marca, la paleta sugerida usa nombres entendibles y la accion de aplicar/restaurar queda al final del flujo.
 
 El generador avanzado sigue disponible, pero deja de ser el mensaje principal para usuario final.
+
+---
+
+## Continuidad PRODUCT-C2.4 - Tres colores de marca
+
+Fecha: 2026-06-07
+
+PRODUCT-C2.4 extiende la generacion de paleta para aceptar hasta tres colores de marca. El color base de PRODUCT-C2.1 sigue existiendo como color principal, pero ahora se puede complementar con secundario y acento sin editar tokens tecnicos.
+
+La generacion conserva la semantica de `success`, `warning` y `danger`, y el contraste visible ahora revisa principal, secundario, acento, fondo, superficie y estado reservado.

@@ -181,3 +181,13 @@ La vista principal queda organizada como secuencia accionable para usuario admin
 6. aplicar o restaurar cambios.
 
 El UI Kit tecnico, tokens, componentes, templates, variantes y detalles de contraste siguen disponibles en opciones avanzadas.
+
+---
+
+## Continuidad PRODUCT-C2.4 - Selector propio
+
+Fecha: 2026-06-07
+
+PRODUCT-C2.4 conserva la pantalla simplificada y reemplaza la experiencia principal de color nativo por un selector propio de la aplicacion. El flujo visible cambia de un solo color base a `Colores de marca`, con principal, secundario y acento.
+
+Las escalas, armonias detalladas, tokens tecnicos y datos RGB/HSL siguen en modo avanzado para no saturar la experiencia inicial.

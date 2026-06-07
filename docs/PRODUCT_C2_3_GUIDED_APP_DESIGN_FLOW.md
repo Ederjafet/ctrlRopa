@@ -129,3 +129,21 @@ ko: leaves=1194 missing=0 extra=0
 - No se agregan fuentes externas.
 - La validacion de contraste sigue siendo basica.
 - Las traducciones nuevas requieren revision nativa.
+
+---
+
+## Continuidad PRODUCT-C2.4 - Colores de marca
+
+Fecha: 2026-06-07
+
+PRODUCT-C2.4 mantiene el flujo guiado de `Diseno de la aplicacion`, pero cambia el paso de color principal por `Colores de marca`.
+
+La experiencia visible ahora permite configurar:
+
+1. color principal;
+2. color secundario;
+3. color de acento.
+
+El cambio evita que el selector nativo de Windows/navegador sea la experiencia principal. La seleccion se realiza con `AppColorPicker`, un panel propio con HEX, swatches, variaciones, aplicar, cancelar y restaurar color original.
+
+La paleta sugerida respeta los colores definidos por el usuario y completa los tokens restantes con reglas semanticas seguras.

@@ -1,6 +1,7 @@
 import { useAppTheme } from '@/context/AppThemeContext';
 import { EditableVisualTokenKey } from '@/theme/designPresets';
 import {
+  BrandColorInputs,
   HarmonyType,
   SemanticPalette,
   generateHarmonyColors,
@@ -16,21 +17,23 @@ import {
   isValidHexColor,
   normalizeHexColor,
 } from '@/theme/colorUtils';
-import React, { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import AppColorPicker from './AppColorPicker';
 import AppButton from './AppButton';
 import AppCard from './AppCard';
-import AppInput from './AppInput';
 import AppText from './AppText';
+
+type BrandColorKey = 'primary' | 'secondary' | 'accent';
 
 type Props = {
   activeScheme: 'light' | 'dark';
   advancedMode?: boolean;
-  baseColor: string;
+  brandColors: BrandColorInputs;
   harmony: HarmonyType;
   onApplyPalette: (palette: SemanticPalette) => void;
-  onBaseColorChange: (value: string) => void;
+  onBrandColorChange: (key: BrandColorKey, value: string) => void;
   onHarmonyChange: (harmony: HarmonyType) => void;
   onTokenChange: (key: EditableVisualTokenKey, value: string) => void;
   showApplyAction?: boolean;
@@ -46,32 +49,38 @@ const DARK_TEXT = '#0F172A';
 export default function PaletteGeneratorCard({
   activeScheme,
   advancedMode = false,
-  baseColor,
+  brandColors,
   harmony,
   onApplyPalette,
-  onBaseColorChange,
+  onBrandColorChange,
   onHarmonyChange,
   onTokenChange,
   showApplyAction = true,
 }: Props) {
   const { theme } = useAppTheme();
   const { t } = useTranslation();
-  const normalizedBase = normalizeHexColor(baseColor);
-  const baseIsValid = isValidHexColor(baseColor);
+  const [activePicker, setActivePicker] = useState<BrandColorKey | null>(null);
+  const normalizedPrimary = normalizeHexColor(brandColors.primary);
+  const normalizedSecondary = brandColors.secondary && isValidHexColor(brandColors.secondary)
+    ? normalizeHexColor(brandColors.secondary)
+    : '';
+  const normalizedAccent = brandColors.accent && isValidHexColor(brandColors.accent)
+    ? normalizeHexColor(brandColors.accent)
+    : '';
 
   const palette = useMemo(
-    () => generateSemanticPalette(normalizedBase, harmony, activeScheme),
-    [activeScheme, harmony, normalizedBase],
+    () => generateSemanticPalette(normalizedPrimary, harmony, activeScheme, brandColors),
+    [activeScheme, brandColors, harmony, normalizedPrimary],
   );
-  const tints = useMemo(() => generateTints(normalizedBase, 7), [normalizedBase]);
-  const shades = useMemo(() => generateShades(normalizedBase, 7), [normalizedBase]);
-  const tones = useMemo(() => generateTones(normalizedBase, 7), [normalizedBase]);
+  const tints = useMemo(() => generateTints(normalizedPrimary, 7), [normalizedPrimary]);
+  const shades = useMemo(() => generateShades(normalizedPrimary, 7), [normalizedPrimary]);
+  const tones = useMemo(() => generateTones(normalizedPrimary, 7), [normalizedPrimary]);
   const harmonyColors = useMemo(
-    () => generateHarmonyColors(normalizedBase, harmony),
-    [harmony, normalizedBase],
+    () => generateHarmonyColors(normalizedPrimary, harmony),
+    [harmony, normalizedPrimary],
   );
-  const baseRgb = hexToRgb(normalizedBase);
-  const baseHsl = hexToHsl(normalizedBase);
+  const baseRgb = hexToRgb(normalizedPrimary);
+  const baseHsl = hexToHsl(normalizedPrimary);
 
   const contrastRows = useMemo(() => {
     const textOnBackground = activeScheme === 'dark' ? '#F8FAFC' : DARK_TEXT;
@@ -88,6 +97,12 @@ export default function PaletteGeneratorCard({
         label: t('paletteGenerator.contrast.primaryDark'),
         foreground: DARK_TEXT,
         background: palette.primary,
+      },
+      {
+        key: 'secondary',
+        label: t('paletteGenerator.contrast.secondary'),
+        foreground: getReadableTextColor(palette.secondary),
+        background: palette.secondary,
       },
       {
         key: 'accent',
@@ -133,46 +148,58 @@ export default function PaletteGeneratorCard({
   const hasLowContrast = contrastRows.some((row) => row.status === 'low');
   const visibleContrastRows = advancedMode
     ? contrastRows
-    : contrastRows.filter((row) => ['button', 'background', 'danger'].includes(row.key));
+    : contrastRows.filter((row) =>
+        ['button', 'secondary', 'accent', 'danger', 'background', 'surface'].includes(row.key),
+      );
   const tokenEntries = Object.entries(palette) as [EditableVisualTokenKey, string][];
-
-  const webColorInput =
-    Platform.OS === 'web'
-      ? React.createElement('input', {
-          'aria-label': t('paletteGenerator.baseColor'),
-          onChange: (event: { target?: { value?: string } }) => {
-            const nextValue = event.target?.value;
-            if (nextValue) onBaseColorChange(normalizeHexColor(nextValue));
-          },
-          style: {
-            background: 'transparent',
-            border: '0',
-            cursor: 'pointer',
-            height: 46,
-            padding: 0,
-            width: 72,
-          },
-          type: 'color',
-          value: normalizedBase,
-        })
-      : null;
+  const brandColorRows = [
+    {
+      key: 'primary' as const,
+      label: t('paletteGenerator.brandColorPrimary'),
+      description: t('paletteGenerator.brandColorPrimaryHelp'),
+      value: normalizedPrimary,
+      resolvedColor: palette.primary,
+      optional: false,
+    },
+    {
+      key: 'secondary' as const,
+      label: t('paletteGenerator.brandColorSecondary'),
+      description: t('paletteGenerator.brandColorSecondaryHelp'),
+      value: normalizedSecondary,
+      resolvedColor: palette.secondary,
+      optional: true,
+    },
+    {
+      key: 'accent' as const,
+      label: t('paletteGenerator.brandColorAccent'),
+      description: t('paletteGenerator.brandColorAccentHelp'),
+      value: normalizedAccent,
+      resolvedColor: palette.accent,
+      optional: true,
+    },
+  ];
+  const pickerRow = brandColorRows.find((row) => row.key === activePicker);
+  const suggestedColors = useMemo(
+    () => Array.from(new Set([normalizedPrimary, normalizedSecondary, normalizedAccent, ...QUICK_SWATCHES, ...harmonyColors].filter(Boolean))),
+    [harmonyColors, normalizedAccent, normalizedPrimary, normalizedSecondary],
+  );
 
   return (
     <AppCard variant="elevated" style={styles.card}>
       <View style={styles.headerRow}>
         <View style={styles.flexBlock}>
           <AppText variant="subtitle" bold>
-            {t('paletteGenerator.brandColorTitle')}
+            {t('paletteGenerator.brandColorsTitle')}
           </AppText>
           <AppText variant="caption" color={theme.colors.mutedText}>
-            {t('paletteGenerator.brandColorHelp')}
+            {t('paletteGenerator.brandColorsHelp')}
           </AppText>
         </View>
         <View
           style={[
             styles.basePreview,
             {
-              backgroundColor: normalizedBase,
+              backgroundColor: normalizedPrimary,
               borderColor: theme.colors.borderStrong,
             },
           ]}
@@ -180,53 +207,38 @@ export default function PaletteGeneratorCard({
       </View>
 
       <View style={styles.generatorGrid}>
-        <View style={styles.controlColumn}>
-          <AppText bold>{t('paletteGenerator.brandColorTitle')}</AppText>
+        <View style={styles.controlColumnWide}>
+          <AppText bold>{t('paletteGenerator.brandColorsTitle')}</AppText>
           <AppText variant="caption" color={theme.colors.mutedText}>
-            {t('paletteGenerator.baseColorHelp')}
+            {t('paletteGenerator.brandColorsHelp')}
           </AppText>
-          <View style={styles.baseInputRow}>
-            {webColorInput}
-            <AppInput
-              value={baseColor}
-              onChangeText={(value) => onBaseColorChange(value)}
-              autoCapitalize="none"
-              autoCorrect={false}
-              placeholder="#2563EB"
-              error={baseColor && !baseIsValid ? t('paletteGenerator.invalidHex') : undefined}
-              style={styles.hexInput}
-            />
+          <View style={styles.brandColorGrid}>
+            {brandColorRows.map((row) => (
+              <BrandColorCard
+                key={row.key}
+                label={row.label}
+                description={row.description}
+                value={row.value}
+                resolvedColor={row.resolvedColor}
+                optional={row.optional}
+                onClear={() => onBrandColorChange(row.key, '')}
+                onOpen={() => setActivePicker(row.key)}
+              />
+            ))}
           </View>
 
           {advancedMode ? (
-            <>
-              <View style={styles.colorMetaRow}>
-                <MetaPill label="HEX" value={normalizedBase} />
-                <MetaPill
-                  label="RGB"
-                  value={baseRgb ? `${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}` : '-'}
-                />
-                <MetaPill
-                  label="HSL"
-                  value={baseHsl ? `${Math.round(baseHsl.h)}, ${baseHsl.s}%, ${baseHsl.l}%` : '-'}
-                />
-              </View>
-
-              <AppText variant="caption" color={theme.colors.mutedText}>
-                {t('paletteGenerator.quickSwatches')}
-              </AppText>
-              <View style={styles.swatchRow}>
-                {QUICK_SWATCHES.map((color) => (
-                  <ColorSwatch
-                    key={color}
-                    color={color}
-                    label={color}
-                    onPress={() => onBaseColorChange(color)}
-                    selected={normalizedBase === color}
-                  />
-                ))}
-              </View>
-            </>
+            <View style={styles.colorMetaRow}>
+              <MetaPill label="HEX" value={normalizedPrimary} />
+              <MetaPill
+                label="RGB"
+                value={baseRgb ? `${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}` : '-'}
+              />
+              <MetaPill
+                label="HSL"
+                value={baseHsl ? `${Math.round(baseHsl.h)}, ${baseHsl.s}%, ${baseHsl.l}%` : '-'}
+              />
+            </View>
           ) : null}
         </View>
 
@@ -250,7 +262,12 @@ export default function PaletteGeneratorCard({
               </AppText>
               <View style={styles.swatchRow}>
                 {harmonyColors.map((color) => (
-                  <ColorSwatch key={color} color={color} label={color} onPress={() => onBaseColorChange(color)} />
+                  <ColorSwatch
+                    key={color}
+                    color={color}
+                    label={color}
+                    onPress={() => onBrandColorChange('primary', color)}
+                  />
                 ))}
               </View>
             </>
@@ -260,9 +277,9 @@ export default function PaletteGeneratorCard({
 
       {advancedMode ? (
         <>
-          <VariationBlock title={t('paletteGenerator.tints')} colors={tints} onPick={onBaseColorChange} />
-          <VariationBlock title={t('paletteGenerator.shades')} colors={shades} onPick={onBaseColorChange} />
-          <VariationBlock title={t('paletteGenerator.tones')} colors={tones} onPick={onBaseColorChange} />
+          <VariationBlock title={t('paletteGenerator.tints')} colors={tints} onPick={(color) => onBrandColorChange('primary', color)} />
+          <VariationBlock title={t('paletteGenerator.shades')} colors={shades} onPick={(color) => onBrandColorChange('primary', color)} />
+          <VariationBlock title={t('paletteGenerator.tones')} colors={tones} onPick={(color) => onBrandColorChange('primary', color)} />
         </>
       ) : null}
 
@@ -346,7 +363,83 @@ export default function PaletteGeneratorCard({
 
         <UiPreview palette={palette} activeScheme={activeScheme} />
       </View>
+
+      {pickerRow ? (
+        <AppColorPicker
+          visible={Boolean(activePicker)}
+          title={t('paletteGenerator.chooseColor')}
+          value={pickerRow.value || pickerRow.resolvedColor}
+          originalValue={pickerRow.resolvedColor}
+          suggestedColors={suggestedColors}
+          onApply={(value) => {
+            onBrandColorChange(pickerRow.key, value);
+            setActivePicker(null);
+          }}
+          onCancel={() => setActivePicker(null)}
+        />
+      ) : null}
     </AppCard>
+  );
+}
+
+function BrandColorCard({
+  description,
+  label,
+  onClear,
+  onOpen,
+  optional,
+  resolvedColor,
+  value,
+}: {
+  description: string;
+  label: string;
+  onClear: () => void;
+  onOpen: () => void;
+  optional: boolean;
+  resolvedColor: string;
+  value: string;
+}) {
+  const { theme } = useAppTheme();
+  const { t } = useTranslation();
+  const displayValue = value || t('paletteGenerator.automaticColor');
+
+  return (
+    <View
+      style={[
+        styles.brandColorCard,
+        {
+          backgroundColor: theme.colors.surfaceMuted,
+          borderColor: theme.colors.borderSubtle,
+        },
+      ]}
+    >
+      <View style={styles.headerRow}>
+        <View style={styles.flexBlock}>
+          <AppText bold>{label}</AppText>
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            {description}
+          </AppText>
+        </View>
+        <View
+          style={[
+            styles.brandColorPreview,
+            {
+              backgroundColor: resolvedColor,
+              borderColor: theme.colors.borderStrong,
+            },
+          ]}
+        />
+      </View>
+      <AppText variant="caption" color={theme.colors.textSecondary}>
+        {displayValue}
+      </AppText>
+      <View style={styles.brandActions}>
+        <AppButton title={t('paletteGenerator.changeColor')} variant="secondary" onPress={onOpen} />
+        {optional && value ? (
+          <AppButton title={t('paletteGenerator.useAutomaticColor')} variant="neutral" onPress={onClear} />
+        ) : null}
+      </View>
+    </View>
   );
 }
 
@@ -539,10 +632,29 @@ function UiPreview({ activeScheme, palette }: { activeScheme: 'light' | 'dark'; 
 }
 
 const styles = StyleSheet.create({
-  baseInputRow: {
-    alignItems: 'flex-start',
+  brandActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  brandColorCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    flex: 1,
     gap: 10,
+    minWidth: 220,
+    padding: 12,
+  },
+  brandColorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  brandColorPreview: {
+    borderRadius: 12,
+    borderWidth: 1,
+    height: 52,
+    width: 70,
   },
   basePreview: {
     borderRadius: 14,
@@ -578,6 +690,11 @@ const styles = StyleSheet.create({
     gap: 10,
     minWidth: 260,
   },
+  controlColumnWide: {
+    flex: 1.5,
+    gap: 10,
+    minWidth: 320,
+  },
   flexBlock: {
     flex: 1,
     minWidth: 0,
@@ -601,9 +718,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 12,
     justifyContent: 'space-between',
-  },
-  hexInput: {
-    minWidth: 160,
   },
   hexText: {
     textAlign: 'center',

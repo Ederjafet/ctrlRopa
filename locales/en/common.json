@@ -1096,7 +1096,7 @@
     "flowSubtitle": "Follow these steps: template, base color, palette, contrast, preview, and local application.",
     "flowSteps": {
       "template": "Choose a visual template",
-      "baseColor": "Choose the main color",
+      "baseColor": "Brand colors",
       "palette": "Review the suggested palette",
       "contrast": "Review contrast and readability",
       "preview": "Check the preview",
@@ -1174,7 +1174,8 @@
       "danger": "Reserved status",
       "background": "Text on background",
       "surface": "Text on cards",
-      "button": "Main button"
+      "button": "Main button",
+      "secondary": "Secondary color"
     },
     "tokens": {
       "primary": "Main",
@@ -1198,8 +1199,26 @@
     "previewReservedBadge": "Reserved",
     "previewNotice": "Sample operational notice.",
     "appearanceCardTitle": "Application design",
-    "appearanceCardHelp": "Configure colors, visual template, and preview without duplicating the generator on this screen.",
-    "openGenerator": "Open visual editor"
+    "appearanceCardHelp": "Configure visual template, brand colors, and preview without duplicating the generator on this screen.",
+    "openGenerator": "Open visual editor",
+    "brandColorsTitle": "Brand colors",
+    "brandColorsHelp": "You can use only one main color or add secondary and accent colors if your brand has them.",
+    "brandColorPrimary": "Main color",
+    "brandColorPrimaryHelp": "Used for navigation, primary buttons, and key actions.",
+    "brandColorSecondary": "Secondary color",
+    "brandColorSecondaryHelp": "Used for contrast, strong backgrounds, or secondary buttons.",
+    "brandColorAccent": "Accent color",
+    "brandColorAccentHelp": "Used to highlight elements, states, or calls to attention.",
+    "changeColor": "Change color",
+    "chooseColor": "Choose color",
+    "chooseColorHelp": "Select a swatch, adjust the HEX value, or use a generated variation.",
+    "applyColor": "Apply color",
+    "useThisColor": "Use this color",
+    "restoreOriginalColor": "Restore original color",
+    "automaticColor": "Automatic",
+    "useAutomaticColor": "Use automatic",
+    "suggestedSwatches": "Suggested swatches",
+    "colorVariations": "Color variations"
   },
   "usersForm": {
     "newTitle": "New user",

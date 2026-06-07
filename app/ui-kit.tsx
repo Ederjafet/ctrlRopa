@@ -22,6 +22,7 @@ import { useAppTheme } from '@/context/AppThemeContext';
 import { isAdmin, isNoAccess } from '@/services/accessControl';
 import { ensureSessionActive, getSession, UserSession } from '@/services/sessionStorage';
 import {
+  BrandColorInputs,
   HarmonyType,
   SemanticPalette,
   generateSemanticPalette,
@@ -72,7 +73,11 @@ export default function UiKitPreview() {
   });
   const [editorRadius, setEditorRadius] = useState<'standard' | 'soft' | 'compact'>('soft');
   const [editorDensity, setEditorDensity] = useState<'NORMAL' | 'COMPACT'>('NORMAL');
-  const [paletteBaseColor, setPaletteBaseColor] = useState('#2563EB');
+  const [brandColors, setBrandColors] = useState<BrandColorInputs>({
+    primary: '#2563EB',
+    secondary: '',
+    accent: '',
+  });
   const [paletteHarmony, setPaletteHarmony] = useState<HarmonyType>('complementary');
   const [showAdvancedDetails, setShowAdvancedDetails] = useState(false);
   const [identityFeedback, setIdentityFeedback] = useState<string | null>(null);
@@ -117,14 +122,17 @@ export default function UiKitPreview() {
     return warnings;
   }, [editorValues.background, editorValues.surface, theme.colors.textPrimary]);
   const generatedPalette = useMemo(
-    () => generateSemanticPalette(normalizeHexColor(paletteBaseColor), paletteHarmony, activeScheme),
-    [activeScheme, paletteBaseColor, paletteHarmony],
+    () => generateSemanticPalette(normalizeHexColor(brandColors.primary), paletteHarmony, activeScheme, brandColors),
+    [activeScheme, brandColors, paletteHarmony],
   );
   const generatedPaletteHasLowContrast = useMemo(() => {
     const textOnBackground = activeScheme === 'dark' ? '#F8FAFC' : '#0F172A';
     const ratios = [
       getPaletteContrastRatio(getReadableTextColor(generatedPalette.primary), generatedPalette.primary),
+      getPaletteContrastRatio(getReadableTextColor(generatedPalette.secondary), generatedPalette.secondary),
+      getPaletteContrastRatio(getReadableTextColor(generatedPalette.accent), generatedPalette.accent),
       getPaletteContrastRatio(textOnBackground, generatedPalette.background),
+      getPaletteContrastRatio(textOnBackground, generatedPalette.surface),
       getPaletteContrastRatio(getReadableTextColor(generatedPalette.danger), generatedPalette.danger),
     ];
 
@@ -174,7 +182,17 @@ export default function UiKitPreview() {
     );
 
     setEditorValues(nextValues);
-    setPaletteBaseColor(nextValues.primary);
+    setBrandColors({
+      primary: nextValues.primary,
+      secondary:
+        customVisualIdentity?.presetId === visualPresetId && activeOverrides.secondary
+          ? nextValues.secondary
+          : '',
+      accent:
+        customVisualIdentity?.presetId === visualPresetId && activeOverrides.accent
+          ? nextValues.accent
+          : '',
+    });
     setEditorRadius(customVisualIdentity?.radius ?? activePreset.radius);
     setEditorDensity(customVisualIdentity?.density ?? activePreset.density);
     setIdentityFeedback(null);
@@ -192,7 +210,11 @@ export default function UiKitPreview() {
     };
 
     setEditorValues(nextValues);
-    setPaletteBaseColor(palette.primary);
+    setBrandColors({
+      primary: palette.primary,
+      secondary: palette.secondary,
+      accent: palette.accent,
+    });
 
     await setCustomVisualIdentity({
       presetId: visualPresetId,
@@ -227,6 +249,14 @@ export default function UiKitPreview() {
   const restoreActivePreset = async () => {
     await resetCustomVisualIdentity();
     setIdentityFeedback(t('paletteGenerator.restoreFeedback'));
+  };
+
+  const updateBrandColor = (key: 'primary' | 'secondary' | 'accent', value: string) => {
+    setBrandColors((current) => ({
+      ...current,
+      [key]: value ? normalizeHexColor(value) : '',
+    }));
+    setIdentityFeedback(null);
   };
 
   if (loading) {
@@ -360,13 +390,10 @@ export default function UiKitPreview() {
       <PaletteGeneratorCard
         activeScheme={activeScheme}
         advancedMode={showAdvancedDetails}
-        baseColor={paletteBaseColor}
+        brandColors={brandColors}
         harmony={paletteHarmony}
         onApplyPalette={applyGeneratedPalette}
-        onBaseColorChange={(value) => {
-          setPaletteBaseColor(value);
-          setIdentityFeedback(null);
-        }}
+        onBrandColorChange={updateBrandColor}
         onHarmonyChange={setPaletteHarmony}
         onTokenChange={updateEditorToken}
         showApplyAction={false}

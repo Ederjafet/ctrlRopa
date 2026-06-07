@@ -1089,7 +1089,7 @@
     "flowSubtitle": "Suivez ces étapes : modèle, couleur de base, palette, contraste, aperçu et application locale.",
     "flowSteps": {
       "template": "Choisissez un modele visuel",
-      "baseColor": "Choisissez la couleur principale",
+      "baseColor": "Couleurs de marque",
       "palette": "Verifiez la palette suggeree",
       "contrast": "Verifiez contraste et lisibilite",
       "preview": "Regardez l apercu",
@@ -1150,7 +1150,8 @@
       "danger": "Etat reserve",
       "background": "Texte sur fond",
       "surface": "Texte sur cartes",
-      "button": "Bouton principal"
+      "button": "Bouton principal",
+      "secondary": "Couleur secondaire"
     },
     "tokens": {
       "primary": "Principal",
@@ -1172,7 +1173,7 @@
     "previewReservedBadge": "Réservé",
     "previewNotice": "Avis opérationnel d'exemple.",
     "appearanceCardTitle": "Conception de l'application",
-    "appearanceCardHelp": "Configurez les couleurs, le modele visuel et l apercu sans dupliquer le generateur sur cet ecran.",
+    "appearanceCardHelp": "Configurez le modele visuel, les couleurs de marque et l apercu sans dupliquer le generateur sur cet ecran.",
     "openGenerator": "Ouvrir l'editeur visuel",
     "loading": "Chargement de la conception de l'application...",
     "appDesignTitle": "Conception de l'application",
@@ -1199,7 +1200,25 @@
     "legibilityHelp": "Avant d appliquer la palette, verifiez que les textes et les boutons sont faciles a lire.",
     "lowContrastApplyWarning": "Cette palette contient des contrastes a verifier avant application.",
     "appPreviewTitle": "Apercu de l'application",
-    "appPreviewHelp": "Voici comment les couleurs apparaitront dans les ecrans reels du systeme."
+    "appPreviewHelp": "Voici comment les couleurs apparaitront dans les ecrans reels du systeme.",
+    "brandColorsTitle": "Couleurs de marque",
+    "brandColorsHelp": "Vous pouvez utiliser une seule couleur principale ou ajouter des couleurs secondaire et accent si votre marque en dispose.",
+    "brandColorPrimary": "Couleur principale",
+    "brandColorPrimaryHelp": "Utilisee pour la navigation, les boutons principaux et les actions cles.",
+    "brandColorSecondary": "Couleur secondaire",
+    "brandColorSecondaryHelp": "Utilisee pour le contraste, les fonds forts ou les boutons secondaires.",
+    "brandColorAccent": "Couleur accent",
+    "brandColorAccentHelp": "Utilisee pour mettre en valeur des elements, des etats ou des appels a l attention.",
+    "changeColor": "Changer la couleur",
+    "chooseColor": "Choisir une couleur",
+    "chooseColorHelp": "Selectionnez un echantillon, ajustez le HEX ou utilisez une variation generee.",
+    "applyColor": "Appliquer la couleur",
+    "useThisColor": "Utiliser cette couleur",
+    "restoreOriginalColor": "Restaurer la couleur originale",
+    "automaticColor": "Automatique",
+    "useAutomaticColor": "Utiliser automatique",
+    "suggestedSwatches": "Echantillons suggeres",
+    "colorVariations": "Variations de couleur"
   },
   "usersForm": {
     "newTitle": "Nouveau",

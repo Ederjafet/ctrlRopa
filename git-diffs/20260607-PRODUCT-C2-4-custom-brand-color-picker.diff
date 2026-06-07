@@ -1,0 +1,1545 @@
+﻿diff --git a/app/ui-kit.tsx b/app/ui-kit.tsx
+index 26395b4..e0e9ec1 100644
+--- a/app/ui-kit.tsx
++++ b/app/ui-kit.tsx
+@@ -22,6 +22,7 @@ import { useAppTheme } from '@/context/AppThemeContext';
+ import { isAdmin, isNoAccess } from '@/services/accessControl';
+ import { ensureSessionActive, getSession, UserSession } from '@/services/sessionStorage';
+ import {
++  BrandColorInputs,
+   HarmonyType,
+   SemanticPalette,
+   generateSemanticPalette,
+@@ -72,7 +73,11 @@ export default function UiKitPreview() {
+   });
+   const [editorRadius, setEditorRadius] = useState<'standard' | 'soft' | 'compact'>('soft');
+   const [editorDensity, setEditorDensity] = useState<'NORMAL' | 'COMPACT'>('NORMAL');
+-  const [paletteBaseColor, setPaletteBaseColor] = useState('#2563EB');
++  const [brandColors, setBrandColors] = useState<BrandColorInputs>({
++    primary: '#2563EB',
++    secondary: '',
++    accent: '',
++  });
+   const [paletteHarmony, setPaletteHarmony] = useState<HarmonyType>('complementary');
+   const [showAdvancedDetails, setShowAdvancedDetails] = useState(false);
+   const [identityFeedback, setIdentityFeedback] = useState<string | null>(null);
+@@ -117,14 +122,17 @@ export default function UiKitPreview() {
+     return warnings;
+   }, [editorValues.background, editorValues.surface, theme.colors.textPrimary]);
+   const generatedPalette = useMemo(
+-    () => generateSemanticPalette(normalizeHexColor(paletteBaseColor), paletteHarmony, activeScheme),
+-    [activeScheme, paletteBaseColor, paletteHarmony],
++    () => generateSemanticPalette(normalizeHexColor(brandColors.primary), paletteHarmony, activeScheme, brandColors),
++    [activeScheme, brandColors, paletteHarmony],
+   );
+   const generatedPaletteHasLowContrast = useMemo(() => {
+     const textOnBackground = activeScheme === 'dark' ? '#F8FAFC' : '#0F172A';
+     const ratios = [
+       getPaletteContrastRatio(getReadableTextColor(generatedPalette.primary), generatedPalette.primary),
++      getPaletteContrastRatio(getReadableTextColor(generatedPalette.secondary), generatedPalette.secondary),
++      getPaletteContrastRatio(getReadableTextColor(generatedPalette.accent), generatedPalette.accent),
+       getPaletteContrastRatio(textOnBackground, generatedPalette.background),
++      getPaletteContrastRatio(textOnBackground, generatedPalette.surface),
+       getPaletteContrastRatio(getReadableTextColor(generatedPalette.danger), generatedPalette.danger),
+     ];
+
+@@ -174,7 +182,17 @@ export default function UiKitPreview() {
+     );
+
+     setEditorValues(nextValues);
+-    setPaletteBaseColor(nextValues.primary);
++    setBrandColors({
++      primary: nextValues.primary,
++      secondary:
++        customVisualIdentity?.presetId === visualPresetId && activeOverrides.secondary
++          ? nextValues.secondary
++          : '',
++      accent:
++        customVisualIdentity?.presetId === visualPresetId && activeOverrides.accent
++          ? nextValues.accent
++          : '',
++    });
+     setEditorRadius(customVisualIdentity?.radius ?? activePreset.radius);
+     setEditorDensity(customVisualIdentity?.density ?? activePreset.density);
+     setIdentityFeedback(null);
+@@ -192,7 +210,11 @@ export default function UiKitPreview() {
+     };
+
+     setEditorValues(nextValues);
+-    setPaletteBaseColor(palette.primary);
++    setBrandColors({
++      primary: palette.primary,
++      secondary: palette.secondary,
++      accent: palette.accent,
++    });
+
+     await setCustomVisualIdentity({
+       presetId: visualPresetId,
+@@ -229,6 +251,14 @@ export default function UiKitPreview() {
+     setIdentityFeedback(t('paletteGenerator.restoreFeedback'));
+   };
+
++  const updateBrandColor = (key: 'primary' | 'secondary' | 'accent', value: string) => {
++    setBrandColors((current) => ({
++      ...current,
++      [key]: value ? normalizeHexColor(value) : '',
++    }));
++    setIdentityFeedback(null);
++  };
++
+   if (loading) {
+     return (
+       <View style={[styles.loadingScreen, { backgroundColor: theme.colors.background }]}>
+@@ -360,13 +390,10 @@ export default function UiKitPreview() {
+       <PaletteGeneratorCard
+         activeScheme={activeScheme}
+         advancedMode={showAdvancedDetails}
+-        baseColor={paletteBaseColor}
++        brandColors={brandColors}
+         harmony={paletteHarmony}
+         onApplyPalette={applyGeneratedPalette}
+-        onBaseColorChange={(value) => {
+-          setPaletteBaseColor(value);
+-          setIdentityFeedback(null);
+-        }}
++        onBrandColorChange={updateBrandColor}
+         onHarmonyChange={setPaletteHarmony}
+         onTokenChange={updateEditorToken}
+         showApplyAction={false}
+diff --git a/components/ui/AppColorPicker.tsx b/components/ui/AppColorPicker.tsx
+new file mode 100644
+index 0000000..7b1da8c
+--- /dev/null
++++ b/components/ui/AppColorPicker.tsx
+@@ -0,0 +1,272 @@
++import { useAppTheme } from '@/context/AppThemeContext';
++import {
++  generateShades,
++  generateTints,
++  generateTones,
++  isValidHexColor,
++  normalizeHexColor,
++} from '@/theme/colorUtils';
++import { useEffect, useMemo, useState } from 'react';
++import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
++import { useTranslation } from 'react-i18next';
++import AppButton from './AppButton';
++import AppInput from './AppInput';
++import AppText from './AppText';
++
++type Props = {
++  visible: boolean;
++  title?: string;
++  value: string;
++  originalValue?: string;
++  suggestedColors?: string[];
++  onApply: (value: string) => void;
++  onCancel: () => void;
++};
++
++const DEFAULT_SWATCHES = [
++  '#2563EB',
++  '#0F766E',
++  '#7C3AED',
++  '#DB2777',
++  '#EA580C',
++  '#15803D',
++  '#B91C1C',
++  '#0F172A',
++  '#F8FAFC',
++];
++
++export default function AppColorPicker({
++  visible,
++  title,
++  value,
++  originalValue,
++  suggestedColors = DEFAULT_SWATCHES,
++  onApply,
++  onCancel,
++}: Props) {
++  const { theme } = useAppTheme();
++  const { t } = useTranslation();
++  const [draftColor, setDraftColor] = useState(normalizeHexColor(value));
++
++  useEffect(() => {
++    if (visible) {
++      setDraftColor(normalizeHexColor(value));
++    }
++  }, [value, visible]);
++
++  const normalizedDraft = normalizeHexColor(draftColor);
++  const draftIsValid = isValidHexColor(draftColor);
++  const variations = useMemo(() => {
++    const base = normalizeHexColor(draftColor);
++    return [
++      ...generateTints(base, 4),
++      base,
++      ...generateShades(base, 4),
++      ...generateTones(base, 3),
++    ];
++  }, [draftColor]);
++  const swatches = useMemo(() => {
++    const merged = [...suggestedColors, ...variations].map((color) => normalizeHexColor(color));
++    return Array.from(new Set(merged));
++  }, [suggestedColors, variations]);
++
++  const apply = () => {
++    if (!draftIsValid) return;
++    onApply(normalizedDraft);
++  };
++
++  return (
++    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
++      <View style={[styles.backdrop, { backgroundColor: theme.colors.backdrop }]}>
++        <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
++        <View
++          style={[
++            styles.panel,
++            {
++              backgroundColor: theme.colors.modalBackground,
++              borderColor: theme.colors.border,
++              borderRadius: theme.radius.xl,
++              shadowColor: theme.colors.shadow,
++            },
++          ]}
++        >
++          <View style={styles.headerRow}>
++            <View style={styles.textBlock}>
++              <AppText variant="subtitle" bold>
++                {title ?? t('paletteGenerator.chooseColor')}
++              </AppText>
++              <AppText variant="caption" color={theme.colors.mutedText}>
++                {t('paletteGenerator.chooseColorHelp')}
++              </AppText>
++            </View>
++            <View
++              style={[
++                styles.largePreview,
++                {
++                  backgroundColor: draftIsValid ? normalizedDraft : theme.colors.surfaceMuted,
++                  borderColor: theme.colors.borderStrong,
++                },
++              ]}
++            />
++          </View>
++
++          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent}>
++            <AppInput
++              label="HEX"
++              value={draftColor}
++              onChangeText={setDraftColor}
++              autoCapitalize="none"
++              autoCorrect={false}
++              placeholder="#2563EB"
++              error={draftColor && !draftIsValid ? t('paletteGenerator.invalidHex') : undefined}
++            />
++
++            <View style={styles.section}>
++              <AppText bold>{t('paletteGenerator.suggestedSwatches')}</AppText>
++              <View style={styles.swatchGrid}>
++                {suggestedColors.map((color) => (
++                  <ColorTile
++                    key={color}
++                    color={normalizeHexColor(color)}
++                    selected={normalizeHexColor(color) === normalizedDraft}
++                    onPress={() => setDraftColor(normalizeHexColor(color))}
++                  />
++                ))}
++              </View>
++            </View>
++
++            <View style={styles.section}>
++              <AppText bold>{t('paletteGenerator.colorVariations')}</AppText>
++              <View style={styles.swatchGrid}>
++                {swatches.map((color) => (
++                  <ColorTile
++                    key={color}
++                    color={color}
++                    selected={color === normalizedDraft}
++                    onPress={() => setDraftColor(color)}
++                  />
++                ))}
++              </View>
++            </View>
++          </ScrollView>
++
++          <View style={styles.actions}>
++            {originalValue ? (
++              <AppButton
++                title={t('paletteGenerator.restoreOriginalColor')}
++                variant="neutral"
++                onPress={() => setDraftColor(normalizeHexColor(originalValue))}
++                style={styles.actionButton}
++              />
++            ) : null}
++            <AppButton
++              title={t('common.cancel')}
++              variant="neutral"
++              onPress={onCancel}
++              style={styles.actionButton}
++            />
++            <AppButton
++              title={t('paletteGenerator.applyColor')}
++              variant="primary"
++              disabled={!draftIsValid}
++              disabledReason={t('paletteGenerator.invalidHex')}
++              onPress={apply}
++              style={styles.actionButton}
++            />
++          </View>
++        </View>
++      </View>
++    </Modal>
++  );
++}
++
++function ColorTile({
++  color,
++  selected,
++  onPress,
++}: {
++  color: string;
++  selected: boolean;
++  onPress: () => void;
++}) {
++  const { theme } = useAppTheme();
++
++  return (
++    <Pressable
++      accessibilityLabel={color}
++      onPress={onPress}
++      style={[
++        styles.swatch,
++        {
++          backgroundColor: color,
++          borderColor: selected ? theme.colors.accent : theme.colors.borderStrong,
++          borderWidth: selected ? 3 : 1,
++        },
++      ]}
++    />
++  );
++}
++
++const styles = StyleSheet.create({
++  actionButton: {
++    minWidth: 140,
++  },
++  actions: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 10,
++    justifyContent: 'flex-end',
++    marginTop: 14,
++  },
++  backdrop: {
++    alignItems: 'center',
++    flex: 1,
++    justifyContent: 'center',
++    padding: 16,
++  },
++  headerRow: {
++    alignItems: 'center',
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 14,
++    justifyContent: 'space-between',
++  },
++  largePreview: {
++    borderRadius: 18,
++    borderWidth: 1,
++    height: 92,
++    width: 140,
++  },
++  panel: {
++    borderWidth: 1,
++    elevation: 8,
++    maxHeight: '88%',
++    maxWidth: 620,
++    padding: 18,
++    shadowOffset: { width: 0, height: 18 },
++    shadowOpacity: 0.18,
++    shadowRadius: 28,
++    width: '100%',
++  },
++  scrollContent: {
++    gap: 16,
++    paddingTop: 16,
++  },
++  section: {
++    gap: 10,
++  },
++  swatch: {
++    borderRadius: 12,
++    height: 44,
++    width: 58,
++  },
++  swatchGrid: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 10,
++  },
++  textBlock: {
++    flex: 1,
++    minWidth: 0,
++  },
++});
+diff --git a/components/ui/PaletteGeneratorCard.tsx b/components/ui/PaletteGeneratorCard.tsx
+index 3a61448..09e9989 100644
+--- a/components/ui/PaletteGeneratorCard.tsx
++++ b/components/ui/PaletteGeneratorCard.tsx
+@@ -1,6 +1,7 @@
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import { EditableVisualTokenKey } from '@/theme/designPresets';
+ import {
++  BrandColorInputs,
+   HarmonyType,
+   SemanticPalette,
+   generateHarmonyColors,
+@@ -16,21 +17,23 @@ import {
+   isValidHexColor,
+   normalizeHexColor,
+ } from '@/theme/colorUtils';
+-import React, { useMemo } from 'react';
++import { useMemo, useState } from 'react';
+ import { useTranslation } from 'react-i18next';
+-import { Platform, Pressable, StyleSheet, View } from 'react-native';
++import { Pressable, StyleSheet, View } from 'react-native';
++import AppColorPicker from './AppColorPicker';
+ import AppButton from './AppButton';
+ import AppCard from './AppCard';
+-import AppInput from './AppInput';
+ import AppText from './AppText';
+
++type BrandColorKey = 'primary' | 'secondary' | 'accent';
++
+ type Props = {
+   activeScheme: 'light' | 'dark';
+   advancedMode?: boolean;
+-  baseColor: string;
++  brandColors: BrandColorInputs;
+   harmony: HarmonyType;
+   onApplyPalette: (palette: SemanticPalette) => void;
+-  onBaseColorChange: (value: string) => void;
++  onBrandColorChange: (key: BrandColorKey, value: string) => void;
+   onHarmonyChange: (harmony: HarmonyType) => void;
+   onTokenChange: (key: EditableVisualTokenKey, value: string) => void;
+   showApplyAction?: boolean;
+@@ -46,32 +49,38 @@ const DARK_TEXT = '#0F172A';
+ export default function PaletteGeneratorCard({
+   activeScheme,
+   advancedMode = false,
+-  baseColor,
++  brandColors,
+   harmony,
+   onApplyPalette,
+-  onBaseColorChange,
++  onBrandColorChange,
+   onHarmonyChange,
+   onTokenChange,
+   showApplyAction = true,
+ }: Props) {
+   const { theme } = useAppTheme();
+   const { t } = useTranslation();
+-  const normalizedBase = normalizeHexColor(baseColor);
+-  const baseIsValid = isValidHexColor(baseColor);
++  const [activePicker, setActivePicker] = useState<BrandColorKey | null>(null);
++  const normalizedPrimary = normalizeHexColor(brandColors.primary);
++  const normalizedSecondary = brandColors.secondary && isValidHexColor(brandColors.secondary)
++    ? normalizeHexColor(brandColors.secondary)
++    : '';
++  const normalizedAccent = brandColors.accent && isValidHexColor(brandColors.accent)
++    ? normalizeHexColor(brandColors.accent)
++    : '';
+
+   const palette = useMemo(
+-    () => generateSemanticPalette(normalizedBase, harmony, activeScheme),
+-    [activeScheme, harmony, normalizedBase],
++    () => generateSemanticPalette(normalizedPrimary, harmony, activeScheme, brandColors),
++    [activeScheme, brandColors, harmony, normalizedPrimary],
+   );
+-  const tints = useMemo(() => generateTints(normalizedBase, 7), [normalizedBase]);
+-  const shades = useMemo(() => generateShades(normalizedBase, 7), [normalizedBase]);
+-  const tones = useMemo(() => generateTones(normalizedBase, 7), [normalizedBase]);
++  const tints = useMemo(() => generateTints(normalizedPrimary, 7), [normalizedPrimary]);
++  const shades = useMemo(() => generateShades(normalizedPrimary, 7), [normalizedPrimary]);
++  const tones = useMemo(() => generateTones(normalizedPrimary, 7), [normalizedPrimary]);
+   const harmonyColors = useMemo(
+-    () => generateHarmonyColors(normalizedBase, harmony),
+-    [harmony, normalizedBase],
++    () => generateHarmonyColors(normalizedPrimary, harmony),
++    [harmony, normalizedPrimary],
+   );
+-  const baseRgb = hexToRgb(normalizedBase);
+-  const baseHsl = hexToHsl(normalizedBase);
++  const baseRgb = hexToRgb(normalizedPrimary);
++  const baseHsl = hexToHsl(normalizedPrimary);
+
+   const contrastRows = useMemo(() => {
+     const textOnBackground = activeScheme === 'dark' ? '#F8FAFC' : DARK_TEXT;
+@@ -89,6 +98,12 @@ export default function PaletteGeneratorCard({
+         foreground: DARK_TEXT,
+         background: palette.primary,
+       },
++      {
++        key: 'secondary',
++        label: t('paletteGenerator.contrast.secondary'),
++        foreground: getReadableTextColor(palette.secondary),
++        background: palette.secondary,
++      },
+       {
+         key: 'accent',
+         label: t('paletteGenerator.contrast.accent'),
+@@ -133,46 +148,58 @@ export default function PaletteGeneratorCard({
+   const hasLowContrast = contrastRows.some((row) => row.status === 'low');
+   const visibleContrastRows = advancedMode
+     ? contrastRows
+-    : contrastRows.filter((row) => ['button', 'background', 'danger'].includes(row.key));
++    : contrastRows.filter((row) =>
++        ['button', 'secondary', 'accent', 'danger', 'background', 'surface'].includes(row.key),
++      );
+   const tokenEntries = Object.entries(palette) as [EditableVisualTokenKey, string][];
+-
+-  const webColorInput =
+-    Platform.OS === 'web'
+-      ? React.createElement('input', {
+-          'aria-label': t('paletteGenerator.baseColor'),
+-          onChange: (event: { target?: { value?: string } }) => {
+-            const nextValue = event.target?.value;
+-            if (nextValue) onBaseColorChange(normalizeHexColor(nextValue));
+-          },
+-          style: {
+-            background: 'transparent',
+-            border: '0',
+-            cursor: 'pointer',
+-            height: 46,
+-            padding: 0,
+-            width: 72,
+-          },
+-          type: 'color',
+-          value: normalizedBase,
+-        })
+-      : null;
++  const brandColorRows = [
++    {
++      key: 'primary' as const,
++      label: t('paletteGenerator.brandColorPrimary'),
++      description: t('paletteGenerator.brandColorPrimaryHelp'),
++      value: normalizedPrimary,
++      resolvedColor: palette.primary,
++      optional: false,
++    },
++    {
++      key: 'secondary' as const,
++      label: t('paletteGenerator.brandColorSecondary'),
++      description: t('paletteGenerator.brandColorSecondaryHelp'),
++      value: normalizedSecondary,
++      resolvedColor: palette.secondary,
++      optional: true,
++    },
++    {
++      key: 'accent' as const,
++      label: t('paletteGenerator.brandColorAccent'),
++      description: t('paletteGenerator.brandColorAccentHelp'),
++      value: normalizedAccent,
++      resolvedColor: palette.accent,
++      optional: true,
++    },
++  ];
++  const pickerRow = brandColorRows.find((row) => row.key === activePicker);
++  const suggestedColors = useMemo(
++    () => Array.from(new Set([normalizedPrimary, normalizedSecondary, normalizedAccent, ...QUICK_SWATCHES, ...harmonyColors].filter(Boolean))),
++    [harmonyColors, normalizedAccent, normalizedPrimary, normalizedSecondary],
++  );
+
+   return (
+     <AppCard variant="elevated" style={styles.card}>
+       <View style={styles.headerRow}>
+         <View style={styles.flexBlock}>
+           <AppText variant="subtitle" bold>
+-            {t('paletteGenerator.brandColorTitle')}
++            {t('paletteGenerator.brandColorsTitle')}
+           </AppText>
+           <AppText variant="caption" color={theme.colors.mutedText}>
+-            {t('paletteGenerator.brandColorHelp')}
++            {t('paletteGenerator.brandColorsHelp')}
+           </AppText>
+         </View>
+         <View
+           style={[
+             styles.basePreview,
+             {
+-              backgroundColor: normalizedBase,
++              backgroundColor: normalizedPrimary,
+               borderColor: theme.colors.borderStrong,
+             },
+           ]}
+@@ -180,53 +207,38 @@ export default function PaletteGeneratorCard({
+       </View>
+
+       <View style={styles.generatorGrid}>
+-        <View style={styles.controlColumn}>
+-          <AppText bold>{t('paletteGenerator.brandColorTitle')}</AppText>
++        <View style={styles.controlColumnWide}>
++          <AppText bold>{t('paletteGenerator.brandColorsTitle')}</AppText>
+           <AppText variant="caption" color={theme.colors.mutedText}>
+-            {t('paletteGenerator.baseColorHelp')}
++            {t('paletteGenerator.brandColorsHelp')}
+           </AppText>
+-          <View style={styles.baseInputRow}>
+-            {webColorInput}
+-            <AppInput
+-              value={baseColor}
+-              onChangeText={(value) => onBaseColorChange(value)}
+-              autoCapitalize="none"
+-              autoCorrect={false}
+-              placeholder="#2563EB"
+-              error={baseColor && !baseIsValid ? t('paletteGenerator.invalidHex') : undefined}
+-              style={styles.hexInput}
+-            />
++          <View style={styles.brandColorGrid}>
++            {brandColorRows.map((row) => (
++              <BrandColorCard
++                key={row.key}
++                label={row.label}
++                description={row.description}
++                value={row.value}
++                resolvedColor={row.resolvedColor}
++                optional={row.optional}
++                onClear={() => onBrandColorChange(row.key, '')}
++                onOpen={() => setActivePicker(row.key)}
++              />
++            ))}
+           </View>
+
+           {advancedMode ? (
+-            <>
+-              <View style={styles.colorMetaRow}>
+-                <MetaPill label="HEX" value={normalizedBase} />
+-                <MetaPill
+-                  label="RGB"
+-                  value={baseRgb ? `${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}` : '-'}
+-                />
+-                <MetaPill
+-                  label="HSL"
+-                  value={baseHsl ? `${Math.round(baseHsl.h)}, ${baseHsl.s}%, ${baseHsl.l}%` : '-'}
+-                />
+-              </View>
+-
+-              <AppText variant="caption" color={theme.colors.mutedText}>
+-                {t('paletteGenerator.quickSwatches')}
+-              </AppText>
+-              <View style={styles.swatchRow}>
+-                {QUICK_SWATCHES.map((color) => (
+-                  <ColorSwatch
+-                    key={color}
+-                    color={color}
+-                    label={color}
+-                    onPress={() => onBaseColorChange(color)}
+-                    selected={normalizedBase === color}
+-                  />
+-                ))}
+-              </View>
+-            </>
++            <View style={styles.colorMetaRow}>
++              <MetaPill label="HEX" value={normalizedPrimary} />
++              <MetaPill
++                label="RGB"
++                value={baseRgb ? `${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}` : '-'}
++              />
++              <MetaPill
++                label="HSL"
++                value={baseHsl ? `${Math.round(baseHsl.h)}, ${baseHsl.s}%, ${baseHsl.l}%` : '-'}
++              />
++            </View>
+           ) : null}
+         </View>
+
+@@ -250,7 +262,12 @@ export default function PaletteGeneratorCard({
+               </AppText>
+               <View style={styles.swatchRow}>
+                 {harmonyColors.map((color) => (
+-                  <ColorSwatch key={color} color={color} label={color} onPress={() => onBaseColorChange(color)} />
++                  <ColorSwatch
++                    key={color}
++                    color={color}
++                    label={color}
++                    onPress={() => onBrandColorChange('primary', color)}
++                  />
+                 ))}
+               </View>
+             </>
+@@ -260,9 +277,9 @@ export default function PaletteGeneratorCard({
+
+       {advancedMode ? (
+         <>
+-          <VariationBlock title={t('paletteGenerator.tints')} colors={tints} onPick={onBaseColorChange} />
+-          <VariationBlock title={t('paletteGenerator.shades')} colors={shades} onPick={onBaseColorChange} />
+-          <VariationBlock title={t('paletteGenerator.tones')} colors={tones} onPick={onBaseColorChange} />
++          <VariationBlock title={t('paletteGenerator.tints')} colors={tints} onPick={(color) => onBrandColorChange('primary', color)} />
++          <VariationBlock title={t('paletteGenerator.shades')} colors={shades} onPick={(color) => onBrandColorChange('primary', color)} />
++          <VariationBlock title={t('paletteGenerator.tones')} colors={tones} onPick={(color) => onBrandColorChange('primary', color)} />
+         </>
+       ) : null}
+
+@@ -346,10 +363,86 @@ export default function PaletteGeneratorCard({
+
+         <UiPreview palette={palette} activeScheme={activeScheme} />
+       </View>
++
++      {pickerRow ? (
++        <AppColorPicker
++          visible={Boolean(activePicker)}
++          title={t('paletteGenerator.chooseColor')}
++          value={pickerRow.value || pickerRow.resolvedColor}
++          originalValue={pickerRow.resolvedColor}
++          suggestedColors={suggestedColors}
++          onApply={(value) => {
++            onBrandColorChange(pickerRow.key, value);
++            setActivePicker(null);
++          }}
++          onCancel={() => setActivePicker(null)}
++        />
++      ) : null}
+     </AppCard>
+   );
+ }
+
++function BrandColorCard({
++  description,
++  label,
++  onClear,
++  onOpen,
++  optional,
++  resolvedColor,
++  value,
++}: {
++  description: string;
++  label: string;
++  onClear: () => void;
++  onOpen: () => void;
++  optional: boolean;
++  resolvedColor: string;
++  value: string;
++}) {
++  const { theme } = useAppTheme();
++  const { t } = useTranslation();
++  const displayValue = value || t('paletteGenerator.automaticColor');
++
++  return (
++    <View
++      style={[
++        styles.brandColorCard,
++        {
++          backgroundColor: theme.colors.surfaceMuted,
++          borderColor: theme.colors.borderSubtle,
++        },
++      ]}
++    >
++      <View style={styles.headerRow}>
++        <View style={styles.flexBlock}>
++          <AppText bold>{label}</AppText>
++          <AppText variant="caption" color={theme.colors.mutedText}>
++            {description}
++          </AppText>
++        </View>
++        <View
++          style={[
++            styles.brandColorPreview,
++            {
++              backgroundColor: resolvedColor,
++              borderColor: theme.colors.borderStrong,
++            },
++          ]}
++        />
++      </View>
++      <AppText variant="caption" color={theme.colors.textSecondary}>
++        {displayValue}
++      </AppText>
++      <View style={styles.brandActions}>
++        <AppButton title={t('paletteGenerator.changeColor')} variant="secondary" onPress={onOpen} />
++        {optional && value ? (
++          <AppButton title={t('paletteGenerator.useAutomaticColor')} variant="neutral" onPress={onClear} />
++        ) : null}
++      </View>
++    </View>
++  );
++}
++
+ function VariationBlock({
+   colors,
+   onPick,
+@@ -539,11 +632,30 @@ function UiPreview({ activeScheme, palette }: { activeScheme: 'light' | 'dark';
+ }
+
+ const styles = StyleSheet.create({
+-  baseInputRow: {
+-    alignItems: 'flex-start',
++  brandActions: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 8,
++  },
++  brandColorCard: {
++    borderRadius: 14,
++    borderWidth: 1,
++    flex: 1,
++    gap: 10,
++    minWidth: 220,
++    padding: 12,
++  },
++  brandColorGrid: {
+     flexDirection: 'row',
++    flexWrap: 'wrap',
+     gap: 10,
+   },
++  brandColorPreview: {
++    borderRadius: 12,
++    borderWidth: 1,
++    height: 52,
++    width: 70,
++  },
+   basePreview: {
+     borderRadius: 14,
+     borderWidth: 1,
+@@ -578,6 +690,11 @@ const styles = StyleSheet.create({
+     gap: 10,
+     minWidth: 260,
+   },
++  controlColumnWide: {
++    flex: 1.5,
++    gap: 10,
++    minWidth: 320,
++  },
+   flexBlock: {
+     flex: 1,
+     minWidth: 0,
+@@ -602,9 +719,6 @@ const styles = StyleSheet.create({
+     gap: 12,
+     justifyContent: 'space-between',
+   },
+-  hexInput: {
+-    minWidth: 160,
+-  },
+   hexText: {
+     textAlign: 'center',
+   },
+diff --git a/docs/PRODUCT_C2_1_PALETTE_CONTRAST_GENERATOR.md b/docs/PRODUCT_C2_1_PALETTE_CONTRAST_GENERATOR.md
+index b1b6454..f84cc5b 100644
+--- a/docs/PRODUCT_C2_1_PALETTE_CONTRAST_GENERATOR.md
++++ b/docs/PRODUCT_C2_1_PALETTE_CONTRAST_GENERATOR.md
+@@ -215,3 +215,13 @@ Fecha: 2026-06-07
+ PRODUCT-C2.3 mantiene el generador tecnico de PRODUCT-C2.1, pero cambia el lenguaje de la experiencia principal a `Diseno de la aplicacion`. El color base pasa a explicarse como color principal de marca, la paleta sugerida usa nombres entendibles y la accion de aplicar/restaurar queda al final del flujo.
+
+ El generador avanzado sigue disponible, pero deja de ser el mensaje principal para usuario final.
++
++---
++
++## Continuidad PRODUCT-C2.4 - Tres colores de marca
++
++Fecha: 2026-06-07
++
++PRODUCT-C2.4 extiende la generacion de paleta para aceptar hasta tres colores de marca. El color base de PRODUCT-C2.1 sigue existiendo como color principal, pero ahora se puede complementar con secundario y acento sin editar tokens tecnicos.
++
++La generacion conserva la semantica de `success`, `warning` y `danger`, y el contraste visible ahora revisa principal, secundario, acento, fondo, superficie y estado reservado.
+diff --git a/docs/PRODUCT_C2_2_SIMPLIFIED_VISUAL_IDENTITY_FLOW.md b/docs/PRODUCT_C2_2_SIMPLIFIED_VISUAL_IDENTITY_FLOW.md
+index d5468c0..88e9bb9 100644
+--- a/docs/PRODUCT_C2_2_SIMPLIFIED_VISUAL_IDENTITY_FLOW.md
++++ b/docs/PRODUCT_C2_2_SIMPLIFIED_VISUAL_IDENTITY_FLOW.md
+@@ -181,3 +181,13 @@ La vista principal queda organizada como secuencia accionable para usuario admin
+ 6. aplicar o restaurar cambios.
+
+ El UI Kit tecnico, tokens, componentes, templates, variantes y detalles de contraste siguen disponibles en opciones avanzadas.
++
++---
++
++## Continuidad PRODUCT-C2.4 - Selector propio
++
++Fecha: 2026-06-07
++
++PRODUCT-C2.4 conserva la pantalla simplificada y reemplaza la experiencia principal de color nativo por un selector propio de la aplicacion. El flujo visible cambia de un solo color base a `Colores de marca`, con principal, secundario y acento.
++
++Las escalas, armonias detalladas, tokens tecnicos y datos RGB/HSL siguen en modo avanzado para no saturar la experiencia inicial.
+diff --git a/docs/PRODUCT_C2_3_GUIDED_APP_DESIGN_FLOW.md b/docs/PRODUCT_C2_3_GUIDED_APP_DESIGN_FLOW.md
+index 31164f6..edae29c 100644
+--- a/docs/PRODUCT_C2_3_GUIDED_APP_DESIGN_FLOW.md
++++ b/docs/PRODUCT_C2_3_GUIDED_APP_DESIGN_FLOW.md
+@@ -129,3 +129,21 @@ ko: leaves=1194 missing=0 extra=0
+ - No se agregan fuentes externas.
+ - La validacion de contraste sigue siendo basica.
+ - Las traducciones nuevas requieren revision nativa.
++
++---
++
++## Continuidad PRODUCT-C2.4 - Colores de marca
++
++Fecha: 2026-06-07
++
++PRODUCT-C2.4 mantiene el flujo guiado de `Diseno de la aplicacion`, pero cambia el paso de color principal por `Colores de marca`.
++
++La experiencia visible ahora permite configurar:
++
++1. color principal;
++2. color secundario;
++3. color de acento.
++
++El cambio evita que el selector nativo de Windows/navegador sea la experiencia principal. La seleccion se realiza con `AppColorPicker`, un panel propio con HEX, swatches, variaciones, aplicar, cancelar y restaurar color original.
++
++La paleta sugerida respeta los colores definidos por el usuario y completa los tokens restantes con reglas semanticas seguras.
+diff --git a/docs/PRODUCT_C2_4_CUSTOM_BRAND_COLOR_PICKER.md b/docs/PRODUCT_C2_4_CUSTOM_BRAND_COLOR_PICKER.md
+new file mode 100644
+index 0000000..7982b27
+--- /dev/null
++++ b/docs/PRODUCT_C2_4_CUSTOM_BRAND_COLOR_PICKER.md
+@@ -0,0 +1,158 @@
++# PRODUCT-C2.4 - Selector propio de colores de marca
++
++Fecha: 2026-06-07
++Rama: `feature/product-c2-4-custom-brand-color-picker`
++
++## Objetivo
++
++PRODUCT-C2.4 reemplaza la experiencia principal del selector nativo de navegador/Windows en `/ui-kit` por un selector visual propio de la aplicacion y extiende el flujo de identidad visual para trabajar con hasta tres colores de marca:
++
++- color principal;
++- color secundario;
++- color de acento.
++
++La fase no toca backend, no crea endpoints y no agrega persistencia por tenant. La aplicacion sigue usando los overrides locales existentes del sistema visual.
++
++## Problema detectado
++
++El flujo de PRODUCT-C2.3 ya comunicaba mejor el `Diseno de la aplicacion`, pero al cambiar el color principal se abria el selector nativo del sistema operativo. Eso generaba una ruptura visual:
++
++- la ventana no seguia light/dark ni presets de la app;
++- la experiencia se sentia tecnica y externa;
++- la seleccion de marca quedaba limitada a un solo color visible;
++- el usuario no podia configurar marcas con color secundario o acento sin tocar tokens avanzados.
++
++## Selector propio
++
++Se agrego `components/ui/AppColorPicker.tsx` como selector visual interno.
++
++El picker soporta:
++
++- panel/modal propio de la aplicacion;
++- muestra grande del color;
++- campo HEX controlado;
++- swatches sugeridos;
++- variaciones claras, oscuras y desaturadas;
++- aplicar color;
++- cancelar cambios;
++- restaurar color original;
++- estilos compatibles con light/dark y presets.
++
++El selector nativo ya no es la experiencia principal. Si en una fase futura se conserva un control nativo, debe quedar solo como fallback avanzado, no como accion principal.
++
++## Colores de marca
++
++La seccion visible cambia de `Color principal de marca` a `Colores de marca`.
++
++Se soportan tres entradas:
++
++- `Principal`: navegacion, botones principales y acciones clave.
++- `Secundario`: contraste, fondos fuertes o botones secundarios.
++- `Acento`: elementos destacados, estados o llamadas de atencion.
++
++Si el usuario define solo principal, el sistema genera secundario y acento con armonias. Si define dos o tres colores, la paleta sugerida respeta esos colores y completa los tokens semanticos restantes.
++
++## Generacion de paleta
++
++`theme/colorUtils.ts` mantiene la generacion semantica segura y ahora acepta `BrandColorInputs`.
++
++Reglas:
++
++- 1 color: `primary` usa el color principal y `secondary`/`accent` se generan por armonia.
++- 2 colores: `primary` y `secondary` se respetan; `accent` se genera.
++- 3 colores: `primary`, `secondary` y `accent` se respetan.
++- `success`, `warning` y `danger` mantienen semantica operativa segura y no se derivan ciegamente de la marca.
++- `background` y `surface` siguen dependiendo de light/dark para conservar legibilidad.
++
++## Contraste
++
++El resumen de contraste ahora contempla:
++
++- texto sobre principal;
++- texto sobre secundario;
++- texto sobre acento;
++- estado reservado/danger;
++- texto sobre fondo;
++- texto sobre superficie.
++
++Los ratios tecnicos siguen disponibles en opciones avanzadas. En la vista principal se muestra una lectura simple de `Correcto`, `Revisar` o `Bajo contraste`.
++
++## Preview
++
++La vista previa usa la paleta resultante con los tres colores de marca:
++
++- mini sidebar;
++- card;
++- boton primario;
++- boton secundario;
++- chip/acento;
++- input;
++- badge activo;
++- badge reservado;
++- aviso operativo.
++
++La preview se actualiza antes de aplicar cambios locales.
++
++## /appearance
++
++`/appearance` no duplica el generador. Conserva la tarjeta de acceso a `/ui-kit` y actualiza su copy para mencionar:
++
++- plantilla visual;
++- colores de marca;
++- vista previa.
++
++Los campos de branding existentes se mantienen intactos.
++
++## I18N
++
++Se agregaron y ajustaron claves `paletteGenerator.*` en:
++
++- `es`;
++- `en`;
++- `pt-BR`;
++- `fr`;
++- `ja`;
++- `zh`;
++- `ko`.
++
++Auditoria local de estructura:
++
++```text
++es: leaves=1213 missing=0 extra=0
++en: leaves=1213 missing=0 extra=0
++pt-BR: leaves=1213 missing=0 extra=0
++fr: leaves=1213 missing=0 extra=0
++ja: leaves=1213 missing=0 extra=0
++zh: leaves=1213 missing=0 extra=0
++ko: leaves=1213 missing=0 extra=0
++```
++
++Las traducciones nuevas son base tecnica y requieren revision humana/nativa antes de release internacional.
++
++## Validacion manual esperada
++
++1. Entrar con `qa.admin`.
++2. Abrir `/ui-kit`.
++3. Ir a `Colores de marca`.
++4. Cambiar color principal.
++5. Confirmar que no se abre la ventana nativa de Windows como experiencia principal.
++6. Cambiar color secundario.
++7. Cambiar color de acento.
++8. Ver paleta sugerida.
++9. Revisar contraste y legibilidad.
++10. Ver preview.
++11. Aplicar paleta localmente.
++12. Abrir `/live` o `/customers` y confirmar tema aplicado.
++13. Volver a `/ui-kit`.
++14. Restaurar plantilla.
++15. Validar light/dark.
++16. Validar mobile/tablet.
++
++## Limitaciones
++
++- No hay persistencia backend ni por tenant.
++- No se implementa color wheel complejo.
++- No se instala ninguna libreria externa.
++- No se agregan fuentes externas.
++- El picker nativo queda fuera de la experiencia principal.
++- La validacion de contraste sigue siendo basica y no reemplaza auditoria completa de accesibilidad.
+diff --git a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+index e8281ca..ce1d923 100644
+--- a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
++++ b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+@@ -365,3 +365,13 @@ Fecha: 2026-06-07
+ PRODUCT-C2.3 reposiciona `/ui-kit` como pantalla de `Diseno de la aplicacion`: la configuracion visible ahora explica que se cambia la plantilla visual, el color principal, la paleta sugerida, contraste, legibilidad y preview antes de aplicar cambios locales.
+
+ El sistema visual premium conserva presets, light/dark, overrides locales y modo avanzado. QA debe validar que el usuario entienda la secuencia sin abrir opciones tecnicas.
++
++---
++
++## Continuidad PRODUCT-C2.4 - Selector propio y colores de marca
++
++Fecha: 2026-06-07
++
++PRODUCT-C2.4 agrega un selector propio de color para `/ui-kit` y evita que la experiencia principal dependa del picker nativo de navegador/Windows. El flujo de diseno visual soporta color principal, secundario y acento, con preview y contraste antes de aplicar localmente.
++
++QA debe validar que el panel propio respete light/dark, presets, responsive y que los tres colores se reflejen en sidebar, cards, botones, chips/acento, badges y estados sin perder legibilidad.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index 94ae848..5ecd1e3 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -291,3 +291,20 @@ Agregar a la corrida manual de sistema visual:
+ - restaurar plantilla;
+ - abrir opciones avanzadas y confirmar que el contenido tecnico no satura por defecto;
+ - abrir `/appearance` y confirmar tarjeta `Diseno de la aplicacion` con boton `Abrir editor visual`.
++
++## Nota PRODUCT-C2.4
++
++Agregar a la corrida manual de sistema visual:
++
++- abrir `/ui-kit`;
++- ir a `Colores de marca`;
++- cambiar color principal y confirmar que no se abre la ventana nativa de Windows como experiencia principal;
++- cambiar color secundario;
++- cambiar color de acento;
++- confirmar que la paleta sugerida respeta los colores definidos;
++- revisar contraste de principal, secundario, acento, fondo, superficie y reservado;
++- confirmar que la preview refleja sidebar, card, boton primario, boton secundario, chip/acento, badge activo y badge reservado;
++- aplicar paleta localmente;
++- abrir `/live` o `/customers` y confirmar tema aplicado;
++- volver a `/ui-kit` y restaurar plantilla;
++- validar light/dark y mobile/tablet.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index f2e95b8..4db1740 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -1096,7 +1096,7 @@
+     "flowSubtitle": "Follow these steps: template, base color, palette, contrast, preview, and local application.",
+     "flowSteps": {
+       "template": "Choose a visual template",
+-      "baseColor": "Choose the main color",
++      "baseColor": "Brand colors",
+       "palette": "Review the suggested palette",
+       "contrast": "Review contrast and readability",
+       "preview": "Check the preview",
+@@ -1174,7 +1174,8 @@
+       "danger": "Reserved status",
+       "background": "Text on background",
+       "surface": "Text on cards",
+-      "button": "Main button"
++      "button": "Main button",
++      "secondary": "Secondary color"
+     },
+     "tokens": {
+       "primary": "Main",
+@@ -1198,8 +1199,26 @@
+     "previewReservedBadge": "Reserved",
+     "previewNotice": "Sample operational notice.",
+     "appearanceCardTitle": "Application design",
+-    "appearanceCardHelp": "Configure colors, visual template, and preview without duplicating the generator on this screen.",
+-    "openGenerator": "Open visual editor"
++    "appearanceCardHelp": "Configure visual template, brand colors, and preview without duplicating the generator on this screen.",
++    "openGenerator": "Open visual editor",
++    "brandColorsTitle": "Brand colors",
++    "brandColorsHelp": "You can use only one main color or add secondary and accent colors if your brand has them.",
++    "brandColorPrimary": "Main color",
++    "brandColorPrimaryHelp": "Used for navigation, primary buttons, and key actions.",
++    "brandColorSecondary": "Secondary color",
++    "brandColorSecondaryHelp": "Used for contrast, strong backgrounds, or secondary buttons.",
++    "brandColorAccent": "Accent color",
++    "brandColorAccentHelp": "Used to highlight elements, states, or calls to attention.",
++    "changeColor": "Change color",
++    "chooseColor": "Choose color",
++    "chooseColorHelp": "Select a swatch, adjust the HEX value, or use a generated variation.",
++    "applyColor": "Apply color",
++    "useThisColor": "Use this color",
++    "restoreOriginalColor": "Restore original color",
++    "automaticColor": "Automatic",
++    "useAutomaticColor": "Use automatic",
++    "suggestedSwatches": "Suggested swatches",
++    "colorVariations": "Color variations"
+   },
+   "usersForm": {
+     "newTitle": "New user",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index 6433eef..397f98c 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -1096,7 +1096,7 @@
+     "flowSubtitle": "Sigue estos pasos: plantilla, color base, paleta, contraste, vista previa y aplicacion local.",
+     "flowSteps": {
+       "template": "Elige una plantilla visual",
+-      "baseColor": "Elige el color principal",
++      "baseColor": "Colores de marca",
+       "palette": "Revisa la paleta sugerida",
+       "contrast": "Revisa contraste y legibilidad",
+       "preview": "Mira la vista previa",
+@@ -1174,7 +1174,8 @@
+       "danger": "Estado reservado",
+       "background": "Texto sobre fondo",
+       "surface": "Texto sobre tarjetas",
+-      "button": "Boton principal"
++      "button": "Boton principal",
++      "secondary": "Color secundario"
+     },
+     "tokens": {
+       "primary": "Principal",
+@@ -1198,8 +1199,26 @@
+     "previewReservedBadge": "Reservada",
+     "previewNotice": "Aviso operativo de ejemplo.",
+     "appearanceCardTitle": "Diseno de la aplicacion",
+-    "appearanceCardHelp": "Configura colores, plantilla visual y vista previa sin duplicar el generador en esta pantalla.",
+-    "openGenerator": "Abrir editor visual"
++    "appearanceCardHelp": "Configura plantilla visual, colores de marca y vista previa sin duplicar el generador en esta pantalla.",
++    "openGenerator": "Abrir editor visual",
++    "brandColorsTitle": "Colores de marca",
++    "brandColorsHelp": "Puedes usar solo un color principal o agregar colores secundario y acento si tu marca los tiene.",
++    "brandColorPrimary": "Color principal",
++    "brandColorPrimaryHelp": "Se usa para navegacion, botones principales y acciones clave.",
++    "brandColorSecondary": "Color secundario",
++    "brandColorSecondaryHelp": "Se usa para contraste, fondos fuertes o botones secundarios.",
++    "brandColorAccent": "Color de acento",
++    "brandColorAccentHelp": "Se usa para resaltar elementos, estados o llamadas de atencion.",
++    "changeColor": "Cambiar color",
++    "chooseColor": "Elegir color",
++    "chooseColorHelp": "Selecciona una muestra, ajusta el HEX o usa una variacion generada.",
++    "applyColor": "Aplicar color",
++    "useThisColor": "Usar este color",
++    "restoreOriginalColor": "Restaurar color original",
++    "automaticColor": "Automatico",
++    "useAutomaticColor": "Usar automatico",
++    "suggestedSwatches": "Muestras sugeridas",
++    "colorVariations": "Variaciones del color"
+   },
+   "usersForm": {
+     "newTitle": "Nuevo usuario",
+diff --git a/locales/fr/common.json b/locales/fr/common.json
+index 0dfd5e0..af77284 100644
+--- a/locales/fr/common.json
++++ b/locales/fr/common.json
+@@ -1089,7 +1089,7 @@
+     "flowSubtitle": "Suivez ces étapes : modèle, couleur de base, palette, contraste, aperçu et application locale.",
+     "flowSteps": {
+       "template": "Choisissez un modele visuel",
+-      "baseColor": "Choisissez la couleur principale",
++      "baseColor": "Couleurs de marque",
+       "palette": "Verifiez la palette suggeree",
+       "contrast": "Verifiez contraste et lisibilite",
+       "preview": "Regardez l apercu",
+@@ -1150,7 +1150,8 @@
+       "danger": "Etat reserve",
+       "background": "Texte sur fond",
+       "surface": "Texte sur cartes",
+-      "button": "Bouton principal"
++      "button": "Bouton principal",
++      "secondary": "Couleur secondaire"
+     },
+     "tokens": {
+       "primary": "Principal",
+@@ -1172,7 +1173,7 @@
+     "previewReservedBadge": "Réservé",
+     "previewNotice": "Avis opérationnel d'exemple.",
+     "appearanceCardTitle": "Conception de l'application",
+-    "appearanceCardHelp": "Configurez les couleurs, le modele visuel et l apercu sans dupliquer le generateur sur cet ecran.",
++    "appearanceCardHelp": "Configurez le modele visuel, les couleurs de marque et l apercu sans dupliquer le generateur sur cet ecran.",
+     "openGenerator": "Ouvrir l'editeur visuel",
+     "loading": "Chargement de la conception de l'application...",
+     "appDesignTitle": "Conception de l'application",
+@@ -1199,7 +1200,25 @@
+     "legibilityHelp": "Avant d appliquer la palette, verifiez que les textes et les boutons sont faciles a lire.",
+     "lowContrastApplyWarning": "Cette palette contient des contrastes a verifier avant application.",
+     "appPreviewTitle": "Apercu de l'application",
+-    "appPreviewHelp": "Voici comment les couleurs apparaitront dans les ecrans reels du systeme."
++    "appPreviewHelp": "Voici comment les couleurs apparaitront dans les ecrans reels du systeme.",
++    "brandColorsTitle": "Couleurs de marque",
++    "brandColorsHelp": "Vous pouvez utiliser une seule couleur principale ou ajouter des couleurs secondaire et accent si votre marque en dispose.",
++    "brandColorPrimary": "Couleur principale",
++    "brandColorPrimaryHelp": "Utilisee pour la navigation, les boutons principaux et les actions cles.",
++    "brandColorSecondary": "Couleur secondaire",
++    "brandColorSecondaryHelp": "Utilisee pour le contraste, les fonds forts ou les boutons secondaires.",
++    "brandColorAccent": "Couleur accent",
++    "brandColorAccentHelp": "Utilisee pour mettre en valeur des elements, des etats ou des appels a l attention.",
++    "changeColor": "Changer la couleur",
++    "chooseColor": "Choisir une couleur",
++    "chooseColorHelp": "Selectionnez un echantillon, ajustez le HEX ou utilisez une variation generee.",
++    "applyColor": "Appliquer la couleur",
++    "useThisColor": "Utiliser cette couleur",
++    "restoreOriginalColor": "Restaurer la couleur originale",
++    "automaticColor": "Automatique",
++    "useAutomaticColor": "Utiliser automatique",
++    "suggestedSwatches": "Echantillons suggeres",
++    "colorVariations": "Variations de couleur"
+   },
+   "usersForm": {
+     "newTitle": "Nouveau",
+diff --git a/locales/ja/common.json b/locales/ja/common.json
+index 18f1aec..8c30d74 100644
+--- a/locales/ja/common.json
++++ b/locales/ja/common.json
+@@ -1089,7 +1089,7 @@
+     "flowSubtitle": "テンプレート、ベースカラー、パレット、コントラスト、プレビュー、適用の順で進めます。",
+     "flowSteps": {
+       "template": "??????????????",
+-      "baseColor": "?????????",
++      "baseColor": "???????",
+       "palette": "?????????",
+       "contrast": "???????????????",
+       "preview": "????????",
+@@ -1150,7 +1150,8 @@
+       "danger": "??????",
+       "background": "????????",
+       "surface": "?????????",
+-      "button": "??????"
++      "button": "??????",
++      "secondary": "????????"
+     },
+     "tokens": {
+       "primary": "???",
+@@ -1172,7 +1173,7 @@
+     "previewReservedBadge": "予約済み",
+     "previewNotice": "サンプル運用通知。",
+     "appearanceCardTitle": "????????",
+-    "appearanceCardHelp": "?????????????????????????????????????",
++    "appearanceCardHelp": "????????????????????????????????????????????????",
+     "openGenerator": "?????????????",
+     "loading": "?????????????...",
+     "appDesignTitle": "????????",
+@@ -1199,7 +1200,25 @@
+     "legibilityHelp": "???????????????????????????????",
+     "lowContrastApplyWarning": "?????????????????????????????",
+     "appPreviewTitle": "?????????",
+-    "appPreviewHelp": "?????????????????????"
++    "appPreviewHelp": "?????????????????????",
++    "brandColorsTitle": "???????",
++    "brandColorsHelp": "?????????????????????????????????????????????",
++    "brandColorPrimary": "??????",
++    "brandColorPrimaryHelp": "????????????????????????",
++    "brandColorSecondary": "????????",
++    "brandColorSecondaryHelp": "??????????????????????????",
++    "brandColorAccent": "????????",
++    "brandColorAccentHelp": "?????????????????????",
++    "changeColor": "????",
++    "chooseColor": "????",
++    "chooseColorHelp": "??????HEX????????????????????????",
++    "applyColor": "????",
++    "useThisColor": "??????",
++    "restoreOriginalColor": "??????",
++    "automaticColor": "??",
++    "useAutomaticColor": "?????",
++    "suggestedSwatches": "?????????",
++    "colorVariations": "?????????"
+   },
+   "usersForm": {
+     "newTitle": "新規",
+diff --git a/locales/ko/common.json b/locales/ko/common.json
+index 915a38a..6333c78 100644
+--- a/locales/ko/common.json
++++ b/locales/ko/common.json
+@@ -1089,7 +1089,7 @@
+     "flowSubtitle": "템플릿, 기본 색상, 팔레트, 대비, 미리보기, 로컬 적용 순서로 진행합니다.",
+     "flowSteps": {
+       "template": "?? ??? ??",
+-      "baseColor": "?? ?? ??",
++      "baseColor": "??? ??",
+       "palette": "?? ??? ??",
+       "contrast": "??? ??? ??",
+       "preview": "?? ?? ??",
+@@ -1150,7 +1150,8 @@
+       "danger": "?? ??",
+       "background": "?? ? ???",
+       "surface": "?? ? ???",
+-      "button": "?? ??"
++      "button": "?? ??",
++      "secondary": "?? ??"
+     },
+     "tokens": {
+       "primary": "??",
+@@ -1172,7 +1173,7 @@
+     "previewReservedBadge": "예약됨",
+     "previewNotice": "예시 운영 알림.",
+     "appearanceCardTitle": "? ???",
+-    "appearanceCardHelp": "? ???? ???? ???? ?? ??, ?? ???, ?? ??? ?????.",
++    "appearanceCardHelp": "? ???? ???? ???? ?? ?? ???, ??? ??, ?? ??? ?????.",
+     "openGenerator": "?? ??? ??",
+     "loading": "? ???? ???? ?...",
+     "appDesignTitle": "? ???",
+@@ -1199,7 +1200,25 @@
+     "legibilityHelp": "???? ???? ?? ???? ??? ?? ??? ?????.",
+     "lowContrastApplyWarning": "? ????? ?? ?? ???? ? ??? ????.",
+     "appPreviewTitle": "? ?? ??",
+-    "appPreviewHelp": "?? ??? ??? ??? ??? ?? ?????."
++    "appPreviewHelp": "?? ??? ??? ??? ??? ?? ?????.",
++    "brandColorsTitle": "??? ??",
++    "brandColorsHelp": "?? ?? ??? ????? ???? ?? ?? ??? ?? ??? ??? ? ????.",
++    "brandColorPrimary": "?? ??",
++    "brandColorPrimaryHelp": "?????, ?? ??, ?? ??? ?????.",
++    "brandColorSecondary": "?? ??",
++    "brandColorSecondaryHelp": "??, ?? ?? ?? ?? ??? ?????.",
++    "brandColorAccent": "?? ??",
++    "brandColorAccentHelp": "??, ?? ?? ?? ??? ???? ? ?????.",
++    "changeColor": "?? ??",
++    "chooseColor": "?? ??",
++    "chooseColorHelp": "?? ??, HEX ? ?? ??? ??? ?????.",
++    "applyColor": "?? ??",
++    "useThisColor": "? ?? ??",
++    "restoreOriginalColor": "?? ?? ??",
++    "automaticColor": "??",
++    "useAutomaticColor": "?? ??",
++    "suggestedSwatches": "?? ??",
++    "colorVariations": "?? ??"
+   },
+   "usersForm": {
+     "newTitle": "새",
+diff --git a/locales/pt-BR/common.json b/locales/pt-BR/common.json
+index 62af3f6..49951ce 100644
+--- a/locales/pt-BR/common.json
++++ b/locales/pt-BR/common.json
+@@ -1089,7 +1089,7 @@
+     "flowSubtitle": "Siga estes passos: modelo, cor base, paleta, contraste, prévia e aplicação local.",
+     "flowSteps": {
+       "template": "Escolha um modelo visual",
+-      "baseColor": "Escolha a cor principal",
++      "baseColor": "Cores da marca",
+       "palette": "Revise a paleta sugerida",
+       "contrast": "Revise contraste e legibilidade",
+       "preview": "Veja a previa",
+@@ -1150,7 +1150,8 @@
+       "danger": "Estado reservado",
+       "background": "Texto sobre fundo",
+       "surface": "Texto sobre cartoes",
+-      "button": "Botao principal"
++      "button": "Botao principal",
++      "secondary": "Cor secundaria"
+     },
+     "tokens": {
+       "primary": "Principal",
+@@ -1172,7 +1173,7 @@
+     "previewReservedBadge": "Reservado",
+     "previewNotice": "Aviso operacional de exemplo.",
+     "appearanceCardTitle": "Design do aplicativo",
+-    "appearanceCardHelp": "Configure cores, modelo visual e previa sem duplicar o gerador nesta tela.",
++    "appearanceCardHelp": "Configure modelo visual, cores da marca e previa sem duplicar o gerador nesta tela.",
+     "openGenerator": "Abrir editor visual",
+     "loading": "Carregando design do aplicativo...",
+     "appDesignTitle": "Design do aplicativo",
+@@ -1199,7 +1200,25 @@
+     "legibilityHelp": "Antes de aplicar a paleta, revise se textos e botoes sao faceis de ler.",
+     "lowContrastApplyWarning": "Esta paleta tem contrastes que devem ser revisados antes de aplicar.",
+     "appPreviewTitle": "Previa do aplicativo",
+-    "appPreviewHelp": "Assim as cores ficarao quando aplicadas em telas reais do sistema."
++    "appPreviewHelp": "Assim as cores ficarao quando aplicadas em telas reais do sistema.",
++    "brandColorsTitle": "Cores da marca",
++    "brandColorsHelp": "Voce pode usar apenas uma cor principal ou adicionar cores secundaria e de acento se sua marca tiver.",
++    "brandColorPrimary": "Cor principal",
++    "brandColorPrimaryHelp": "Usada para navegacao, botoes principais e acoes chave.",
++    "brandColorSecondary": "Cor secundaria",
++    "brandColorSecondaryHelp": "Usada para contraste, fundos fortes ou botoes secundarios.",
++    "brandColorAccent": "Cor de acento",
++    "brandColorAccentHelp": "Usada para destacar elementos, estados ou chamadas de atencao.",
++    "changeColor": "Alterar cor",
++    "chooseColor": "Escolher cor",
++    "chooseColorHelp": "Selecione uma amostra, ajuste o HEX ou use uma variacao gerada.",
++    "applyColor": "Aplicar cor",
++    "useThisColor": "Usar esta cor",
++    "restoreOriginalColor": "Restaurar cor original",
++    "automaticColor": "Automatico",
++    "useAutomaticColor": "Usar automatico",
++    "suggestedSwatches": "Amostras sugeridas",
++    "colorVariations": "Variacoes da cor"
+   },
+   "usersForm": {
+     "newTitle": "Novo",
+diff --git a/locales/zh/common.json b/locales/zh/common.json
+index 7a4e123..4b451be 100644
+--- a/locales/zh/common.json
++++ b/locales/zh/common.json
+@@ -1089,7 +1089,7 @@
+     "flowSubtitle": "按模板、基础色、调色板、对比度、预览和本地应用的顺序操作。",
+     "flowSteps": {
+       "template": "??????",
+-      "baseColor": "?????",
++      "baseColor": "????",
+       "palette": "???????",
+       "contrast": "?????????",
+       "preview": "????",
+@@ -1150,7 +1150,8 @@
+       "danger": "????",
+       "background": "??????",
+       "surface": "??????",
+-      "button": "???"
++      "button": "???",
++      "secondary": "???"
+     },
+     "tokens": {
+       "primary": "??",
+@@ -1172,7 +1173,7 @@
+     "previewReservedBadge": "已预留",
+     "previewNotice": "示例运营提示。",
+     "appearanceCardTitle": "????",
+-    "appearanceCardHelp": "????????????????????????",
++    "appearanceCardHelp": "??????????????????????????",
+     "openGenerator": "???????",
+     "loading": "????????...",
+     "appDesignTitle": "????",
+@@ -1199,7 +1200,25 @@
+     "legibilityHelp": "????????????????????",
+     "lowContrastApplyWarning": "??????????????????",
+     "appPreviewTitle": "????",
+-    "appPreviewHelp": "????????????????????"
++    "appPreviewHelp": "????????????????????",
++    "brandColorsTitle": "????",
++    "brandColorsHelp": "?????????????????????????????",
++    "brandColorPrimary": "???",
++    "brandColorPrimaryHelp": "??????????????",
++    "brandColorSecondary": "???",
++    "brandColorSecondaryHelp": "??????????????",
++    "brandColorAccent": "???",
++    "brandColorAccentHelp": "?????????????",
++    "changeColor": "????",
++    "chooseColor": "????",
++    "chooseColorHelp": "???????HEX????????????",
++    "applyColor": "????",
++    "useThisColor": "?????",
++    "restoreOriginalColor": "?????",
++    "automaticColor": "??",
++    "useAutomaticColor": "????",
++    "suggestedSwatches": "????",
++    "colorVariations": "????"
+   },
+   "usersForm": {
+     "newTitle": "新建",
+diff --git a/theme/colorUtils.ts b/theme/colorUtils.ts
+index 9cd9523..458061a 100644
+--- a/theme/colorUtils.ts
++++ b/theme/colorUtils.ts
+@@ -23,6 +23,12 @@ export type SemanticPalette = {
+   surface: string;
+ };
+
++export type BrandColorInputs = {
++  primary?: string | null;
++  secondary?: string | null;
++  accent?: string | null;
++};
++
+ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+ const normalizeHue = (hue: number) => ((hue % 360) + 360) % 360;
+ const toHexChannel = (value: number) => clamp(Math.round(value), 0, 255).toString(16).padStart(2, '0');
+@@ -219,17 +225,30 @@ export function generateSemanticPalette(
+   value: string,
+   harmony: HarmonyType,
+   scheme: 'light' | 'dark',
++  brandColors: BrandColorInputs = {},
+ ): SemanticPalette {
+-  const base = normalizeHexColor(value);
++  const base = normalizeHexColor(brandColors.primary ?? value);
+   const baseHsl = hexToHsl(base) ?? hexToHsl('#2563EB')!;
+   const harmonyColors = generateHarmonyColors(base, harmony);
+   const tone = generateTones(base, 4);
+   const shade = generateShades(base, 4);
++  const secondary =
++    brandColors.secondary && isValidHexColor(brandColors.secondary)
++      ? normalizeHexColor(brandColors.secondary)
++      : scheme === 'dark'
++        ? tone[1]
++        : shade[1];
++  const accent =
++    brandColors.accent && isValidHexColor(brandColors.accent)
++      ? normalizeHexColor(brandColors.accent)
++      : harmony === 'monochromatic'
++        ? tone[2]
++        : harmonyColors[1];
+
+   return {
+     primary: base,
+-    secondary: scheme === 'dark' ? tone[1] : shade[1],
+-    accent: harmony === 'monochromatic' ? tone[2] : harmonyColors[1],
++    secondary,
++    accent,
+     success: scheme === 'dark' ? '#86EFAC' : '#15803D',
+     warning: scheme === 'dark' ? '#FBBF24' : '#B45309',
+     danger: scheme === 'dark' ? '#FCA5A5' : '#B91C1C',
