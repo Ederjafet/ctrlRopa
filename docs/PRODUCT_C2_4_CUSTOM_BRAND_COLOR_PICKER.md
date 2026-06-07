@@ -173,3 +173,16 @@ Cambios principales:
 - `Identidad visual local` se renombra a `Editor avanzado de tokens locales`;
 - `Design tokens` queda como diagnostico tecnico dentro de avanzado;
 - el bloque visible de contraste se reduce a `Legibilidad`.
+
+---
+
+## Continuidad PRODUCT-C2.6 - Modal compacto
+
+Fecha: 2026-06-07
+
+PRODUCT-C2.6 mantiene el selector propio de PRODUCT-C2.4, pero reduce su peso visual:
+
+- el header muestra el color que se esta editando;
+- las variaciones se organizan en pestañas;
+- las acciones quedan visibles fuera del scroll;
+- las keys de swatches usan seccion, HEX e indice para evitar duplicados.

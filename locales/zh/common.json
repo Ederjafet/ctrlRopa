@@ -1208,7 +1208,7 @@
     "brandColorSecondary": "???",
     "brandColorSecondaryHelp": "??????????????",
     "brandColorAccent": "???",
-    "brandColorAccentHelp": "?????????????",
+    "brandColorAccentHelp": "这是品牌的第三种颜色，用于突出细节、标签、提示和重点元素。",
     "changeColor": "????",
     "chooseColor": "????",
     "chooseColorHelp": "选择色块、调整 HEX，或使用浅色、深色、低饱和变化。",
@@ -1243,7 +1243,16 @@
     "designTokensTitle": "Design tokens",
     "designTokensHelp": "Token 是应用组件使用的内部变量，显示用于诊断和技术调整。",
     "semanticTokensTitle": "当前主题的语义 token",
-    "semanticTokensHelp": "AppShell、LIVE 和详情页使用的表面、文本、输入和状态。"
+    "semanticTokensHelp": "AppShell、LIVE 和详情页使用的表面、文本、输入和状态。",
+    "harmonySecondaryAccentHelp": "色彩和谐可帮助建议辅助色和强调色。",
+    "harmonyAccentHelp": "会保留你的辅助色。色彩和谐只用于建议强调色。",
+    "swatchesTab": "色块",
+    "chooseBrandColor": {
+      "primary": "选择主色",
+      "secondary": "选择辅助色",
+      "accent": "选择强调色"
+    },
+    "harmonySecondaryHelp": "会保留你的强调色。色彩和谐只用于建议辅助色。"
   },
   "usersForm": {
     "newTitle": "新建",

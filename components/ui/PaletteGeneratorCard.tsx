@@ -144,10 +144,15 @@ export default function PaletteGeneratorCard({
     ? contrastRows
     : contrastRows.filter((row) => ['button', 'background', 'danger'].includes(row.key));
   const tokenEntries = Object.entries(palette) as [EditableVisualTokenKey, string][];
-  const customBrandColorCount = [normalizedSecondary, normalizedAccent].filter(Boolean).length;
-  const harmonyNoteKey = customBrandColorCount > 0
+  const hasSecondary = Boolean(normalizedSecondary);
+  const hasAccent = Boolean(normalizedAccent);
+  const harmonyNoteKey = hasSecondary && hasAccent
     ? 'paletteGenerator.usingDefinedBrandColors'
-    : 'paletteGenerator.harmonySuggestionHelp';
+    : hasSecondary
+      ? 'paletteGenerator.harmonyAccentHelp'
+      : hasAccent
+        ? 'paletteGenerator.harmonySecondaryHelp'
+        : 'paletteGenerator.harmonySecondaryAccentHelp';
   const brandColorRows = [
     {
       key: 'primary' as const,
@@ -269,9 +274,9 @@ export default function PaletteGeneratorCard({
               {t('paletteGenerator.harmonyHelp')}
             </AppText>
             <View style={styles.swatchRow}>
-              {harmonyColors.map((color) => (
+              {harmonyColors.map((color, index) => (
                 <ColorSwatch
-                  key={color}
+                  key={`harmony-${color}-${index}`}
                   color={color}
                   label={color}
                   onPress={() => onBrandColorChange('primary', color)}
@@ -365,8 +370,9 @@ export default function PaletteGeneratorCard({
 
       {pickerRow ? (
         <AppColorPicker
+          colorName={pickerRow.label}
           visible={Boolean(activePicker)}
-          title={t('paletteGenerator.chooseColor')}
+          title={t(`paletteGenerator.chooseBrandColor.${pickerRow.key}`)}
           value={pickerRow.value || pickerRow.resolvedColor}
           originalValue={pickerRow.resolvedColor}
           suggestedColors={suggestedColors}

@@ -1208,7 +1208,7 @@
     "brandColorSecondary": "?? ??",
     "brandColorSecondaryHelp": "??, ?? ?? ?? ?? ??? ?????.",
     "brandColorAccent": "?? ??",
-    "brandColorAccentHelp": "??, ?? ?? ?? ??? ???? ? ?????.",
+    "brandColorAccentHelp": "브랜드의 세 번째 색상입니다. 세부 요소, 칩, 주목 요소, 강조 요소에 사용됩니다.",
     "changeColor": "?? ??",
     "chooseColor": "?? ??",
     "chooseColorHelp": "스와치, HEX 또는 밝은/어두운/저채도 변형을 선택합니다.",
@@ -1243,7 +1243,16 @@
     "designTokensTitle": "Design tokens",
     "designTokensHelp": "토큰은 애플리케이션 컴포넌트가 사용하는 내부 변수입니다. 진단과 기술 조정을 위해 표시됩니다.",
     "semanticTokensTitle": "활성 테마의 의미 토큰",
-    "semanticTokensHelp": "AppShell, LIVE, 상세 화면에서 사용하는 표면, 텍스트, 입력, 상태입니다."
+    "semanticTokensHelp": "AppShell, LIVE, 상세 화면에서 사용하는 표면, 텍스트, 입력, 상태입니다.",
+    "harmonySecondaryAccentHelp": "색상 조화는 보조색과 강조색을 제안하는 데 도움을 줍니다.",
+    "harmonyAccentHelp": "보조색은 그대로 사용됩니다. 색상 조화는 강조색 제안에만 사용됩니다.",
+    "swatchesTab": "스와치",
+    "chooseBrandColor": {
+      "primary": "기본 색상 선택",
+      "secondary": "보조 색상 선택",
+      "accent": "강조 색상 선택"
+    },
+    "harmonySecondaryHelp": "강조색은 그대로 사용됩니다. 색상 조화는 보조색 제안에만 사용됩니다."
   },
   "usersForm": {
     "newTitle": "새",

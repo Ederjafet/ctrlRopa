@@ -323,3 +323,18 @@ Agregar a la corrida manual de sistema visual:
 - aplicar paleta localmente;
 - restaurar plantilla;
 - validar light/dark y mobile/tablet.
+
+## Nota PRODUCT-C2.6
+
+Agregar a la corrida manual de sistema visual:
+
+- abrir `/ui-kit`;
+- definir solo principal y confirmar que armonia se presenta como ayuda para sugerir secundario/acento;
+- definir principal + secundario y confirmar que armonia solo sugiere acento;
+- definir principal + secundario + acento y confirmar mensaje `Usando colores de marca definidos`;
+- abrir `Cambiar color` para principal, secundario y acento;
+- confirmar header especifico del color editado;
+- revisar tabs `Muestras`, `Claros`, `Oscuros`, `Desaturados`;
+- confirmar que no aparece warning `Encountered two children with the same key`;
+- aplicar color y confirmar que la paleta/preview se actualizan;
+- validar light/dark y mobile/tablet.

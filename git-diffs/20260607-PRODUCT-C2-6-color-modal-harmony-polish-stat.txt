@@ -1,0 +1,17 @@
+﻿ components/ui/AppColorPicker.tsx                   | 163 +++++++++++----------
+ components/ui/PaletteGeneratorCard.tsx             |  18 ++-
+ docs/PRODUCT_C2_3_GUIDED_APP_DESIGN_FLOW.md        |   8 +
+ docs/PRODUCT_C2_4_CUSTOM_BRAND_COLOR_PICKER.md     |  13 ++
+ docs/PRODUCT_C2_5_BRAND_EDITOR_SIMPLIFICATION.md   |  13 ++
+ docs/PRODUCT_C2_6_COLOR_MODAL_HARMONY_POLISH.md    | 140 ++++++++++++++++++
+ docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md            |   8 +
+ docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md              |  15 ++
+ locales/en/common.json                             |  19 ++-
+ locales/es/common.json                             |  13 +-
+ locales/fr/common.json                             |  13 +-
+ locales/ja/common.json                             |  13 +-
+ locales/ko/common.json                             |  13 +-
+ locales/pt-BR/common.json                          |  13 +-
+ locales/zh/common.json                             |  13 +-
+ ...-modal-harmony-polish-report-20260607-114939.md |  73 +++++++++
+ 16 files changed, 449 insertions(+), 99 deletions(-)

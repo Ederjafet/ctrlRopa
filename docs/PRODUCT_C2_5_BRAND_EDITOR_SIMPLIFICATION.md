@@ -158,3 +158,16 @@ Las traducciones nuevas son base tecnica y requieren revision humana/nativa ante
 - No se implementa ajuste automatico de contraste en esta fase.
 - No se instalan dependencias externas.
 - No se agregan fuentes externas.
+
+---
+
+## Continuidad PRODUCT-C2.6 - Armonia y modal
+
+Fecha: 2026-06-07
+
+PRODUCT-C2.6 conserva la simplificacion de PRODUCT-C2.5 y pule dos puntos visuales:
+
+- armonia se comunica como sugerencia segun los colores faltantes, no como limitante;
+- `AppColorPicker` se compacta con pestañas de muestras, claros, oscuros y desaturados.
+
+Tambien corrige keys duplicadas en listas de colores para evitar warnings de React en mobile.

@@ -1213,7 +1213,7 @@
     "brandColorSecondary": "Color secundario",
     "brandColorSecondaryHelp": "Se usa para contraste, fondos fuertes o botones secundarios.",
     "brandColorAccent": "Color de acento",
-    "brandColorAccentHelp": "Se usa para resaltar elementos, estados o llamadas de atencion.",
+    "brandColorAccentHelp": "Es el tercer color de tu marca. Se usa para resaltar detalles, chips, llamadas de atencion y elementos destacados.",
     "changeColor": "Cambiar color",
     "chooseColor": "Elegir color",
     "chooseColorHelp": "Selecciona una muestra, ajusta el HEX o usa una variacion clara, oscura o desaturada.",
@@ -1243,7 +1243,16 @@
     "designTokensTitle": "Design tokens",
     "designTokensHelp": "Los tokens son variables internas que usan los componentes de la aplicacion. Se muestran para diagnostico y ajustes tecnicos.",
     "semanticTokensTitle": "Tokens semanticos del tema activo",
-    "semanticTokensHelp": "Superficies, texto, inputs y estados usados por AppShell, LIVE y detalle."
+    "semanticTokensHelp": "Superficies, texto, inputs y estados usados por AppShell, LIVE y detalle.",
+    "harmonySecondaryAccentHelp": "La armonia ayuda a sugerir colores secundarios y de acento.",
+    "harmonyAccentHelp": "Se respeta tu color secundario. La armonia solo ayuda a sugerir el color de acento.",
+    "swatchesTab": "Muestras",
+    "chooseBrandColor": {
+      "primary": "Elegir color principal",
+      "secondary": "Elegir color secundario",
+      "accent": "Elegir color de acento"
+    },
+    "harmonySecondaryHelp": "Se respeta tu color de acento. La armonia solo ayuda a sugerir el color secundario."
   },
   "usersForm": {
     "newTitle": "Nuevo usuario",

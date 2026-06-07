@@ -1208,7 +1208,7 @@
     "brandColorSecondary": "????????",
     "brandColorSecondaryHelp": "??????????????????????????",
     "brandColorAccent": "????????",
-    "brandColorAccentHelp": "?????????????????????",
+    "brandColorAccentHelp": "ブランドの3つ目の色です。細部、チップ、注目要素、強調表示に使います。",
     "changeColor": "????",
     "chooseColor": "????",
     "chooseColorHelp": "スウォッチ、HEX、または明るい/暗い/低彩度のバリエーションから選びます。",
@@ -1243,7 +1243,16 @@
     "designTokensTitle": "Design tokens",
     "designTokensHelp": "トークンはアプリケーションコンポーネントが使う内部変数です。診断と技術調整のために表示します。",
     "semanticTokensTitle": "有効テーマのセマンティックトークン",
-    "semanticTokensHelp": "AppShell、LIVE、詳細画面で使うサーフェス、テキスト、入力、状態です。"
+    "semanticTokensHelp": "AppShell、LIVE、詳細画面で使うサーフェス、テキスト、入力、状態です。",
+    "harmonySecondaryAccentHelp": "ハーモニーはセカンダリカラーとアクセントカラーの提案に役立ちます。",
+    "harmonyAccentHelp": "セカンダリカラーはそのまま使われます。ハーモニーはアクセントカラーの提案だけに使われます。",
+    "swatchesTab": "スウォッチ",
+    "chooseBrandColor": {
+      "primary": "メインカラーを選択",
+      "secondary": "セカンダリカラーを選択",
+      "accent": "アクセントカラーを選択"
+    },
+    "harmonySecondaryHelp": "アクセントカラーはそのまま使われます。ハーモニーはセカンダリカラーの提案だけに使われます。"
   },
   "usersForm": {
     "newTitle": "新規",
