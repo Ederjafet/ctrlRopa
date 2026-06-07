@@ -1,9 +1,9 @@
 import AppShell from '@/components/layout/AppShell';
+import AppShellPage from '@/components/layout/AppShellPage';
 import { buildMainNavSections, getSessionScopeLabel } from '@/components/layout/appNavigation';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import EmptyState from '@/components/ui/EmptyState';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -85,9 +85,13 @@ export default function CustomersScreen() {
 
   if (isLoading) {
     return (
-      <AppScreen scroll={false}>
+      <AppShellPage
+        title="Clientes"
+        subtitle="Seguimiento comercial y datos de contacto"
+        activeRoute="customers"
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 

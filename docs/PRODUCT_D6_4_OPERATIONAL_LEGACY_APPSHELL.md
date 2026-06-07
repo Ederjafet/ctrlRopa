@@ -71,10 +71,20 @@ PRODUCT-D6.5 ejecuto una auditoria automatica sobre `app/*.tsx` y migro dos ruta
 
 El inventario completo de rutas legacy restantes queda documentado en `docs/PRODUCT_D6_5_LEGACY_ROUTE_AUDIT.md`.
 
+## Nota PRODUCT-D6.6
+
+PRODUCT-D6.6 migro las rutas hijas visibles que habian quedado pendientes en inventario/lotes:
+
+- `/items/[id]`
+- `/batch-form`
+- `/batch-detail`
+
+Estas rutas ahora usan `AppShellPage`, conservan la logica de inventario/lotes y mantienen `activeRoute` bajo Inventario/Lotes.
+
 ## Riesgos pendientes
 
 - Algunas alertas historicas y textos secundarios de flujo operativo siguen hardcodeados; no se tocaron para evitar cambios funcionales fuera de la migracion visual.
-- `batch-form`, `batch-detail` e `items/[id]` siguen como rutas hijas con patron legacy. Se recomienda evaluarlas en una fase posterior si QA las marca como parte del recorrido visual.
+- Las rutas hijas `batch-form`, `batch-detail` e `items/[id]` fueron migradas en PRODUCT-D6.6.
 - Las rutas de caja siguen legacy por alcance y requieren una fase separada si se decide migrarlas.
 
 ## Validacion manual esperada

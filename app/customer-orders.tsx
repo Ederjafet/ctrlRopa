@@ -1,9 +1,8 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { Customer, getCustomerById, getCustomersByBranch } from '@/services/customerService';
@@ -118,21 +117,23 @@ export default function CustomerOrdersScreen() {
 
   if (isLoading) {
     return (
-      <AppScreen>
+      <AppShellPage
+        title="Pedidos"
+        subtitle="Pedidos y seguimiento por cliente"
+        activeRoute="customers"
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   if (!selectedCustomerId) {
     return (
-      <AppScreen>
-        <AppBackButton fallbackRoute="/" />
-
-        <AppText variant="title" bold>
-          Pedidos
-        </AppText>
-
+      <AppShellPage
+        title="Pedidos"
+        subtitle="Pedidos y seguimiento por cliente"
+        activeRoute="customers"
+      >
         <AppCard>
           <AppText variant="subtitle" bold>
             Selecciona cliente
@@ -165,18 +166,23 @@ export default function CustomerOrdersScreen() {
             ))
           )}
         </AppCard>
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute={returnRoute || '/customer-orders'} />
-
-      <AppText variant="title" bold>
-        Pedidos del cliente
-      </AppText>
-
+    <AppShellPage
+      title="Pedidos del cliente"
+      subtitle="Pedido activo e historial comercial"
+      activeRoute="customers"
+      rightContent={
+        <AppButton
+          title="Volver"
+          variant="secondary"
+          onPress={() => router.replace((returnRoute || '/customer-orders') as any)}
+        />
+      }
+    >
       <AppCard>
         <AppText variant="subtitle" bold>
           {customer?.name || 'Cliente'}
@@ -267,7 +273,7 @@ export default function CustomerOrdersScreen() {
           ))
         )}
       </AppCard>
-    </AppScreen>
+    </AppShellPage>
   );
 }
 

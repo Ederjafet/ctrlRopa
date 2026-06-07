@@ -137,3 +137,14 @@ No se traducen codigos tecnicos, datos retornados por backend ni identificadores
 ## GO/NO-GO
 
 GO tecnico condicionado a validaciones automaticas completas y a corrida visual manual de `/system-security` y `/system-sessions`.
+
+## Seguimiento PRODUCT-D6.6
+
+PRODUCT-D6.6 tomo este inventario como base y migro rutas visibles/operativas adicionales:
+
+- `customers`, `customers-create`, `customers/[id]`, `customer-addresses-create`, `customer-addresses/[id]`
+- `reservations` en estado de carga y `users` en estado de carga
+- `items/[id]`, `batch-form`, `batch-detail`
+- `customer-orders`, `customer-order-detail`, `customer-packages`, `customer-package-detail`
+
+Despues de D6.6, el conteo top-level con patron legacy baja a 33 rutas. Las rutas restantes pertenecen principalmente a auth/especiales, caja/pagos o dominios amplios pendientes de una fase dedicada.

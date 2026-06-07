@@ -85,6 +85,10 @@ Las rutas de caja (`cash-closures`, `cash-closure-detail`) se documentan como le
 
 PRODUCT-D6.5 complementa esta migracion con una auditoria automatica de rutas `app/*.tsx` y migra `/system-security` y `/system-sessions`, que QA observo con layout legacy.
 
+## Nota PRODUCT-D6.6
+
+PRODUCT-D6.6 avanza sobre rutas visibles/operativas restantes de clientes, apartados, usuarios, inventario/lotes, pedidos y paquetes de cliente. La estrategia mantiene `AppShellPage`, `activeRoute` logico y no cambia servicios, formularios, permisos ni endpoints.
+
 ## Riesgos pendientes
 
 - Algunas tablas de reportes muestran estados/codigos que vienen del backend; se mantienen como datos tecnicos.
