@@ -442,6 +442,7 @@ export default function LiveScreen() {
   const [liveNotice, setLiveNotice] = useState<LiveNotice | null>(null);
   const [closeLiveToConfirm, setCloseLiveToConfirm] = useState<Live | null>(null);
   const [activateLiveToConfirm, setActivateLiveToConfirm] = useState<Live | null>(null);
+  const [operationalSoldToConfirm, setOperationalSoldToConfirm] = useState<number | null>(null);
   const [cancelReservationToConfirm, setCancelReservationToConfirm] = useState<number | null>(null);
   const [reservationIssue, setReservationIssue] = useState<LiveReservationIssue | null>(null);
   const [showDemoMetrics, setShowDemoMetrics] = useState(true);
@@ -1868,14 +1869,68 @@ export default function LiveScreen() {
       return;
     }
 
-    Alert.alert(t('live.operationalSoldConfirmTitle'), t('live.operationalSoldConfirmMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('live.confirmOperationalSold'),
-        onPress: () =>
-          handleUpdateReservationOperationalStatus(reservationId, 'OPERATIONAL_SOLD'),
-      },
-    ]);
+    if (!selectedLive) {
+      setLiveNotice({
+        title: t('live.operationalSoldUnavailableTitle'),
+        message: t('live.selectOpenLiveReason'),
+        tone: 'warning',
+      });
+      return;
+    }
+
+    const reservationEntry = recentReservations.find(
+      ({ reservation }) => reservation.id === reservationId
+    );
+
+    if (!reservationEntry) {
+      setLiveNotice({
+        title: t('live.operationalSoldUnavailableTitle'),
+        message: t('live.operationalSoldUnavailableMessage'),
+        tone: 'warning',
+      });
+      return;
+    }
+
+    const paid = paidByReservationId[reservationId] ?? 0;
+    const settled = isReservationSettled(reservationEntry.reservation, paid);
+    const operationalStatus = getLiveReservationOperationalStatus(reservationEntry.reservation);
+
+    if (settled) {
+      setLiveNotice({
+        title: t('live.operationalSoldUnavailableTitle'),
+        message: t('live.operationalSoldAlreadySettledMessage'),
+        tone: 'warning',
+      });
+      return;
+    }
+
+    if (operationalStatus === 'OPERATIONAL_SOLD') {
+      setLiveNotice({
+        title: t('live.operationalStatusNoChangesTitle'),
+        message: t('live.operationalSoldAlreadyClosedMessage'),
+        tone: 'warning',
+      });
+      return;
+    }
+
+    if (operationalStatus === 'CANCELLED') {
+      setLiveNotice({
+        title: t('live.operationalSoldUnavailableTitle'),
+        message: t('live.operationalSoldCancelledMessage'),
+        tone: 'warning',
+      });
+      return;
+    }
+
+    setOperationalSoldToConfirm(reservationId);
+  };
+
+  const confirmOperationalSold = async () => {
+    if (!operationalSoldToConfirm) return;
+
+    const reservationId = operationalSoldToConfirm;
+    setOperationalSoldToConfirm(null);
+    await handleUpdateReservationOperationalStatus(reservationId, 'OPERATIONAL_SOLD');
   };
 
   const handleCancelLiveReservation = (reservationId: number) => {
@@ -2261,6 +2316,22 @@ export default function LiveScreen() {
     } finally {
       setIsSavingActiveItem(false);
     }
+  };
+
+  const handleChangeToPreparedItem = () => {
+    const hasPreparedItemForSwitch =
+      !!activeItem && !!selectedItem && activeItem.id !== selectedItem.id;
+
+    if (!hasPreparedItemForSwitch) {
+      setLiveNotice({
+        title: t('live.preparedItemRequiredTitle'),
+        message: t('live.preparedItemRequiredMessage'),
+        tone: 'warning',
+      });
+      return;
+    }
+
+    void handleSetSelectedItemActive();
   };
 
   const handleRemovePreparedItem = () => {
@@ -2985,11 +3056,10 @@ export default function LiveScreen() {
                 <AppButton
                   title={t('live.changeItemOnAir')}
                   variant="secondary"
-                  onPress={handleSetSelectedItemActive}
+                  onPress={handleChangeToPreparedItem}
                   loading={isSavingActiveItem}
                   disabled={
                     isSavingActiveItem ||
-                    !preparedItem ||
                     !operatorFlowEnabled ||
                     !maySetActiveItem
                   }
@@ -2998,9 +3068,7 @@ export default function LiveScreen() {
                       ? t('live.liveOperatePermissionError')
                       : !operatorFlowEnabled
                         ? t('live.selectOpenLiveReason')
-                        : !preparedItem
-                          ? t('live.prepareItemBeforeSwitch')
-                          : undefined
+                        : undefined
                   }
                 />
                 <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
@@ -5884,6 +5952,38 @@ export default function LiveScreen() {
             </AppText>
           }
         />
+      </AppBottomModal>
+
+      <AppBottomModal
+        visible={operationalSoldToConfirm !== null}
+        title={t('live.operationalSoldConfirmTitle')}
+        onClose={() => setOperationalSoldToConfirm(null)}
+        showCancelButton={false}
+      >
+        <AppText>
+          {t('live.operationalSoldConfirmMessage')}
+        </AppText>
+        <AppText color={theme.colors.warning} bold>
+          {t('live.operationalSoldConfirmNoPaymentWarning')}
+        </AppText>
+        <View style={styles.buttonRow}>
+          <View style={styles.buttonFill}>
+            <AppButton
+              title={t('common.cancel')}
+              variant="secondary"
+              onPress={() => setOperationalSoldToConfirm(null)}
+              disabled={updatingOperationalReservationId !== null}
+            />
+          </View>
+          <View style={styles.buttonFill}>
+            <AppButton
+              title={t('live.confirmOperationalSold')}
+              onPress={confirmOperationalSold}
+              loading={updatingOperationalReservationId !== null}
+              disabled={updatingOperationalReservationId !== null}
+            />
+          </View>
+        </View>
       </AppBottomModal>
 
       <AppBottomModal

@@ -4,6 +4,8 @@
 
 > Actualizacion PRODUCT-D4 REAL: la corrida nueva se prepara en `docs/PRODUCT_D4_REAL_QA_EXECUTION_PLAN.md` y `docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md`. La plantilla de resultados esta en `qa-reports/manual-evidence/PRODUCT-D4-REAL-QA-results-template-20260608.md`.
 
+> Actualizacion LIVE-FIX-A: agregar a la corrida manual que `CAMBIAR POR PRENDA PREPARADA` muestre aviso si no hay prenda preparada y que `Cerrar como venta LIVE` use confirmacion visual accionable.
+
 ## Objetivo
 
 PRODUCT-D4 existe para convertir los casos `PENDIENTE_MANUAL` de PRODUCT-D2/D3 en resultados reales: `PASS`, `FAIL`, `BLOQUEADO` o `NO_APLICA`, siempre con evidencia capturada.

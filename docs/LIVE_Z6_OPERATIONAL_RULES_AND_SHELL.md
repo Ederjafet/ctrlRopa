@@ -9,6 +9,8 @@
 
 > Nota LIVE-Z10A: la autorizacion de cambio de precio LIVE queda marcada como no disponible porque no existe backend real de solicitudes/aprobaciones. La UI ya no muestra `Solicitud pendiente` simulada.
 
+> Nota LIVE-FIX-A: las acciones visibles `Cambiar por prenda preparada` y `Cerrar como venta LIVE` ahora muestran feedback accionable cuando no pueden continuar; no deben quedarse sin respuesta visible.
+
 ## Objetivo
 
 Integrar `/live` al layout profesional del producto usando `AppShell`, sidebar, TopBar y navegacion lateral responsive, sin cambiar reglas operativas profundas ni backend.
