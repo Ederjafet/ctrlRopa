@@ -9,22 +9,100 @@ Definir como Codex debe cerrar pendientes uno por uno, sin mezclar fases ni marc
 1. Tomar un pendiente de `docs/PROJECT_BACKLOG_PRIORITIZED.md`.
 2. Crear o confirmar rama de fase.
 3. Auditar contexto minimo: docs, codigo, servicios y reportes relacionados.
-4. Implementar solo esa fase.
-5. Ejecutar validaciones requeridas.
-6. Corregir errores seguros dentro del alcance.
-7. Generar documentacion y evidencia.
-8. Hacer commit con mensaje de fase.
-9. No hacer merge a develop.
-10. Entregar GO/NO-GO.
-11. Si QA falla, abrir fase correctiva puntual.
-12. Actualizar tablero/backlog/log QA cuando aplique.
+4. Clasificar sensibilidad del bloque.
+5. Si el bloque es sensible, detenerse y entregar handoff para arquitectura antes de modificar codigo o configuracion.
+6. Si el bloque no es sensible, implementar solo esa fase.
+7. Ejecutar validaciones requeridas.
+8. Corregir errores seguros dentro del alcance.
+9. Generar documentacion y evidencia.
+10. Hacer commit con mensaje de fase.
+11. No hacer merge a develop.
+12. Entregar GO/NO-GO.
+13. Si QA falla, abrir fase correctiva puntual.
+14. Actualizar tablero/backlog/log QA cuando aplique.
+
+## Compuerta de aprobacion arquitectonica
+
+Codex puede seleccionar y ejecutar directamente solo bloques de bajo riesgo. Ejemplos:
+
+- documentacion;
+- i18n y traducciones base;
+- copy, microcopy y textos visibles;
+- UI visual de bajo riesgo sin cambio funcional;
+- evidencia QA;
+- actualizacion de tableros;
+- errores frontend no sensibles;
+- refactors pequenos sin cambio de comportamiento.
+
+Codex no debe ejecutar automaticamente bloques sensibles sin aprobacion previa. En esos casos debe detenerse antes de modificar codigo, configuracion o scripts y entregar solo una propuesta.
+
+Bloques sensibles:
+
+- seguridad;
+- autenticacion;
+- autorizacion;
+- RBAC/permisos;
+- backend funcional;
+- base de datos y migraciones;
+- configuracion sensible/secrets;
+- infraestructura;
+- despliegue;
+- CORS/sesion/tokens;
+- pagos/caja;
+- LIVE critico;
+- cambios de precio;
+- inventario critico;
+- borrado o modificacion masiva de datos;
+- refactors grandes.
+
+La propuesta previa debe incluir:
+
+1. Fase sugerida.
+2. Motivo.
+3. Riesgo.
+4. Archivos que tocaria.
+5. Validaciones necesarias.
+6. Plan de rollback.
+7. Preguntas o decisiones necesarias.
+8. Recomendacion GO/NO-GO.
+9. Que debe revisar el arquitecto.
+10. Prompt sugerido para ejecucion, sin ejecutarlo.
+
+Codex no debe modificar codigo en fases sensibles hasta que el usuario confirme aprobacion arquitectonica.
+
+## Handoff para arquitectura
+
+Usar esta plantilla antes de ejecutar una fase sensible:
+
+```text
+HANDOFF PARA ARQUITECTURA
+
+Rama actual:
+Fase sugerida:
+Tipo de cambio:
+Dominio:
+Sensibilidad:
+Motivo:
+Riesgo:
+Archivos estimados:
+Validaciones requeridas:
+Impacto QA:
+Decisiones requeridas:
+Recomendacion:
+Ejecutar ahora: SI/NO
+Motivo para detenerse:
+Prompt de ejecucion sugerido:
+```
+
+Este handoff se entrega antes de tocar codigo, configuracion, migraciones, permisos, seguridad, pagos, LIVE critico o inventario critico.
 
 ## Cuando Codex puede corregir autonomamente
 
 Codex puede avanzar sin pedir confirmacion cuando:
 
 - el alcance esta definido y no requiere decision de negocio nueva;
-- el cambio no toca backend sensible salvo que la fase lo pida;
+- el cambio no toca backend sensible;
+- el cambio no cae en los bloques sensibles de la compuerta arquitectonica;
 - no cambia contratos de API;
 - no concede permisos nuevos sin permiso real;
 - las validaciones fallan por errores directamente causados por la fase;
@@ -34,6 +112,7 @@ Codex puede avanzar sin pedir confirmacion cuando:
 
 Codex debe detenerse y reportar decision requerida cuando:
 
+- la fase cae en un bloque sensible y no existe aprobacion arquitectonica explicita;
 - se necesita crear endpoints no solicitados;
 - hay que cambiar reglas de negocio profundas;
 - el fix requiere pagos/caja/billing/IA fuera del alcance;
