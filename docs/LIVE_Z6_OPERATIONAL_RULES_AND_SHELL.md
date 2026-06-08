@@ -1,5 +1,7 @@
 # LIVE-Z6A - AppShell y layout operacional
 
+> Referencia PROJECT-GOV-A: el estado maestro de LIVE, pendientes, QA y fases correctivas vive en `docs/PROJECT_MASTER_STATUS.md`, `docs/PROJECT_BACKLOG_PRIORITIZED.md` y `docs/QA_TODO_HANDOFF.md`.
+
 > Nota LIVE-Z9D: `Cambiar por prenda preparada` usa directamente la prenda preparada visible y no abre el selector.
 > `Quitar prenda preparada` limpia solo la preparacion local, sin afectar prenda al aire, precio, cliente ni apartado.
 
