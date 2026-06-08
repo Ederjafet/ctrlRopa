@@ -616,7 +616,10 @@
     "hideUnavailableItems": "隐藏不可用",
     "itemAvailabilityFilterHelp": "LIVE 操作默认显示可用商品。",
     "noItemsAvailableWithFilters": "没有符合这些筛选条件的可用商品。",
-    "noItemSearchResults": "此搜索没有结果。"
+    "noItemSearchResults": "此搜索没有结果。",
+    "newReservationReceivedTitle": "收到新的预留",
+    "newReservationReceivedMessage": "LIVE期间新增了一个预留。",
+    "newReservationReceivedAction": "查看预留"
   },
   "payments": {
     "title": "Payments / Collections",

@@ -616,7 +616,10 @@
     "hideUnavailableItems": "利用不可を非表示",
     "itemAvailabilityFilterHelp": "LIVE操作では、既定で利用可能な商品を表示します。",
     "noItemsAvailableWithFilters": "このフィルターで利用可能な商品はありません。",
-    "noItemSearchResults": "この検索に一致する結果はありません。"
+    "noItemSearchResults": "この検索に一致する結果はありません。",
+    "newReservationReceivedTitle": "新しい取り置きを受信しました",
+    "newReservationReceivedMessage": "LIVE中に取り置きが追加されました。",
+    "newReservationReceivedAction": "取り置きを表示"
   },
   "payments": {
     "title": "Payments / Collections",

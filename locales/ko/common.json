@@ -616,7 +616,10 @@
     "hideUnavailableItems": "사용 불가 숨기기",
     "itemAvailabilityFilterHelp": "LIVE 운영에서는 기본적으로 사용 가능한 상품을 표시합니다.",
     "noItemsAvailableWithFilters": "이 필터에 맞는 사용 가능한 상품이 없습니다.",
-    "noItemSearchResults": "이 검색 결과가 없습니다."
+    "noItemSearchResults": "이 검색 결과가 없습니다.",
+    "newReservationReceivedTitle": "새 예약이 접수되었습니다",
+    "newReservationReceivedMessage": "LIVE 중 예약이 추가되었습니다.",
+    "newReservationReceivedAction": "예약 보기"
   },
   "payments": {
     "title": "Payments / Collections",

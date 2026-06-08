@@ -616,7 +616,10 @@
     "hideUnavailableItems": "Ocultar indisponiveis",
     "itemAvailabilityFilterHelp": "Por padrao, itens disponiveis sao exibidos para a operacao LIVE.",
     "noItemsAvailableWithFilters": "Nao ha itens disponiveis com esses filtros.",
-    "noItemSearchResults": "Nao ha resultados para esta busca."
+    "noItemSearchResults": "Nao ha resultados para esta busca.",
+    "newReservationReceivedTitle": "Nova reserva recebida",
+    "newReservationReceivedMessage": "Uma reserva foi adicionada durante o LIVE.",
+    "newReservationReceivedAction": "Ver reservas"
   },
   "payments": {
     "title": "Payments / Collections",

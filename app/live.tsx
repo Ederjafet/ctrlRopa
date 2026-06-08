@@ -96,6 +96,11 @@ type LiveNotice = {
   tone: 'success' | 'warning' | 'danger';
 };
 
+type LiveNewReservationNotice = {
+  count: number;
+  latestReservationId?: number;
+};
+
 type LiveReservationIssue = {
   detail: string;
   action: 'customer' | 'item' | 'none';
@@ -459,6 +464,8 @@ export default function LiveScreen() {
   const [isRefreshingLiveView, setIsRefreshingLiveView] = useState(false);
   const [lastLiveRefreshAt, setLastLiveRefreshAt] = useState<Date | null>(null);
   const [liveRefreshIssue, setLiveRefreshIssue] = useState<string | null>(null);
+  const [newReservationNotice, setNewReservationNotice] =
+    useState<LiveNewReservationNotice | null>(null);
 
   const [lives, setLives] = useState<Live[]>([]);
   const [selectedLive, setSelectedLive] = useState<Live | null>(null);
@@ -1443,6 +1450,15 @@ export default function LiveScreen() {
     });
   };
 
+  const handleViewNewReservations = () => {
+    const reservationId = newReservationNotice?.latestReservationId;
+    setNewReservationNotice(null);
+
+    if (reservationId) {
+      goToReservationDetail(reservationId);
+    }
+  };
+
   const goToReservationPayment = (reservationId: number) => {
     router.push({
       pathname: '/payments',
@@ -1454,6 +1470,7 @@ export default function LiveScreen() {
     live: Live,
     source: 'recent' | 'history' | 'auto' = 'recent'
   ) => {
+    setNewReservationNotice(null);
     setSelectedLive(live);
     setActiveItemForReservation(activeItemFromLive(live));
     updateRecentReservations(branchReservations, live.id);
@@ -1520,7 +1537,12 @@ export default function LiveScreen() {
   }, []);
 
   const refreshLiveViewData = useCallback(async (
-    options: { showSuccess?: boolean; showError?: boolean } = {}
+    options: {
+      notifyNewReservations?: boolean;
+      preserveOperatorDraft?: boolean;
+      showError?: boolean;
+      showSuccess?: boolean;
+    } = {}
   ) => {
     if (liveViewRefreshInFlightRef.current) {
       return false;
@@ -1554,8 +1576,14 @@ export default function LiveScreen() {
       const savedLive = savedLiveId
         ? liveData.find((live) => live.id === savedLiveId && live.status !== 'CLOSED')
         : null;
+      const shouldKeepClosedSelectedLive =
+        refreshedSelectedLive &&
+        normalizeStatus(refreshedSelectedLive.status) === 'CLOSED' &&
+        selectedClosedLiveSource !== 'auto';
       const nextSelectedLive =
-        refreshedSelectedLive && refreshedSelectedLive.status !== 'CLOSED'
+        refreshedSelectedLive &&
+        (normalizeStatus(refreshedSelectedLive.status) !== 'CLOSED' ||
+          shouldKeepClosedSelectedLive)
           ? refreshedSelectedLive
           : savedLive ??
             liveData.find((live) => live.status === 'ACTIVE') ??
@@ -1569,13 +1597,31 @@ export default function LiveScreen() {
           return b.id - a.id;
         })[0];
       const contextLiveId = nextSelectedLive?.id ?? latestClosedLive?.id;
+      const nextActiveItem = activeItemFromLive(nextSelectedLive);
+      const shouldPreserveOperatorDraft =
+        options.preserveOperatorDraft !== false &&
+        liveActorContext.actor === 'OPERATOR' &&
+        Boolean(
+          selectedCustomer ||
+          selectedItem ||
+          priceText.trim() ||
+          isCustomerModalVisible ||
+          isItemModalVisible ||
+          isScannerVisible
+        );
+      const shouldNotifyNewReservations =
+        options.notifyNewReservations ?? liveActorContext.actor === 'OPERATOR';
 
       setLives(liveData);
       setSelectedLive(nextSelectedLive);
       if (!nextSelectedLive) {
         setSelectedClosedLiveSource('auto');
       }
-      setActiveItemForReservation(activeItemFromLive(nextSelectedLive));
+      if (shouldPreserveOperatorDraft) {
+        setActiveItem(nextActiveItem);
+      } else {
+        setActiveItemForReservation(nextActiveItem);
+      }
       setLiveLoadIssue(null);
 
       const [reservationResult, eventResult] = await Promise.allSettled([
@@ -1584,6 +1630,20 @@ export default function LiveScreen() {
       ]);
 
       if (reservationResult.status === 'fulfilled') {
+        const nextRecentReservations = mapLiveReservations(
+          reservationResult.value,
+          nextSelectedLive?.id
+        );
+        const previousReservationIds = new Set(
+          recentReservations.map((entry) => entry.reservation.id)
+        );
+        const receivedReservations =
+          shouldNotifyNewReservations && lastLiveRefreshAt
+            ? nextRecentReservations.filter(
+                (entry) => !previousReservationIds.has(entry.reservation.id)
+              )
+            : [];
+
         setReservationLoadIssue(null);
         setBranchReservations(reservationResult.value);
         await updateRecentReservations(
@@ -1592,6 +1652,13 @@ export default function LiveScreen() {
           false,
           { clearPaymentsWhenSkipped: false }
         );
+
+        if (receivedReservations.length > 0) {
+          setNewReservationNotice({
+            count: receivedReservations.length,
+            latestReservationId: receivedReservations[0]?.reservation.id,
+          });
+        }
       } else {
         setReservationLoadIssue(
           resolveLoadIssue(
@@ -1644,7 +1711,17 @@ export default function LiveScreen() {
     }
   }, [
     router,
+    isCustomerModalVisible,
+    isItemModalVisible,
+    isScannerVisible,
+    lastLiveRefreshAt,
+    liveActorContext.actor,
+    priceText,
+    recentReservations,
     selectedLive,
+    selectedCustomer,
+    selectedClosedLiveSource,
+    selectedItem,
     setActiveItemForReservation,
     t,
     updateRecentReservations,
@@ -1657,7 +1734,9 @@ export default function LiveScreen() {
   const shouldAutoRefreshLiveView =
     isAllowed === true &&
     liveCapabilities.canViewLive &&
-    (liveActorContext.actor === 'SELLER' || liveActorContext.actor === 'SUPERVISOR');
+    (liveActorContext.actor === 'OPERATOR' ||
+      liveActorContext.actor === 'SELLER' ||
+      liveActorContext.actor === 'SUPERVISOR');
 
   useEffect(() => {
     if (!shouldAutoRefreshLiveView) return undefined;
@@ -3984,6 +4063,25 @@ export default function LiveScreen() {
             </View>
           </AppCard>
         ) : null}
+        {newReservationNotice ? (
+          <AppCard variant="success" style={styles.newReservationNoticeCard}>
+            <View style={styles.newReservationNoticeRow}>
+              <View style={styles.newReservationNoticeText}>
+                <AppText bold>{t('live.newReservationReceivedTitle')}</AppText>
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  {t('live.newReservationReceivedMessage', {
+                    count: newReservationNotice.count,
+                  })}
+                </AppText>
+              </View>
+              <AppButton
+                title={t('live.newReservationReceivedAction')}
+                variant="secondary"
+                onPress={handleViewNewReservations}
+              />
+            </View>
+          </AppCard>
+        ) : null}
 
         {isOperatorFocusedView ? (
           <LiveActionCard
@@ -6185,6 +6283,21 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 3,
     minWidth: 180,
+  },
+  newReservationNoticeCard: {
+    marginBottom: 10,
+  },
+  newReservationNoticeRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
+  newReservationNoticeText: {
+    flex: 1,
+    gap: 3,
+    minWidth: 190,
   },
   livePulse: {
     height: 9,

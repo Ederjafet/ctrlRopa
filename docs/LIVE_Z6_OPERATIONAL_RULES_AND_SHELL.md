@@ -480,3 +480,7 @@ LIVE-Z9I agrega filtros `Disponibles`, `Apartadas`, `Vendidas / no disponibles` 
 # Nota LIVE-Z9I.1 - Acciones responsive en tarjetas
 
 LIVE-Z9I.1 ajusta solo presentacion: las acciones de `Prenda preparada para cambio` y `Prenda al aire ahora` se muestran en fila en tablet/desktop y apiladas en mobile. No cambia permisos, reglas LIVE, filtros ni endpoints.
+
+# Nota LIVE-Z9J - Sincronizacion operador/admin
+
+LIVE-Z9J extiende el refresh controlado a operador/admin para que apartados creados por vendedor u otros usuarios aparezcan en LIVE sin salir/entrar. No implementa WebSocket/SSE, no consulta pagos/caja y no sobrescribe cliente seleccionado, prenda preparada ni precio en edicion.
