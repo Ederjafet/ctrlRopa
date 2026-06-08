@@ -2,6 +2,8 @@
 
 > Referencia PROJECT-GOV-A: usar `docs/QA_TODO_HANDOFF.md` como checklist QA actualizado y `docs/QA_RESULTS_LOG.md` como bitacora central de resultados reales.
 
+> Actualizacion PRODUCT-D4 REAL: la corrida nueva se prepara en `docs/PRODUCT_D4_REAL_QA_EXECUTION_PLAN.md` y `docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md`. La plantilla de resultados esta en `qa-reports/manual-evidence/PRODUCT-D4-REAL-QA-results-template-20260608.md`.
+
 ## Objetivo
 
 PRODUCT-D4 existe para convertir los casos `PENDIENTE_MANUAL` de PRODUCT-D2/D3 en resultados reales: `PASS`, `FAIL`, `BLOQUEADO` o `NO_APLICA`, siempre con evidencia capturada.
