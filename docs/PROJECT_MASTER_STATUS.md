@@ -10,12 +10,13 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 
 | Rama | Merge commit | Fase | Observacion |
 | --- | --- | --- | --- |
-| `feature/live-z10a-price-authorization-audit` | `99eff73` | LIVE-Z10A | Se audito autorizacion de cambio de precio LIVE y se retiro la simulacion de solicitud pendiente. |
+| `feature/project-gov-a-master-status-qa-board` | `2a377e9` | PROJECT-GOV-A | Se creo tablero maestro, backlog priorizado, handoff QA y runbook de cierre autonomo. |
 
 ## Ultimas fases cerradas
 
 | Fase | Commit | Estado tecnico | Estado QA |
 | --- | --- | --- | --- |
+| SEC-CONFIG-A | commit PROJECT-GOV-B | DONE_TECH | PENDING_QA |
 | LIVE-Z10A | `61b7ba8` | DONE_TECH | PENDING_QA |
 | LIVE-Z9J | `f92aa24` | DONE_TECH | PENDING_QA |
 | PRODUCT-ERR-A | `d97668b` | DONE_TECH | PENDING_QA |
@@ -36,7 +37,7 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 | PRODUCT-D / QA visual | DONE_TECH | PENDING_QA | Navegacion/AppShell migrados; PRODUCT-D4 mantiene evidencia manual pendiente. |
 | I18N | DONE_TECH | PENDING_QA | Soporte multidioma base y limpieza de claves; falta revision humana/nativa. |
 | ERROR HANDLING | DONE_TECH | PENDING_QA | PRODUCT-ERR-A aplicado en pantallas criticas; quedan dominios restantes. |
-| Seguridad | DONE_TECH | QA_PASS | AUTH y auditoria tienen evidencia tecnica; quedan hardening y configuracion/secrets. |
+| Seguridad | DONE_TECH | PENDING_QA | AUTH y auditoria tienen evidencia tecnica; SEC-CONFIG-A externaliza secrets/config; queda hardening y validacion por ambiente. |
 | Refactor | PENDING_DECISION | PENDING_QA | `app/live.tsx` requiere particion por mantenibilidad. |
 
 ## Tabla de fases
@@ -60,6 +61,7 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 | PRODUCT-I18N-A/B/B.1 | Multidioma, limpieza de mezclas y glosario | varias | `cb89fa0` y relacionados | DONE_TECH | PENDING_QA | Revision humana/nativa y no claves crudas. |
 | PRODUCT-ERR-A | Errores accionables | `feature/product-err-a-actionable-errors` | `d97668b` | DONE_TECH | PENDING_QA | Simular error red/backend y validar mensajes. |
 | PRODUCT-D4 | QA manual con evidencia | `feature/product-d4-*` | varios | DONE_TECH | PENDING_QA | Ejecutar corrida real con screenshots/evidencia. |
+| SEC-CONFIG-A | Configuracion/secrets fuera de repo | `feature/project-gov-b-autonomous-backlog-runner` | commit PROJECT-GOV-B | DONE_TECH | PENDING_QA | Validar arranque local/QA con `CONTROL_ROPA_DB_PASSWORD` fuera del repo. |
 
 ## GO/NO-GO general
 
@@ -77,7 +79,7 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 2. LIVE-Z10B: backend real para autorizacion de cambio de precio, o decision de producto formal.
 3. ITEM-Z1: edicion/correccion segura de prendas capturadas.
 4. PRODUCT-ERR-B: extender errores accionables a dominios restantes.
-5. LIVE-REF-A: partir `app/live.tsx` en componentes/hooks mantenibles.
+5. SECURITY-A: hardening CORS/sesion/headers por ambiente.
 
 ## Riesgos abiertos
 
@@ -88,8 +90,8 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 | `app/live.tsx` muy grande | Mantenibilidad y riesgo de regresion | PENDING_DECISION |
 | Traducciones no nativas | Experiencia internacional inconsistente | PENDING_QA |
 | Branding solo local | No sirve aun para tenant/backend productivo | PENDING_DECISION |
-| Secrets/configuracion | Riesgo operativo si no se revisa despliegue | PENDING_DECISION |
+| Configuracion por ambiente | Arranque puede fallar si QA/staging no define env vars requeridas | PENDING_QA |
 
 ## Ultima actualizacion
 
-2026-06-08, `feature/project-gov-a-master-status-qa-board`.
+2026-06-08, `feature/project-gov-b-autonomous-backlog-runner`.

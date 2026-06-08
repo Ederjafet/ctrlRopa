@@ -4,6 +4,8 @@ Fecha: 2026-05-12
 
 > Referencia PROJECT-GOV-A: los riesgos abiertos priorizados ahora se consolidan en `docs/PROJECT_MASTER_STATUS.md` y `docs/PROJECT_BACKLOG_PRIORITIZED.md`. Este documento conserva la matriz historica de riesgos operativos.
 
+> Nota SEC-CONFIG-A: `application.properties` ya no versiona password de base de datos; `CONTROL_ROPA_DB_PASSWORD` debe venir de entorno o secret store por ambiente.
+
 ## Escala
 
 Severidad:
