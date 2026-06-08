@@ -79,6 +79,20 @@ Como no hay hallazgos confirmados, esta tabla representa severidad potencial de 
 
 Falta evidencia para los 28 casos del smoke PRODUCT-D4, incluyendo:
 
+## Anexo LIVE-Z10A - Autorizacion de precio LIVE
+
+Agregar evidencia manual para el flujo de cambio de precio LIVE:
+
+- usuario sin `canChangeLivePrice` en `/live`;
+- prenda al aire visible;
+- precio LIVE en solo lectura;
+- mensaje claro de autorizacion no disponible;
+- ausencia de modal de motivos de autorizacion;
+- ausencia de `Solicitud pendiente`;
+- validacion light/dark y mobile/tablet.
+
+Resultado esperado: la app no simula una solicitud de autorizacion y no permite cambio libre de precio sin capacidad real.
+
 - capturas de `/`, `/live`, `/ui-kit`, `/customers`, `/reservations`, `/users`, `/system`, `/reports`, `/appearance` si existe y `reservation-detail`;
 - ejecucion con usuarios `qa.admin@local.test`, `qa.vendedor.centro@local.test`, `qa.supervisor.centro@local.test` y `qa.sinpermisos@local.test`;
 - validacion light/dark;

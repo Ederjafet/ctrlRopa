@@ -5,6 +5,8 @@
 
 > Nota LIVE-Z9E: `Crear prenda rapida` mantiene `returnTo=/live` y ahora muestra validacion visible por campo cuando faltan datos obligatorios antes de generar prendas.
 
+> Nota LIVE-Z10A: la autorizacion de cambio de precio LIVE queda marcada como no disponible porque no existe backend real de solicitudes/aprobaciones. La UI ya no muestra `Solicitud pendiente` simulada.
+
 ## Objetivo
 
 Integrar `/live` al layout profesional del producto usando `AppShell`, sidebar, TopBar y navegacion lateral responsive, sin cambiar reglas operativas profundas ni backend.
