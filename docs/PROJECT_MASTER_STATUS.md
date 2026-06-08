@@ -16,6 +16,7 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 
 | Fase | Commit | Estado tecnico | Estado QA |
 | --- | --- | --- | --- |
+| SEC-CONFIG-A1 | commit SEC-CONFIG-A1 | DONE_TECH | PENDING_QA |
 | SEC-CONFIG-A | commit PROJECT-GOV-B | DONE_TECH | PENDING_QA |
 | LIVE-Z10A | `61b7ba8` | DONE_TECH | PENDING_QA |
 | LIVE-Z9J | `f92aa24` | DONE_TECH | PENDING_QA |
@@ -37,7 +38,7 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 | PRODUCT-D / QA visual | DONE_TECH | PENDING_QA | Navegacion/AppShell migrados; PRODUCT-D4 mantiene evidencia manual pendiente. |
 | I18N | DONE_TECH | PENDING_QA | Soporte multidioma base y limpieza de claves; falta revision humana/nativa. |
 | ERROR HANDLING | DONE_TECH | PENDING_QA | PRODUCT-ERR-A aplicado en pantallas criticas; quedan dominios restantes. |
-| Seguridad | DONE_TECH | PENDING_QA | AUTH y auditoria tienen evidencia tecnica; SEC-CONFIG-A externaliza secrets/config; queda hardening y validacion por ambiente. |
+| Seguridad | DONE_TECH | PENDING_QA | AUTH y auditoria tienen evidencia tecnica; SEC-CONFIG-A externaliza secrets/config y SEC-CONFIG-A1 agrega arranque DEV seguro; queda hardening y validacion por ambiente. |
 | Refactor | PENDING_DECISION | PENDING_QA | `app/live.tsx` requiere particion por mantenibilidad. |
 
 ## Tabla de fases
@@ -62,6 +63,7 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 | PRODUCT-ERR-A | Errores accionables | `feature/product-err-a-actionable-errors` | `d97668b` | DONE_TECH | PENDING_QA | Simular error red/backend y validar mensajes. |
 | PRODUCT-D4 | QA manual con evidencia | `feature/product-d4-*` | varios | DONE_TECH | PENDING_QA | Ejecutar corrida real con screenshots/evidencia. |
 | SEC-CONFIG-A | Configuracion/secrets fuera de repo | `feature/project-gov-b-autonomous-backlog-runner` | commit PROJECT-GOV-B | DONE_TECH | PENDING_QA | Validar arranque local/QA con `CONTROL_ROPA_DB_PASSWORD` fuera del repo. |
+| SEC-CONFIG-A1 | Script local seguro de arranque DEV | `feature/sec-config-a1-dev-startup-script` | commit SEC-CONFIG-A1 | DONE_TECH | PENDING_QA | Validar `scripts/dev-backend.sh` y `scripts\dev-backend.cmd` con `.env` local no versionado. |
 
 ## GO/NO-GO general
 
@@ -90,8 +92,8 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 | `app/live.tsx` muy grande | Mantenibilidad y riesgo de regresion | PENDING_DECISION |
 | Traducciones no nativas | Experiencia internacional inconsistente | PENDING_QA |
 | Branding solo local | No sirve aun para tenant/backend productivo | PENDING_DECISION |
-| Configuracion por ambiente | Arranque puede fallar si QA/staging no define env vars requeridas | PENDING_QA |
+| Configuracion por ambiente | QA/staging deben definir env vars requeridas; DEV ya cuenta con scripts seguros para cargar `.env` local | PENDING_QA |
 
 ## Ultima actualizacion
 
-2026-06-08, `feature/project-gov-b-autonomous-backlog-runner`.
+2026-06-08, `feature/sec-config-a1-dev-startup-script`.

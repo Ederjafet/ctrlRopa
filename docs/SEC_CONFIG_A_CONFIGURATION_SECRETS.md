@@ -99,6 +99,15 @@ y permite:
 4. Confirmar que `.env` no aparece en `git status`.
 5. Confirmar que `.env.example` si queda versionado.
 
+## Arranque DEV local
+
+SEC-CONFIG-A1 agrega scripts locales seguros para cargar `.env` sin versionar secretos:
+
+- Git Bash: `./scripts/dev-backend.sh`
+- Windows CMD: `scripts\dev-backend.cmd`
+
+Ver `docs/SEC_CONFIG_A1_DEV_STARTUP.md`.
+
 ## Estado
 
 DONE_TECH para SEC-CONFIG-A.

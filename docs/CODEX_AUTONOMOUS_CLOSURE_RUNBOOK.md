@@ -42,6 +42,17 @@ Codex debe detenerse y reportar decision requerida cuando:
 - QA pide aceptar un riesgo sin responsable;
 - no existe evidencia suficiente para marcar `QA_PASS`.
 
+## Reglas para configuracion y secrets
+
+En fases de configuracion local o seguridad:
+
+- no versionar `.env`;
+- no reintroducir passwords reales en `application.properties`;
+- no imprimir secretos en consola ni evidencia;
+- usar `.env.example` solo con placeholders;
+- validar que los scripts fallen con mensajes claros si falta un secreto local;
+- dejar QA en `PENDING_QA` hasta probar con variables reales fuera del repositorio.
+
 ## Validaciones base
 
 Para cambios de codigo frontend:

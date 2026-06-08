@@ -1,0 +1,413 @@
+﻿diff --git a/.env.example b/.env.example
+index b458a5b..7bdd1cb 100644
+--- a/.env.example
++++ b/.env.example
+@@ -11,14 +11,14 @@ EXPO_PUBLIC_API_HOST=192.168.0.128
+ CONTROL_ROPA_SERVER_PORT=8090
+
+ # Backend datasource
+-CONTROL_ROPA_DB_URL=jdbc:mysql://localhost:3306/control_ropa?useSSL=false&serverTimezone=America/Mexico_City&allowPublicKeyRetrieval=true
++CONTROL_ROPA_DB_URL='jdbc:mysql://localhost:3306/control_ropa?useSSL=false&serverTimezone=America/Mexico_City&allowPublicKeyRetrieval=true'
+ CONTROL_ROPA_DB_USERNAME=root
+-CONTROL_ROPA_DB_PASSWORD=change-me
++CONTROL_ROPA_DB_PASSWORD=CAMBIA_ESTE_VALOR
+
+ # Security audit
+ SECURITY_AUDIT_RETENTION_DAYS=180
+ SECURITY_AUDIT_CLEANUP_ENABLED=true
+-SECURITY_AUDIT_CLEANUP_CRON=0 0 3 * * *
++SECURITY_AUDIT_CLEANUP_CRON='0 0 3 * * *'
+
+ # Backend logs
+ CONTROL_ROPA_LOG_FILE=C:/HPSQ-SOFT/control-ropa/logs/backend/control-ropa.log
+diff --git a/docs/CODEX_AUTONOMOUS_CLOSURE_RUNBOOK.md b/docs/CODEX_AUTONOMOUS_CLOSURE_RUNBOOK.md
+index 4d57984..dff9bc2 100644
+--- a/docs/CODEX_AUTONOMOUS_CLOSURE_RUNBOOK.md
++++ b/docs/CODEX_AUTONOMOUS_CLOSURE_RUNBOOK.md
+@@ -42,6 +42,17 @@ Codex debe detenerse y reportar decision requerida cuando:
+ - QA pide aceptar un riesgo sin responsable;
+ - no existe evidencia suficiente para marcar `QA_PASS`.
+
++## Reglas para configuracion y secrets
++
++En fases de configuracion local o seguridad:
++
++- no versionar `.env`;
++- no reintroducir passwords reales en `application.properties`;
++- no imprimir secretos en consola ni evidencia;
++- usar `.env.example` solo con placeholders;
++- validar que los scripts fallen con mensajes claros si falta un secreto local;
++- dejar QA en `PENDING_QA` hasta probar con variables reales fuera del repositorio.
++
+ ## Validaciones base
+
+ Para cambios de codigo frontend:
+diff --git a/docs/PROJECT_BACKLOG_PRIORITIZED.md b/docs/PROJECT_BACKLOG_PRIORITIZED.md
+index 83a0fde..d88dbd8 100644
+--- a/docs/PROJECT_BACKLOG_PRIORITIZED.md
++++ b/docs/PROJECT_BACKLOG_PRIORITIZED.md
+@@ -21,6 +21,7 @@ No se debe cerrar un pendiente sin evidencia, validaciones y commit de fase.
+ | P0 | Inventario | Edicion/correccion de prendas capturadas | QA/operacion | Errores de captura quedan sin correccion clara | S1 | ITEM-Z1 | Editar campos permitidos con permisos, auditoria y QA | PENDING_DECISION |
+ | P1 | Error handling | Errores accionables en dominios restantes | PRODUCT-ERR-A | Mensajes genericos pueden seguir apareciendo fuera de pantallas criticas | S2 | PRODUCT-ERR-B | Mapper aplicado a dominios restantes y QA de errores | PENDING_QA |
+ | P1 | Seguridad | Limpieza de configuracion/secrets | Riesgo operativo | Posible exposicion o configuracion debil en despliegue | S1 | SEC-CONFIG-A | Inventario de env vars, secrets fuera de repo, docs de despliegue seguro | DONE_TECH |
++| P1 | Seguridad | Script local seguro de arranque DEV | SEC-CONFIG-A | Backend local falla si no se carga `CONTROL_ROPA_DB_PASSWORD` | S1 | SEC-CONFIG-A1 | Scripts DEV cargan `.env` sin versionar secretos y docs explican uso seguro | DONE_TECH |
+ | P1 | Seguridad | Hardening CORS/sesion/headers | AUTH/Security | Riesgo de sesion o acceso en ambientes reales | S1 | SECURITY-A | Revision config, pruebas negativas, evidencia | PENDING_DECISION |
+ | P1 | LIVE | Refactor de `app/live.tsx` | Mantenibilidad | Archivo grande eleva costo de cambios LIVE | S2 | LIVE-REF-A | Separar hooks/componentes sin cambiar comportamiento; pruebas pasan | PENDING_DECISION |
+ | P1 | I18N | Revision humana/nativa de traducciones | I18N-A/B/B.1 | Riesgo de copy poco natural en pt/fr/ja/zh/ko | S2 | PRODUCT-I18N-B-NATIVE | Revision por idioma y correcciones aprobadas | PENDING_QA |
+diff --git a/docs/PROJECT_MASTER_STATUS.md b/docs/PROJECT_MASTER_STATUS.md
+index 9b07d86..e729897 100644
+--- a/docs/PROJECT_MASTER_STATUS.md
++++ b/docs/PROJECT_MASTER_STATUS.md
+@@ -16,6 +16,7 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
+
+ | Fase | Commit | Estado tecnico | Estado QA |
+ | --- | --- | --- | --- |
++| SEC-CONFIG-A1 | commit SEC-CONFIG-A1 | DONE_TECH | PENDING_QA |
+ | SEC-CONFIG-A | commit PROJECT-GOV-B | DONE_TECH | PENDING_QA |
+ | LIVE-Z10A | `61b7ba8` | DONE_TECH | PENDING_QA |
+ | LIVE-Z9J | `f92aa24` | DONE_TECH | PENDING_QA |
+@@ -37,7 +38,7 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
+ | PRODUCT-D / QA visual | DONE_TECH | PENDING_QA | Navegacion/AppShell migrados; PRODUCT-D4 mantiene evidencia manual pendiente. |
+ | I18N | DONE_TECH | PENDING_QA | Soporte multidioma base y limpieza de claves; falta revision humana/nativa. |
+ | ERROR HANDLING | DONE_TECH | PENDING_QA | PRODUCT-ERR-A aplicado en pantallas criticas; quedan dominios restantes. |
+-| Seguridad | DONE_TECH | PENDING_QA | AUTH y auditoria tienen evidencia tecnica; SEC-CONFIG-A externaliza secrets/config; queda hardening y validacion por ambiente. |
++| Seguridad | DONE_TECH | PENDING_QA | AUTH y auditoria tienen evidencia tecnica; SEC-CONFIG-A externaliza secrets/config y SEC-CONFIG-A1 agrega arranque DEV seguro; queda hardening y validacion por ambiente. |
+ | Refactor | PENDING_DECISION | PENDING_QA | `app/live.tsx` requiere particion por mantenibilidad. |
+
+ ## Tabla de fases
+@@ -62,6 +63,7 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
+ | PRODUCT-ERR-A | Errores accionables | `feature/product-err-a-actionable-errors` | `d97668b` | DONE_TECH | PENDING_QA | Simular error red/backend y validar mensajes. |
+ | PRODUCT-D4 | QA manual con evidencia | `feature/product-d4-*` | varios | DONE_TECH | PENDING_QA | Ejecutar corrida real con screenshots/evidencia. |
+ | SEC-CONFIG-A | Configuracion/secrets fuera de repo | `feature/project-gov-b-autonomous-backlog-runner` | commit PROJECT-GOV-B | DONE_TECH | PENDING_QA | Validar arranque local/QA con `CONTROL_ROPA_DB_PASSWORD` fuera del repo. |
++| SEC-CONFIG-A1 | Script local seguro de arranque DEV | `feature/sec-config-a1-dev-startup-script` | commit SEC-CONFIG-A1 | DONE_TECH | PENDING_QA | Validar `scripts/dev-backend.sh` y `scripts\dev-backend.cmd` con `.env` local no versionado. |
+
+ ## GO/NO-GO general
+
+@@ -90,8 +92,8 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
+ | `app/live.tsx` muy grande | Mantenibilidad y riesgo de regresion | PENDING_DECISION |
+ | Traducciones no nativas | Experiencia internacional inconsistente | PENDING_QA |
+ | Branding solo local | No sirve aun para tenant/backend productivo | PENDING_DECISION |
+-| Configuracion por ambiente | Arranque puede fallar si QA/staging no define env vars requeridas | PENDING_QA |
++| Configuracion por ambiente | QA/staging deben definir env vars requeridas; DEV ya cuenta con scripts seguros para cargar `.env` local | PENDING_QA |
+
+ ## Ultima actualizacion
+
+-2026-06-08, `feature/project-gov-b-autonomous-backlog-runner`.
++2026-06-08, `feature/sec-config-a1-dev-startup-script`.
+diff --git a/docs/QA_TODO_HANDOFF.md b/docs/QA_TODO_HANDOFF.md
+index b04123d..b1b2415 100644
+--- a/docs/QA_TODO_HANDOFF.md
++++ b/docs/QA_TODO_HANDOFF.md
+@@ -46,6 +46,7 @@ Checklist operativo para QA manual. Ningun caso debe marcarse como `PASS` sin ev
+ | NAV-004 | `qa.admin@local.test` | `/customers`, `/reservations`, `/users` | Rutas operativas migradas | Abrir rutas principales | AppShell, idioma activo, light/dark | N/A | PENDING_QA | Pendiente | Pendiente | S2 |
+ | SEC-001 | DBA/DevOps | Backend local/QA | Variables backend seguras | Definir `CONTROL_ROPA_DB_PASSWORD`; iniciar backend; ejecutar health/login smoke | Backend arranca sin password versionado; DB conecta por env var | Secret configurado fuera del repo | PENDING_QA | Pendiente | Pendiente | S1 |
+ | SEC-002 | DBA/DevOps | Git workspace | `.env` no versionado | Crear `.env` local con valores reales; ejecutar `git status --short` | `.env` no aparece; `.env.example` queda versionado como plantilla | `.env` local temporal | PENDING_QA | Pendiente | Pendiente | S1 |
++| SEC-003 | Dev/QA tecnico | Backend local DEV | Script DEV seguro | Copiar `.env.example` a `.env`; configurar password local; ejecutar `./scripts/dev-backend.sh` en Git Bash o `scripts\dev-backend.cmd` en CMD | Backend arranca cargando `.env`; password no se imprime; `.env` no queda staged | `.env` local no versionado | PENDING_QA | Pendiente | Pendiente | S1 |
+
+ ## Reglas de evidencia
+
+diff --git a/docs/SEC_CONFIG_A1_DEV_STARTUP.md b/docs/SEC_CONFIG_A1_DEV_STARTUP.md
+new file mode 100644
+index 0000000..ca96132
+--- /dev/null
++++ b/docs/SEC_CONFIG_A1_DEV_STARTUP.md
+@@ -0,0 +1,113 @@
++# SEC-CONFIG-A1 - Script local seguro de arranque DEV
++
++## Problema
++
++Despues de SEC-CONFIG-A, el backend ya no versiona el password de base de datos. Si `CONTROL_ROPA_DB_PASSWORD` no esta cargada, Spring Boot intenta conectar sin password y puede fallar con:
++
++```text
++Access denied for user 'root'@'localhost' (using password: NO)
++```
++
++Ese comportamiento es correcto desde seguridad: el secreto debe vivir fuera del repositorio.
++
++## Como configurar DEV
++
++Desde la raiz del proyecto:
++
++```bash
++cp .env.example .env
++```
++
++Luego editar `.env` y reemplazar:
++
++```text
++CONTROL_ROPA_DB_PASSWORD=CAMBIA_ESTE_VALOR
++```
++
++por el password local real. No compartir ese archivo y no subirlo al repositorio.
++
++## Arranque con Git Bash
++
++Desde la raiz del proyecto:
++
++```bash
++./scripts/dev-backend.sh
++```
++
++El script:
++
++- valida que exista `.env`;
++- carga variables con `set -a` y `source .env`;
++- valida que `CONTROL_ROPA_DB_PASSWORD` no este vacia ni sea el placeholder;
++- entra a `backend/control-ropa`;
++- ejecuta `./mvnw.cmd spring-boot:run`;
++- no imprime el password en consola.
++
++## Arranque con Windows CMD
++
++Desde la raiz del proyecto:
++
++```cmd
++scripts\dev-backend.cmd
++```
++
++El script:
++
++- valida que exista `.env`;
++- carga variables simples `KEY=VALUE`;
++- valida `CONTROL_ROPA_DB_PASSWORD`;
++- entra a `backend\control-ropa`;
++- ejecuta `mvnw.cmd spring-boot:run`;
++- no imprime el password en consola.
++
++## Alternativa manual en CMD
++
++Si se prefiere no usar `.env` en CMD:
++
++```cmd
++set CONTROL_ROPA_DB_PASSWORD=TU_PASSWORD_LOCAL
++cd backend\control-ropa
++mvnw.cmd spring-boot:run
++```
++
++No pegar el valor real en documentacion, tickets ni capturas.
++
++## Validar que la variable existe
++
++Git Bash:
++
++```bash
++echo $CONTROL_ROPA_DB_PASSWORD
++```
++
++Windows CMD:
++
++```cmd
++echo %CONTROL_ROPA_DB_PASSWORD%
++```
++
++Usar esto solo en ambiente local controlado. No compartir capturas si aparece el password.
++
++## Que NO hacer
++
++- No subir `.env`.
++- No poner password real en `application.properties`.
++- No pegar secretos reales en documentacion.
++- No compartir capturas con passwords.
++- No usar variables `EXPO_PUBLIC_*` para secretos.
++
++## Troubleshooting
++
++| Error | Causa probable | Accion |
++| --- | --- | --- |
++| `Access denied ... using password: NO` | `CONTROL_ROPA_DB_PASSWORD` no esta cargada. | Revisar `.env` o variable de entorno. |
++| `Access denied ... using password: YES` | Password cargado pero incorrecto. | Corregir el valor local en `.env`. |
++| `Unknown database` | La base no existe o la URL apunta a otra DB. | Crear DB o ajustar `CONTROL_ROPA_DB_URL`. |
++| `Communications link failure` | MySQL no esta levantado, host/puerto incorrecto o firewall. | Levantar MySQL y revisar URL/puerto. |
++| El script indica placeholder | `.env` sigue usando `CAMBIA_ESTE_VALOR`. | Reemplazar por el valor local real. |
++
++## Estado
++
++DONE_TECH para SEC-CONFIG-A1.
++
++Estado QA: PENDING_QA hasta validar arranque local con `.env` real no versionado.
+diff --git a/docs/SEC_CONFIG_A_CONFIGURATION_SECRETS.md b/docs/SEC_CONFIG_A_CONFIGURATION_SECRETS.md
+index ea18bbb..ba08a5a 100644
+--- a/docs/SEC_CONFIG_A_CONFIGURATION_SECRETS.md
++++ b/docs/SEC_CONFIG_A_CONFIGURATION_SECRETS.md
+@@ -99,6 +99,15 @@ y permite:
+ 4. Confirmar que `.env` no aparece en `git status`.
+ 5. Confirmar que `.env.example` si queda versionado.
+
++## Arranque DEV local
++
++SEC-CONFIG-A1 agrega scripts locales seguros para cargar `.env` sin versionar secretos:
++
++- Git Bash: `./scripts/dev-backend.sh`
++- Windows CMD: `scripts\dev-backend.cmd`
++
++Ver `docs/SEC_CONFIG_A1_DEV_STARTUP.md`.
++
+ ## Estado
+
+ DONE_TECH para SEC-CONFIG-A.
+diff --git a/qa-reports/SEC-CONFIG-A1-dev-startup-script-report-20260608-105828.md b/qa-reports/SEC-CONFIG-A1-dev-startup-script-report-20260608-105828.md
+new file mode 100644
+index 0000000..7297d06
+--- /dev/null
++++ b/qa-reports/SEC-CONFIG-A1-dev-startup-script-report-20260608-105828.md
+@@ -0,0 +1,49 @@
++# SEC-CONFIG-A1 - Dev startup script report
++
++Fecha: 2026-06-08 10:58:28
++Rama: `feature/sec-config-a1-dev-startup-script`
++
++## Objetivo
++
++Crear un mecanismo local seguro para levantar backend DEV despues de SEC-CONFIG-A, cargando `CONTROL_ROPA_DB_PASSWORD` desde `.env` no versionado.
++
++## Cambios realizados
++
++- Se agrego `scripts/dev-backend.sh` para Git Bash.
++- Se agrego `scripts/dev-backend.cmd` para Windows CMD.
++- `.env.example` usa `CONTROL_ROPA_DB_PASSWORD=CAMBIA_ESTE_VALOR` y comillas en valores con `&` o espacios.
++- Se creo `docs/SEC_CONFIG_A1_DEV_STARTUP.md`.
++- Se actualizaron tablero, backlog, handoff QA, runbook y documentacion SEC-CONFIG-A.
++
++## Validaciones ejecutadas
++
++Frontend:
++
++- `npm.cmd run lint` - PASS, 0 errores; warnings preexistentes.
++- `npx.cmd tsc --noEmit` - PASS.
++
++Backend:
++
++- `./mvnw.cmd test` - PASS, usando variable temporal local sin imprimir el valor.
++- `./mvnw.cmd -q -DskipTests package` - PASS.
++
++Scripts:
++
++- `C:\Program Files\Git\bin\bash.exe -n scripts/dev-backend.sh` - PASS.
++- `C:\Program Files\Git\bin\bash.exe scripts/dev-backend.sh` sin `.env` - FAIL esperado con mensaje claro.
++- `cmd /c scripts\dev-backend.cmd` sin `.env` - FAIL esperado con mensaje claro.
++
++Git:
++
++- `git --no-pager diff --check` - PASS.
++
++## Observaciones
++
++- No existe `.env` local en el workspace.
++- No se ejecuto `spring-boot:run` completo porque requiere password real en `.env`; queda como validacion manual de QA/dev.
++- `.env` no esta staged ni versionado.
++- No se agregaron passwords reales en scripts, docs ni `.env.example`.
++
++## Resultado
++
++SEC-CONFIG-A1 queda `DONE_TECH` y `PENDING_QA`.
+diff --git a/scripts/dev-backend.cmd b/scripts/dev-backend.cmd
+new file mode 100644
+index 0000000..1075d4a
+--- /dev/null
++++ b/scripts/dev-backend.cmd
+@@ -0,0 +1,66 @@
++@echo off
++setlocal EnableExtensions DisableDelayedExpansion
++
++set "PROJECT_ROOT=%~dp0.."
++
++pushd "%PROJECT_ROOT%" >nul
++if errorlevel 1 (
++  echo No se pudo entrar a la raiz del proyecto.
++  exit /b 1
++)
++
++if not exist ".env" (
++  echo No existe .env. Copia .env.example a .env y configura CONTROL_ROPA_DB_PASSWORD.
++  popd >nul
++  exit /b 1
++)
++
++for /f "usebackq eol=# tokens=1* delims==" %%A in (".env") do (
++  call :set_env_var "%%A" "%%B"
++)
++
++if not defined CONTROL_ROPA_DB_PASSWORD (
++  echo CONTROL_ROPA_DB_PASSWORD esta vacia. Configurala en .env antes de arrancar backend DEV.
++  popd >nul
++  exit /b 1
++)
++
++if "%CONTROL_ROPA_DB_PASSWORD%"=="CAMBIA_ESTE_VALOR" (
++  echo CONTROL_ROPA_DB_PASSWORD sigue usando el valor de ejemplo. Configura el password local real en .env.
++  popd >nul
++  exit /b 1
++)
++
++if "%CONTROL_ROPA_DB_PASSWORD%"=="change-me" (
++  echo CONTROL_ROPA_DB_PASSWORD sigue usando el valor de ejemplo. Configura el password local real en .env.
++  popd >nul
++  exit /b 1
++)
++
++pushd "backend\control-ropa" >nul
++if errorlevel 1 (
++  echo No se pudo entrar a backend\control-ropa.
++  popd >nul
++  exit /b 1
++)
++
++call mvnw.cmd spring-boot:run
++set "EXIT_CODE=%ERRORLEVEL%"
++
++popd >nul
++popd >nul
++exit /b %EXIT_CODE%
++
++:set_env_var
++setlocal EnableExtensions DisableDelayedExpansion
++set "KEY=%~1"
++set "VALUE=%~2"
++
++if "%KEY%"=="" exit /b 0
++if "%KEY:~0,1%"=="#" exit /b 0
++
++if "%VALUE:~0,1%"=="'" if "%VALUE:~-1%"=="'" set "VALUE=%VALUE:~1,-1%"
++if "%VALUE:~0,1%"=="""" if "%VALUE:~-1%"=="""" set "VALUE=%VALUE:~1,-1%"
++
++endlocal & set "%KEY%=%VALUE%"
++exit /b 0
+diff --git a/scripts/dev-backend.sh b/scripts/dev-backend.sh
+new file mode 100644
+index 0000000..d2ae33d
+--- /dev/null
++++ b/scripts/dev-backend.sh
+@@ -0,0 +1,33 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
++ENV_FILE="$PROJECT_ROOT/.env"
++
++cd "$PROJECT_ROOT"
++
++if [[ ! -f "$ENV_FILE" ]]; then
++  echo "No existe .env. Copia .env.example a .env y configura CONTROL_ROPA_DB_PASSWORD."
++  exit 1
++fi
++
++set -a
++if ! source "$ENV_FILE"; then
++  set +a
++  echo "No se pudo cargar .env. Revisa que use formato KEY=VALUE y comillas para valores con espacios o &."
++  exit 1
++fi
++set +a
++
++if [[ -z "${CONTROL_ROPA_DB_PASSWORD:-}" ]]; then
++  echo "CONTROL_ROPA_DB_PASSWORD esta vacia. Configurala en .env antes de arrancar backend DEV."
++  exit 1
++fi
++
++if [[ "$CONTROL_ROPA_DB_PASSWORD" == "CAMBIA_ESTE_VALOR" || "$CONTROL_ROPA_DB_PASSWORD" == "change-me" ]]; then
++  echo "CONTROL_ROPA_DB_PASSWORD sigue usando el valor de ejemplo. Configura el password local real en .env."
++  exit 1
++fi
++
++cd "$PROJECT_ROOT/backend/control-ropa"
++./mvnw.cmd spring-boot:run

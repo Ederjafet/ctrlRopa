@@ -46,6 +46,7 @@ Checklist operativo para QA manual. Ningun caso debe marcarse como `PASS` sin ev
 | NAV-004 | `qa.admin@local.test` | `/customers`, `/reservations`, `/users` | Rutas operativas migradas | Abrir rutas principales | AppShell, idioma activo, light/dark | N/A | PENDING_QA | Pendiente | Pendiente | S2 |
 | SEC-001 | DBA/DevOps | Backend local/QA | Variables backend seguras | Definir `CONTROL_ROPA_DB_PASSWORD`; iniciar backend; ejecutar health/login smoke | Backend arranca sin password versionado; DB conecta por env var | Secret configurado fuera del repo | PENDING_QA | Pendiente | Pendiente | S1 |
 | SEC-002 | DBA/DevOps | Git workspace | `.env` no versionado | Crear `.env` local con valores reales; ejecutar `git status --short` | `.env` no aparece; `.env.example` queda versionado como plantilla | `.env` local temporal | PENDING_QA | Pendiente | Pendiente | S1 |
+| SEC-003 | Dev/QA tecnico | Backend local DEV | Script DEV seguro | Copiar `.env.example` a `.env`; configurar password local; ejecutar `./scripts/dev-backend.sh` en Git Bash o `scripts\dev-backend.cmd` en CMD | Backend arranca cargando `.env`; password no se imprime; `.env` no queda staged | `.env` local no versionado | PENDING_QA | Pendiente | Pendiente | S1 |
 
 ## Reglas de evidencia
 
