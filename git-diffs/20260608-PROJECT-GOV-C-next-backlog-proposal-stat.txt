@@ -1,0 +1,3 @@
+﻿ docs/PROJECT_GOV_C_NEXT_BACKLOG_PROPOSAL.md        | 139 +++++++++++++++++++++
+ ...next-backlog-proposal-report-20260608-144851.md |  58 +++++++++
+ 2 files changed, 197 insertions(+)
