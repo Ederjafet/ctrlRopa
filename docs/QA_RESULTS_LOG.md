@@ -23,6 +23,16 @@ Bitacora central para registrar resultados reales de QA. Este documento inicia s
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | YYYY-MM-DD | Nombre QA | local/qa/staging | usuario | ruta | ID de `QA_TODO_HANDOFF` | PASS/FAIL/BLOCKED/NA | ruta o link | detalle | S1/S2/S3/S4 | fase | OPEN/FIXED/RETEST/PENDING |
 
+## Plantilla PRODUCT-D4 REAL
+
+Usar esta plantilla para pegar resultados reales de `docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md`. No llenar con datos supuestos.
+
+| Fecha | Tester | Ambiente | Usuario | Ruta | Caso | Resultado | Evidencia | Comentario QA | Severidad | Fase correctiva sugerida | Estado de correccion |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| YYYY-MM-DD | Nombre QA | local/qa/staging | usuario | ruta | D4R-001 | PASS/FAIL/BLOCKED/NA | ruta o link | detalle | S1/S2/S3/S4 | fase | OPEN/FIXED/RETEST/PENDING |
+
+Referencia de captura: `qa-reports/manual-evidence/PRODUCT-D4-REAL-QA-results-template-20260608.md`.
+
 ## Reglas
 
 - Todo `FAIL` debe tener severidad.

@@ -16,7 +16,7 @@ No se debe cerrar un pendiente sin evidencia, validaciones y commit de fase.
 
 | Prioridad | Bloque | Pendiente | Origen | Impacto | Severidad | Fase sugerida | Criterio de cierre | Estado |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| P0 | QA | Corrida QA manual real con evidencia | PRODUCT-D4 | Sin QA formal no hay release confiable | S1 | PRODUCT-D4 REAL | Casos ejecutados, evidencia adjunta, PASS/FAIL/BLOCKED documentado | PENDING_QA |
+| P0 | QA | Corrida QA manual real con evidencia | PRODUCT-D4 | Sin QA formal no hay release confiable | S1 | PRODUCT-D4 REAL | Plan, matriz y plantilla listos; ejecutar casos con evidencia y registrar PASS/FAIL/BLOCKED | READY_FOR_QA |
 | P0 | Gobierno | Compuerta arquitectura para backlog autonomo | PROJECT-GOV-B | Evita ejecucion autonoma de cambios sensibles sin revision | S1 | PROJECT-GOV-B1 | Runbook actualizado; siguientes corridas deben detenerse y entregar handoff si el bloque es sensible | DONE_TECH |
 | P0 | LIVE | Autorizacion real de cambio de precio | LIVE-Z10A | Vendedor no puede solicitar aprobacion dentro del sistema | S1 | LIVE-Z10B | Backend + UI real de solicitud/aprobacion/auditoria o decision producto firmada | PENDING_DECISION |
 | P0 | Inventario | Edicion/correccion de prendas capturadas | QA/operacion | Errores de captura quedan sin correccion clara | S1 | ITEM-Z1 | Editar campos permitidos con permisos, auditoria y QA | PENDING_DECISION |
@@ -31,13 +31,16 @@ No se debe cerrar un pendiente sin evidencia, validaciones y commit de fase.
 | P2 | Branding | Pulido pendiente editor visual | PRODUCT-C2.6 | Si QA detecta saturacion o contraste bajo | S3 | PRODUCT-C2.7 | Ajuste visual puntual con evidencia | PENDING_QA |
 | P2 | Backend | Endpoint raiz/health simple | Observacion DEV | Raiz del backend puede no guiar a dev/QA | S3 | BACKEND-HEALTH-A | Requiere aprobacion si toca backend; documentar contrato y pruebas antes de ejecutar | PENDING_DECISION |
 | P2 | Navegacion | Legacy routes restantes no priorizadas | PRODUCT-D6.5/D6.6 | Pantallas menos usadas pueden verse legacy | S3 | PRODUCT-D6.7 | Auditar/migrar siguiente lote por dominio | PENDING_QA |
+| P2 | Correcciones QA | Fases correctivas derivadas de PRODUCT-D4 REAL | PRODUCT-D4 REAL | Fallos reales deben corregirse por fase puntual | S1-S3 | PENDING_QA_RESULTS | Abrir fase correctiva por dominio solo si QA registra FAIL/BLOCKED con evidencia | PENDING_QA_RESULTS |
 | P3 | Reportes | Validacion manual de reportes y permisos | PRODUCT-D/QA | Reportes requieren dataset real para QA | S3 | REPORT-QA-A | Casos con datos, permisos y evidencia | PENDING_QA |
 | P3 | Operacion | Caja/pagos no tocados por LIVE-Z9/Z10 | Alcance excluido | Riesgo de deuda funcional futura | S2 | PAYMENTS-QA-A | Smoke de pagos/caja separado, sin mezclar con LIVE | PENDING_DECISION |
 
 ## Reglas de cierre de backlog
 
 - `DONE_TECH`: implementado, validaciones tecnicas pasan, commit existe.
+- `READY_FOR_QA`: material de ejecucion preparado; falta QA humano.
 - `DEV_VALIDATED`: nota operativa de entorno DEV; no equivale a `QA_PASS`.
+- `PENDING_QA_RESULTS`: esperando resultados reales para decidir fase correctiva.
 - `PENDING_QA`: falta ejecucion manual o evidencia.
 - `QA_PASS`: solo con evidencia real y referencia en `docs/QA_RESULTS_LOG.md`.
 - `QA_FAIL`: registrar severidad, evidencia y fase correctiva sugerida.

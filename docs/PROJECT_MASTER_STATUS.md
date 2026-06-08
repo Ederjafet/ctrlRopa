@@ -10,12 +10,14 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 
 | Rama | Merge commit | Fase | Observacion |
 | --- | --- | --- | --- |
-| `feature/sec-config-a1-dev-startup-script` | `fdce443` | SEC-CONFIG-A1 | Se agrego arranque DEV seguro con `.env` local no versionado. |
+| `feature/project-gov-c-next-backlog-proposal` | `29c4461` | PROJECT-GOV-C | Se propuso PRODUCT-D4 REAL como siguiente bloque y se entrego handoff. |
 
 ## Ultimas fases cerradas
 
 | Fase | Commit | Estado tecnico | Estado QA |
 | --- | --- | --- | --- |
+| PRODUCT-D4 REAL | commit PRODUCT-D4 REAL | READY_FOR_QA | PENDING_QA |
+| PROJECT-GOV-C | `a772390` | DONE_TECH | PENDING_QA |
 | PROJECT-GOV-B1 | commit PROJECT-GOV-B1 | DONE_TECH | PENDING_QA |
 | SEC-CONFIG-A1 | `5fe5c38` | DONE_TECH | PENDING_QA |
 | SEC-CONFIG-A | commit PROJECT-GOV-B | DONE_TECH | PENDING_QA |
@@ -36,7 +38,7 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 | AUTH | DONE_TECH | QA_PASS | Hay smokes y reportes AUTH con resultados automatizados; mantener QA manual de roles y regresion. |
 | LIVE | DONE_TECH | PENDING_QA | LIVE-Z0 a LIVE-Z10A estan documentados; falta corrida manual multiusuario/multidispositivo completa. |
 | PRODUCT-C / Diseno | DONE_TECH | PENDING_QA | Sistema visual, UI Kit y editor de marca cerrados tecnicamente; falta validacion visual formal. |
-| PRODUCT-D / QA visual | DONE_TECH | PENDING_QA | Navegacion/AppShell migrados; PRODUCT-D4 mantiene evidencia manual pendiente. |
+| PRODUCT-D / QA visual | READY_FOR_QA | PENDING_QA | PRODUCT-D4 REAL prepara plan, matriz y plantilla; ejecucion humana con evidencia sigue pendiente. |
 | I18N | DONE_TECH | PENDING_QA | Soporte multidioma base y limpieza de claves; falta revision humana/nativa. |
 | ERROR HANDLING | DONE_TECH | PENDING_QA | PRODUCT-ERR-A aplicado en pantallas criticas; quedan dominios restantes. |
 | Seguridad | DONE_TECH | PENDING_QA | AUTH y auditoria tienen evidencia tecnica; SEC-CONFIG-A externaliza secrets/config y SEC-CONFIG-A1 agrega arranque DEV seguro; queda hardening y validacion por ambiente. |
@@ -63,7 +65,7 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 | PRODUCT-D5/D6.x | Navegacion, AppShell, legacy routes e i18n visible | varias | varios | DONE_TECH | PENDING_QA | Confirmar ausencia de layouts legacy en rutas priorizadas. |
 | PRODUCT-I18N-A/B/B.1 | Multidioma, limpieza de mezclas y glosario | varias | `cb89fa0` y relacionados | DONE_TECH | PENDING_QA | Revision humana/nativa y no claves crudas. |
 | PRODUCT-ERR-A | Errores accionables | `feature/product-err-a-actionable-errors` | `d97668b` | DONE_TECH | PENDING_QA | Simular error red/backend y validar mensajes. |
-| PRODUCT-D4 | QA manual con evidencia | `feature/product-d4-*` | varios | DONE_TECH | PENDING_QA | Ejecutar corrida real con screenshots/evidencia. |
+| PRODUCT-D4 REAL | Corrida QA manual real con evidencia | `feature/product-d4-real-manual-qa-evidence` | commit PRODUCT-D4 REAL | READY_FOR_QA | PENDING_QA | Ejecutar matriz `D4R-*` con evidencia real; no marcar PASS sin evidencia. |
 | PROJECT-GOV-B1 | Compuerta arquitectura para backlog autonomo | `feature/project-gov-b1-architectural-approval-gate` | commit PROJECT-GOV-B1 | DONE_TECH | PENDING_QA | Revisar que Codex detenga bloques sensibles y entregue handoff antes de ejecutar. |
 | SEC-CONFIG-A | Configuracion/secrets fuera de repo | `feature/project-gov-b-autonomous-backlog-runner` | commit PROJECT-GOV-B | DONE_TECH | PENDING_QA | Validar arranque local/QA con `CONTROL_ROPA_DB_PASSWORD` fuera del repo. |
 | SEC-CONFIG-A1 | Script local seguro de arranque DEV | `feature/sec-config-a1-dev-startup-script` | `5fe5c38` | DONE_TECH | PENDING_QA | DEV_VALIDATED: backend 8090, `/api/me` 401 esperado, `.env` no versionado; falta QA formal. |
@@ -76,13 +78,13 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 | Backlog autonomo de bajo riesgo | GO condicionado a alcance documental/visual/no sensible |
 | Backlog autonomo sensible | NO-GO sin aprobacion arquitectonica |
 | Merge automatico a develop desde este tablero | NO-GO |
-| Release funcional amplio | NO-GO hasta QA manual |
+| Release funcional amplio | NO-GO hasta ejecutar PRODUCT-D4 REAL con evidencia |
 | Demo controlada con riesgos conocidos | GO condicionado |
 | Internacionalizacion comercial | NO-GO hasta revision nativa |
 
 ## Proximas 5 prioridades
 
-1. PRODUCT-D4 REAL: corrida QA manual con evidencia.
+1. Ejecutar PRODUCT-D4 REAL: corrida QA manual con evidencia.
 2. LIVE-Z10B: backend real para autorizacion de cambio de precio, o decision de producto formal.
 3. ITEM-Z1: edicion/correccion segura de prendas capturadas.
 4. PRODUCT-ERR-B: extender errores accionables a dominios restantes.
@@ -92,7 +94,7 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 
 | Riesgo | Impacto | Estado |
 | --- | --- | --- |
-| QA manual insuficiente | Regresiones visuales o de permisos no detectadas | PENDING_QA |
+| QA manual insuficiente | Regresiones visuales o de permisos no detectadas; PRODUCT-D4 REAL queda listo para ejecutar | PENDING_QA |
 | Autorizacion de precio sin backend | Usuarios esperan un flujo no disponible | ACCEPTED_RISK |
 | `app/live.tsx` muy grande | Mantenibilidad y riesgo de regresion | PENDING_DECISION |
 | Traducciones no nativas | Experiencia internacional inconsistente | PENDING_QA |
@@ -102,4 +104,4 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 
 ## Ultima actualizacion
 
-2026-06-08, `feature/project-gov-b1-architectural-approval-gate`.
+2026-06-08, `feature/product-d4-real-manual-qa-evidence`.

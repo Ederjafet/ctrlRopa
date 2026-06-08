@@ -13,6 +13,57 @@ Checklist operativo para QA manual. Ningun caso debe marcarse como `PASS` sin ev
 | `qa.supervisor.centro@local.test` | Supervision LIVE y monitoreo. |
 | `qa.sinpermisos@local.test` | Bloqueo y pruebas negativas. |
 
+## Corrida PRODUCT-D4 REAL
+
+### Instrucciones para QA
+
+- Usar `docs/PRODUCT_D4_REAL_QA_EXECUTION_PLAN.md` como guia de ejecucion.
+- Usar `docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md` como matriz ejecutable.
+- Registrar resultados reales en `docs/QA_RESULTS_LOG.md`.
+- Adjuntar evidencia en `qa-reports/manual-evidence/` o indicar ruta externa.
+- No marcar `PASS` sin screenshot, video o evidencia verificable.
+- No incluir passwords reales, `.env` ni secretos en capturas.
+- No corregir dentro de la corrida; si hay `FAIL`, registrar fase correctiva sugerida.
+
+### Orden recomendado
+
+1. Arranque DEV/backend y `.env`.
+2. Login/sesion.
+3. Navegacion/AppShell/permisos.
+4. LIVE operador.
+5. LIVE vendedor.
+6. LIVE supervisor.
+7. LIVE sin permisos.
+8. Apartados/reservas.
+9. Prendas/inventario.
+10. UI Kit/diseno visual.
+11. I18n.
+12. Errores accionables.
+
+### Ambiente y usuarios
+
+- Ambiente: local, QA o staging definido por QA.
+- Usuarios: `qa.admin@local.test`, `qa.vendedor.centro@local.test`, `qa.supervisor.centro@local.test`, `qa.sinpermisos@local.test`.
+- Datos minimos: LIVE activo, prendas disponibles/apartadas/vendidas, cliente/interesado, catalogos y permisos QA.
+
+### Evidencia requerida
+
+- ID de caso.
+- Usuario.
+- Ruta.
+- Tema y viewport si aplica.
+- Resultado real.
+- Screenshot/video/ruta de evidencia.
+- Comentario QA.
+
+### Matriz resumida
+
+La matriz ejecutable completa esta en `docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md`. Los casos cubren backend DEV, login, navegacion, LIVE por actor, apartados, inventario, UI Kit, i18n, errores accionables y configuracion segura.
+
+### Donde registrar resultados
+
+Usar `docs/QA_RESULTS_LOG.md` y la plantilla `qa-reports/manual-evidence/PRODUCT-D4-REAL-QA-results-template-20260608.md`.
+
 ## Casos de prueba
 
 | ID | Usuario | Ruta | Caso | Pasos | Resultado esperado | Datos necesarios | Estado QA | Resultado real | Evidencia | Severidad si falla |
