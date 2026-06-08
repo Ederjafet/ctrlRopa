@@ -2,6 +2,8 @@
 
 Fecha: 2026-05-12
 
+> Referencia PROJECT-GOV-A: los riesgos abiertos priorizados ahora se consolidan en `docs/PROJECT_MASTER_STATUS.md` y `docs/PROJECT_BACKLOG_PRIORITIZED.md`. Este documento conserva la matriz historica de riesgos operativos.
+
 ## Escala
 
 Severidad:

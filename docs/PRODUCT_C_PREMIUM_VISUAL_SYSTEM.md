@@ -2,6 +2,8 @@
 
 Fecha: 2026-06-04
 
+> Referencia PROJECT-GOV-A: el seguimiento de QA visual, branding pendiente y proximas fases de diseno se centraliza en `docs/PROJECT_MASTER_STATUS.md`, `docs/PROJECT_BACKLOG_PRIORITIZED.md` y `docs/QA_TODO_HANDOFF.md`.
+
 ## Objetivo
 
 Definir y aplicar una direccion visual premium global para `control-ropa-app`, sin tocar backend ni reglas de negocio.

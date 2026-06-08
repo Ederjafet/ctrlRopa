@@ -1,5 +1,7 @@
 # PRODUCT-D4 - Ejecucion manual QA visual con evidencia real
 
+> Referencia PROJECT-GOV-A: usar `docs/QA_TODO_HANDOFF.md` como checklist QA actualizado y `docs/QA_RESULTS_LOG.md` como bitacora central de resultados reales.
+
 ## Objetivo
 
 PRODUCT-D4 existe para convertir los casos `PENDIENTE_MANUAL` de PRODUCT-D2/D3 en resultados reales: `PASS`, `FAIL`, `BLOQUEADO` o `NO_APLICA`, siempre con evidencia capturada.

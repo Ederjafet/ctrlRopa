@@ -1,0 +1,491 @@
+﻿diff --git a/docs/CODEX_AUTONOMOUS_CLOSURE_RUNBOOK.md b/docs/CODEX_AUTONOMOUS_CLOSURE_RUNBOOK.md
+new file mode 100644
+index 0000000..4d57984
+--- /dev/null
++++ b/docs/CODEX_AUTONOMOUS_CLOSURE_RUNBOOK.md
+@@ -0,0 +1,111 @@
++# CODEX_AUTONOMOUS_CLOSURE_RUNBOOK
++
++## Objetivo
++
++Definir como Codex debe cerrar pendientes uno por uno, sin mezclar fases ni marcar avances sin evidencia.
++
++## Flujo obligatorio
++
++1. Tomar un pendiente de `docs/PROJECT_BACKLOG_PRIORITIZED.md`.
++2. Crear o confirmar rama de fase.
++3. Auditar contexto minimo: docs, codigo, servicios y reportes relacionados.
++4. Implementar solo esa fase.
++5. Ejecutar validaciones requeridas.
++6. Corregir errores seguros dentro del alcance.
++7. Generar documentacion y evidencia.
++8. Hacer commit con mensaje de fase.
++9. No hacer merge a develop.
++10. Entregar GO/NO-GO.
++11. Si QA falla, abrir fase correctiva puntual.
++12. Actualizar tablero/backlog/log QA cuando aplique.
++
++## Cuando Codex puede corregir autonomamente
++
++Codex puede avanzar sin pedir confirmacion cuando:
++
++- el alcance esta definido y no requiere decision de negocio nueva;
++- el cambio no toca backend sensible salvo que la fase lo pida;
++- no cambia contratos de API;
++- no concede permisos nuevos sin permiso real;
++- las validaciones fallan por errores directamente causados por la fase;
++- la correccion queda dentro del mismo modulo o documento.
++
++## Cuando debe detenerse
++
++Codex debe detenerse y reportar decision requerida cuando:
++
++- se necesita crear endpoints no solicitados;
++- hay que cambiar reglas de negocio profundas;
++- el fix requiere pagos/caja/billing/IA fuera del alcance;
++- hay datos productivos o secretos involucrados;
++- hay cambios del usuario que contradicen la fase;
++- QA pide aceptar un riesgo sin responsable;
++- no existe evidencia suficiente para marcar `QA_PASS`.
++
++## Validaciones base
++
++Para cambios de codigo frontend:
++
++```powershell
++npm.cmd run lint
++npx.cmd tsc --noEmit
++npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export
++```
++
++Para cambios backend:
++
++```powershell
++cd backend/control-ropa
++.\mvnw.cmd test
++.\mvnw.cmd -q -DskipTests package
++cd /e/CtrlPan/2026/control-ropa-app
++```
++
++Para cambios solo documentales:
++
++```powershell
++git status
++git --no-pager diff --stat
++git --no-pager diff --name-only
++git --no-pager diff --check
++```
++
++Lint/TypeScript pueden ejecutarse opcionalmente si el tablero o fase lo pide.
++
++## Evidencia requerida por fase
++
++- `qa-reports/<FASE>-report-YYYYMMDD-HHMMSS.md`
++- `git-diffs/YYYYMMDD-<FASE>.diff`
++- `git-diffs/YYYYMMDD-<FASE>-stat.txt`
++- Documentacion de fase en `docs/`.
++
++## Actualizacion de tablero
++
++Al cerrar una fase:
++
++1. En `PROJECT_MASTER_STATUS.md`, actualizar fase, commit y estado tecnico.
++2. En `PROJECT_BACKLOG_PRIORITIZED.md`, mover el pendiente a `DONE_TECH` o `PENDING_QA`.
++3. En `QA_TODO_HANDOFF.md`, agregar casos si se creo funcionalidad nueva.
++4. En `QA_RESULTS_LOG.md`, solo registrar resultados reales recibidos de QA.
++
++## Criterios de GO/NO-GO
++
++GO:
++
++- validaciones pasan;
++- evidencia generada;
++- commit creado;
++- alcance respetado;
++- no hay cambios fuera de fase.
++
++NO-GO:
++
++- validaciones fallan;
++- falta evidencia;
++- se requiere decision de negocio;
++- hay riesgo de seguridad no resuelto;
++- QA falla y no hay correccion segura dentro del alcance.
++
++## Regla final
++
++Codex no debe cerrar pendientes por optimismo. Cierra por evidencia.
+diff --git a/docs/ERP_RIESGOS_OPERATIVOS.md b/docs/ERP_RIESGOS_OPERATIVOS.md
+index 1dfa283..acd8973 100644
+--- a/docs/ERP_RIESGOS_OPERATIVOS.md
++++ b/docs/ERP_RIESGOS_OPERATIVOS.md
+@@ -2,6 +2,8 @@
+
+ Fecha: 2026-05-12
+
++> Referencia PROJECT-GOV-A: los riesgos abiertos priorizados ahora se consolidan en `docs/PROJECT_MASTER_STATUS.md` y `docs/PROJECT_BACKLOG_PRIORITIZED.md`. Este documento conserva la matriz historica de riesgos operativos.
++
+ ## Escala
+
+ Severidad:
+diff --git a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+index 5cd2c93..170a1c2 100644
+--- a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
++++ b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+@@ -1,5 +1,7 @@
+ # LIVE-Z6A - AppShell y layout operacional
+
++> Referencia PROJECT-GOV-A: el estado maestro de LIVE, pendientes, QA y fases correctivas vive en `docs/PROJECT_MASTER_STATUS.md`, `docs/PROJECT_BACKLOG_PRIORITIZED.md` y `docs/QA_TODO_HANDOFF.md`.
++
+ > Nota LIVE-Z9D: `Cambiar por prenda preparada` usa directamente la prenda preparada visible y no abre el selector.
+ > `Quitar prenda preparada` limpia solo la preparacion local, sin afectar prenda al aire, precio, cliente ni apartado.
+
+diff --git a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+index dae4114..0235f1b 100644
+--- a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
++++ b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+@@ -2,6 +2,8 @@
+
+ Fecha: 2026-06-04
+
++> Referencia PROJECT-GOV-A: el seguimiento de QA visual, branding pendiente y proximas fases de diseno se centraliza en `docs/PROJECT_MASTER_STATUS.md`, `docs/PROJECT_BACKLOG_PRIORITIZED.md` y `docs/QA_TODO_HANDOFF.md`.
++
+ ## Objetivo
+
+ Definir y aplicar una direccion visual premium global para `control-ropa-app`, sin tocar backend ni reglas de negocio.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index 7588469..08bf058 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -1,5 +1,7 @@
+ # PRODUCT-D4 - Ejecucion manual QA visual con evidencia real
+
++> Referencia PROJECT-GOV-A: usar `docs/QA_TODO_HANDOFF.md` como checklist QA actualizado y `docs/QA_RESULTS_LOG.md` como bitacora central de resultados reales.
++
+ ## Objetivo
+
+ PRODUCT-D4 existe para convertir los casos `PENDIENTE_MANUAL` de PRODUCT-D2/D3 en resultados reales: `PASS`, `FAIL`, `BLOQUEADO` o `NO_APLICA`, siempre con evidencia capturada.
+diff --git a/docs/PROJECT_BACKLOG_PRIORITIZED.md b/docs/PROJECT_BACKLOG_PRIORITIZED.md
+new file mode 100644
+index 0000000..9f90182
+--- /dev/null
++++ b/docs/PROJECT_BACKLOG_PRIORITIZED.md
+@@ -0,0 +1,48 @@
++# PROJECT_BACKLOG_PRIORITIZED
++
++## Criterio de priorizacion
++
++El backlog se ordena por:
++
++1. Bloqueos QA.
++2. Riesgo operativo.
++3. Seguridad.
++4. Mantenibilidad.
++5. Branding/UX.
++
++No se debe cerrar un pendiente sin evidencia, validaciones y commit de fase.
++
++## Backlog priorizado
++
++| Prioridad | Bloque | Pendiente | Origen | Impacto | Severidad | Fase sugerida | Criterio de cierre | Estado |
++| --- | --- | --- | --- | --- | --- | --- | --- | --- |
++| P0 | QA | Corrida QA manual real con evidencia | PRODUCT-D4 | Sin QA formal no hay release confiable | S1 | PRODUCT-D4 REAL | Casos ejecutados, evidencia adjunta, PASS/FAIL/BLOCKED documentado | PENDING_QA |
++| P0 | LIVE | Autorizacion real de cambio de precio | LIVE-Z10A | Vendedor no puede solicitar aprobacion dentro del sistema | S1 | LIVE-Z10B | Backend + UI real de solicitud/aprobacion/auditoria o decision producto firmada | PENDING_DECISION |
++| P0 | Inventario | Edicion/correccion de prendas capturadas | QA/operacion | Errores de captura quedan sin correccion clara | S1 | ITEM-Z1 | Editar campos permitidos con permisos, auditoria y QA | PENDING_DECISION |
++| P1 | Error handling | Errores accionables en dominios restantes | PRODUCT-ERR-A | Mensajes genericos pueden seguir apareciendo fuera de pantallas criticas | S2 | PRODUCT-ERR-B | Mapper aplicado a dominios restantes y QA de errores | PENDING_QA |
++| P1 | Seguridad | Limpieza de configuracion/secrets | Riesgo operativo | Posible exposicion o configuracion debil en despliegue | S1 | SEC-CONFIG-A | Inventario de env vars, secrets fuera de repo, docs de despliegue seguro | PENDING_DECISION |
++| P1 | Seguridad | Hardening CORS/sesion/headers | AUTH/Security | Riesgo de sesion o acceso en ambientes reales | S1 | SECURITY-A | Revision config, pruebas negativas, evidencia | PENDING_DECISION |
++| P1 | LIVE | Refactor de `app/live.tsx` | Mantenibilidad | Archivo grande eleva costo de cambios LIVE | S2 | LIVE-REF-A | Separar hooks/componentes sin cambiar comportamiento; pruebas pasan | PENDING_DECISION |
++| P1 | I18N | Revision humana/nativa de traducciones | I18N-A/B/B.1 | Riesgo de copy poco natural en pt/fr/ja/zh/ko | S2 | PRODUCT-I18N-B-NATIVE | Revision por idioma y correcciones aprobadas | PENDING_QA |
++| P2 | UX | Ergonomia diestro/zurdo, densidad y acciones | LIVE-Z9F.1/C2.x | Mobile/tablet puede requerir ajustes finos | S3 | PRODUCT-UX-A | Acciones configurables o layout validado por QA | PENDING_DECISION |
++| P2 | Branding | Persistencia branding por tenant/backend | PRODUCT-C2.x | Branding actual es local por dispositivo | S2 | PRODUCT-C3 | Backend/tenant config, permisos y QA de persistencia | PENDING_DECISION |
++| P2 | Branding | Pulido pendiente editor visual | PRODUCT-C2.6 | Si QA detecta saturacion o contraste bajo | S3 | PRODUCT-C2.7 | Ajuste visual puntual con evidencia | PENDING_QA |
++| P2 | Navegacion | Legacy routes restantes no priorizadas | PRODUCT-D6.5/D6.6 | Pantallas menos usadas pueden verse legacy | S3 | PRODUCT-D6.7 | Auditar/migrar siguiente lote por dominio | PENDING_QA |
++| P3 | Reportes | Validacion manual de reportes y permisos | PRODUCT-D/QA | Reportes requieren dataset real para QA | S3 | REPORT-QA-A | Casos con datos, permisos y evidencia | PENDING_QA |
++| P3 | Operacion | Caja/pagos no tocados por LIVE-Z9/Z10 | Alcance excluido | Riesgo de deuda funcional futura | S2 | PAYMENTS-QA-A | Smoke de pagos/caja separado, sin mezclar con LIVE | PENDING_DECISION |
++
++## Reglas de cierre de backlog
++
++- `DONE_TECH`: implementado, validaciones tecnicas pasan, commit existe.
++- `PENDING_QA`: falta ejecucion manual o evidencia.
++- `QA_PASS`: solo con evidencia real y referencia en `docs/QA_RESULTS_LOG.md`.
++- `QA_FAIL`: registrar severidad, evidencia y fase correctiva sugerida.
++- `BLOCKED`: documentar bloqueo y quien debe desbloquear.
++- `ACCEPTED_RISK`: permitido solo con decision explicita en docs.
++
++## Pendientes que no deben mezclarse
++
++- No mezclar LIVE-Z10B con pagos/caja.
++- No mezclar PRODUCT-C3 con cambios visuales de /ui-kit.
++- No mezclar LIVE-REF-A con cambios funcionales LIVE.
++- No mezclar PRODUCT-D4 REAL con fixes; si QA falla, abrir fase correctiva puntual.
+diff --git a/docs/PROJECT_MASTER_STATUS.md b/docs/PROJECT_MASTER_STATUS.md
+new file mode 100644
+index 0000000..52b128e
+--- /dev/null
++++ b/docs/PROJECT_MASTER_STATUS.md
+@@ -0,0 +1,95 @@
++# PROJECT_MASTER_STATUS
++
++## Resumen ejecutivo
++
++Este tablero centraliza el estado tecnico, QA y pendientes del proyecto Control Ropa.
++
++El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I18N, PRODUCT-ERR y PRODUCT-C2.x. La mayor parte del trabajo reciente esta tecnicamente cerrada con commits, reportes QA tecnicos y artefactos de diff. La validacion visual/manual de QA sigue siendo el principal pendiente transversal: ningun caso debe marcarse como `QA_PASS` sin evidencia verificable.
++
++## Ultima rama integrada a develop
++
++| Rama | Merge commit | Fase | Observacion |
++| --- | --- | --- | --- |
++| `feature/live-z10a-price-authorization-audit` | `99eff73` | LIVE-Z10A | Se audito autorizacion de cambio de precio LIVE y se retiro la simulacion de solicitud pendiente. |
++
++## Ultimas fases cerradas
++
++| Fase | Commit | Estado tecnico | Estado QA |
++| --- | --- | --- | --- |
++| LIVE-Z10A | `61b7ba8` | DONE_TECH | PENDING_QA |
++| LIVE-Z9J | `f92aa24` | DONE_TECH | PENDING_QA |
++| PRODUCT-ERR-A | `d97668b` | DONE_TECH | PENDING_QA |
++| LIVE-Z9I.1 | `6a4b26c` | DONE_TECH | PENDING_QA |
++| LIVE-Z9I | `d258e20` | DONE_TECH | PENDING_QA |
++| PRODUCT-C2.6 | `39b35fd` | DONE_TECH | PENDING_QA |
++| PRODUCT-C2.5 | `c11f630` | DONE_TECH | PENDING_QA |
++| PRODUCT-C2.4 | `1ad2d3e` | DONE_TECH | PENDING_QA |
++| PRODUCT-C2.3 | `31260a7` | DONE_TECH | PENDING_QA |
++
++## Estado por bloque
++
++| Bloque | Estado tecnico | Estado QA | Comentario |
++| --- | --- | --- | --- |
++| AUTH | DONE_TECH | QA_PASS | Hay smokes y reportes AUTH con resultados automatizados; mantener QA manual de roles y regresion. |
++| LIVE | DONE_TECH | PENDING_QA | LIVE-Z0 a LIVE-Z10A estan documentados; falta corrida manual multiusuario/multidispositivo completa. |
++| PRODUCT-C / Diseno | DONE_TECH | PENDING_QA | Sistema visual, UI Kit y editor de marca cerrados tecnicamente; falta validacion visual formal. |
++| PRODUCT-D / QA visual | DONE_TECH | PENDING_QA | Navegacion/AppShell migrados; PRODUCT-D4 mantiene evidencia manual pendiente. |
++| I18N | DONE_TECH | PENDING_QA | Soporte multidioma base y limpieza de claves; falta revision humana/nativa. |
++| ERROR HANDLING | DONE_TECH | PENDING_QA | PRODUCT-ERR-A aplicado en pantallas criticas; quedan dominios restantes. |
++| Seguridad | DONE_TECH | QA_PASS | AUTH y auditoria tienen evidencia tecnica; quedan hardening y configuracion/secrets. |
++| Refactor | PENDING_DECISION | PENDING_QA | `app/live.tsx` requiere particion por mantenibilidad. |
++
++## Tabla de fases
++
++| Fase | Objetivo | Rama | Commit | Estado tecnico | Estado QA | Pendiente |
++| --- | --- | --- | --- | --- | --- | --- |
++| AUTH-F a AUTH-Z | RBAC, tenant isolation, single session y auditoria | varias | varios | DONE_TECH | QA_PASS | Repetir smoke en QA remoto y completar datos opcionales. |
++| LIVE-Z0 a LIVE-Z5 | Base operativa LIVE y actor operador | varias | varios | DONE_TECH | PENDING_QA | Retestar flujo completo en QA actual. |
++| LIVE-Z6 | Reglas operativas y AppShell | `feature/live-z6-*` | varios | DONE_TECH | PENDING_QA | Validar AppShell, permisos y no regresion de captura. |
++| LIVE-Z7/Z8 | Precio/autorizacion preliminar | varias | varios | ACCEPTED_RISK | PENDING_QA | Reemplazado por decision LIVE-Z10A; backend real queda pendiente. |
++| LIVE-Z9A-Z9F.1 | Claridad operativa, dialogos y paneles accionables | varias | varios | DONE_TECH | PENDING_QA | Validacion visual LIVE de mensajes y paneles. |
++| LIVE-Z9G | Capacidades reales del vendedor | `feature/live-z9g-seller-capabilities` | no listado en log reciente | DONE_TECH | PENDING_QA | Confirmar vendedor con `DO_LIVE_RESERVATION`. |
++| LIVE-Z9H | Refresh vendedor/supervisor | `feature/live-z9h-view-refresh` | no listado en log reciente | DONE_TECH | PENDING_QA | Confirmar polling, foco y ultima actualizacion. |
++| LIVE-Z9I | Filtros disponibilidad selector prendas | `feature/live-z9i-item-selector-availability-filters` | `d258e20` | DONE_TECH | PENDING_QA | Validar disponibles/apartadas/vendidas. |
++| LIVE-Z9I.1 | Layout responsive acciones tarjetas LIVE | `feature/live-z9i-1-card-action-layout` | `6a4b26c` | DONE_TECH | PENDING_QA | Validar desktop/tablet/mobile. |
++| LIVE-Z9J | Sincronizacion apartados operador/admin | `feature/live-z9j-operator-reservation-sync` | `f92aa24` | DONE_TECH | PENDING_QA | Vendedor crea apartado y operador lo ve sin salir. |
++| LIVE-Z10A | Auditoria autorizacion precio LIVE | `feature/live-z10a-price-authorization-audit` | `61b7ba8` | DONE_TECH | PENDING_QA | Validar que no hay solicitud pendiente simulada. |
++| PRODUCT-C/C1 | Sistema visual premium global | varias | varios | DONE_TECH | PENDING_QA | Validar light/dark/presets en rutas principales. |
++| PRODUCT-C2.1-C2.6 | Editor visual, paletas, contraste y marca | varias | `31c3a4f` a `39b35fd` | DONE_TECH | PENDING_QA | Validar /ui-kit y /appearance con mobile/tablet. |
++| PRODUCT-D5/D6.x | Navegacion, AppShell, legacy routes e i18n visible | varias | varios | DONE_TECH | PENDING_QA | Confirmar ausencia de layouts legacy en rutas priorizadas. |
++| PRODUCT-I18N-A/B/B.1 | Multidioma, limpieza de mezclas y glosario | varias | `cb89fa0` y relacionados | DONE_TECH | PENDING_QA | Revision humana/nativa y no claves crudas. |
++| PRODUCT-ERR-A | Errores accionables | `feature/product-err-a-actionable-errors` | `d97668b` | DONE_TECH | PENDING_QA | Simular error red/backend y validar mensajes. |
++| PRODUCT-D4 | QA manual con evidencia | `feature/product-d4-*` | varios | DONE_TECH | PENDING_QA | Ejecutar corrida real con screenshots/evidencia. |
++
++## GO/NO-GO general
++
++| Area | Resultado |
++| --- | --- |
++| Desarrollo tecnico reciente | GO |
++| Merge automatico a develop desde este tablero | NO-GO |
++| Release funcional amplio | NO-GO hasta QA manual |
++| Demo controlada con riesgos conocidos | GO condicionado |
++| Internacionalizacion comercial | NO-GO hasta revision nativa |
++
++## Proximas 5 prioridades
++
++1. PRODUCT-D4 REAL: corrida QA manual con evidencia.
++2. LIVE-Z10B: backend real para autorizacion de cambio de precio, o decision de producto formal.
++3. ITEM-Z1: edicion/correccion segura de prendas capturadas.
++4. PRODUCT-ERR-B: extender errores accionables a dominios restantes.
++5. LIVE-REF-A: partir `app/live.tsx` en componentes/hooks mantenibles.
++
++## Riesgos abiertos
++
++| Riesgo | Impacto | Estado |
++| --- | --- | --- |
++| QA manual insuficiente | Regresiones visuales o de permisos no detectadas | PENDING_QA |
++| Autorizacion de precio sin backend | Usuarios esperan un flujo no disponible | ACCEPTED_RISK |
++| `app/live.tsx` muy grande | Mantenibilidad y riesgo de regresion | PENDING_DECISION |
++| Traducciones no nativas | Experiencia internacional inconsistente | PENDING_QA |
++| Branding solo local | No sirve aun para tenant/backend productivo | PENDING_DECISION |
++| Secrets/configuracion | Riesgo operativo si no se revisa despliegue | PENDING_DECISION |
++
++## Ultima actualizacion
++
++2026-06-08, `feature/project-gov-a-master-status-qa-board`.
+diff --git a/docs/QA_RESULTS_LOG.md b/docs/QA_RESULTS_LOG.md
+new file mode 100644
+index 0000000..64119b5
+--- /dev/null
++++ b/docs/QA_RESULTS_LOG.md
+@@ -0,0 +1,32 @@
++# QA_RESULTS_LOG
++
++## Objetivo
++
++Bitacora central para registrar resultados reales de QA. Este documento inicia sin resultados ejecutados por PROJECT-GOV-A.
++
++## Estados permitidos
++
++- `PASS`: caso ejecutado y evidencia adjunta.
++- `FAIL`: caso ejecutado con resultado incorrecto y evidencia.
++- `BLOCKED`: caso no ejecutable por bloqueo verificable.
++- `NA`: no aplica por permiso, ambiente o alcance documentado.
++
++## Bitacora
++
++| Fecha | Tester | Ambiente | Usuario | Ruta | Caso | Resultado | Evidencia | Comentario QA | Severidad | Fase correctiva sugerida | Estado de correccion |
++| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
++| Pendiente | Pendiente | Pendiente | Pendiente | Pendiente | Pendiente | Pendiente | Pendiente | Sin ejecucion registrada por PROJECT-GOV-A | Pendiente | Pendiente | Pendiente |
++
++## Plantilla para nuevo resultado
++
++| Fecha | Tester | Ambiente | Usuario | Ruta | Caso | Resultado | Evidencia | Comentario QA | Severidad | Fase correctiva sugerida | Estado de correccion |
++| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
++| YYYY-MM-DD | Nombre QA | local/qa/staging | usuario | ruta | ID de `QA_TODO_HANDOFF` | PASS/FAIL/BLOCKED/NA | ruta o link | detalle | S1/S2/S3/S4 | fase | OPEN/FIXED/RETEST/PENDING |
++
++## Reglas
++
++- Todo `FAIL` debe tener severidad.
++- Todo `FAIL` debe tener fase correctiva sugerida.
++- Todo `PASS` debe apuntar a evidencia.
++- No editar resultados historicos sin agregar nota de correccion.
++- Si Codex corrige un fallo, debe agregar commit/fase y dejar estado `RETEST`.
+diff --git a/docs/QA_TODO_HANDOFF.md b/docs/QA_TODO_HANDOFF.md
+new file mode 100644
+index 0000000..dcdb290
+--- /dev/null
++++ b/docs/QA_TODO_HANDOFF.md
+@@ -0,0 +1,53 @@
++# QA_TODO_HANDOFF
++
++## Objetivo
++
++Checklist operativo para QA manual. Ningun caso debe marcarse como `PASS` sin evidencia. Usar `docs/QA_RESULTS_LOG.md` para registrar resultados reales.
++
++## Usuarios QA
++
++| Usuario | Uso esperado |
++| --- | --- |
++| `qa.admin@local.test` | Administracion, operador LIVE, UI Kit, sistema y navegacion completa. |
++| `qa.vendedor.centro@local.test` | Vendedor con permisos operativos LIVE segun matriz actual. |
++| `qa.supervisor.centro@local.test` | Supervision LIVE y monitoreo. |
++| `qa.sinpermisos@local.test` | Bloqueo y pruebas negativas. |
++
++## Casos de prueba
++
++| ID | Usuario | Ruta | Caso | Pasos | Resultado esperado | Datos necesarios | Estado QA | Resultado real | Evidencia | Severidad si falla |
++| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
++| LIVE-001 | `qa.admin@local.test` | `/live` | Admin opera LIVE completo | Iniciar live; seleccionar prenda disponible; poner al aire; seleccionar cliente; apartar | Flujo opera sin errores, AppShell visible, no acciones falsas | Cliente e item disponible | PENDING_QA | Pendiente | Pendiente | S1 |
++| LIVE-002 | `qa.vendedor.centro@local.test` | `/live` | Vendedor con permiso aparta | Abrir LIVE activo; seleccionar cliente si tiene permiso; confirmar precio; apartar | Puede apartar si tiene `DO_LIVE_RESERVATION`; no ve acciones no permitidas | Live activo con prenda al aire | PENDING_QA | Pendiente | Pendiente | S1 |
++| LIVE-003 | `qa.supervisor.centro@local.test` | `/live` | Supervisor ve cambios sin salir | Entrar antes de cambios; admin cambia prenda/live; esperar polling o refrescar | Vista se actualiza, muestra ultima actualizacion | Dos sesiones/navegadores | PENDING_QA | Pendiente | Pendiente | S2 |
++| LIVE-004 | `qa.sinpermisos@local.test` | `/live` | Sin permisos bloqueado | Iniciar sesion; abrir LIVE | No opera LIVE ni ve acciones utiles | Usuario sin permisos | PENDING_QA | Pendiente | Pendiente | S1 |
++| LIVE-005 | `qa.admin@local.test` | `/live` | Selector filtra disponibilidad | Abrir Buscar prenda; revisar filtro Disponibles; cambiar a Todas | Vendidas/apartadas no aparecen por defecto; con Todas muestran motivo | Items disponibles, apartados y vendidos | PENDING_QA | Pendiente | Pendiente | S1 |
++| LIVE-006 | `qa.vendedor.centro@local.test` + `qa.admin@local.test` | `/live` | Vendedor crea apartado y operador lo ve | Operador permanece en LIVE; vendedor crea apartado; esperar polling | Operador ve nuevo apartado sin salir y aparece aviso discreto | Dos sesiones y live activo | PENDING_QA | Pendiente | Pendiente | S1 |
++| LIVE-007 | `qa.admin@local.test` | `/live` | Paneles accionables consistentes | Intentar apartar sin cliente; sin prenda; prenda ya apartada | Panel contextual claro, no modal innecesario | Estados preparados | PENDING_QA | Pendiente | Pendiente | S2 |
++| LIVE-008 | `qa.admin@local.test` | `/items-create?returnTo=%2Flive` | Alta rapida valida faltantes | Dejar talla/precio/cantidad faltantes; generar | Dialogo accionable, helpers inline, no limpia formulario | Catalogos cargados | PENDING_QA | Pendiente | Pendiente | S2 |
++| LIVE-009 | `qa.vendedor.centro@local.test` | `/live` | Autorizacion precio no simulada | Usar usuario sin `canChangeLivePrice`; revisar precio | Precio solo lectura; no modal de solicitud; no `Solicitud pendiente` | Live activo con prenda al aire | PENDING_QA | Pendiente | Pendiente | S1 |
++| UI-001 | `qa.admin@local.test` | `/ui-kit` | Flujo diseno visual | Abrir editor; revisar pasos visibles | Titulo comunica diseno de aplicacion; tecnico queda avanzado | N/A | PENDING_QA | Pendiente | Pendiente | S3 |
++| UI-002 | `qa.admin@local.test` | `/ui-kit` | Cambiar colores marca | Cambiar primario/secundario/acento con picker propio | No abre selector nativo como experiencia principal; preview cambia | N/A | PENDING_QA | Pendiente | Pendiente | S3 |
++| UI-003 | `qa.admin@local.test` | `/ui-kit` | Restaurar plantilla | Aplicar paleta local; restaurar plantilla | Tema vuelve a preset activo | N/A | PENDING_QA | Pendiente | Pendiente | S3 |
++| UI-004 | `qa.admin@local.test` | `/live`, `/customers`, `/ui-kit` | Light/dark | Alternar tema y navegar rutas | Contraste correcto, textos visibles | N/A | PENDING_QA | Pendiente | Pendiente | S2 |
++| UI-005 | `qa.admin@local.test` | `/ui-kit` | Mobile/tablet editor | Probar ancho movil/tablet | Picker, preview y acciones no se cortan | Dispositivo o responsive | PENDING_QA | Pendiente | Pendiente | S3 |
++| I18N-001 | `qa.admin@local.test` | `/system` + `/live` | Espanol | Seleccionar Espanol; abrir LIVE | No aparecen claves crudas ni mezcla grave | N/A | PENDING_QA | Pendiente | Pendiente | S2 |
++| I18N-002 | `qa.admin@local.test` | `/system` + `/live` | English | Seleccionar English; abrir LIVE | Labels principales en ingles | N/A | PENDING_QA | Pendiente | Pendiente | S2 |
++| I18N-003 | `qa.admin@local.test` | `/system` + `/live` | Portugues Brasil | Seleccionar pt-BR; abrir LIVE | Labels principales en portugues; sin `undefined` | N/A | PENDING_QA | Pendiente | Pendiente | S2 |
++| I18N-004 | `qa.admin@local.test` | `/system` + `/live` | Francais | Seleccionar fr; abrir LIVE | Labels principales en frances; sin claves crudas | N/A | PENDING_QA | Pendiente | Pendiente | S2 |
++| I18N-005 | `qa.admin@local.test` | `/system` + `/live` | Japones | Seleccionar ja; abrir LIVE | No aparece `live.size`, ingles/espanol visible minimo | N/A | PENDING_QA | Pendiente | Pendiente | S2 |
++| I18N-006 | `qa.admin@local.test` | `/system` + `/live` | Chino simplificado | Seleccionar zh; abrir LIVE | No hay claves crudas ni `undefined` | N/A | PENDING_QA | Pendiente | Pendiente | S2 |
++| I18N-007 | `qa.admin@local.test` | `/system` + `/live` | Coreano | Seleccionar ko; abrir LIVE | No hay claves crudas ni `undefined` | N/A | PENDING_QA | Pendiente | Pendiente | S2 |
++| ERR-001 | `qa.admin@local.test` | `/door-reservation` | Backend detenido/error red | Detener backend o simular error; abrir ruta | Mensaje accionable, no `Ocurrio un error interno inesperado` | Ambiente controlado | PENDING_QA | Pendiente | Pendiente | S1 |
++| ERR-002 | `qa.admin@local.test` | `/live` | Error refresh LIVE | Interrumpir backend durante refresh | Error limpio y accionable | Ambiente controlado | PENDING_QA | Pendiente | Pendiente | S2 |
++| NAV-001 | `qa.admin@local.test` | `/` | Menu categorizado | Revisar sidebar/topbar | Categorias correctas, logout visible | N/A | PENDING_QA | Pendiente | Pendiente | S2 |
++| NAV-002 | `qa.vendedor.centro@local.test` | `/door-sale` | Venta puerta por permisos | Abrir ruta o menu | Visible solo si permiso/canal aplica | Permisos QA | PENDING_QA | Pendiente | Pendiente | S1 |
++| NAV-003 | `qa.admin@local.test` | `/system-security`, `/system-sessions` | Sin layout legacy | Abrir rutas | AppShell/sidebar, sin Menu principal legacy | N/A | PENDING_QA | Pendiente | Pendiente | S2 |
++| NAV-004 | `qa.admin@local.test` | `/customers`, `/reservations`, `/users` | Rutas operativas migradas | Abrir rutas principales | AppShell, idioma activo, light/dark | N/A | PENDING_QA | Pendiente | Pendiente | S2 |
++
++## Reglas de evidencia
++
++- Screenshot o video por caso visual.
++- Usuario, ruta, tema y viewport visibles o anotados.
++- Para fallos, incluir severidad y pasos exactos.
++- No usar `PASS` si el caso no fue ejecutado.
+diff --git a/qa-reports/PROJECT-GOV-A-master-status-qa-board-report-20260608-002427.md b/qa-reports/PROJECT-GOV-A-master-status-qa-board-report-20260608-002427.md
+new file mode 100644
+index 0000000..c41ab29
+--- /dev/null
++++ b/qa-reports/PROJECT-GOV-A-master-status-qa-board-report-20260608-002427.md
+@@ -0,0 +1,66 @@
++# PROJECT-GOV-A - Master status and QA board report
++
++## Timestamp
++
++20260608-002427
++
++## Branch
++
++`feature/project-gov-a-master-status-qa-board`
++
++## Scope
++
++Documentation-only governance phase. No productive frontend, backend, services, routes, components, locales, or business logic were modified.
++
++## Documents created
++
++- `docs/PROJECT_MASTER_STATUS.md`
++- `docs/PROJECT_BACKLOG_PRIORITIZED.md`
++- `docs/QA_TODO_HANDOFF.md`
++- `docs/QA_RESULTS_LOG.md`
++- `docs/CODEX_AUTONOMOUS_CLOSURE_RUNBOOK.md`
++
++## Documents referenced
++
++- `docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md`
++- `docs/ERP_RIESGOS_OPERATIVOS.md`
++- `docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md`
++- `docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md`
++
++## Audit inputs
++
++- Current branch and clean initial Git status.
++- `git log --oneline -25`.
++- Existing `docs/` inventory.
++- Existing `qa-reports/` inventory.
++- Existing `git-diffs/` inventory.
++- Existing QA and risk references under `docs/`.
++
++## Governance result
++
++The project now has central documents for:
++
++- master technical/QA status;
++- prioritized backlog;
++- manual QA handoff;
++- QA result logging;
++- autonomous closure rules for Codex.
++
++## QA policy
++
++No new QA `PASS` result was invented by this phase. New cases start as `PENDING_QA` unless prior explicit evidence exists in historical docs.
++
++## Validations executed
++
++- `git status`
++- `git --no-pager diff --stat`
++- `git --no-pager diff --name-only`
++- `git --no-pager diff --check`
++
++No npm, TypeScript, Expo export, or Maven validation was required because this phase is documentation-only.
++
++## GO/NO-GO
++
++GO for documentation governance.
++
++NO-GO for release certification until QA executes `docs/QA_TODO_HANDOFF.md` and records real results in `docs/QA_RESULTS_LOG.md`.

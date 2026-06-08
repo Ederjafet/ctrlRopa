@@ -1,0 +1,11 @@
+﻿ docs/CODEX_AUTONOMOUS_CLOSURE_RUNBOOK.md           | 111 +++++++++++++++++++++
+ docs/ERP_RIESGOS_OPERATIVOS.md                     |   2 +
+ docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md        |   2 +
+ docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md            |   2 +
+ docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md              |   2 +
+ docs/PROJECT_BACKLOG_PRIORITIZED.md                |  48 +++++++++
+ docs/PROJECT_MASTER_STATUS.md                      |  95 ++++++++++++++++++
+ docs/QA_RESULTS_LOG.md                             |  32 ++++++
+ docs/QA_TODO_HANDOFF.md                            |  53 ++++++++++
+ ...aster-status-qa-board-report-20260608-002427.md |  66 ++++++++++++
+ 10 files changed, 413 insertions(+)
