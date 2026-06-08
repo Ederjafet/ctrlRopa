@@ -1,0 +1,7 @@
+﻿ docs/CODEX_AUTONOMOUS_CLOSURE_RUNBOOK.md           |  99 +++++++++++++++++--
+ docs/PROJECT_BACKLOG_PRIORITIZED.md                |   8 +-
+ docs/PROJECT_GOV_B1_ARCHITECTURAL_APPROVAL_GATE.md | 105 +++++++++++++++++++++
+ docs/PROJECT_MASTER_STATUS.md                      |  14 ++-
+ docs/QA_TODO_HANDOFF.md                            |   2 +
+ ...ectural-approval-gate-report-20260608-140127.md |  45 +++++++++
+ 6 files changed, 257 insertions(+), 16 deletions(-)

@@ -1,0 +1,395 @@
+﻿diff --git a/docs/CODEX_AUTONOMOUS_CLOSURE_RUNBOOK.md b/docs/CODEX_AUTONOMOUS_CLOSURE_RUNBOOK.md
+index dff9bc2..ee230de 100644
+--- a/docs/CODEX_AUTONOMOUS_CLOSURE_RUNBOOK.md
++++ b/docs/CODEX_AUTONOMOUS_CLOSURE_RUNBOOK.md
+@@ -9,22 +9,100 @@ Definir como Codex debe cerrar pendientes uno por uno, sin mezclar fases ni marc
+ 1. Tomar un pendiente de `docs/PROJECT_BACKLOG_PRIORITIZED.md`.
+ 2. Crear o confirmar rama de fase.
+ 3. Auditar contexto minimo: docs, codigo, servicios y reportes relacionados.
+-4. Implementar solo esa fase.
+-5. Ejecutar validaciones requeridas.
+-6. Corregir errores seguros dentro del alcance.
+-7. Generar documentacion y evidencia.
+-8. Hacer commit con mensaje de fase.
+-9. No hacer merge a develop.
+-10. Entregar GO/NO-GO.
+-11. Si QA falla, abrir fase correctiva puntual.
+-12. Actualizar tablero/backlog/log QA cuando aplique.
++4. Clasificar sensibilidad del bloque.
++5. Si el bloque es sensible, detenerse y entregar handoff para arquitectura antes de modificar codigo o configuracion.
++6. Si el bloque no es sensible, implementar solo esa fase.
++7. Ejecutar validaciones requeridas.
++8. Corregir errores seguros dentro del alcance.
++9. Generar documentacion y evidencia.
++10. Hacer commit con mensaje de fase.
++11. No hacer merge a develop.
++12. Entregar GO/NO-GO.
++13. Si QA falla, abrir fase correctiva puntual.
++14. Actualizar tablero/backlog/log QA cuando aplique.
++
++## Compuerta de aprobacion arquitectonica
++
++Codex puede seleccionar y ejecutar directamente solo bloques de bajo riesgo. Ejemplos:
++
++- documentacion;
++- i18n y traducciones base;
++- copy, microcopy y textos visibles;
++- UI visual de bajo riesgo sin cambio funcional;
++- evidencia QA;
++- actualizacion de tableros;
++- errores frontend no sensibles;
++- refactors pequenos sin cambio de comportamiento.
++
++Codex no debe ejecutar automaticamente bloques sensibles sin aprobacion previa. En esos casos debe detenerse antes de modificar codigo, configuracion o scripts y entregar solo una propuesta.
++
++Bloques sensibles:
++
++- seguridad;
++- autenticacion;
++- autorizacion;
++- RBAC/permisos;
++- backend funcional;
++- base de datos y migraciones;
++- configuracion sensible/secrets;
++- infraestructura;
++- despliegue;
++- CORS/sesion/tokens;
++- pagos/caja;
++- LIVE critico;
++- cambios de precio;
++- inventario critico;
++- borrado o modificacion masiva de datos;
++- refactors grandes.
++
++La propuesta previa debe incluir:
++
++1. Fase sugerida.
++2. Motivo.
++3. Riesgo.
++4. Archivos que tocaria.
++5. Validaciones necesarias.
++6. Plan de rollback.
++7. Preguntas o decisiones necesarias.
++8. Recomendacion GO/NO-GO.
++9. Que debe revisar el arquitecto.
++10. Prompt sugerido para ejecucion, sin ejecutarlo.
++
++Codex no debe modificar codigo en fases sensibles hasta que el usuario confirme aprobacion arquitectonica.
++
++## Handoff para arquitectura
++
++Usar esta plantilla antes de ejecutar una fase sensible:
++
++```text
++HANDOFF PARA ARQUITECTURA
++
++Rama actual:
++Fase sugerida:
++Tipo de cambio:
++Dominio:
++Sensibilidad:
++Motivo:
++Riesgo:
++Archivos estimados:
++Validaciones requeridas:
++Impacto QA:
++Decisiones requeridas:
++Recomendacion:
++Ejecutar ahora: SI/NO
++Motivo para detenerse:
++Prompt de ejecucion sugerido:
++```
++
++Este handoff se entrega antes de tocar codigo, configuracion, migraciones, permisos, seguridad, pagos, LIVE critico o inventario critico.
+
+ ## Cuando Codex puede corregir autonomamente
+
+ Codex puede avanzar sin pedir confirmacion cuando:
+
+ - el alcance esta definido y no requiere decision de negocio nueva;
+-- el cambio no toca backend sensible salvo que la fase lo pida;
++- el cambio no toca backend sensible;
++- el cambio no cae en los bloques sensibles de la compuerta arquitectonica;
+ - no cambia contratos de API;
+ - no concede permisos nuevos sin permiso real;
+ - las validaciones fallan por errores directamente causados por la fase;
+@@ -34,6 +112,7 @@ Codex puede avanzar sin pedir confirmacion cuando:
+
+ Codex debe detenerse y reportar decision requerida cuando:
+
++- la fase cae en un bloque sensible y no existe aprobacion arquitectonica explicita;
+ - se necesita crear endpoints no solicitados;
+ - hay que cambiar reglas de negocio profundas;
+ - el fix requiere pagos/caja/billing/IA fuera del alcance;
+diff --git a/docs/PROJECT_BACKLOG_PRIORITIZED.md b/docs/PROJECT_BACKLOG_PRIORITIZED.md
+index d88dbd8..39515bb 100644
+--- a/docs/PROJECT_BACKLOG_PRIORITIZED.md
++++ b/docs/PROJECT_BACKLOG_PRIORITIZED.md
+@@ -17,17 +17,19 @@ No se debe cerrar un pendiente sin evidencia, validaciones y commit de fase.
+ | Prioridad | Bloque | Pendiente | Origen | Impacto | Severidad | Fase sugerida | Criterio de cierre | Estado |
+ | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+ | P0 | QA | Corrida QA manual real con evidencia | PRODUCT-D4 | Sin QA formal no hay release confiable | S1 | PRODUCT-D4 REAL | Casos ejecutados, evidencia adjunta, PASS/FAIL/BLOCKED documentado | PENDING_QA |
++| P0 | Gobierno | Compuerta arquitectura para backlog autonomo | PROJECT-GOV-B | Evita ejecucion autonoma de cambios sensibles sin revision | S1 | PROJECT-GOV-B1 | Runbook actualizado; siguientes corridas deben detenerse y entregar handoff si el bloque es sensible | DONE_TECH |
+ | P0 | LIVE | Autorizacion real de cambio de precio | LIVE-Z10A | Vendedor no puede solicitar aprobacion dentro del sistema | S1 | LIVE-Z10B | Backend + UI real de solicitud/aprobacion/auditoria o decision producto firmada | PENDING_DECISION |
+ | P0 | Inventario | Edicion/correccion de prendas capturadas | QA/operacion | Errores de captura quedan sin correccion clara | S1 | ITEM-Z1 | Editar campos permitidos con permisos, auditoria y QA | PENDING_DECISION |
+ | P1 | Error handling | Errores accionables en dominios restantes | PRODUCT-ERR-A | Mensajes genericos pueden seguir apareciendo fuera de pantallas criticas | S2 | PRODUCT-ERR-B | Mapper aplicado a dominios restantes y QA de errores | PENDING_QA |
+ | P1 | Seguridad | Limpieza de configuracion/secrets | Riesgo operativo | Posible exposicion o configuracion debil en despliegue | S1 | SEC-CONFIG-A | Inventario de env vars, secrets fuera de repo, docs de despliegue seguro | DONE_TECH |
+-| P1 | Seguridad | Script local seguro de arranque DEV | SEC-CONFIG-A | Backend local falla si no se carga `CONTROL_ROPA_DB_PASSWORD` | S1 | SEC-CONFIG-A1 | Scripts DEV cargan `.env` sin versionar secretos y docs explican uso seguro | DONE_TECH |
+-| P1 | Seguridad | Hardening CORS/sesion/headers | AUTH/Security | Riesgo de sesion o acceso en ambientes reales | S1 | SECURITY-A | Revision config, pruebas negativas, evidencia | PENDING_DECISION |
++| P1 | Seguridad | Script local seguro de arranque DEV | SEC-CONFIG-A | Backend local falla si no se carga `CONTROL_ROPA_DB_PASSWORD` | S1 | SEC-CONFIG-A1 | Scripts DEV cargan `.env` sin versionar secretos y docs explican uso seguro; DEV_VALIDATED sin QA_PASS | DONE_TECH |
++| P1 | Seguridad | Hardening CORS/sesion/headers | AUTH/Security | Riesgo de sesion o acceso en ambientes reales | S1 | SECURITY-A | Requiere aprobacion arquitectonica; despues, revision config, pruebas negativas y evidencia | PENDING_DECISION |
+ | P1 | LIVE | Refactor de `app/live.tsx` | Mantenibilidad | Archivo grande eleva costo de cambios LIVE | S2 | LIVE-REF-A | Separar hooks/componentes sin cambiar comportamiento; pruebas pasan | PENDING_DECISION |
+ | P1 | I18N | Revision humana/nativa de traducciones | I18N-A/B/B.1 | Riesgo de copy poco natural en pt/fr/ja/zh/ko | S2 | PRODUCT-I18N-B-NATIVE | Revision por idioma y correcciones aprobadas | PENDING_QA |
+ | P2 | UX | Ergonomia diestro/zurdo, densidad y acciones | LIVE-Z9F.1/C2.x | Mobile/tablet puede requerir ajustes finos | S3 | PRODUCT-UX-A | Acciones configurables o layout validado por QA | PENDING_DECISION |
+ | P2 | Branding | Persistencia branding por tenant/backend | PRODUCT-C2.x | Branding actual es local por dispositivo | S2 | PRODUCT-C3 | Backend/tenant config, permisos y QA de persistencia | PENDING_DECISION |
+ | P2 | Branding | Pulido pendiente editor visual | PRODUCT-C2.6 | Si QA detecta saturacion o contraste bajo | S3 | PRODUCT-C2.7 | Ajuste visual puntual con evidencia | PENDING_QA |
++| P2 | Backend | Endpoint raiz/health simple | Observacion DEV | Raiz del backend puede no guiar a dev/QA | S3 | BACKEND-HEALTH-A | Requiere aprobacion si toca backend; documentar contrato y pruebas antes de ejecutar | PENDING_DECISION |
+ | P2 | Navegacion | Legacy routes restantes no priorizadas | PRODUCT-D6.5/D6.6 | Pantallas menos usadas pueden verse legacy | S3 | PRODUCT-D6.7 | Auditar/migrar siguiente lote por dominio | PENDING_QA |
+ | P3 | Reportes | Validacion manual de reportes y permisos | PRODUCT-D/QA | Reportes requieren dataset real para QA | S3 | REPORT-QA-A | Casos con datos, permisos y evidencia | PENDING_QA |
+ | P3 | Operacion | Caja/pagos no tocados por LIVE-Z9/Z10 | Alcance excluido | Riesgo de deuda funcional futura | S2 | PAYMENTS-QA-A | Smoke de pagos/caja separado, sin mezclar con LIVE | PENDING_DECISION |
+@@ -35,6 +37,7 @@ No se debe cerrar un pendiente sin evidencia, validaciones y commit de fase.
+ ## Reglas de cierre de backlog
+
+ - `DONE_TECH`: implementado, validaciones tecnicas pasan, commit existe.
++- `DEV_VALIDATED`: nota operativa de entorno DEV; no equivale a `QA_PASS`.
+ - `PENDING_QA`: falta ejecucion manual o evidencia.
+ - `QA_PASS`: solo con evidencia real y referencia en `docs/QA_RESULTS_LOG.md`.
+ - `QA_FAIL`: registrar severidad, evidencia y fase correctiva sugerida.
+@@ -47,3 +50,4 @@ No se debe cerrar un pendiente sin evidencia, validaciones y commit de fase.
+ - No mezclar PRODUCT-C3 con cambios visuales de /ui-kit.
+ - No mezclar LIVE-REF-A con cambios funcionales LIVE.
+ - No mezclar PRODUCT-D4 REAL con fixes; si QA falla, abrir fase correctiva puntual.
++- SECURITY-A, LIVE-Z10B, ITEM-Z1 y BACKEND-HEALTH-A requieren handoff de arquitectura antes de ejecucion.
+diff --git a/docs/PROJECT_GOV_B1_ARCHITECTURAL_APPROVAL_GATE.md b/docs/PROJECT_GOV_B1_ARCHITECTURAL_APPROVAL_GATE.md
+new file mode 100644
+index 0000000..6d74ebf
+--- /dev/null
++++ b/docs/PROJECT_GOV_B1_ARCHITECTURAL_APPROVAL_GATE.md
+@@ -0,0 +1,105 @@
++# PROJECT-GOV-B1 - Control de aprobacion arquitectonica para backlog autonomo
++
++## Problema detectado
++
++PROJECT-GOV-B permitio que Codex eligiera autonomamente `SEC-CONFIG-A`. El cambio fue util y quedo validado tecnicamente, pero expuso un riesgo de gobierno: una seleccion autonoma puede tocar seguridad, configuracion sensible o backend sin revision arquitectonica previa.
++
++## Riesgo
++
++Sin compuerta, Codex podria ejecutar cambios sensibles que requieren criterio de arquitectura, seguridad o negocio antes de modificar archivos. Esto puede afectar:
++
++- seguridad;
++- configuracion/secrets;
++- autenticacion/autorizacion;
++- backend funcional;
++- migraciones;
++- pagos/caja;
++- LIVE critico;
++- inventario critico.
++
++## Regla nueva
++
++Codex puede proponer y ejecutar cambios de bajo riesgo. Si el pendiente es sensible, debe detenerse y entregar un handoff para arquitectura antes de tocar codigo, configuracion o scripts.
++
++## Bloques que Codex puede ejecutar directamente
++
++- Documentacion.
++- I18n y traducciones base.
++- Copy/microcopy.
++- UI visual de bajo riesgo sin cambio funcional.
++- Evidencia QA.
++- Actualizacion de tableros.
++- Errores frontend no sensibles.
++- Refactors pequenos sin cambio de comportamiento.
++
++## Bloques que Codex debe proponer sin ejecutar
++
++- Seguridad.
++- Autenticacion.
++- Autorizacion.
++- RBAC/permisos.
++- Backend funcional.
++- Base de datos/migraciones.
++- Configuracion sensible/secrets.
++- Infraestructura/despliegue.
++- CORS/sesion/tokens.
++- Pagos/caja.
++- LIVE critico.
++- Cambios de precio.
++- Inventario critico.
++- Borrado o modificacion masiva de datos.
++- Refactors grandes.
++
++## Plantilla de handoff para arquitectura
++
++```text
++HANDOFF PARA ARQUITECTURA
++
++Rama actual:
++Fase sugerida:
++Tipo de cambio:
++Dominio:
++Sensibilidad:
++Motivo:
++Riesgo:
++Archivos estimados:
++Validaciones requeridas:
++Impacto QA:
++Decisiones requeridas:
++Recomendacion:
++Ejecutar ahora: SI/NO
++Motivo para detenerse:
++Prompt de ejecucion sugerido:
++```
++
++## Flujo recomendado
++
++1. Codex lee backlog y detecta si el bloque es sensible.
++2. Si no es sensible, Codex puede ejecutar dentro del alcance.
++3. Si es sensible, Codex entrega handoff y no toca codigo.
++4. El usuario comparte el handoff con arquitectura.
++5. Arquitectura aprueba, ajusta o rechaza.
++6. Con aprobacion explicita, Codex ejecuta la fase aprobada.
++7. Codex documenta, valida, genera evidencia y hace commit.
++8. El usuario decide merge; Codex no hace merge a develop.
++
++## Validacion local registrada de SEC-CONFIG-A1
++
++Se registra como validacion DEV, no como QA formal:
++
++- Backend vivo en puerto `8090`.
++- `/api/me` respondio `401` esperado para sesion invalida/vencida.
++- `git status` quedo limpio.
++- `.env` no se versiono.
++
++Estado: `DEV_VALIDATED` como nota operativa y `PENDING_QA` para QA formal.
++
++## GO/NO-GO
++
++GO documental para PROJECT-GOV-B1.
++
++NO-GO para ejecucion autonoma de bloques sensibles sin aprobacion arquitectonica previa.
++
++## Que sigue
++
++En la siguiente corrida de backlog, Codex debe clasificar sensibilidad antes de ejecutar. Si el siguiente pendiente es `SECURITY-A`, `LIVE-Z10B`, `ITEM-Z1` o similar, debe entregar handoff para arquitectura y detenerse.
+diff --git a/docs/PROJECT_MASTER_STATUS.md b/docs/PROJECT_MASTER_STATUS.md
+index e729897..7eb4add 100644
+--- a/docs/PROJECT_MASTER_STATUS.md
++++ b/docs/PROJECT_MASTER_STATUS.md
+@@ -10,13 +10,14 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
+
+ | Rama | Merge commit | Fase | Observacion |
+ | --- | --- | --- | --- |
+-| `feature/project-gov-a-master-status-qa-board` | `2a377e9` | PROJECT-GOV-A | Se creo tablero maestro, backlog priorizado, handoff QA y runbook de cierre autonomo. |
++| `feature/sec-config-a1-dev-startup-script` | `fdce443` | SEC-CONFIG-A1 | Se agrego arranque DEV seguro con `.env` local no versionado. |
+
+ ## Ultimas fases cerradas
+
+ | Fase | Commit | Estado tecnico | Estado QA |
+ | --- | --- | --- | --- |
+-| SEC-CONFIG-A1 | commit SEC-CONFIG-A1 | DONE_TECH | PENDING_QA |
++| PROJECT-GOV-B1 | commit PROJECT-GOV-B1 | DONE_TECH | PENDING_QA |
++| SEC-CONFIG-A1 | `5fe5c38` | DONE_TECH | PENDING_QA |
+ | SEC-CONFIG-A | commit PROJECT-GOV-B | DONE_TECH | PENDING_QA |
+ | LIVE-Z10A | `61b7ba8` | DONE_TECH | PENDING_QA |
+ | LIVE-Z9J | `f92aa24` | DONE_TECH | PENDING_QA |
+@@ -40,6 +41,7 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
+ | ERROR HANDLING | DONE_TECH | PENDING_QA | PRODUCT-ERR-A aplicado en pantallas criticas; quedan dominios restantes. |
+ | Seguridad | DONE_TECH | PENDING_QA | AUTH y auditoria tienen evidencia tecnica; SEC-CONFIG-A externaliza secrets/config y SEC-CONFIG-A1 agrega arranque DEV seguro; queda hardening y validacion por ambiente. |
+ | Refactor | PENDING_DECISION | PENDING_QA | `app/live.tsx` requiere particion por mantenibilidad. |
++| Gobierno | DONE_TECH | PENDING_QA | PROJECT-GOV-B1 agrega compuerta de aprobacion arquitectonica para backlog autonomo sensible. |
+
+ ## Tabla de fases
+
+@@ -62,14 +64,17 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
+ | PRODUCT-I18N-A/B/B.1 | Multidioma, limpieza de mezclas y glosario | varias | `cb89fa0` y relacionados | DONE_TECH | PENDING_QA | Revision humana/nativa y no claves crudas. |
+ | PRODUCT-ERR-A | Errores accionables | `feature/product-err-a-actionable-errors` | `d97668b` | DONE_TECH | PENDING_QA | Simular error red/backend y validar mensajes. |
+ | PRODUCT-D4 | QA manual con evidencia | `feature/product-d4-*` | varios | DONE_TECH | PENDING_QA | Ejecutar corrida real con screenshots/evidencia. |
++| PROJECT-GOV-B1 | Compuerta arquitectura para backlog autonomo | `feature/project-gov-b1-architectural-approval-gate` | commit PROJECT-GOV-B1 | DONE_TECH | PENDING_QA | Revisar que Codex detenga bloques sensibles y entregue handoff antes de ejecutar. |
+ | SEC-CONFIG-A | Configuracion/secrets fuera de repo | `feature/project-gov-b-autonomous-backlog-runner` | commit PROJECT-GOV-B | DONE_TECH | PENDING_QA | Validar arranque local/QA con `CONTROL_ROPA_DB_PASSWORD` fuera del repo. |
+-| SEC-CONFIG-A1 | Script local seguro de arranque DEV | `feature/sec-config-a1-dev-startup-script` | commit SEC-CONFIG-A1 | DONE_TECH | PENDING_QA | Validar `scripts/dev-backend.sh` y `scripts\dev-backend.cmd` con `.env` local no versionado. |
++| SEC-CONFIG-A1 | Script local seguro de arranque DEV | `feature/sec-config-a1-dev-startup-script` | `5fe5c38` | DONE_TECH | PENDING_QA | DEV_VALIDATED: backend 8090, `/api/me` 401 esperado, `.env` no versionado; falta QA formal. |
+
+ ## GO/NO-GO general
+
+ | Area | Resultado |
+ | --- | --- |
+ | Desarrollo tecnico reciente | GO |
++| Backlog autonomo de bajo riesgo | GO condicionado a alcance documental/visual/no sensible |
++| Backlog autonomo sensible | NO-GO sin aprobacion arquitectonica |
+ | Merge automatico a develop desde este tablero | NO-GO |
+ | Release funcional amplio | NO-GO hasta QA manual |
+ | Demo controlada con riesgos conocidos | GO condicionado |
+@@ -93,7 +98,8 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
+ | Traducciones no nativas | Experiencia internacional inconsistente | PENDING_QA |
+ | Branding solo local | No sirve aun para tenant/backend productivo | PENDING_DECISION |
+ | Configuracion por ambiente | QA/staging deben definir env vars requeridas; DEV ya cuenta con scripts seguros para cargar `.env` local | PENDING_QA |
++| Autonomia sin compuerta | Mitigado tecnicamente por PROJECT-GOV-B1; pendiente revision de proceso | PENDING_QA |
+
+ ## Ultima actualizacion
+
+-2026-06-08, `feature/sec-config-a1-dev-startup-script`.
++2026-06-08, `feature/project-gov-b1-architectural-approval-gate`.
+diff --git a/docs/QA_TODO_HANDOFF.md b/docs/QA_TODO_HANDOFF.md
+index b1b2415..c6e64a7 100644
+--- a/docs/QA_TODO_HANDOFF.md
++++ b/docs/QA_TODO_HANDOFF.md
+@@ -47,6 +47,8 @@ Checklist operativo para QA manual. Ningun caso debe marcarse como `PASS` sin ev
+ | SEC-001 | DBA/DevOps | Backend local/QA | Variables backend seguras | Definir `CONTROL_ROPA_DB_PASSWORD`; iniciar backend; ejecutar health/login smoke | Backend arranca sin password versionado; DB conecta por env var | Secret configurado fuera del repo | PENDING_QA | Pendiente | Pendiente | S1 |
+ | SEC-002 | DBA/DevOps | Git workspace | `.env` no versionado | Crear `.env` local con valores reales; ejecutar `git status --short` | `.env` no aparece; `.env.example` queda versionado como plantilla | `.env` local temporal | PENDING_QA | Pendiente | Pendiente | S1 |
+ | SEC-003 | Dev/QA tecnico | Backend local DEV | Script DEV seguro | Copiar `.env.example` a `.env`; configurar password local; ejecutar `./scripts/dev-backend.sh` en Git Bash o `scripts\dev-backend.cmd` en CMD | Backend arranca cargando `.env`; password no se imprime; `.env` no queda staged | `.env` local no versionado | PENDING_QA | Pendiente | Pendiente | S1 |
++| SEC-CONFIG-A1-QA-01 | Dev/QA tecnico | Backend local DEV | Validar arranque backend DEV con `.env` local | Copiar `.env.example` a `.env`; configurar `CONTROL_ROPA_DB_PASSWORD`; ejecutar `./scripts/dev-backend.sh`; confirmar backend en 8090; ejecutar `curl -i http://localhost:8090/api/me`; ejecutar `git status` | Backend levanta; `/api/me` responde HTTP 401 esperado; `.env` no aparece en git status | `.env` local no versionado | DEV_VALIDATED / PENDING_QA | DEV validado localmente; QA formal pendiente | Pendiente | S1 |
++| GOV-001 | Arquitectura | Docs gobierno | Compuerta arquitectura backlog | Revisar `CODEX_AUTONOMOUS_CLOSURE_RUNBOOK.md`; seleccionar pendiente sensible de ejemplo; confirmar que Codex debe entregar handoff sin ejecutar | Bloques sensibles requieren aprobacion previa; bloques bajos pueden ejecutarse controladamente | Docs PROJECT-GOV-B1 | PENDING_QA | Pendiente | Pendiente | S1 |
+
+ ## Reglas de evidencia
+
+diff --git a/qa-reports/PROJECT-GOV-B1-architectural-approval-gate-report-20260608-140127.md b/qa-reports/PROJECT-GOV-B1-architectural-approval-gate-report-20260608-140127.md
+new file mode 100644
+index 0000000..256af1a
+--- /dev/null
++++ b/qa-reports/PROJECT-GOV-B1-architectural-approval-gate-report-20260608-140127.md
+@@ -0,0 +1,45 @@
++# PROJECT-GOV-B1 - Architectural approval gate report
++
++Fecha: 2026-06-08 14:01:27
++Rama: `feature/project-gov-b1-architectural-approval-gate`
++
++## Objetivo
++
++Actualizar el modelo de trabajo autonomo para que Codex pueda seguir ayudando con backlog, pero se detenga antes de ejecutar cambios sensibles sin aprobacion arquitectonica.
++
++## Cambios realizados
++
++- Se agrego la seccion `Compuerta de aprobacion arquitectonica` en `CODEX_AUTONOMOUS_CLOSURE_RUNBOOK.md`.
++- Se agrego una plantilla fija de `HANDOFF PARA ARQUITECTURA`.
++- Se documento que bloques de bajo riesgo pueden ejecutarse directamente.
++- Se documento que bloques sensibles deben proponerse sin ejecutar.
++- Se actualizo `PROJECT_MASTER_STATUS.md` con nota de gobierno y validacion DEV de SEC-CONFIG-A1.
++- Se actualizo `PROJECT_BACKLOG_PRIORITIZED.md` con PROJECT-GOV-B1 y reglas de handoff para pendientes sensibles.
++- Se actualizo `QA_TODO_HANDOFF.md` con casos de revision de gobierno y validacion DEV/QA de SEC-CONFIG-A1.
++- Se creo `PROJECT_GOV_B1_ARCHITECTURAL_APPROVAL_GATE.md`.
++
++## Validacion SEC-CONFIG-A1 registrada
++
++Se registro como validacion DEV, no como QA formal:
++
++- Backend vivo en puerto `8090`.
++- `/api/me` respondio `401` esperado.
++- `git status` limpio.
++- `.env` no se versiono.
++
++Estado: `DEV_VALIDATED / PENDING_QA`.
++
++## Validaciones ejecutadas
++
++Fase documental:
++
++- `git status` - revisado.
++- `git --no-pager diff --stat` - revisado.
++- `git --no-pager diff --name-only` - revisado.
++- `git --no-pager diff --check` - PASS.
++
++No se ejecutaron npm/maven porque la fase no toca codigo productivo, frontend funcional, backend funcional ni configuracion real.
++
++## Resultado
++
++PROJECT-GOV-B1 queda `DONE_TECH` y `PENDING_QA` para revision de proceso.

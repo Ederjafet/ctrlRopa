@@ -10,13 +10,14 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 
 | Rama | Merge commit | Fase | Observacion |
 | --- | --- | --- | --- |
-| `feature/project-gov-a-master-status-qa-board` | `2a377e9` | PROJECT-GOV-A | Se creo tablero maestro, backlog priorizado, handoff QA y runbook de cierre autonomo. |
+| `feature/sec-config-a1-dev-startup-script` | `fdce443` | SEC-CONFIG-A1 | Se agrego arranque DEV seguro con `.env` local no versionado. |
 
 ## Ultimas fases cerradas
 
 | Fase | Commit | Estado tecnico | Estado QA |
 | --- | --- | --- | --- |
-| SEC-CONFIG-A1 | commit SEC-CONFIG-A1 | DONE_TECH | PENDING_QA |
+| PROJECT-GOV-B1 | commit PROJECT-GOV-B1 | DONE_TECH | PENDING_QA |
+| SEC-CONFIG-A1 | `5fe5c38` | DONE_TECH | PENDING_QA |
 | SEC-CONFIG-A | commit PROJECT-GOV-B | DONE_TECH | PENDING_QA |
 | LIVE-Z10A | `61b7ba8` | DONE_TECH | PENDING_QA |
 | LIVE-Z9J | `f92aa24` | DONE_TECH | PENDING_QA |
@@ -40,6 +41,7 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 | ERROR HANDLING | DONE_TECH | PENDING_QA | PRODUCT-ERR-A aplicado en pantallas criticas; quedan dominios restantes. |
 | Seguridad | DONE_TECH | PENDING_QA | AUTH y auditoria tienen evidencia tecnica; SEC-CONFIG-A externaliza secrets/config y SEC-CONFIG-A1 agrega arranque DEV seguro; queda hardening y validacion por ambiente. |
 | Refactor | PENDING_DECISION | PENDING_QA | `app/live.tsx` requiere particion por mantenibilidad. |
+| Gobierno | DONE_TECH | PENDING_QA | PROJECT-GOV-B1 agrega compuerta de aprobacion arquitectonica para backlog autonomo sensible. |
 
 ## Tabla de fases
 
@@ -62,14 +64,17 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 | PRODUCT-I18N-A/B/B.1 | Multidioma, limpieza de mezclas y glosario | varias | `cb89fa0` y relacionados | DONE_TECH | PENDING_QA | Revision humana/nativa y no claves crudas. |
 | PRODUCT-ERR-A | Errores accionables | `feature/product-err-a-actionable-errors` | `d97668b` | DONE_TECH | PENDING_QA | Simular error red/backend y validar mensajes. |
 | PRODUCT-D4 | QA manual con evidencia | `feature/product-d4-*` | varios | DONE_TECH | PENDING_QA | Ejecutar corrida real con screenshots/evidencia. |
+| PROJECT-GOV-B1 | Compuerta arquitectura para backlog autonomo | `feature/project-gov-b1-architectural-approval-gate` | commit PROJECT-GOV-B1 | DONE_TECH | PENDING_QA | Revisar que Codex detenga bloques sensibles y entregue handoff antes de ejecutar. |
 | SEC-CONFIG-A | Configuracion/secrets fuera de repo | `feature/project-gov-b-autonomous-backlog-runner` | commit PROJECT-GOV-B | DONE_TECH | PENDING_QA | Validar arranque local/QA con `CONTROL_ROPA_DB_PASSWORD` fuera del repo. |
-| SEC-CONFIG-A1 | Script local seguro de arranque DEV | `feature/sec-config-a1-dev-startup-script` | commit SEC-CONFIG-A1 | DONE_TECH | PENDING_QA | Validar `scripts/dev-backend.sh` y `scripts\dev-backend.cmd` con `.env` local no versionado. |
+| SEC-CONFIG-A1 | Script local seguro de arranque DEV | `feature/sec-config-a1-dev-startup-script` | `5fe5c38` | DONE_TECH | PENDING_QA | DEV_VALIDATED: backend 8090, `/api/me` 401 esperado, `.env` no versionado; falta QA formal. |
 
 ## GO/NO-GO general
 
 | Area | Resultado |
 | --- | --- |
 | Desarrollo tecnico reciente | GO |
+| Backlog autonomo de bajo riesgo | GO condicionado a alcance documental/visual/no sensible |
+| Backlog autonomo sensible | NO-GO sin aprobacion arquitectonica |
 | Merge automatico a develop desde este tablero | NO-GO |
 | Release funcional amplio | NO-GO hasta QA manual |
 | Demo controlada con riesgos conocidos | GO condicionado |
@@ -93,7 +98,8 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 | Traducciones no nativas | Experiencia internacional inconsistente | PENDING_QA |
 | Branding solo local | No sirve aun para tenant/backend productivo | PENDING_DECISION |
 | Configuracion por ambiente | QA/staging deben definir env vars requeridas; DEV ya cuenta con scripts seguros para cargar `.env` local | PENDING_QA |
+| Autonomia sin compuerta | Mitigado tecnicamente por PROJECT-GOV-B1; pendiente revision de proceso | PENDING_QA |
 
 ## Ultima actualizacion
 
-2026-06-08, `feature/sec-config-a1-dev-startup-script`.
+2026-06-08, `feature/project-gov-b1-architectural-approval-gate`.
