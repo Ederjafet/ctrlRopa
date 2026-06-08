@@ -10,8 +10,8 @@ type Props = {
   requiredCapability: string;
   reason: string;
   entityContext?: string;
-  onRequestAuthorization: () => void;
-  requestLabel: string;
+  onRequestAuthorization?: () => void;
+  requestLabel?: string;
   pendingBackendLabel?: string;
   style?: StyleProp<ViewStyle>;
 };
@@ -57,11 +57,13 @@ export default function AuthorizationRequestPanel({
           {pendingBackendLabel}
         </AppText>
       ) : null}
-      <AppButton
-        title={requestLabel}
-        variant="secondary"
-        onPress={onRequestAuthorization}
-      />
+      {requestLabel && onRequestAuthorization ? (
+        <AppButton
+          title={requestLabel}
+          variant="secondary"
+          onPress={onRequestAuthorization}
+        />
+      ) : null}
     </View>
   );
 }

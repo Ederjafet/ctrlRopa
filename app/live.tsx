@@ -109,14 +109,6 @@ type LiveReservationIssue = {
   tone?: 'info' | 'warning' | 'danger' | 'success';
 };
 
-type AuthorizationRequestContext =
-  | 'price'
-  | 'release'
-  | 'cancel'
-  | 'close'
-  | 'operationalSold'
-  | 'startLive';
-
 type ActivityFeedEvent = {
   badge: string;
   label: string;
@@ -451,8 +443,6 @@ export default function LiveScreen() {
   const [closeLiveToConfirm, setCloseLiveToConfirm] = useState<Live | null>(null);
   const [activateLiveToConfirm, setActivateLiveToConfirm] = useState<Live | null>(null);
   const [cancelReservationToConfirm, setCancelReservationToConfirm] = useState<number | null>(null);
-  const [authorizationRequestContext, setAuthorizationRequestContext] =
-    useState<AuthorizationRequestContext | null>(null);
   const [reservationIssue, setReservationIssue] = useState<LiveReservationIssue | null>(null);
   const [showDemoMetrics, setShowDemoMetrics] = useState(true);
   const [liveLayoutPreferences, setLiveLayoutPreferences] =
@@ -1907,46 +1897,6 @@ export default function LiveScreen() {
     const reservationId = cancelReservationToConfirm;
     setCancelReservationToConfirm(null);
     await handleUpdateReservationOperationalStatus(reservationId, 'CANCELLED', reason);
-  };
-
-  const handleRequestAuthorization = (context: AuthorizationRequestContext) => {
-    setAuthorizationRequestContext(context);
-  };
-
-  const getAuthorizationActionLabel = (context: AuthorizationRequestContext | null) => {
-    switch (context) {
-      case 'price':
-        return t('live.authorizationActionPrice');
-      case 'release':
-        return t('live.authorizationActionReleaseItem');
-      case 'cancel':
-        return t('live.authorizationActionCancelHold');
-      case 'close':
-        return t('live.authorizationActionCloseLive');
-      case 'operationalSold':
-        return t('live.authorizationActionOperationalSold');
-      case 'startLive':
-        return t('live.authorizationActionStartLive');
-      default:
-        return t('live.authorizationGenericAction');
-    }
-  };
-
-  const getAuthorizationPrompt = (context: AuthorizationRequestContext | null) =>
-    context === 'price'
-      ? t('live.authorizationPricePrompt')
-      : t('live.authorizationGenericPrompt', {
-          action: getAuthorizationActionLabel(context),
-        });
-
-  const confirmAuthorizationRequest = (reason: string) => {
-    const action = getAuthorizationActionLabel(authorizationRequestContext);
-    setAuthorizationRequestContext(null);
-    setLiveNotice({
-      title: t('live.authorizationRequestPendingTitle'),
-      message: t('live.authorizationRequestPendingMessage', { action, reason }),
-      tone: 'warning',
-    });
   };
 
   const handleCreateLive = async () => {
@@ -4280,9 +4230,7 @@ export default function LiveScreen() {
                         requiredCapability="canChangeLivePrice"
                         reason={t('live.livePriceAuthorizationHelp')}
                         entityContext={activeItem.code}
-                        pendingBackendLabel={t('live.authorizationBackendRequired')}
-                        requestLabel={t('live.requestAuthorization')}
-                        onRequestAuthorization={() => handleRequestAuthorization('price')}
+                        pendingBackendLabel={t('live.priceAuthorizationUnavailableMessage')}
                         style={styles.operatorPriceAuthorizationBox}
                       />
                     ) : null}
@@ -4594,9 +4542,9 @@ export default function LiveScreen() {
                                   entityContext={t('live.reservationNumber', {
                                     id: reservation.id,
                                   })}
-                                  pendingBackendLabel={t('live.authorizationBackendRequired')}
-                                  requestLabel={t('live.requestAuthorization')}
-                                  onRequestAuthorization={() => handleRequestAuthorization('cancel')}
+                                  pendingBackendLabel={t('live.authorizationUnavailableMessage', {
+                                    action: t('live.authorizationActionCancelHold'),
+                                  })}
                                   style={styles.authorizationInlinePanel}
                                 />
                               ) : null}
@@ -5972,44 +5920,6 @@ export default function LiveScreen() {
           disabled={updatingOperationalReservationId !== null}
         />
       </AppBottomModal>
-
-      <AppBottomModal
-        visible={authorizationRequestContext !== null}
-        title={t('live.authorizationRequestTitle')}
-        onClose={() => setAuthorizationRequestContext(null)}
-        showCancelButton={false}
-      >
-        <AppText bold>
-          {getAuthorizationActionLabel(authorizationRequestContext)}
-        </AppText>
-        <AppText color={theme.colors.mutedText}>
-          {getAuthorizationPrompt(authorizationRequestContext)}
-        </AppText>
-        {[
-          t('live.authorizationReasonLivePromotion'),
-          t('live.authorizationReasonDefectAdjustment'),
-          t('live.authorizationReasonFrequentCustomer'),
-          t('live.authorizationReasonVerbalApproval'),
-          t('live.authorizationReasonOther'),
-        ].map((reason) => (
-          <AppOptionRow
-            key={reason}
-            title={reason}
-            subtitle={
-              reason === t('live.authorizationReasonOther')
-                ? t('live.authorizationRequestNotPersistedHelp')
-                : undefined
-            }
-            onPress={() => confirmAuthorizationRequest(reason)}
-          />
-        ))}
-        <AppButton
-          title={t('common.cancel')}
-          variant="secondary"
-          onPress={() => setAuthorizationRequestContext(null)}
-        />
-      </AppBottomModal>
-
 
       <AppBottomModal
         visible={activateLiveToConfirm !== null}

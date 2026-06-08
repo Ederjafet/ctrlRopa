@@ -1,0 +1,13 @@
+﻿ app/live.tsx                                  | 98 ++-------------------------
+ components/live/AuthorizationRequestPanel.tsx | 16 +++--
+ docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md   |  2 +
+ docs/LIVE_Z9G_SELLER_CAPABILITIES.md          |  4 ++
+ docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md         | 14 ++++
+ locales/en/common.json                        |  8 ++-
+ locales/es/common.json                        |  8 ++-
+ locales/fr/common.json                        |  8 ++-
+ locales/ja/common.json                        |  8 ++-
+ locales/ko/common.json                        |  8 ++-
+ locales/pt-BR/common.json                     |  8 ++-
+ locales/zh/common.json                        |  8 ++-
+ 12 files changed, 75 insertions(+), 115 deletions(-)
