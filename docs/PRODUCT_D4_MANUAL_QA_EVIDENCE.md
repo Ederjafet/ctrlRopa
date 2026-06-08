@@ -6,6 +6,8 @@
 
 > Actualizacion LIVE-FIX-A: agregar a la corrida manual que `CAMBIAR POR PRENDA PREPARADA` muestre aviso si no hay prenda preparada y que `Cerrar como venta LIVE` use confirmacion visual accionable.
 
+> Complemento LIVE-FIX-A: validar que la accion inversa posterior a una venta LIVE diga `Deshacer cierre de venta LIVE`, que sea distinta de `Cancelar apartado` y que ambos helpers aclaren que no registran pago ni caja.
+
 ## Objetivo
 
 PRODUCT-D4 existe para convertir los casos `PENDIENTE_MANUAL` de PRODUCT-D2/D3 en resultados reales: `PASS`, `FAIL`, `BLOQUEADO` o `NO_APLICA`, siempre con evidencia capturada.

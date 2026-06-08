@@ -25,6 +25,23 @@ Esta fase corrige el feedback de frontend sin tocar backend, endpoints, pagos, c
   - apartado cancelado.
 - En esos casos se muestra `LiveNoticeModal` con mensaje claro y no se ejecuta actualizacion silenciosa.
 
+## Complemento de microcopy
+
+QA detecto que, despues de cerrar un apartado como venta LIVE, la accion inversa `Volver a apartado` podia confundirse con `Cancelar apartado`.
+
+Se separo el microcopy:
+
+- `Deshacer cierre de venta LIVE`: revierte el cierre operativo de venta LIVE y regresa el registro a seguimiento como apartado.
+- `Cancelar apartado`: cancela el apartado operativo de la prenda.
+
+Textos objetivo:
+
+- `Cerrar como venta LIVE`: cierra el apartado como venta operativa dentro del LIVE, sin pago ni caja.
+- `Deshacer cierre de venta LIVE`: regresa el registro a seguimiento como apartado, sin pago ni caja.
+- `Cancelar apartado`: cancela el apartado de la prenda, sin pago ni caja.
+
+No se cambiaron estados funcionales ni llamadas backend; solo se ajustaron claves y textos visibles.
+
 ## Reglas mantenidas
 
 - No se registra pago ni movimiento de caja al cerrar como venta LIVE.
@@ -67,8 +84,12 @@ Las claves cubren:
 10. Confirmar que aparece una confirmacion visual dentro de la app.
 11. Confirmar que el mensaje aclara que no registra pago ni caja.
 12. Confirmar y validar que el estado cambia a venta LIVE.
-13. Repetir con apartados ya cerrados/cancelados/liquidados si estan disponibles.
-14. Validar light/dark y mobile/tablet.
+13. Confirmar que la accion inversa dice `Deshacer cierre de venta LIVE`.
+14. Confirmar que `Deshacer cierre de venta LIVE` regresa el registro a seguimiento como apartado.
+15. Confirmar que `Cancelar apartado` sigue siendo una accion separada.
+16. Confirmar que ambos textos de ayuda aclaran que no registran pago ni caja.
+17. Repetir con apartados ya cerrados/cancelados/liquidados si estan disponibles.
+18. Validar light/dark y mobile/tablet.
 
 ## Limitaciones
 

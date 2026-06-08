@@ -4573,7 +4573,11 @@ export default function LiveScreen() {
                               mayChangeLiveReservationStatus ? (
                                 <View style={styles.buttonFill}>
                                   <AppButton
-                                    title={t('live.returnToReserved')}
+                                    title={
+                                      operationalSold
+                                        ? t('live.undoOperationalSold')
+                                        : t('live.returnToReserved')
+                                    }
                                     variant="secondary"
                                     loading={isUpdatingOperationalStatus}
                                     onPress={() =>
@@ -4584,7 +4588,9 @@ export default function LiveScreen() {
                                     }
                                   />
                                   <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
-                                    {t('live.returnToReservedHelp')}
+                                    {operationalSold
+                                      ? t('live.undoOperationalSoldHelp')
+                                      : t('live.returnToReservedHelp')}
                                   </AppText>
                                 </View>
                               ) : null}
@@ -5660,7 +5666,7 @@ export default function LiveScreen() {
                     {operationalSold && mayChangeLiveReservationStatus ? (
                       <View style={styles.buttonFill}>
                         <AppButton
-                          title={t('live.returnToReserved')}
+                          title={t('live.undoOperationalSold')}
                           variant="secondary"
                           loading={isUpdatingOperationalStatus}
                           onPress={() =>
@@ -5671,7 +5677,7 @@ export default function LiveScreen() {
                           }
                         />
                         <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
-                          {t('live.returnToReservedHelp')}
+                          {t('live.undoOperationalSoldHelp')}
                         </AppText>
                       </View>
                     ) : null}
