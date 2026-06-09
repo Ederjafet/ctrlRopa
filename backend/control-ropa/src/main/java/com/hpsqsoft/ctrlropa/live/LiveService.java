@@ -48,6 +48,7 @@ public class LiveService {
 
     @Transactional(readOnly = true)
     public List<LiveResponse> findByBranch(Long branchId) {
+        assertCanViewLive(branchId);
         assertBranchBelongsToCurrentTenant(branchId);
 
         return repository.findByBranchIdOrderByCreatedAtDesc(branchId)
@@ -59,13 +60,14 @@ public class LiveService {
     @Transactional(readOnly = true)
     public LiveResponse findById(Long id) {
         Live live = findEntityById(id);
+        assertCanViewLive(live.getBranch().getId());
         assertLiveBelongsToCurrentTenant(live);
         return toResponse(live);
     }
 
     public LiveResponse create(Long branchId, Live entity) {
         Long userId = currentUser.getUserId();
-        assertCanOperateLive(branchId);
+        assertCanOperateLiveSession(branchId);
         assertBranchBelongsToCurrentTenant(branchId);
 
         Branch branch = branchRepository.findById(branchId)
@@ -85,7 +87,7 @@ public class LiveService {
     public LiveResponse activate(Long id) {
         Live existing = findEntityById(id);
 
-        assertCanOperateLive(existing.getBranch().getId());
+        assertCanOperateLiveSession(existing.getBranch().getId());
         assertLiveBelongsToCurrentTenant(existing);
 
         existing.setStatus(LiveStatus.ACTIVE);
@@ -109,7 +111,7 @@ public class LiveService {
     public LiveResponse close(Long id) {
         Live existing = findEntityById(id);
 
-        assertCanOperateLive(existing.getBranch().getId());
+        assertCanOperateLiveSession(existing.getBranch().getId());
         assertLiveBelongsToCurrentTenant(existing);
 
         existing.setStatus(LiveStatus.CLOSED);
@@ -131,13 +133,18 @@ public class LiveService {
     @Transactional(readOnly = true)
     public ItemResponse getActiveItem(Long id) {
         Live live = findEntityById(id);
+        assertCanViewLive(live.getBranch().getId());
         assertLiveBelongsToCurrentTenant(live);
         return live.getActiveItem() == null ? null : toItemResponse(live.getActiveItem());
     }
 
     public LiveResponse setActiveItem(Long id, LiveActiveItemRequest request) {
         Live live = findEntityById(id);
-        assertCanOperateLive(live.getBranch().getId());
+        if (request == null || request.getItemId() == null) {
+            assertCanRemoveLiveActiveItem(live.getBranch().getId());
+        } else {
+            assertCanChangeLiveActiveItem(live.getBranch().getId());
+        }
         assertLiveBelongsToCurrentTenant(live);
 
         if (live.getStatus() == LiveStatus.CLOSED) {
@@ -169,6 +176,8 @@ public class LiveService {
 
     @Transactional(readOnly = true)
     public List<LiveEventResponse> findEvents(Long id) {
+        Live live = findEntityById(id);
+        assertCanViewLive(live.getBranch().getId());
         return liveEventService.findByLive(id);
     }
 
@@ -193,13 +202,55 @@ public class LiveService {
                 .orElseThrow(() -> new IllegalArgumentException("Live no encontrado con id: " + id));
     }
 
-    private void assertCanOperateLive(Long branchId) {
-        accessService.assertCan(
-                currentUser.getUserId(),
-                PermissionCode.DO_LIVE_RESERVATION,
-                ChannelCode.LIVE,
-                branchId
+    private void assertCanViewLive(Long branchId) {
+        assertCanAnyLivePermission(
+                branchId,
+                PermissionCode.VIEW_LIVE,
+                PermissionCode.OPERATE_LIVE,
+                PermissionCode.DO_LIVE_RESERVATION
         );
+    }
+
+    private void assertCanOperateLiveSession(Long branchId) {
+        assertCanAnyLivePermission(
+                branchId,
+                PermissionCode.OPERATE_LIVE,
+                PermissionCode.DO_LIVE_RESERVATION
+        );
+    }
+
+    private void assertCanChangeLiveActiveItem(Long branchId) {
+        assertCanAnyLivePermission(
+                branchId,
+                PermissionCode.CHANGE_LIVE_ACTIVE_ITEM,
+                PermissionCode.DO_LIVE_RESERVATION
+        );
+    }
+
+    private void assertCanRemoveLiveActiveItem(Long branchId) {
+        assertCanAnyLivePermission(
+                branchId,
+                PermissionCode.REMOVE_LIVE_ACTIVE_ITEM,
+                PermissionCode.DO_LIVE_RESERVATION
+        );
+    }
+
+    private void assertCanAnyLivePermission(Long branchId, String primaryPermission, String... fallbackPermissions) {
+        Long userId = currentUser.getUserId();
+
+        if (accessService.can(userId, primaryPermission)) {
+            accessService.assertCan(userId, primaryPermission, ChannelCode.LIVE, branchId);
+            return;
+        }
+
+        for (String fallbackPermission : fallbackPermissions) {
+            if (accessService.can(userId, fallbackPermission)) {
+                accessService.assertCan(userId, fallbackPermission, ChannelCode.LIVE, branchId);
+                return;
+            }
+        }
+
+        accessService.assertCan(userId, primaryPermission, ChannelCode.LIVE, branchId);
     }
 
     private void assertBranchBelongsToCurrentTenant(Long branchId) {

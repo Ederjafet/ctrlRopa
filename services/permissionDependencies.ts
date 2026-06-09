@@ -9,6 +9,11 @@ export const SUGGESTED_PERMISSION_DEPENDENCIES: Record<string, string[]> = {
   EDIT_ITEM: ['VIEW_INVENTORY'],
   REGISTER_PAYMENTS: ['VIEW_PAYMENTS'],
   VOID_PAYMENT: ['VIEW_PAYMENTS'],
+  DO_LIVE_RESERVATION: ['VIEW_LIVE'],
+  OPERATE_LIVE: ['VIEW_LIVE'],
+  PREPARE_LIVE_ITEM: ['VIEW_LIVE'],
+  CHANGE_LIVE_ACTIVE_ITEM: ['VIEW_LIVE'],
+  REMOVE_LIVE_ACTIVE_ITEM: ['VIEW_LIVE'],
 };
 
 const PERMISSION_GROUP_ORDER = [
@@ -94,6 +99,7 @@ const PERMISSION_LABELS_ES: Record<string, string> = {
   VIEW_CUSTOMERS: 'Ver clientes',
   VIEW_DEPOSIT_REPORTS: 'Ver reporte de depósitos',
   VIEW_INVENTORY: 'Ver inventario',
+  VIEW_LIVE: 'Ver LIVE',
   VIEW_LIVE_OPERATION_AUTHORIZATIONS: 'Ver autorizaciones operativas LIVE',
   VIEW_LIVE_PRICE_AUTHORIZATIONS: 'Ver autorizaciones de precio LIVE',
   VIEW_PAYMENT_STATUS: 'Ver estado de pago',
@@ -173,6 +179,7 @@ const PERMISSION_LABELS_EN: Record<string, string> = {
   VIEW_CUSTOMERS: 'View customers',
   VIEW_DEPOSIT_REPORTS: 'View deposit reports',
   VIEW_INVENTORY: 'View inventory',
+  VIEW_LIVE: 'View LIVE',
   VIEW_LIVE_OPERATION_AUTHORIZATIONS: 'View LIVE operational authorizations',
   VIEW_LIVE_PRICE_AUTHORIZATIONS: 'View LIVE price authorizations',
   VIEW_PAYMENT_STATUS: 'View payment status',

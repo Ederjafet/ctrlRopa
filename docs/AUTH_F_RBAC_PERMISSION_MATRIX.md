@@ -19,6 +19,8 @@ Nota AUTH-I2: el permiso dedicado `VIEW_SECURITY_AUDIT` queda documentado en `do
 
 Nota AUTH-Z: el cierre integral de seguridad queda documentado en `docs/AUTH_Z_SECURITY_FINAL_VALIDATION.md` y se ejecuta con `docs/qa/99-auth-z-final-security-smoke.sh`. Orquesta los smokes AUTH-F6, AUTH-H, AUTH-I2, AUTH-J2, AUTH-J4 y AUTH-J5.
 
+Nota LIVE-PERM-A1: los permisos LIVE minimos reales quedan documentados en `docs/LIVE_PERM_A1_MINIMAL_LIVE_PERMISSIONS.md`. Agrega `VIEW_LIVE`, `OPERATE_LIVE`, `PREPARE_LIVE_ITEM`, `CHANGE_LIVE_ACTIVE_ITEM` y `REMOVE_LIVE_ACTIVE_ITEM`, manteniendo `DO_LIVE_RESERVATION` como compatibilidad para apartados LIVE.
+
 ## Objetivo
 
 Iniciar AUTH-F como fase de diagnostico y matriz RBAC. Esta fase no cambia permisos productivos, no agrega migraciones, no toca SQL y no modifica enforcement funcional. El resultado es una base formal para decidir subfases posteriores de RBAC avanzado.
@@ -61,7 +63,7 @@ Fuera de alcance:
 | Ventas | `DO_DOOR_SALE`, `CANCEL_SALE` |
 | Reservas | `DO_LIVE_RESERVATION`, `DO_DOOR_RESERVATION`, `CANCEL_RESERVATION` |
 | Reportes | `VIEW_REPORTS`, `VIEW_DEPOSIT_REPORTS` en migracion/dataset, no presente en `PermissionCode.java` |
-| En vivo | `DO_LIVE_RESERVATION` |
+| En vivo | `VIEW_LIVE`, `OPERATE_LIVE`, `PREPARE_LIVE_ITEM`, `CHANGE_LIVE_ACTIVE_ITEM`, `REMOVE_LIVE_ACTIVE_ITEM`, `DO_LIVE_RESERVATION` |
 | Sistema/Usuarios | `MANAGE_USERS`, `MANAGE_ROLES`, `MANAGE_SECURITY_SETTINGS`, `VIEW_SECURITY_AUDIT`, `MANAGE_BRANCHES`, `MANAGE_BRANCH_CHANNELS`, `MANAGE_CATALOGS`, `MANAGE_BRANDING` |
 | Transferencias | `MANAGE_TRANSFERS`, `SEND_TRANSFERS`, `RECEIVE_TRANSFERS`, `CANCEL_TRANSFERS` |
 | Consignaciones | `MANAGE_CONSIGNMENTS`, `SETTLE_CONSIGNMENTS`, `CANCEL_CONSIGNMENTS` |
@@ -128,8 +130,8 @@ Notas:
 | Lotes | `GET /api/batches/**` | `BatchController` | Si | Batches tenant-aware | `VIEW_INVENTORY` | Mantener o crear permiso lote lectura | Medio |
 | Lotes | `POST/PATCH/PUT /api/batches/**` | `BatchController` | Si | Batches tenant-aware | `MANAGE_INVENTORY` | Mantener o crear permisos lote finos | Medio |
 | Ubicaciones/Cajas | `/api/storage-locations/**`, `/api/boxes/**` | Inventario | Si | Branch | No confirmado permiso funcional completo | `VIEW_INVENTORY`/`MANAGE_INVENTORY` | Alto |
-| En vivo | `/api/lives/branch/{branchId}`, `/{id}` | `LiveController` | Si | Branch/company | `DO_LIVE_RESERVATION` observado | Separar `VIEW_LIVE` futuro si se requiere presentadora solo vista | Medio |
-| En vivo | `POST /api/lives/branch/{branchId}`, activar/cerrar | `LiveController` | Si | Branch/company | `DO_LIVE_RESERVATION` | `MANAGE_LIVE` futuro si se separa operacion | Medio |
+| En vivo | `/api/lives/branch/{branchId}`, `/{id}` | `LiveController` | Si | Branch/company | `VIEW_LIVE`, `OPERATE_LIVE` o `DO_LIVE_RESERVATION` legacy | Mantener separacion minima LIVE-PERM-A1 | Medio |
+| En vivo | `POST /api/lives/branch/{branchId}`, activar/cerrar | `LiveController` | Si | Branch/company | `OPERATE_LIVE` o `DO_LIVE_RESERVATION` legacy | Mantener operacion minima LIVE-PERM-A1 | Medio |
 | Reservas | `GET /api/reservations/**` | `ReservationController` | Si | Branch/reservation | No confirmado permiso lectura fino | `DO_LIVE_RESERVATION`/`DO_DOOR_RESERVATION` o `VIEW_RESERVATIONS` futuro | Alto |
 | Reservas | `POST /api/reservations` | `ReservationController` | Si | Branch/canal | `DO_LIVE_RESERVATION` o `DO_DOOR_RESERVATION` por canal | Mantener | Medio |
 | Reservas | `PATCH /api/reservations/{id}/cancel` | `ReservationController` | Si | Reservation | `CANCEL_RESERVATION` | Mantener | Medio |
@@ -162,7 +164,7 @@ Notas:
 | `/items` | `VIEW_INVENTORY` o `MANAGE_INVENTORY` | `/api/items/**` | Si | Bajo/medio |
 | `/items-create` | Operacion inventario | `/api/items` | Pendiente de confirmar directo | No hay `CREATE_ITEM` persistido |
 | `/batches` | `VIEW_INVENTORY` o `MANAGE_INVENTORY` | `/api/batches/**` | Si | Permiso fino lote pendiente |
-| `/live` | `DO_LIVE_RESERVATION` y helpers LIVE | `/api/lives`, customers/items/reservations | Si | Separacion presentadora/operador aun no existe en backend |
+| `/live` | `VIEW_LIVE`, `OPERATE_LIVE`, `PREPARE_LIVE_ITEM`, `CHANGE_LIVE_ACTIVE_ITEM`, `REMOVE_LIVE_ACTIVE_ITEM` y `DO_LIVE_RESERVATION` legacy | `/api/lives`, customers/items/reservations | Si | Separacion minima implementada; autorizaciones/precio/pagos siguen fuera de alcance |
 | `/payments` | `REGISTER_PAYMENTS` en menu | `/api/payments/**` | Parcial | Falta `VIEW_PAYMENTS` para consulta |
 | `/door-sale` | `DO_DOOR_SALE` | ventas/pagos/items | Por menu/canal | Backend create cubierto; lectura venta pendiente |
 | `/door-reservation`, `/reservations` | `DO_DOOR_RESERVATION` | `/api/reservations/**` | Por menu/canal | Lectura reserva fina pendiente |
@@ -198,7 +200,7 @@ Notas:
 
 - `/customers` bloquea con `VIEW_CUSTOMERS`, pero backend de clientes debe ser fuente final.
 - `/payments` se expone por `REGISTER_PAYMENTS`, pero las consultas de pagos no tienen permiso de lectura dedicado.
-- LIVE usa helpers frontend por rol/capacidad; backend todavia opera principalmente con `DO_LIVE_RESERVATION`.
+- LIVE-PERM-A1 separa permisos minimos de ver/operar/preparar/cambiar/retirar prenda al aire; `DO_LIVE_RESERVATION` queda como compatibilidad de apartado LIVE. Precio, pagos, reversas y autorizaciones siguen pendientes.
 
 ### Permisos sugeridos que no existen
 
