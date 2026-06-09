@@ -1,0 +1,4 @@
+﻿ ..._UX_B1_PERMISSIONS_TECHNICAL_DETAILS_CLEANUP.md | 64 ++++++++++++++++++++++
+ ...nical-details-cleanup-report-20260608-230008.md | 33 +++++++++++
+ services/permissionDependencies.ts                 | 20 +++++++
+ 3 files changed, 117 insertions(+)
