@@ -1,0 +1,384 @@
+# ITEM-Z1 - Handoff arquitectonico de inventario LIVE
+
+## Resumen ejecutivo
+
+ITEM-Z1 audita el estado real del flujo de inventario relacionado con LIVE y deja una propuesta de arquitectura antes de tocar inventario critico.
+
+Resultado de esta fase:
+
+- `HANDOFF_ARQUITECTONICO_COMPLETO`
+- `NO_IMPLEMENTATION`
+- `PENDING_APPROVAL_FOR_ITEM_Z2`
+
+No se implementaron cambios funcionales, no se tocaron migraciones, endpoints, backend funcional, pagos, caja, devoluciones, autorizaciones ni RBAC.
+
+## Estado previo validado
+
+La rama incluye el trabajo previo de permisos LIVE minimos:
+
+- `5f5cf4d LIVE-PERM-A1 agrega permisos live minimos`
+- `4975138 LIVE-PERM-A1B corrige dependencias de permisos live`
+- `6c757c9 LIVE-PERM-A1 documenta cierre final`
+- `5c7aced LIVE-PERM-A2 ajusta capacidades live por rol`
+- `c818cb1 LIVE-PERM-A3 documenta smoke visual por rol`
+
+Permisos LIVE minimos reales:
+
+- `VIEW_LIVE`
+- `OPERATE_LIVE`
+- `PREPARE_LIVE_ITEM`
+- `CHANGE_LIVE_ACTIVE_ITEM`
+- `REMOVE_LIVE_ACTIVE_ITEM`
+
+Permiso conservado para apartado LIVE:
+
+- `DO_LIVE_RESERVATION`
+
+Dependencia vigente:
+
+- `DO_LIVE_RESERVATION` depende de `VIEW_LIVE`.
+- `OPERATE_LIVE`, `PREPARE_LIVE_ITEM`, `CHANGE_LIVE_ACTIVE_ITEM` y `REMOVE_LIVE_ACTIVE_ITEM` dependen de `VIEW_LIVE`.
+- V51 hace backfill idempotente de `VIEW_LIVE` para roles con `DO_LIVE_RESERVATION`.
+
+## Estado actual real
+
+### Prenda / producto / item
+
+La prenda se representa con la entidad `Item` y la tabla `items`.
+
+Campos relevantes:
+
+| Campo | Uso actual |
+| --- | --- |
+| `id` | Identificador interno. |
+| `code` | Codigo operativo de prenda. |
+| `qr_code` | Identificador QR. |
+| `company_id` | Aislamiento tenant. |
+| `branch_id` | Sucursal. |
+| `batch_id` | Lote de origen. |
+| `product_type_id`, `brand_id`, `size_id` | Clasificacion visible. |
+| `price` | Precio base visible/operativo. |
+| `status` | Estado canonico de disponibilidad de inventario. |
+| `storage_location_id` | Ubicacion fisica. |
+
+Estados actuales de `ItemStatus`:
+
+- `AVAILABLE`
+- `RESERVED`
+- `SOLD`
+- `DISABLED`
+- `ON_CONSIGNMENT`
+
+Hallazgo: el backend ya bloquea edicion y cambio de ubicacion de prendas que no estan `AVAILABLE`.
+
+### Disponibilidad
+
+La disponibilidad real se apoya en `items.status`.
+
+Reglas backend observadas:
+
+- `ReservationService.create` solo permite reservar si `item.status == AVAILABLE`.
+- Al crear una reserva, el item pasa a `RESERVED`.
+- Al cancelar una reserva activa, el item vuelve a `AVAILABLE`.
+- En pagos/ventas, cuando una venta activa queda pagada, el item puede pasar a `SOLD`; si no queda pagada, puede permanecer `RESERVED`.
+
+Reglas frontend observadas:
+
+- `/live` calcula disponibilidad con `item.status`, reservas recientes y pagos visibles.
+- El selector LIVE puede filtrar disponibles, apartadas/reservadas, vendidas/no disponibles y todas.
+- La UI bloquea o advierte para prendas vendidas, con pago, reservadas o no confirmadas.
+
+Riesgo: la UI filtra y explica, pero la regla critica debe vivir en backend. Hoy `ReservationService.create` protege la reserva, pero `LiveService.setActiveItem` no valida `ItemStatus`.
+
+### Reserva / apartado
+
+La reserva se representa con `Reservation` y la tabla `reservations`.
+
+Campos relevantes:
+
+| Campo | Uso actual |
+| --- | --- |
+| `item_id` | Prenda reservada. |
+| `customer_id` | Cliente. |
+| `branch_id` | Sucursal. |
+| `live_id` | LIVE asociado, nullable. |
+| `sales_channel_id` | Canal; LIVE requiere `live_id`. |
+| `price` | Precio de reserva. |
+| `status` | Estado general: `ACTIVE`, `CANCELLED`, `CONVERTED_TO_SALE`, `COMPLETED`. |
+| `live_operational_status` | Estado operativo LIVE: `PENDING`, `RESERVED`, `OPERATIONAL_SOLD`, `CANCELLED`. |
+| `live_operational_status_updated_at/by/reason` | Trazabilidad basica de estado operativo. |
+
+Reglas backend observadas:
+
+- Reservas LIVE requieren canal `LIVE` y `liveId`.
+- Reservas LIVE requieren permiso `DO_LIVE_RESERVATION`.
+- El LIVE debe estar `OPEN` o `ACTIVE`.
+- La reserva valida tenant/branch de prenda, cliente, sucursal y LIVE.
+- Se revisa si existe una reserva activa por `item_id`.
+- Al reservar, la prenda pasa a `RESERVED`.
+- Cambiar `live_operational_status` no cambia `items.status`.
+
+Riesgo: la verificacion de reserva activa y el cambio de estado del item ocurren en servicio, pero no se observo bloqueo pesimista ni constraint unico para evitar doble reserva concurrente.
+
+### Relacion LIVE con inventario
+
+`Live` representa una transmision y `lives.active_item_id` apunta a la prenda al aire.
+
+Migraciones relevantes:
+
+- V47 agrega `lives.active_item_id`.
+- V48 agrega estado operativo LIVE en reservas.
+- V49 agrega `live_events`.
+- V50/V51 agregan permisos LIVE minimos y dependencias.
+
+Reglas backend observadas:
+
+- `LiveService.setActiveItem` permite asignar o limpiar `active_item_id`.
+- Cambiar prenda al aire requiere `CHANGE_LIVE_ACTIVE_ITEM` o compatibilidad con `DO_LIVE_RESERVATION`.
+- Retirar prenda al aire requiere `REMOVE_LIVE_ACTIVE_ITEM` o compatibilidad con `DO_LIVE_RESERVATION`.
+- El item asignado debe pertenecer a la misma sucursal del LIVE.
+- Se registra evento `ACTIVE_ITEM_CHANGED`.
+
+Brecha: `LiveService.setActiveItem` no valida actualmente que el item este `AVAILABLE`, ni bloquea si esta `RESERVED`, `SOLD`, `DISABLED` u otro estado no elegible.
+
+### Prenda preparada
+
+La "prenda preparada para cambio" se maneja en el frontend de `/live` como seleccion temporal (`selectedItem` distinto de `activeItem`).
+
+Hallazgo:
+
+- No se observo campo backend persistido para `prepared_item_id`.
+- No hay evento backend dedicado para "prenda preparada".
+- Al promoverla, se usa el flujo existente de `setLiveActiveItem`.
+
+Riesgo: si dos operadores preparan/cambian en paralelo, el backend solo conoce la prenda activa final; no conoce la preparacion intermedia.
+
+### Venta operacional LIVE
+
+El cierre como venta LIVE se representa hoy con `reservations.live_operational_status = OPERATIONAL_SOLD`.
+
+Alcance actual:
+
+- No registra pago.
+- No registra caja.
+- No crea venta financiera nueva en este flujo.
+- No cambia necesariamente `items.status` a `SOLD`.
+
+Esto es correcto para el alcance operativo actual, pero debe mantenerse visible para QA y operacion: "venta operacional" no equivale a venta/cobro/caja.
+
+## Riesgos detectados
+
+| Riesgo | Severidad | Evidencia / causa |
+| --- | --- | --- |
+| Doble reserva | Critico | `ReservationService.create` valida estado y reserva activa, pero no se observo lock/constraint unico contra concurrencia. |
+| Poner al aire prenda no disponible | Alto | `LiveService.setActiveItem` valida sucursal/permisos, pero no valida `ItemStatus`. |
+| Reservar prenda ya no disponible desde estado stale | Alto | Frontend puede tener datos viejos; backend bloquea si `item.status != AVAILABLE`, pero el usuario debe recibir error accionable. |
+| Prenda vendida o reservada visible como candidata | Medio/Alto | Frontend filtra, pero `getItemsByBranch` devuelve inventario completo; el backend debe proteger cada operacion critica. |
+| Prenda retirada sin liberar estado | Medio | Retirar del aire solo limpia `active_item_id`; no debe liberar inventario si ya hay reserva, pero debe estar auditado y explicado. |
+| Cambio de prenda al aire sin regla de disponibilidad | Alto | Se registra evento, pero falta elegibilidad backend por estado. |
+| Desincronizacion active item vs reserva | Alto | Una prenda activa puede quedar reservada; la UI bloquea nueva reserva, pero el backend no limpia ni reinterpreta active item automaticamente. |
+| Venta operacional confundida con venta real | Critico | `OPERATIONAL_SOLD` no procesa pagos/caja; debe mantenerse separado de venta/cobro. |
+| Pago sobre apartado y reversas | Critico | UI muestra/bloquea segun pagos visibles, pero flujo formal de autorizacion/reversa queda fuera de ITEM-Z1. |
+| Tenant/branch isolation | Critico | Hay validaciones tenant/branch en servicios revisados; cualquier fase futura debe conservarlas. |
+| Permisos insuficientes o excesivos | Alto | `DO_LIVE_RESERVATION` sigue como compatibilidad; permisos minimos ayudan, pero no sustituyen autorizaciones sensibles. |
+
+## Diseno recomendado
+
+### Principios
+
+1. `items.status` debe seguir siendo la fuente canonica de disponibilidad.
+2. `lives.active_item_id` debe representar "al aire", no una venta ni reserva.
+3. `reservations` debe representar apartado real.
+4. `live_operational_status` debe representar estado operativo LIVE, no pago ni caja.
+5. Toda regla critica debe validarse en backend aunque el frontend tambien guie al operador.
+6. Ninguna accion con pago debe revertirse/cancelarse sin autorizacion formal futura.
+
+### Estados minimos de prenda para LIVE
+
+No se recomienda cambiar `ItemStatus` en ITEM-Z2 sin aprobacion. Para MVP se puede usar el contrato actual:
+
+| Estado item | Elegible para preparar/poner al aire | Elegible para apartar |
+| --- | --- | --- |
+| `AVAILABLE` | Si | Si |
+| `ON_CONSIGNMENT` | Pendiente de decision de negocio | Pendiente de decision de negocio |
+| `RESERVED` | No para nueva venta; solo seguimiento o correccion autorizada | No |
+| `SOLD` | No | No |
+| `DISABLED` | No | No |
+
+Decision pendiente: confirmar si `ON_CONSIGNMENT` se puede vender/apartar en LIVE o si requiere flujo de consignacion separado.
+
+### Preparar prenda
+
+Regla recomendada:
+
+- Requiere `PREPARE_LIVE_ITEM`.
+- Debe validar que el LIVE este `OPEN` o `ACTIVE`.
+- Debe validar tenant/branch de la prenda.
+- Debe validar disponibilidad antes de permitir que quede preparada.
+- Si se mantiene frontend-local, debe revalidarse de nuevo al ponerla al aire.
+- Si se persiste en backend, proponer campo `prepared_item_id` o tabla/evento de preparacion con auditoria.
+
+MVP recomendado para ITEM-Z2:
+
+- Mantener preparacion local.
+- Agregar validacion backend fuerte al momento de `setActiveItem`.
+- Documentar que multioperador preparado requiere fase posterior.
+
+### Poner prenda al aire
+
+Regla recomendada:
+
+- Requiere `CHANGE_LIVE_ACTIVE_ITEM`.
+- Live debe estar `OPEN` o `ACTIVE`.
+- Item debe pertenecer a la misma company/branch.
+- Item debe estar en estado elegible.
+- No debe tener reserva activa bloqueante.
+- Debe registrar evento con item previo y item nuevo.
+- No debe cambiar `items.status` por solo estar al aire.
+
+### Cambiar prenda al aire
+
+Regla recomendada:
+
+- Requiere `CHANGE_LIVE_ACTIVE_ITEM`.
+- Debe revalidar la prenda entrante justo antes de aplicar el cambio.
+- Si la prenda anterior esta reservada/vendida, no debe liberarse automaticamente.
+- Si la prenda anterior esta solo al aire sin reserva, basta limpiar referencia y auditar cambio.
+- Debe evitar que el operador cambie a una prenda no disponible por datos stale.
+
+### Retirar prenda del aire
+
+Regla recomendada:
+
+- Requiere `REMOVE_LIVE_ACTIVE_ITEM`.
+- Debe limpiar `lives.active_item_id`.
+- Debe registrar evento `ACTIVE_ITEM_CHANGED` o evento mas especifico futuro.
+- No debe cambiar estado de inventario por defecto.
+- Si la prenda tiene reserva/venta/pago, no debe liberar nada.
+
+### Apartar en LIVE
+
+Regla recomendada:
+
+- Requiere `DO_LIVE_RESERVATION`.
+- Requiere `VIEW_LIVE`.
+- Requiere LIVE abierto/activo.
+- Requiere item elegible (`AVAILABLE` o estado aprobado por negocio).
+- Debe validar tenant/branch de item, cliente, live y canal.
+- Debe bloquear doble reserva con garantia transaccional.
+- Debe dejar item en `RESERVED`.
+- Debe crear `Reservation` con `live_id` y `live_operational_status = RESERVED`.
+- Debe registrar evento LIVE.
+
+MVP recomendado para ITEM-Z2/Z3:
+
+- ITEM-Z2: reforzar elegibilidad backend de prenda al aire.
+- ITEM-Z3: reforzar doble reserva con lock/constraint y pruebas concurrentes.
+
+### Vendido operacional
+
+Regla recomendada:
+
+- `OPERATIONAL_SOLD` solo debe significar cierre operativo dentro de LIVE.
+- No debe registrar pago.
+- No debe tocar caja.
+- No debe crear venta financiera sin fase aprobada.
+- Debe mantener advertencia clara de que no hay pago/caja.
+- Si hay pago registrado, reversa/cancelacion debe requerir autorizacion formal futura.
+
+### Relacion con pago, caja y venta real
+
+Queda fuera de ITEM-Z1 e ITEM-Z2.
+
+Fases futuras deben decidir:
+
+- Cuando una reserva LIVE se convierte a venta real.
+- Como se sincroniza con pagos y caja.
+- Que autorizaciones aplican si ya existe pago.
+- Como se audita una reversa.
+- Como se refleja `SOLD` en inventario.
+
+## Modelo de permisos relacionado
+
+| Permiso | Uso recomendado |
+| --- | --- |
+| `VIEW_LIVE` | Ver estado LIVE, historial y contexto. |
+| `OPERATE_LIVE` | Operar sesion LIVE basica. |
+| `PREPARE_LIVE_ITEM` | Preparar prenda para cambio sin controlar retiro. |
+| `CHANGE_LIVE_ACTIVE_ITEM` | Poner/cambiar prenda al aire. |
+| `REMOVE_LIVE_ACTIVE_ITEM` | Retirar prenda del aire. |
+| `DO_LIVE_RESERVATION` | Crear apartado LIVE. |
+
+No se deben usar estos permisos para precio, pagos, caja, devoluciones ni autorizaciones complejas.
+
+## Propuesta de fases siguientes
+
+### ITEM-Z2 - Estado LIVE de prenda y elegibilidad backend minima
+
+Alcance sugerido:
+
+- Reforzar `LiveService.setActiveItem` para validar disponibilidad real antes de poner/cambiar prenda al aire.
+- Mantener `lives.active_item_id` como referencia, sin cambiar `items.status` solo por estar al aire.
+- Emitir errores accionables si la prenda no es elegible.
+- No tocar pagos/caja/precio/autorizaciones.
+
+Archivos probables:
+
+- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveService.java`
+- tests backend de `LiveService`
+- `app/live.tsx` solo si hace falta alinear mensaje.
+- docs/QA/evidencia de fase.
+
+### ITEM-Z3 - Bloqueo de doble reserva/disponibilidad
+
+Alcance sugerido:
+
+- Hacer atomica la transicion `AVAILABLE -> RESERVED`.
+- Evaluar lock pesimista sobre item o update condicional por status.
+- Evaluar constraint unico para reserva activa por item si la base lo permite sin riesgo.
+- Agregar pruebas de concurrencia o doble submit.
+
+### ITEM-Z4 - Auditoria y trazabilidad
+
+Alcance sugerido:
+
+- Eventos especificos para preparar, poner al aire, retirar, reservar, marcar operacional vendido y reactivar seguimiento.
+- Payload minimo sin datos sensibles.
+- Trazabilidad por usuario, company, branch, live, item, reservation.
+
+### ITEM-Z5 - Integracion venta/pago/caja
+
+Alcance sugerido:
+
+- Solo con aprobacion arquitectonica.
+- Definir conversion de reserva LIVE a venta real.
+- Definir reglas de pagos, caja, reversa y autorizacion.
+- No mezclar con ITEM-Z2/Z3.
+
+## Criterios de aprobacion arquitectonica para ITEM-Z2
+
+Antes de implementar ITEM-Z2, arquitectura debe aprobar:
+
+1. Si `AVAILABLE` es el unico estado elegible para poner prenda al aire.
+2. Tratamiento de `ON_CONSIGNMENT` en LIVE.
+3. Si "prenda al aire" debe o no bloquear inventario.
+4. Si la preparacion se mantiene local o se persiste.
+5. Mensajes accionables esperados para item reservado, vendido, deshabilitado, sucursal ajena y live cerrado.
+6. Pruebas backend requeridas.
+7. QA visual y API por rol.
+8. Rollback: revertir cambio de servicio y conservar V47/V48/V49.
+9. Criterio de no tocar pagos/caja/precio/autorizaciones.
+10. Criterio para no romper `DO_LIVE_RESERVATION` ni permisos LIVE minimos.
+
+## GO / NO-GO
+
+Resultado ITEM-Z1: `GO_DOCUMENTAL`.
+
+Recomendacion para ITEM-Z2: `GO_CONDICIONADO`.
+
+Condiciones:
+
+- Aprobar reglas de elegibilidad de prenda.
+- Confirmar decision para `ON_CONSIGNMENT`.
+- Confirmar que ITEM-Z2 solo refuerza `setActiveItem` y mensajes, sin pago/caja/precio/autorizaciones.
+- Mantener pruebas backend y validaciones frontend completas.
