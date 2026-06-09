@@ -892,6 +892,8 @@
     "searchPermission": "Rechercher permission",
     "noPermissionsFound": "Sans permissions trouvé",
     "internalCode": "Interne code {{code}}",
+    "showTechnicalDetails": "Voir les détails techniques",
+    "hideTechnicalDetails": "Masquer les détails techniques",
     "included": "Inclus",
     "add": "Ajouter"
   },

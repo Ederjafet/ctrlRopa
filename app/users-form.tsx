@@ -74,13 +74,14 @@ function parseId(value: string | string[] | undefined): number | null {
 function selectedNames<T extends { id: number; code?: string; name: string }>(
   items: T[],
   ids: number[],
-  emptyText: string
+  emptyText: string,
+  language = 'es'
 ) {
   if (ids.length === 0) return emptyText;
   const selected = items.filter((item) => ids.includes(item.id));
   if (selected.length === 0) return emptyText;
   return selected
-    .map((item) => (item.code ? formatPermissionCode(item.code) : item.name))
+    .map((item) => (item.code ? formatPermissionCode(item.code, language) : item.name))
     .join(', ');
 }
 
@@ -103,7 +104,7 @@ export default function UsersFormScreen() {
   const userId = parseId(id);
   const isEdit = userId !== null;
   const { theme } = useAppTheme();
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
 
   const [form, setForm] = useState<FormState>(initialForm);
   const [branches, setBranches] = useState<AdminBranch[]>([]);
@@ -118,6 +119,7 @@ export default function UsersFormScreen() {
   const [draftRoleIds, setDraftRoleIds] = useState<number[]>([]);
   const [draftPermissionIds, setDraftPermissionIds] = useState<number[]>([]);
   const [permissionSearch, setPermissionSearch] = useState('');
+  const [showPermissionTechnicalDetails, setShowPermissionTechnicalDetails] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -175,8 +177,14 @@ export default function UsersFormScreen() {
   );
 
   const selectedAssignedBranches = useMemo(
-    () => selectedNames(branches, mergeIds(form.branchIds, form.branchId), t('usersForm.selectBranches')),
-    [branches, form.branchId, form.branchIds, t]
+    () =>
+      selectedNames(
+        branches,
+        mergeIds(form.branchIds, form.branchId),
+        t('usersForm.selectBranches'),
+        i18n.language
+      ),
+    [branches, form.branchId, form.branchIds, i18n.language, t]
   );
 
   const draftPermissionCodes = useMemo(
@@ -190,9 +198,10 @@ export default function UsersFormScreen() {
   const groupedPermissionOptions = useMemo(
     () =>
       groupPermissionsForDisplay(
-        permissions.filter((permission) => matchesPermissionSearch(permission, permissionSearch))
+        permissions.filter((permission) => matchesPermissionSearch(permission, permissionSearch, i18n.language)),
+        i18n.language
       ),
-    [permissionSearch, permissions]
+    [i18n.language, permissionSearch, permissions]
   );
 
   const openRolesModal = () => {
@@ -213,6 +222,7 @@ export default function UsersFormScreen() {
   const openPermissionsModal = () => {
     setDraftPermissionIds(form.permissionIds);
     setPermissionSearch('');
+    setShowPermissionTechnicalDetails(false);
     setPermissionsModalVisible(true);
   };
 
@@ -389,14 +399,19 @@ export default function UsersFormScreen() {
 
           <AppSelectorField
             label={t('usersForm.roles')}
-            value={selectedNames(roles, form.roleIds, t('usersForm.selectRoles'))}
+            value={selectedNames(roles, form.roleIds, t('usersForm.selectRoles'), i18n.language)}
             placeholder={t('usersForm.selectRoles')}
             onPress={openRolesModal}
           />
 
           <AppSelectorField
             label={t('usersForm.directPermissions')}
-            value={selectedNames(permissions, form.permissionIds, t('usersForm.noDirectPermissions'))}
+            value={selectedNames(
+              permissions,
+              form.permissionIds,
+              t('usersForm.noDirectPermissions'),
+              i18n.language
+            )}
             placeholder={t('usersForm.selectDirectPermissions')}
             onPress={openPermissionsModal}
           />
@@ -532,7 +547,7 @@ export default function UsersFormScreen() {
             <AppOptionRow
               key={role.id}
               title={role.name}
-              subtitle={formatPermissionCode(role.code)}
+              subtitle={formatPermissionCode(role.code, i18n.language)}
               onPress={() =>
                 setDraftRoleIds((current) => toggleId(current, role.id))
               }
@@ -573,6 +588,18 @@ export default function UsersFormScreen() {
           onChangeText={setPermissionSearch}
         />
 
+        <View style={styles.technicalToggle}>
+          <AppButton
+            title={
+              showPermissionTechnicalDetails
+                ? t('systemRoles.hideTechnicalDetails')
+                : t('systemRoles.showTechnicalDetails')
+            }
+            variant="secondary"
+            onPress={() => setShowPermissionTechnicalDetails((current) => !current)}
+          />
+        </View>
+
         {groupedPermissionOptions.length === 0 ? (
           <AppText color={theme.colors.mutedText} style={styles.emptyPermissions}>
             {t('usersForm.noPermissionsFound')}
@@ -587,13 +614,22 @@ export default function UsersFormScreen() {
               {group.permissions.map((permission) => {
                 const selected = draftPermissionIds.includes(permission.id);
                 const dependencyWarnings = selected
-                  ? getSuggestedDependencyWarnings(permission.code, draftPermissionCodes, permissions)
+                  ? getSuggestedDependencyWarnings(
+                      permission.code,
+                      draftPermissionCodes,
+                      permissions,
+                      i18n.language
+                    )
                   : [];
                 return (
                   <AppOptionRow
                     key={permission.id}
-                    title={formatPermissionCode(permission.code)}
-                    subtitle={t('systemRoles.internalCode', { code: permission.code })}
+                    title={formatPermissionCode(permission.code, i18n.language)}
+                    subtitle={
+                      showPermissionTechnicalDetails
+                        ? t('systemRoles.internalCode', { code: permission.code })
+                        : undefined
+                    }
                     onPress={() =>
                       setDraftPermissionIds((current) => toggleId(current, permission.id))
                     }
@@ -652,6 +688,11 @@ const styles = StyleSheet.create({
   },
   permissionGroup: {
     marginTop: 14,
+  },
+  technicalToggle: {
+    alignItems: 'flex-start',
+    marginBottom: 4,
+    marginTop: 10,
   },
   permissionStatusRow: {
     alignItems: 'flex-start',

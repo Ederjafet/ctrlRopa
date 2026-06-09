@@ -892,6 +892,8 @@
     "searchPermission": "搜索权限",
     "noPermissionsFound": "无权限项目",
     "internalCode": "内部代码{{code}}",
+    "showTechnicalDetails": "查看技术细节",
+    "hideTechnicalDetails": "隐藏技术细节",
     "included": "包含",
     "add": "添加"
   },

@@ -892,6 +892,8 @@
     "searchPermission": "Search permission",
     "noPermissionsFound": "No permissions found with that filter.",
     "internalCode": "Internal code: {{code}}",
+    "showTechnicalDetails": "View technical details",
+    "hideTechnicalDetails": "Hide technical details",
     "included": "Included",
     "add": "Add"
   },

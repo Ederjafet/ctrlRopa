@@ -892,6 +892,8 @@
     "searchPermission": "검색 권한",
     "noPermissionsFound": "없음 권한 항목",
     "internalCode": "내부 코드 {{code}}",
+    "showTechnicalDetails": "기술 세부 정보 보기",
+    "hideTechnicalDetails": "기술 세부 정보 숨기기",
     "included": "포함",
     "add": "추가"
   },
