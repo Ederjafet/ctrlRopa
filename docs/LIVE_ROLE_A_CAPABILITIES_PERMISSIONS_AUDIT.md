@@ -231,6 +231,18 @@ LIVE-AUTH-A disena la entidad y flujo de autorizaciones operativas. LIVE-ROLE-A 
 
 LIVE-ROLE-A no reemplaza LIVE-AUTH-A; lo prepara para decidir permisos concretos por accion.
 
+## 10.1 Relacion con LIVE-Z10B
+
+LIVE-Z10B toma la brecha de precio identificada en esta auditoria y la convierte en un diseno especifico. Los permisos sugeridos para esa fase son:
+
+- `REQUEST_LIVE_PRICE_CHANGE`;
+- `APPROVE_LIVE_PRICE_CHANGE`;
+- `APPLY_APPROVED_LIVE_PRICE_CHANGE`;
+- `VIEW_LIVE_PRICE_AUTHORIZATIONS`;
+- `CHANGE_LIVE_PRICE` solo si arquitectura aprueba cambio directo.
+
+Esta auditoria mantiene la recomendacion de no conceder cambio de precio por actor visual. Vendedor puede solicitar solo con permiso efectivo; supervisor/admin pueden aprobar solo con permiso explicito y scope correcto.
+
 ## 11. Riesgos
 
 | Riesgo | Impacto | Mitigacion sugerida |
@@ -261,7 +273,8 @@ LIVE-ROLE-A no reemplaza LIVE-AUTH-A; lo prepara para decidir permisos concretos
 | LIVE-ROLE-B | Implementar permisos frontend/backend para preparar y cambiar prenda LIVE | Alta |
 | LIVE-AUTH-B | Crear backend de autorizaciones operativas | Alta |
 | LIVE-AUTH-C | Crear UI de solicitud y cola de autorizaciones | Media/alta |
-| LIVE-Z10B | Autorizacion real de cambio de precio LIVE | Alta |
+| LIVE-Z10B | Diseno especifico de autorizacion real de cambio de precio LIVE | Media |
+| LIVE-Z10C / LIVE-Z10D | Implementacion backend/frontend de autorizacion de precio LIVE | Alta |
 | LIVE-PAYMENT-GUARD-A | Reversa/cancelacion con pago y autorizacion formal | Critica |
 
 Todas requieren handoff de arquitectura antes de implementacion.

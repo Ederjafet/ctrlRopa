@@ -1,0 +1,9 @@
+﻿ ...LIVE_AUTH_A_OPERATIONAL_AUTHORIZATION_DESIGN.md |   9 +-
+ docs/LIVE_ROLE_A_CAPABILITIES_PERMISSIONS_AUDIT.md |  15 +-
+ docs/LIVE_Z10B_PRICE_AUTHORIZATION_DESIGN.md       | 614 +++++++++++++++++++++
+ docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md             |   1 +
+ docs/PROJECT_BACKLOG_PRIORITIZED.md                |   8 +-
+ docs/PROJECT_MASTER_STATUS.md                      |  18 +-
+ docs/QA_TODO_HANDOFF.md                            |   3 +-
+ ...-authorization-design-report-20260608-223114.md |  41 ++
+ 8 files changed, 696 insertions(+), 13 deletions(-)
