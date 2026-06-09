@@ -3293,3 +3293,26 @@ Decision:
 
 - `GO tecnico` si backend/frontend pasan validaciones.
 - `PENDING_QA_VISUAL` hasta validar doble submit/API con datos reales.
+
+## 2026-06-09 - ITEM-Z4 consistencia visual de prenda al aire
+
+Tipo: mejora frontend/UI, sin backend, migraciones, endpoints, permisos, RBAC, pagos, caja, precio LIVE, devoluciones ni autorizaciones.
+
+Objetivo:
+
+- Evitar que una prenda actualmente al aire aparezca en el selector LIVE solamente como `Libre`.
+- Mantener `items.status = AVAILABLE` como disponibilidad real de inventario.
+- Distinguir `lives.active_item_id` como estado operativo visual.
+
+Cambios realizados:
+
+- `app/live.tsx`: el selector muestra panel `Actualmente al aire` para la prenda activa.
+- `app/live.tsx`: la prenda activa queda deshabilitada en el selector para no prepararla como reemplazo de si misma.
+- `AppOptionRow`: agrega soporte opcional `disabled`.
+- Locales ES/EN/PT-BR/FR/JA/ZH/KO: agregan microcopy del selector.
+- `docs/ITEM_Z4_LIVE_ACTIVE_ITEM_UX_CONSISTENCY.md`: documenta alcance, restricciones y QA.
+
+Decision:
+
+- `GO tecnico` si frontend pasa validaciones.
+- `PENDING_QA_VISUAL` hasta validar en `/live` con navegador/capturas reales.

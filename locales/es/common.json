@@ -269,6 +269,8 @@
     "priceConfirmedForReservation": "Precio confirmado para apartado: {{price}}",
     "itemNotAvailableForReservation": "La prenda no esta disponible para reservar.",
     "itemFree": "Libre",
+    "activeItemSelectorOnAirBadge": "Actualmente al aire",
+    "activeItemSelectorOnAirHelp": "Ya esta al aire. Sigue disponible para apartado, pero elige otra prenda para preparar el cambio.",
     "itemReservedWithoutPayment": "Reservada sin pago",
     "itemReservedWithoutPaymentWarning": "Esta prenda esta reservada sin pago. Puedes ponerla al aire bajo criterio operativo.",
     "itemNotAvailableSold": "No disponible: vendida",

@@ -269,6 +269,8 @@
     "priceConfirmedForReservation": "Confirmed hold price: {{price}}",
     "itemNotAvailableForReservation": "The item is not available for reservation.",
     "itemFree": "Free",
+    "activeItemSelectorOnAirBadge": "On air now",
+    "activeItemSelectorOnAirHelp": "Already on air. It remains available for holds, but choose another item to prepare a switch.",
     "itemReservedWithoutPayment": "Reserved without payment",
     "itemReservedWithoutPaymentWarning": "This item is reserved without payment. You can put it on air under operational criteria.",
     "itemNotAvailableSold": "Not available: sold",

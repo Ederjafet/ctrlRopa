@@ -269,6 +269,8 @@
     "priceConfirmedForReservation": "预留确认价格：{{price}}",
     "itemNotAvailableForReservation": "商品项目可用预留",
     "itemFree": "商品免费",
+    "activeItemSelectorOnAirBadge": "当前直播中",
+    "activeItemSelectorOnAirHelp": "该商品已在直播中。仍可用于预留，但请选另一件商品准备切换。",
     "itemReservedWithoutPayment": "商品已预留无付款",
     "itemReservedWithoutPaymentWarning": "商品已预留无付款警告",
     "itemNotAvailableSold": "商品项目可用已售",

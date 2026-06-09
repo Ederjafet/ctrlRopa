@@ -633,6 +633,8 @@
     "preparedItemRemovedTitle": "Preparado peça campo",
     "preparedItemRemovedMessage": "Preparado peça campo",
     "itemFilterAvailable": "Disponiveis",
+    "activeItemSelectorOnAirBadge": "No ar agora",
+    "activeItemSelectorOnAirHelp": "Ja esta no ar. Continua disponivel para apartado, mas escolha outra peca para preparar a troca.",
     "itemFilterReserved": "Reservadas",
     "itemFilterUnavailable": "Vendidas / indisponiveis",
     "itemFilterAll": "Todas",

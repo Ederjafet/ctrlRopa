@@ -6063,8 +6063,11 @@ export default function LiveScreen() {
           renderItem={({ item }) => {
             const availability = getItemLiveAvailability(item);
             const availabilityFilter = getItemAvailabilityFilter(item);
+            const isOnAir = activeItem?.id === item.id;
             const availabilityColor =
-              availabilityFilter === 'available'
+              isOnAir
+                ? theme.colors.accent
+                : availabilityFilter === 'available'
                 ? theme.colors.success
                 : availabilityFilter === 'reserved'
                   ? theme.colors.warning
@@ -6079,6 +6082,7 @@ export default function LiveScreen() {
                   item.brandName || t('live.noBrand')
                 } - ${item.sizeName || t('live.noSize')}`}
                 onPress={() => selectItem(item)}
+                disabled={isOnAir}
               >
                 <AppText variant="caption" color={theme.colors.mutedText}>
                   {t('live.suggestedPrice')}{' '}
@@ -6093,6 +6097,25 @@ export default function LiveScreen() {
                 >
                   {availability.label}
                 </AppText>
+                {isOnAir ? (
+                  <View
+                    style={[
+                      styles.itemSelectorOnAirPanel,
+                      {
+                        backgroundColor: theme.colors.accentSoft,
+                        borderColor: theme.colors.accent,
+                        borderRadius: theme.radius.sm,
+                      },
+                    ]}
+                  >
+                    <AppText variant="caption" color={theme.colors.accent} bold>
+                      {t('live.activeItemSelectorOnAirBadge')}
+                    </AppText>
+                    <AppText variant="caption" color={theme.colors.mutedText}>
+                      {t('live.activeItemSelectorOnAirHelp')}
+                    </AppText>
+                  </View>
+                ) : null}
                 {availability.reason ? (
                   <AppText variant="caption" color={availabilityColor}>
                     {availability.reason}
@@ -6506,6 +6529,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  itemSelectorOnAirPanel: {
+    borderWidth: 1,
+    gap: 2,
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
   },
   modalList: {
     maxHeight: 420,

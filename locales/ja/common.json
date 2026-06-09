@@ -269,6 +269,8 @@
     "priceConfirmedForReservation": "取り置き確認価格: {{price}}",
     "itemNotAvailableForReservation": "商品 項目 利用可能 取り置き",
     "itemFree": "商品 無料",
+    "activeItemSelectorOnAirBadge": "現在オンエア中",
+    "activeItemSelectorOnAirHelp": "すでにオンエア中です。取り置きは可能ですが、切り替え準備には別の商品を選択してください。",
     "itemReservedWithoutPayment": "商品 取り置き済み なし 支払い",
     "itemReservedWithoutPaymentWarning": "商品 取り置き済み なし 支払い 警告",
     "itemNotAvailableSold": "商品 項目 利用可能 販売済み",
