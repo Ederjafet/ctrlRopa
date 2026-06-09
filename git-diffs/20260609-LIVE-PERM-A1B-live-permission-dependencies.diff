@@ -1,0 +1,244 @@
+﻿diff --git a/backend/control-ropa/src/main/resources/db/migration/V51__live_permission_view_dependency_backfill.sql b/backend/control-ropa/src/main/resources/db/migration/V51__live_permission_view_dependency_backfill.sql
+new file mode 100644
+index 0000000..7b45895
+--- /dev/null
++++ b/backend/control-ropa/src/main/resources/db/migration/V51__live_permission_view_dependency_backfill.sql
+@@ -0,0 +1,12 @@
++SET NAMES utf8mb4;
++START TRANSACTION;
++
++-- LIVE-PERM-A1B: every role that can create LIVE holds must also be able to view LIVE.
++INSERT IGNORE INTO role_permissions (role_id, permission_id)
++SELECT DISTINCT rp_live.role_id, p_view.id
++FROM role_permissions rp_live
++JOIN permissions p_live ON p_live.id = rp_live.permission_id
++JOIN permissions p_view ON p_view.code = 'VIEW_LIVE'
++WHERE p_live.code = 'DO_LIVE_RESERVATION';
++
++COMMIT;
+diff --git a/docs/LIVE_PERM_A1B_LIVE_PERMISSION_DEPENDENCIES.md b/docs/LIVE_PERM_A1B_LIVE_PERMISSION_DEPENDENCIES.md
+new file mode 100644
+index 0000000..6ccc5c6
+--- /dev/null
++++ b/docs/LIVE_PERM_A1B_LIVE_PERMISSION_DEPENDENCIES.md
+@@ -0,0 +1,103 @@
++# LIVE-PERM-A1B - Dependencias minimas de permisos LIVE
++
++Fecha: 2026-06-09
++
++Rama: `feature/live-perm-a1-minimal-live-permissions`
++
++Commit base revisado: `5f5cf4d LIVE-PERM-A1 agrega permisos live minimos`
++
++## Resumen ejecutivo
++
++LIVE-PERM-A1B corrige una inconsistencia visible en la pantalla de permisos: un rol podia mostrar `DO_LIVE_RESERVATION` / "Apartar en LIVE" como incluido mientras `VIEW_LIVE` / "Ver LIVE" aparecia como agregable.
++
++La decision aplicada es que cualquier rol que pueda apartar en LIVE debe tener como minimo capacidad de ver LIVE. Tambien se alinea el mapper visible para que los permisos LIVE minimos dependan directamente de `VIEW_LIVE`.
++
++## Problema confirmado
++
++QA observo una combinacion operativamente incoherente:
++
++- `DO_LIVE_RESERVATION` / Apartar en LIVE: incluido.
++- `VIEW_LIVE` / Ver LIVE: agregable.
++- permisos LIVE minimos como operar, preparar, cambiar o retirar prenda tambien aparecian independientes de la capacidad de ver LIVE.
++
++Esto podia hacer que el administrador asignara permisos LIVE sin entender la base minima de acceso al modulo.
++
++## Decision aplicada
++
++Se definieron estas dependencias minimas:
++
++| Permiso | Dependencia minima |
++| --- | --- |
++| `DO_LIVE_RESERVATION` | `VIEW_LIVE` |
++| `OPERATE_LIVE` | `VIEW_LIVE` |
++| `PREPARE_LIVE_ITEM` | `VIEW_LIVE` |
++| `CHANGE_LIVE_ACTIVE_ITEM` | `VIEW_LIVE` |
++| `REMOVE_LIVE_ACTIVE_ITEM` | `VIEW_LIVE` |
++
++`DO_LIVE_RESERVATION` se conserva como permiso legacy/funcional para apartados LIVE. No reemplaza `VIEW_LIVE`.
++
++## Cambios realizados
++
++### Frontend / mapper visible
++
++`services/permissionDependencies.ts` ahora declara:
++
++- `DO_LIVE_RESERVATION -> VIEW_LIVE`;
++- `OPERATE_LIVE -> VIEW_LIVE`;
++- `PREPARE_LIVE_ITEM -> VIEW_LIVE`;
++- `CHANGE_LIVE_ACTIVE_ITEM -> VIEW_LIVE`;
++- `REMOVE_LIVE_ACTIVE_ITEM -> VIEW_LIVE`.
++
++Las pantallas de roles siguen usando el mapper central. No se hardcodearon permisos en pantallas.
++
++### Migracion RBAC
++
++Se agrega `backend/control-ropa/src/main/resources/db/migration/V51__live_permission_view_dependency_backfill.sql`.
++
++La migracion es idempotente y solo hace backfill:
++
++- todo rol que ya tenga `DO_LIVE_RESERVATION` recibe `VIEW_LIVE`;
++- no crea permisos nuevos;
++- no modifica `DO_LIVE_RESERVATION`;
++- no asigna permisos sensibles;
++- no asigna `REMOVE_LIVE_ACTIVE_ITEM` a `SELLER`.
++
++No se edito `V50__live_minimal_permissions.sql` porque puede estar aplicada en ambientes existentes.
++
++## Backend / enforcement
++
++No se cambiaron endpoints ni reglas funcionales.
++
++`LiveService` conserva la compatibilidad legacy existente con `DO_LIVE_RESERVATION` mientras los roles migran a los permisos finos. La navegacion/operacion de LIVE sigue usando las capacidades ya definidas en A1.
++
++## Fuera de alcance
++
++No se toco:
++
++- precio LIVE;
++- pagos;
++- caja;
++- devoluciones;
++- autorizaciones complejas;
++- endpoints;
++- migraciones ajenas;
++- permisos no aprobados;
++- reglas de negocio sensibles.
++
++## QA esperado
++
++QA debe validar visualmente en la pantalla de permisos:
++
++1. Si "Apartar en LIVE" esta incluido, "Ver LIVE" tambien debe quedar incluido o sugerido como dependencia obligatoria.
++2. "Operar LIVE", "Preparar prenda para LIVE", "Cambiar prenda al aire" y "Retirar prenda del aire" muestran `VIEW_LIVE` como dependencia minima.
++3. No aparecen permisos nuevos fuera de A1.
++4. `DO_LIVE_RESERVATION` sigue disponible para apartados LIVE.
++5. Precio, pagos, caja, devoluciones y autorizaciones no tienen cambios nuevos.
++
++Sin evidencia visual real posterior, el estado queda `PENDING_QA_VISUAL`.
++
++## Resultado
++
++Resultado tecnico esperado: `GO_TECNICO` si pasan Maven, lint, TypeScript, export web y checks de Git.
++
++Resultado QA: `PENDING_QA_VISUAL` hasta confirmar la pantalla de permisos en ambiente real.
+diff --git a/qa-reports/LIVE-PERM-A1B-live-permission-dependencies-report-20260609-074052.md b/qa-reports/LIVE-PERM-A1B-live-permission-dependencies-report-20260609-074052.md
+new file mode 100644
+index 0000000..2f3e16c
+--- /dev/null
++++ b/qa-reports/LIVE-PERM-A1B-live-permission-dependencies-report-20260609-074052.md
+@@ -0,0 +1,93 @@
++# LIVE-PERM-A1B - Reporte de dependencias de permisos LIVE
++
++Fecha: 2026-06-09 07:40:52
++
++Rama: `feature/live-perm-a1-minimal-live-permissions`
++
++## Alcance
++
++Corregir la inconsistencia visual/operativa donde `DO_LIVE_RESERVATION` / "Apartar en LIVE" podia quedar incluido sin `VIEW_LIVE` / "Ver LIVE".
++
++La fase no implementa permisos nuevos ni capacidades sensibles.
++
++## Comandos ejecutados
++
++- `git branch --show-current`
++- `git status`
++- `git log --oneline -12`
++- `git show --stat --oneline 5f5cf4d`
++- `git show --name-only --oneline 5f5cf4d`
++- `git grep -n "DO_LIVE_RESERVATION|VIEW_LIVE|OPERATE_LIVE|PREPARE_LIVE_ITEM|CHANGE_LIVE_ACTIVE_ITEM|REMOVE_LIVE_ACTIVE_ITEM" services app backend/control-ropa/src/main/resources backend/control-ropa/src/main/java docs`
++- `git grep -n "permissionDependencies|dependencies|requires|required|Incluido|Agregar" services app components locales docs`
++- `./mvnw.cmd test`
++- `npm.cmd run lint`
++- `npx.cmd tsc --noEmit`
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`
++- `git --no-pager diff --check`
++
++## Hallazgos
++
++- `services/permissionDependencies.ts` ya declaraba `OPERATE_LIVE -> VIEW_LIVE` y `PREPARE_LIVE_ITEM -> VIEW_LIVE`.
++- `services/permissionDependencies.ts` no declaraba `DO_LIVE_RESERVATION -> VIEW_LIVE`.
++- `CHANGE_LIVE_ACTIVE_ITEM` y `REMOVE_LIVE_ACTIVE_ITEM` dependian de `OPERATE_LIVE`, pero la decision A1B exige dependencia minima directa de `VIEW_LIVE`.
++- `V50__live_minimal_permissions.sql` asignaba `VIEW_LIVE` a roles base A1, pero no hacia backfill de roles legacy que ya tuvieran `DO_LIVE_RESERVATION`.
++- `DO_LIVE_RESERVATION` se conserva como permiso legacy/funcional de apartados LIVE.
++
++## Cambios aplicados
++
++- Se agrego `DO_LIVE_RESERVATION -> VIEW_LIVE` al mapper central.
++- Se alinearon `CHANGE_LIVE_ACTIVE_ITEM` y `REMOVE_LIVE_ACTIVE_ITEM` para depender como minimo de `VIEW_LIVE`.
++- Se agrego `V51__live_permission_view_dependency_backfill.sql` para que todo rol con `DO_LIVE_RESERVATION` reciba `VIEW_LIVE`.
++- Se creo documentacion de fase en `docs/LIVE_PERM_A1B_LIVE_PERMISSION_DEPENDENCIES.md`.
++
++## Migracion
++
++Archivo: `backend/control-ropa/src/main/resources/db/migration/V51__live_permission_view_dependency_backfill.sql`
++
++Caracteristicas:
++
++- idempotente con `INSERT IGNORE`;
++- solo inserta `VIEW_LIVE` para roles con `DO_LIVE_RESERVATION`;
++- no crea permisos;
++- no toca permisos sensibles;
++- no edita `V50`;
++- no asigna `REMOVE_LIVE_ACTIVE_ITEM` a `SELLER`.
++
++## Validaciones
++
++| Validacion | Resultado |
++| --- | --- |
++| Maven test | PASS |
++| npm lint | PASS con warnings preexistentes |
++| TypeScript | PASS |
++| Expo export web | PASS |
++| git diff --check | PASS |
++
++Nota: Maven emitio warning de logback por no poder escribir en `C:\HPSQ-SOFT\control-ropa\logs\backend\control-ropa.log`, pero el proceso termino con codigo 0.
++
++## No tocado
++
++- Precio LIVE.
++- Pagos.
++- Caja.
++- Devoluciones.
++- Autorizaciones complejas.
++- Endpoints.
++- Permisos nuevos fuera de A1.
++- Reglas de negocio sensibles.
++
++## Estado QA
++
++Resultado tecnico: `GO_TECNICO`.
++
++Estado visual: `PENDING_QA_VISUAL`.
++
++No se marca `QA_PASS` porque no hubo validacion visual posterior en navegador/ambiente QA.
++
++## QA visual recomendado
++
++1. Abrir pantalla de roles/permisos.
++2. Confirmar que si "Apartar en LIVE" esta incluido, "Ver LIVE" no queda como agregable independiente.
++3. Confirmar que operar/preparar/cambiar/retirar LIVE muestran dependencia minima con "Ver LIVE".
++4. Confirmar que no aparecen permisos nuevos fuera de A1.
++5. Confirmar que no cambian precio, pagos, caja, devoluciones ni autorizaciones.
+diff --git a/services/permissionDependencies.ts b/services/permissionDependencies.ts
+index 196e7e7..d38b1ed 100644
+--- a/services/permissionDependencies.ts
++++ b/services/permissionDependencies.ts
+@@ -9,10 +9,11 @@ export const SUGGESTED_PERMISSION_DEPENDENCIES: Record<string, string[]> = {
+   EDIT_ITEM: ['VIEW_INVENTORY'],
+   REGISTER_PAYMENTS: ['VIEW_PAYMENTS'],
+   VOID_PAYMENT: ['VIEW_PAYMENTS'],
++  DO_LIVE_RESERVATION: ['VIEW_LIVE'],
+   OPERATE_LIVE: ['VIEW_LIVE'],
+   PREPARE_LIVE_ITEM: ['VIEW_LIVE'],
+-  CHANGE_LIVE_ACTIVE_ITEM: ['OPERATE_LIVE'],
+-  REMOVE_LIVE_ACTIVE_ITEM: ['OPERATE_LIVE'],
++  CHANGE_LIVE_ACTIVE_ITEM: ['VIEW_LIVE'],
++  REMOVE_LIVE_ACTIVE_ITEM: ['VIEW_LIVE'],
+ };
+
+ const PERMISSION_GROUP_ORDER = [
