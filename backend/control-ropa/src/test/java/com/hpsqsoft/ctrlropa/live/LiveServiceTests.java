@@ -13,6 +13,8 @@ import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
 import com.hpsqsoft.ctrlropa.tenant.CurrentTenantContext;
 import com.hpsqsoft.ctrlropa.tenant.TenantResolver;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -22,6 +24,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -72,6 +75,7 @@ class LiveServiceTests {
         assertEquals(8L, response.getActiveItemId());
         assertEquals("QA-CTR-005", response.getActiveItemCode());
         assertEquals("Blusa Verde", response.getActiveItemProductTypeName());
+        assertEquals(ItemStatus.AVAILABLE, item.getStatus());
         verify(tenantResolver).assertBranchBelongsToCompany(6L, 2L);
         verify(liveEventService).record(
                 live,
@@ -81,6 +85,27 @@ class LiveServiceTests {
                 8L,
                 "{\"previousItemId\":null,\"activeItemId\":8}"
         );
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ItemStatus.class, names = {"RESERVED", "SOLD", "DISABLED", "ON_CONSIGNMENT"})
+    void setActiveItemRejectsUnavailableItemStatuses(ItemStatus status) {
+        Live live = live(4L, branch(6L, company(2L)));
+        Item item = item(8L, live.getBranch());
+        item.setStatus(status);
+        LiveActiveItemRequest request = new LiveActiveItemRequest();
+        request.setItemId(8L);
+
+        when(tenantResolver.resolveCurrent()).thenReturn(tenant());
+        when(liveRepository.findById(4L)).thenReturn(Optional.of(live));
+        when(itemRepository.findByCompanyIdAndId(2L, 8L)).thenReturn(Optional.of(item));
+
+        IllegalArgumentException exception =
+                assertThrows(IllegalArgumentException.class, () -> service.setActiveItem(4L, request));
+
+        assertEquals("Solo se pueden poner al aire prendas disponibles", exception.getMessage());
+        assertEquals(status, item.getStatus());
+        verify(liveRepository, never()).save(live);
     }
 
     @Test
@@ -96,6 +121,32 @@ class LiveServiceTests {
         when(itemRepository.findByCompanyIdAndId(2L, 8L)).thenReturn(Optional.of(item));
 
         assertThrows(AccessDeniedException.class, () -> service.setActiveItem(4L, request));
+    }
+
+    @Test
+    void clearActiveItemDoesNotChangeInventoryStatus() {
+        Live live = live(4L, branch(6L, company(2L)));
+        Item item = item(8L, live.getBranch());
+        item.setStatus(ItemStatus.RESERVED);
+        live.setActiveItem(item);
+
+        when(currentUser.getUserId()).thenReturn(10L);
+        when(tenantResolver.resolveCurrent()).thenReturn(tenant());
+        when(liveRepository.findById(4L)).thenReturn(Optional.of(live));
+        when(liveRepository.save(live)).thenReturn(live);
+
+        LiveResponse response = service.setActiveItem(4L, null);
+
+        assertEquals(null, response.getActiveItemId());
+        assertEquals(ItemStatus.RESERVED, item.getStatus());
+        verify(liveEventService).record(
+                live,
+                LiveEventType.ACTIVE_ITEM_CHANGED,
+                10L,
+                "ITEM",
+                null,
+                "{\"previousItemId\":8,\"activeItemId\":null}"
+        );
     }
 
     @Test

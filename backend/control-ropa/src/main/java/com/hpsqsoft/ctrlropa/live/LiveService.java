@@ -5,6 +5,7 @@ import com.hpsqsoft.ctrlropa.branch.BranchRepository;
 import com.hpsqsoft.ctrlropa.item.Item;
 import com.hpsqsoft.ctrlropa.item.ItemRepository;
 import com.hpsqsoft.ctrlropa.item.ItemResponse;
+import com.hpsqsoft.ctrlropa.item.ItemStatus;
 import com.hpsqsoft.ctrlropa.security.access.AccessService;
 import com.hpsqsoft.ctrlropa.security.access.ChannelCode;
 import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
@@ -166,6 +167,10 @@ public class LiveService {
 
         if (!live.getBranch().getId().equals(item.getBranch().getId())) {
             throw new AccessDeniedException("El item no pertenece a la sucursal del En vivo");
+        }
+
+        if (item.getStatus() != ItemStatus.AVAILABLE) {
+            throw new IllegalArgumentException("Solo se pueden poner al aire prendas disponibles");
         }
 
         live.setActiveItem(item);

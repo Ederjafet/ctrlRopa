@@ -811,3 +811,5 @@ Pendiente backlog:
 | LIVE-PERM-A2 enforcement fino reservas/reversas | P0 | CRITICO | aprobacion arquitectura | Cancelacion/reversa con pago no depende de permiso general |
 | LIVE-AUTH implementacion autorizaciones | P0 | CRITICO | LIVE-AUTH-A/LIVE-ROLE-A/LIVE-Z10B aprobados | Solicitud/aprobacion real auditada |
 | LIVE-Z10C backend precio autorizado | P1 | CRITICO | aprobacion arquitectura | Cambio de precio no simulado y con auditoria |
+| ITEM-Z2 elegibilidad prenda al aire | P0 | ALTO | ITEM-Z1 | `LiveService.setActiveItem` solo acepta prendas `AVAILABLE` |
+| ITEM-Z3 doble reserva/disponibilidad | P0 | CRITICO | ITEM-Z2 | Transicion `AVAILABLE -> RESERVED` segura ante doble submit |
