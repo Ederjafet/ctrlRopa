@@ -318,7 +318,8 @@ Cada evento debe incluir:
 | LIVE-AUTH-B | Contrato backend y migracion de autorizaciones operativas | Alta |
 | LIVE-AUTH-C | UI de solicitud y cola de aprobacion | Media/alta |
 | LIVE-PAYMENT-GUARD-A | Reversa autorizada de apartados con pago | Critica |
-| LIVE-Z10B | Autorizacion real de cambio de precio LIVE | Alta |
+| LIVE-Z10B | Diseno especifico de autorizacion real de cambio de precio LIVE | Media |
+| LIVE-Z10C / LIVE-Z10D | Implementacion backend/frontend de autorizacion de precio LIVE | Alta |
 | LIVE-ROLE-A | Auditoria accion-permiso/capacidad LIVE antes de tocar RBAC | Media |
 | LIVE-ROLE-B / AUTH-LIVE-PERMISSIONS-A | Implementacion de permisos LIVE finos aprobados | Alta |
 
@@ -331,6 +332,12 @@ LIVE-ROLE-A complementa este diseno con una auditoria documental de permisos act
 - reglas para vendedor centro;
 - autorizaciones requeridas para pago, reversa, cancelacion y cambio de precio;
 - migraciones, endpoints y QA de regresion.
+
+## 13.2 Continuidad LIVE-Z10B
+
+LIVE-Z10B especializa este modelo para `request_type = LIVE_PRICE_CHANGE`. Recomienda usar la entidad generica `operational_authorization_requests`, definir permisos de solicitud/aprobacion/aplicacion/ver cola, y mantener el bloqueo honesto de LIVE-Z10A hasta que existan backend, endpoints, auditoria y QA reales.
+
+Z10B no implementa autorizacion de precio; prepara las fases futuras `LIVE-Z10C` y `LIVE-Z10D`.
 
 ## 14. Criterio GO/NO-GO
 

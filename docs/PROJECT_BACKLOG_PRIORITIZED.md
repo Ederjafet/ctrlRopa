@@ -19,7 +19,9 @@ No se debe cerrar un pendiente sin evidencia, validaciones y commit de fase.
 | P0 | QA | Corrida QA manual real con evidencia | PRODUCT-D4 | Sin QA formal no hay release confiable | S1 | PRODUCT-D4 REAL | Plan, matriz y plantilla listos; ejecutar casos con evidencia y registrar PASS/FAIL/BLOCKED | READY_FOR_QA |
 | P0 | Gobierno | Compuerta arquitectura para backlog autonomo | PROJECT-GOV-B | Evita ejecucion autonoma de cambios sensibles sin revision | S1 | PROJECT-GOV-B1 | Runbook actualizado; siguientes corridas deben detenerse y entregar handoff si el bloque es sensible | DONE_TECH |
 | P0 | LIVE / autorizaciones | Diseno autorizaciones operativas LIVE | LIVE-FIX-A QA / LIVE-Z10A | Varias acciones requieren aprobacion formal antes de ejecutarse | S1 | LIVE-AUTH-A | Documento de arquitectura creado; revisar modelo, permisos, endpoints y reglas antes de implementar | DESIGN_READY |
-| P0 | LIVE | Autorizacion real de cambio de precio | LIVE-Z10A | Vendedor no puede solicitar aprobacion dentro del sistema | S1 | LIVE-Z10B | Backend + UI real de solicitud/aprobacion/auditoria o decision producto firmada | PENDING_DECISION |
+| P0 | LIVE | Diseno autorizacion real de cambio de precio | LIVE-Z10A / LIVE-AUTH-A / LIVE-ROLE-A | Vendedor no puede solicitar aprobacion dentro del sistema; se requiere contrato formal antes de implementar | S1 | LIVE-Z10B | Documento especifico creado con reglas, permisos, modelo, endpoints, eventos, UX y plan futuro | DESIGN_READY |
+| P0 | LIVE | Implementar backend de autorizacion de precio LIVE | LIVE-Z10B | Sin backend real no puede existir solicitud/aprobacion/aplicacion de precio | S1 | LIVE-Z10C | Requiere aprobacion arquitectonica; migracion, permisos, servicio, endpoints, auditoria y tests backend | PENDING_ARCH_REVIEW |
+| P0 | LIVE | Implementar frontend de autorizacion de precio LIVE | LIVE-Z10B | UI debe solicitar, mostrar cola/aprobacion y aplicar precio solo contra backend real | S1 | LIVE-Z10D | Requiere backend Z10C o contrato aprobado; lint, TS, export web y QA multiusuario | PENDING_ARCH_REVIEW |
 | P0 | LIVE / pagos | Autorizacion de reversa para apartados con pago | LIVE-FIX-A QA | Cancelar o deshacer apartados con pago requiere flujo formal; LIVE-FIX-A solo bloquea frontend sin simular autorizacion | S1 | LIVE-PAYMENT-GUARD-A | Definir contrato backend/permisos/auditoria para reversa autorizada de apartados con pago; no tocar caja sin aprobacion arquitectonica | PENDING_DECISION |
 | P1 | LIVE / roles | Capacidades y permisos operativos LIVE | LIVE-FIX-A QA / LIVE-AUTH-A | Vendedor centro puede requerir preparar prendas, y varias acciones LIVE dependen de permisos demasiado generales | S2 | LIVE-ROLE-A | Auditoria accion-permiso creada; arquitectura debe revisar permisos sugeridos antes de implementar | DESIGN_READY |
 | P1 | LIVE / roles | Implementar permisos finos para preparar/cambiar prenda LIVE | LIVE-ROLE-A | Separar preparar prenda de controlar prenda al aire requiere permisos backend/frontend nuevos | S1 | LIVE-ROLE-B / AUTH-LIVE-PERMISSIONS-A | Requiere aprobacion arquitectonica, migraciones, backend, frontend, QA y no mezclar pagos/caja | PENDING_ARCH_REVIEW |
@@ -56,6 +58,8 @@ No se debe cerrar un pendiente sin evidencia, validaciones y commit de fase.
 ## Pendientes que no deben mezclarse
 
 - No mezclar LIVE-Z10B con pagos/caja.
+- LIVE-Z10B es diseno documental; no convertirlo en endpoints, permisos reales o migraciones dentro de la misma fase.
+- No implementar LIVE-Z10C/LIVE-Z10D sin aprobar LIVE-Z10B, LIVE-AUTH-A y LIVE-ROLE-A.
 - No mezclar LIVE-PAYMENT-GUARD-A con cambio de precio ni con caja/pagos sin handoff de arquitectura.
 - LIVE-ROLE-A es auditoria/diseno; no convertirlo en cambios RBAC/backend dentro de la misma fase.
 - No implementar LIVE-ROLE-B/AUTH-LIVE-PERMISSIONS-A sin revisar LIVE-ROLE-A y aprobar catalogo de permisos finos.
@@ -63,4 +67,4 @@ No se debe cerrar un pendiente sin evidencia, validaciones y commit de fase.
 - No mezclar PRODUCT-C3 con cambios visuales de /ui-kit.
 - No mezclar LIVE-REF-A con cambios funcionales LIVE.
 - No mezclar PRODUCT-D4 REAL con fixes; si QA falla, abrir fase correctiva puntual.
-- SECURITY-A, LIVE-Z10B, ITEM-Z1 y BACKEND-HEALTH-A requieren handoff de arquitectura antes de ejecucion.
+- SECURITY-A, LIVE-Z10C/LIVE-Z10D, ITEM-Z1 y BACKEND-HEALTH-A requieren handoff de arquitectura antes de ejecucion.
