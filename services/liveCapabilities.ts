@@ -87,10 +87,11 @@ export function resolveLiveCapabilities(user: UserSession | null): LiveCapabilit
   const removeLiveActiveItemPermission = hasPermission(user, 'REMOVE_LIVE_ACTIVE_ITEM');
   const viewReports = hasPermission(user, 'VIEW_REPORTS');
   const operate = liveChannelEnabled && (operateLivePermission || liveReservation);
+  const legacyLiveReservationAccess = liveChannelEnabled && liveReservation;
   const canViewLive =
     liveChannelEnabled &&
     (admin || viewLivePermission || operateLivePermission || liveReservation || viewReports);
-  const canSelectCustomer = liveChannelEnabled && liveReservation && canAccessByPermission(user, 'VIEW_CUSTOMERS');
+  const canSelectCustomer = legacyLiveReservationAccess && canAccessByPermission(user, 'VIEW_CUSTOMERS');
   const canSelectItem = operate && canAccessByPermission(user, 'VIEW_INVENTORY');
   const canManageInventory = canAccessByPermission(user, 'MANAGE_INVENTORY');
   const canCreateDoorSale = canAccessByPermission(user, 'DO_DOOR_SALE');
@@ -99,12 +100,12 @@ export function resolveLiveCapabilities(user: UserSession | null): LiveCapabilit
   const canPrepareLiveItem = canSelectItem && (prepareLiveItemPermission || canManageLiveItem);
   const canSetLiveActiveItem = canSelectItem && (changeLiveActiveItemPermission || canManageLiveItem);
   const canClearLiveActiveItem = canSelectItem && (removeLiveActiveItemPermission || canManageLiveItem);
-  const canCancelReservation = operate && canAccessByPermission(user, 'CANCEL_RESERVATION');
-  const canMarkOperationalSold = operate && (admin || canCreateDoorSale);
+  const canCancelReservation = legacyLiveReservationAccess && canAccessByPermission(user, 'CANCEL_RESERVATION');
+  const canMarkOperationalSold = legacyLiveReservationAccess && (admin || canCreateDoorSale);
   const canViewPayments = hasEffectivePermission(user, 'VIEW_PAYMENTS');
   const canViewLiveDashboard = canViewLive && (supervisor || viewReports || admin);
   const canChangeLivePrice =
-    operate &&
+    legacyLiveReservationAccess &&
     (admin || (canManageInventory && canCancelReservation && canViewLiveDashboard));
   const canAccessCashbox =
     canAccessByPermission(user, 'MANAGE_CASH_CLOSURES') ||
@@ -134,9 +135,9 @@ export function resolveLiveCapabilities(user: UserSession | null): LiveCapabilit
     canPrepareItem: canPrepareLiveItem,
     canSetActiveItem: canSetLiveActiveItem,
     canClearActiveItem: canClearLiveActiveItem,
-    canCreateReservation: liveChannelEnabled && liveReservation,
+    canCreateReservation: legacyLiveReservationAccess,
     canCancelReservation,
-    canMarkPending: liveChannelEnabled && liveReservation,
+    canMarkPending: legacyLiveReservationAccess,
     canMarkOperationalSold,
     canReleaseReservedItem: canCancelReservation && canManageInventory && canViewPayments,
     canChangeLivePrice,
@@ -146,7 +147,7 @@ export function resolveLiveCapabilities(user: UserSession | null): LiveCapabilit
     canViewPayments,
     canAccessCashbox,
     canSelectCustomer,
-    canCreateCustomer: operate && canAccessByPermission(user, 'CREATE_CUSTOMER'),
+    canCreateCustomer: legacyLiveReservationAccess && canAccessByPermission(user, 'CREATE_CUSTOMER'),
     canSelectItem,
     canCreateItem: canManageLiveSession && canManageInventory,
     canChangeReservationStatus: canMarkOperationalSold || canCancelReservation,

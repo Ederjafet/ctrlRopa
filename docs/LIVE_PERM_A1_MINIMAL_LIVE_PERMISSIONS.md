@@ -114,6 +114,12 @@ Para no romper ambientes con roles legacy:
 - Los apartados LIVE siguen dependiendo de `DO_LIVE_RESERVATION`.
 - La separacion fina queda disponible para roles actualizados por V50.
 
+## Postcheck A1
+
+La validacion final antes de merge confirma que `OPERATE_LIVE` no debe ampliar acciones sensibles fuera del MVP. Por eso las capacidades frontend relacionadas con apartado, cambio de estado operativo, cancelacion, cambio de precio LIVE y alta de cliente dentro del flujo LIVE siguen atadas a `DO_LIVE_RESERVATION` y a sus permisos existentes.
+
+`OPERATE_LIVE` queda limitado al alcance aprobado de operacion de sesion y flujo LIVE minimo. Precio, pagos, caja, reversas y autorizaciones siguen fuera de alcance.
+
 ## Fuera de alcance
 
 Queda fuera de A1:
