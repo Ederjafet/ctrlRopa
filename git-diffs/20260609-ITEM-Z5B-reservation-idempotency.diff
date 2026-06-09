@@ -1,0 +1,1281 @@
+﻿diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationController.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationController.java
+index 63fe3a0..78e633a 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationController.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationController.java
+@@ -8,6 +8,8 @@ import java.util.List;
+ @RequestMapping("/api/reservations")
+ public class ReservationController {
+
++    private static final String IDEMPOTENCY_KEY_HEADER = "X-Idempotency-Key";
++
+     private final ReservationService service;
+
+     public ReservationController(ReservationService service) {
+@@ -35,8 +37,11 @@ public class ReservationController {
+     }
+
+     @PostMapping
+-    public ReservationResponse create(@RequestBody ReservationService.CreateReservationRequest request) {
+-        return service.create(request);
++    public ReservationResponse create(
++            @RequestBody ReservationService.CreateReservationRequest request,
++            @RequestHeader(value = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey
++    ) {
++        return service.create(request, idempotencyKey);
+     }
+
+     @PatchMapping("/{reservationId}/box/{boxId}")
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyRecord.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyRecord.java
+new file mode 100644
+index 0000000..9c1cf12
+--- /dev/null
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyRecord.java
+@@ -0,0 +1,169 @@
++package com.hpsqsoft.ctrlropa.reservation;
++
++import jakarta.persistence.*;
++
++import java.time.LocalDateTime;
++
++@Entity
++@Table(
++        name = "reservation_idempotency_keys",
++        uniqueConstraints = {
++                @UniqueConstraint(
++                        name = "uq_reservation_idempotency_scope",
++                        columnNames = {"company_id", "branch_id", "user_id", "operation", "idempotency_key"}
++                )
++        }
++)
++public class ReservationIdempotencyRecord {
++
++    @Id
++    @GeneratedValue(strategy = GenerationType.IDENTITY)
++    private Long id;
++
++    @Column(name = "company_id", nullable = false)
++    private Long companyId;
++
++    @Column(name = "branch_id", nullable = false)
++    private Long branchId;
++
++    @Column(name = "user_id", nullable = false)
++    private Long userId;
++
++    @Column(nullable = false, length = 80)
++    private String operation;
++
++    @Column(name = "idempotency_key", nullable = false, length = 120)
++    private String idempotencyKey;
++
++    @Column(name = "request_hash", nullable = false, length = 64)
++    private String requestHash;
++
++    @Column(name = "reservation_id")
++    private Long reservationId;
++
++    @Enumerated(EnumType.STRING)
++    @Column(nullable = false, length = 30)
++    private ReservationIdempotencyStatus status;
++
++    @Column(name = "error_message", length = 255)
++    private String errorMessage;
++
++    @Column(name = "created_at", nullable = false)
++    private LocalDateTime createdAt;
++
++    @Column(name = "updated_at", nullable = false)
++    private LocalDateTime updatedAt;
++
++    @Column(name = "expires_at")
++    private LocalDateTime expiresAt;
++
++    public ReservationIdempotencyRecord() {
++    }
++
++    @PrePersist
++    public void prePersist() {
++        LocalDateTime now = LocalDateTime.now();
++        this.createdAt = now;
++        this.updatedAt = now;
++        if (this.status == null) {
++            this.status = ReservationIdempotencyStatus.IN_PROGRESS;
++        }
++    }
++
++    @PreUpdate
++    public void preUpdate() {
++        this.updatedAt = LocalDateTime.now();
++    }
++
++    public Long getId() {
++        return id;
++    }
++
++    public Long getCompanyId() {
++        return companyId;
++    }
++
++    public void setCompanyId(Long companyId) {
++        this.companyId = companyId;
++    }
++
++    public Long getBranchId() {
++        return branchId;
++    }
++
++    public void setBranchId(Long branchId) {
++        this.branchId = branchId;
++    }
++
++    public Long getUserId() {
++        return userId;
++    }
++
++    public void setUserId(Long userId) {
++        this.userId = userId;
++    }
++
++    public String getOperation() {
++        return operation;
++    }
++
++    public void setOperation(String operation) {
++        this.operation = operation;
++    }
++
++    public String getIdempotencyKey() {
++        return idempotencyKey;
++    }
++
++    public void setIdempotencyKey(String idempotencyKey) {
++        this.idempotencyKey = idempotencyKey;
++    }
++
++    public String getRequestHash() {
++        return requestHash;
++    }
++
++    public void setRequestHash(String requestHash) {
++        this.requestHash = requestHash;
++    }
++
++    public Long getReservationId() {
++        return reservationId;
++    }
++
++    public void setReservationId(Long reservationId) {
++        this.reservationId = reservationId;
++    }
++
++    public ReservationIdempotencyStatus getStatus() {
++        return status;
++    }
++
++    public void setStatus(ReservationIdempotencyStatus status) {
++        this.status = status;
++    }
++
++    public String getErrorMessage() {
++        return errorMessage;
++    }
++
++    public void setErrorMessage(String errorMessage) {
++        this.errorMessage = errorMessage;
++    }
++
++    public LocalDateTime getCreatedAt() {
++        return createdAt;
++    }
++
++    public LocalDateTime getUpdatedAt() {
++        return updatedAt;
++    }
++
++    public LocalDateTime getExpiresAt() {
++        return expiresAt;
++    }
++
++    public void setExpiresAt(LocalDateTime expiresAt) {
++        this.expiresAt = expiresAt;
++    }
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyRepository.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyRepository.java
+new file mode 100644
+index 0000000..28871c6
+--- /dev/null
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyRepository.java
+@@ -0,0 +1,16 @@
++package com.hpsqsoft.ctrlropa.reservation;
++
++import org.springframework.data.jpa.repository.JpaRepository;
++
++import java.util.Optional;
++
++public interface ReservationIdempotencyRepository extends JpaRepository<ReservationIdempotencyRecord, Long> {
++
++    Optional<ReservationIdempotencyRecord> findByCompanyIdAndBranchIdAndUserIdAndOperationAndIdempotencyKey(
++            Long companyId,
++            Long branchId,
++            Long userId,
++            String operation,
++            String idempotencyKey
++    );
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyStatus.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyStatus.java
+new file mode 100644
+index 0000000..79c5f21
+--- /dev/null
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyStatus.java
+@@ -0,0 +1,7 @@
++package com.hpsqsoft.ctrlropa.reservation;
++
++public enum ReservationIdempotencyStatus {
++    IN_PROGRESS,
++    COMPLETED,
++    FAILED
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
+index bb07df9..9ac50c3 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
+@@ -23,11 +23,16 @@ import com.hpsqsoft.ctrlropa.security.access.ChannelCode;
+ import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
+ import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
+ import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
++import com.hpsqsoft.ctrlropa.web.error.ConflictException;
++import org.springframework.dao.DataIntegrityViolationException;
+ import org.springframework.jdbc.core.JdbcTemplate;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+
+ import java.math.BigDecimal;
++import java.nio.charset.StandardCharsets;
++import java.security.MessageDigest;
++import java.security.NoSuchAlgorithmException;
+ import java.time.LocalDateTime;
+ import java.util.List;
+
+@@ -35,6 +40,9 @@ import java.util.List;
+ @Transactional
+ public class ReservationService {
+
++    private static final String RESERVATION_CREATE_OPERATION = "RESERVATION_CREATE";
++    private static final int IDEMPOTENCY_KEY_MAX_LENGTH = 120;
++
+     private final ReservationRepository repository;
+     private final ItemRepository itemRepository;
+     private final CustomerRepository customerRepository;
+@@ -48,6 +56,7 @@ public class ReservationService {
+     private final JdbcTemplate jdbcTemplate;
+     private final TenantAccessGuard tenantAccessGuard;
+     private final LiveEventService liveEventService;
++    private final ReservationIdempotencyRepository idempotencyRepository;
+
+     public ReservationService(ReservationRepository repository,
+                               ItemRepository itemRepository,
+@@ -61,7 +70,8 @@ public class ReservationService {
+                               CustomerOrderService customerOrderService,
+                               JdbcTemplate jdbcTemplate,
+                               TenantAccessGuard tenantAccessGuard,
+-                              LiveEventService liveEventService) {
++                              LiveEventService liveEventService,
++                              ReservationIdempotencyRepository idempotencyRepository) {
+         this.repository = repository;
+         this.itemRepository = itemRepository;
+         this.customerRepository = customerRepository;
+@@ -75,6 +85,7 @@ public class ReservationService {
+         this.jdbcTemplate = jdbcTemplate;
+         this.tenantAccessGuard = tenantAccessGuard;
+         this.liveEventService = liveEventService;
++        this.idempotencyRepository = idempotencyRepository;
+     }
+
+     @Transactional(readOnly = true)
+@@ -112,6 +123,10 @@ public class ReservationService {
+     }
+
+     public ReservationResponse create(CreateReservationRequest request) {
++        return create(request, null);
++    }
++
++    public ReservationResponse create(CreateReservationRequest request, String idempotencyKey) {
+         Long userId = currentUser.getUserId();
+         tenantAccessGuard.requireBranch(request.getBranchId(), "La sucursal de la reserva no pertenece al tenant activo");
+
+@@ -119,24 +134,32 @@ public class ReservationService {
+                 .orElseThrow(() -> new IllegalArgumentException("Item no encontrado"));
+         tenantAccessGuard.requireBranch(item.getBranch().getId(), "El item no pertenece a la sucursal activa");
+
+-        if (item.getStatus() != ItemStatus.AVAILABLE) {
+-            throw new IllegalArgumentException("El item no está disponible");
++        Branch branch = branchRepository.findById(request.getBranchId())
++                .orElseThrow(() -> new IllegalArgumentException("Sucursal no encontrada"));
++
++        if (!item.getBranch().getId().equals(branch.getId())) {
++            throw new IllegalArgumentException("El item no pertenece a la sucursal indicada");
++        }
++
++        ReservationIdempotencyRecord existingIdempotency = findExistingIdempotency(
++                item.getCompany().getId(),
++                branch.getId(),
++                userId,
++                idempotencyKey,
++                request
++        );
++
++        if (existingIdempotency == null && item.getStatus() != ItemStatus.AVAILABLE) {
++            throw new IllegalArgumentException("El item no esta disponible");
+         }
+
+         Customer customer = customerRepository.findById(request.getCustomerId())
+                 .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado"));
+         tenantAccessGuard.requireBranch(customer.getBranch().getId(), "El cliente no pertenece a la sucursal activa");
+
+-        Branch branch = branchRepository.findById(request.getBranchId())
+-                .orElseThrow(() -> new IllegalArgumentException("Sucursal no encontrada"));
+-
+         SalesChannel salesChannel = salesChannelRepository.findById(request.getSalesChannelId())
+                 .orElseThrow(() -> new IllegalArgumentException("Canal de venta no encontrado"));
+
+-        if (!item.getBranch().getId().equals(branch.getId())) {
+-            throw new IllegalArgumentException("El item no pertenece a la sucursal indicada");
+-        }
+-
+         if (!customer.getBranch().getId().equals(branch.getId())) {
+             throw new IllegalArgumentException("El cliente no pertenece a la sucursal indicada");
+         }
+@@ -166,6 +189,18 @@ public class ReservationService {
+             throw new IllegalArgumentException("Las reservas LIVE requieren liveId");
+         }
+
++        if (existingIdempotency != null) {
++            return resolveExistingIdempotency(existingIdempotency);
++        }
++
++        ReservationIdempotencyRecord idempotencyRecord = createIdempotencyRecord(
++                item.getCompany().getId(),
++                branch.getId(),
++                userId,
++                idempotencyKey,
++                request
++        );
++
+         Reservation activeReservation = repository.findByItemIdAndStatus(item.getId(), ReservationStatus.ACTIVE)
+                 .orElse(null);
+
+@@ -236,9 +271,153 @@ public class ReservationService {
+             );
+         }
+
++        markIdempotencyCompleted(idempotencyRecord, saved.getId());
++
+         return toResponse(saved);
+     }
+
++    private ReservationIdempotencyRecord findExistingIdempotency(Long companyId,
++                                                                 Long branchId,
++                                                                 Long userId,
++                                                                 String idempotencyKey,
++                                                                 CreateReservationRequest request) {
++        String normalizedKey = normalizeIdempotencyKey(idempotencyKey);
++        if (normalizedKey == null) {
++            return null;
++        }
++
++        String requestHash = hashReservationRequest(request);
++        ReservationIdempotencyRecord existing = idempotencyRepository
++                .findByCompanyIdAndBranchIdAndUserIdAndOperationAndIdempotencyKey(
++                        companyId,
++                        branchId,
++                        userId,
++                        RESERVATION_CREATE_OPERATION,
++                        normalizedKey
++                )
++                .orElse(null);
++
++        if (existing != null && !requestHash.equals(existing.getRequestHash())) {
++            throw new ConflictException("La llave de idempotencia ya fue usada con datos distintos");
++        }
++
++        return existing;
++    }
++
++    private ReservationIdempotencyRecord createIdempotencyRecord(Long companyId,
++                                                                 Long branchId,
++                                                                 Long userId,
++                                                                 String idempotencyKey,
++                                                                 CreateReservationRequest request) {
++        String normalizedKey = normalizeIdempotencyKey(idempotencyKey);
++        if (normalizedKey == null) {
++            return null;
++        }
++
++        ReservationIdempotencyRecord record = new ReservationIdempotencyRecord();
++        record.setCompanyId(companyId);
++        record.setBranchId(branchId);
++        record.setUserId(userId);
++        record.setOperation(RESERVATION_CREATE_OPERATION);
++        record.setIdempotencyKey(normalizedKey);
++        record.setRequestHash(hashReservationRequest(request));
++        record.setStatus(ReservationIdempotencyStatus.IN_PROGRESS);
++        record.setExpiresAt(LocalDateTime.now().plusHours(24));
++
++        try {
++            return idempotencyRepository.saveAndFlush(record);
++        } catch (DataIntegrityViolationException ex) {
++            throw new ConflictException(
++                    "La solicitud de reserva con esta llave ya esta en proceso. Intenta de nuevo en unos segundos."
++            );
++        }
++    }
++
++    private ReservationResponse resolveExistingIdempotency(ReservationIdempotencyRecord record) {
++        if (record.getStatus() == ReservationIdempotencyStatus.COMPLETED
++                && record.getReservationId() != null) {
++            return toResponse(findEntityById(record.getReservationId()));
++        }
++
++        if (record.getStatus() == ReservationIdempotencyStatus.IN_PROGRESS) {
++            throw new ConflictException(
++                    "La solicitud de reserva con esta llave sigue en proceso. Intenta de nuevo en unos segundos."
++            );
++        }
++
++        throw new ConflictException(
++                "La solicitud de reserva con esta llave quedo en estado ambiguo. Genera un nuevo intento."
++        );
++    }
++
++    private void markIdempotencyCompleted(ReservationIdempotencyRecord record, Long reservationId) {
++        if (record == null) {
++            return;
++        }
++
++        record.setReservationId(reservationId);
++        record.setStatus(ReservationIdempotencyStatus.COMPLETED);
++        record.setErrorMessage(null);
++        idempotencyRepository.save(record);
++    }
++
++    private String normalizeIdempotencyKey(String idempotencyKey) {
++        if (idempotencyKey == null || idempotencyKey.isBlank()) {
++            return null;
++        }
++
++        String normalized = idempotencyKey.trim();
++        if (normalized.length() > IDEMPOTENCY_KEY_MAX_LENGTH) {
++            throw new IllegalArgumentException("La llave de idempotencia excede 120 caracteres");
++        }
++
++        return normalized;
++    }
++
++    private String hashReservationRequest(CreateReservationRequest request) {
++        return sha256(
++                "itemId=" + valuePart(request.getItemId()) + "\n"
++                        + "customerId=" + valuePart(request.getCustomerId()) + "\n"
++                        + "branchId=" + valuePart(request.getBranchId()) + "\n"
++                        + "liveId=" + valuePart(request.getLiveId()) + "\n"
++                        + "salesChannelId=" + valuePart(request.getSalesChannelId()) + "\n"
++                        + "sellerUserId=" + valuePart(request.getSellerUserId()) + "\n"
++                        + "price=" + amountPart(request.getPrice()) + "\n"
++                        + "notes=" + valuePart(request.getNotes())
++        );
++    }
++
++    private String valuePart(Object value) {
++        if (value == null) {
++            return "";
++        }
++
++        return value.toString().trim();
++    }
++
++    private String amountPart(BigDecimal value) {
++        if (value == null) {
++            return "";
++        }
++
++        return value.stripTrailingZeros().toPlainString();
++    }
++
++    private String sha256(String value) {
++        try {
++            byte[] hash = MessageDigest
++                    .getInstance("SHA-256")
++                    .digest(value.getBytes(StandardCharsets.UTF_8));
++            StringBuilder builder = new StringBuilder();
++            for (byte item : hash) {
++                builder.append(String.format("%02x", item));
++            }
++            return builder.toString();
++        } catch (NoSuchAlgorithmException ex) {
++            throw new IllegalStateException("No se pudo calcular hash de idempotencia", ex);
++        }
++    }
++
+     public ReservationResponse assignBox(Long reservationId, Long boxId) {
+         Long userId = currentUser.getUserId();
+
+diff --git a/backend/control-ropa/src/main/resources/db/migration/V52__reservation_idempotency_keys.sql b/backend/control-ropa/src/main/resources/db/migration/V52__reservation_idempotency_keys.sql
+new file mode 100644
+index 0000000..5d81f53
+--- /dev/null
++++ b/backend/control-ropa/src/main/resources/db/migration/V52__reservation_idempotency_keys.sql
+@@ -0,0 +1,32 @@
++-- ITEM-Z5B: idempotencia minima para creacion de reservas.
++-- No toca pagos, caja, precio LIVE, devoluciones, autorizaciones, permisos ni RBAC.
++
++CREATE TABLE IF NOT EXISTS reservation_idempotency_keys (
++  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
++  company_id BIGINT UNSIGNED NOT NULL,
++  branch_id BIGINT UNSIGNED NOT NULL,
++  user_id BIGINT UNSIGNED NOT NULL,
++  operation VARCHAR(80) NOT NULL,
++  idempotency_key VARCHAR(120) NOT NULL,
++  request_hash VARCHAR(64) NOT NULL,
++  reservation_id BIGINT UNSIGNED NULL,
++  status ENUM('IN_PROGRESS','COMPLETED','FAILED') NOT NULL DEFAULT 'IN_PROGRESS',
++  error_message VARCHAR(255) NULL,
++  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
++  expires_at DATETIME NULL,
++  PRIMARY KEY (id),
++  UNIQUE KEY uq_reservation_idempotency_scope (
++    company_id,
++    branch_id,
++    user_id,
++    operation,
++    idempotency_key
++  ),
++  KEY idx_reservation_idempotency_reservation (reservation_id),
++  KEY idx_reservation_idempotency_expires (expires_at),
++  CONSTRAINT fk_reservation_idempotency_company FOREIGN KEY (company_id) REFERENCES companies(id),
++  CONSTRAINT fk_reservation_idempotency_branch FOREIGN KEY (branch_id) REFERENCES branches(id),
++  CONSTRAINT fk_reservation_idempotency_user FOREIGN KEY (user_id) REFERENCES users(id),
++  CONSTRAINT fk_reservation_idempotency_reservation FOREIGN KEY (reservation_id) REFERENCES reservations(id)
++);
+diff --git a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java
+index 5747496..194c151 100644
+--- a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java
++++ b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java
+@@ -51,6 +51,7 @@ class ReservationServiceLiveOperationalStatusTests {
+     private final JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+     private final TenantAccessGuard tenantAccessGuard = mock(TenantAccessGuard.class);
+     private final LiveEventService liveEventService = mock(LiveEventService.class);
++    private final ReservationIdempotencyRepository idempotencyRepository = mock(ReservationIdempotencyRepository.class);
+
+     private final ReservationService service = new ReservationService(
+             repository,
+@@ -65,7 +66,8 @@ class ReservationServiceLiveOperationalStatusTests {
+             customerOrderService,
+             jdbcTemplate,
+             tenantAccessGuard,
+-            liveEventService
++            liveEventService,
++            idempotencyRepository
+     );
+
+     @Test
+diff --git a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java
+index 074a26d..93fe876 100644
+--- a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java
++++ b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java
+@@ -22,6 +22,7 @@ import com.hpsqsoft.ctrlropa.security.access.ChannelCode;
+ import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
+ import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
+ import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
++import com.hpsqsoft.ctrlropa.web.error.ConflictException;
+ import org.junit.jupiter.api.Test;
+ import org.junit.jupiter.params.ParameterizedTest;
+ import org.junit.jupiter.params.provider.EnumSource;
+@@ -31,6 +32,9 @@ import org.springframework.test.util.ReflectionTestUtils;
+ import org.mockito.ArgumentMatchers;
+
+ import java.math.BigDecimal;
++import java.nio.charset.StandardCharsets;
++import java.security.MessageDigest;
++import java.security.NoSuchAlgorithmException;
+ import java.util.List;
+ import java.util.Optional;
+
+@@ -48,6 +52,7 @@ import static org.mockito.Mockito.when;
+ class ReservationServiceTests {
+
+     private final ReservationRepository repository = mock(ReservationRepository.class);
++    private final ReservationIdempotencyRepository idempotencyRepository = mock(ReservationIdempotencyRepository.class);
+     private final ItemRepository itemRepository = mock(ItemRepository.class);
+     private final CustomerRepository customerRepository = mock(CustomerRepository.class);
+     private final BranchRepository branchRepository = mock(BranchRepository.class);
+@@ -74,7 +79,8 @@ class ReservationServiceTests {
+             customerOrderService,
+             jdbcTemplate,
+             tenantAccessGuard,
+-            liveEventService
++            liveEventService,
++            idempotencyRepository
+     );
+
+     @Test
+@@ -105,6 +111,7 @@ class ReservationServiceTests {
+         assertEquals(8L, response.getItemId());
+         assertEquals("ACTIVE", response.getStatus());
+         verify(itemRepository).reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED);
++        verify(idempotencyRepository, never()).saveAndFlush(any(ReservationIdempotencyRecord.class));
+         verify(itemRepository, never()).save(any(Item.class));
+         verify(repository).save(any(Reservation.class));
+         verify(customerOrderService).refreshStatus(55L);
+@@ -126,6 +133,7 @@ class ReservationServiceTests {
+
+         when(currentUser.getUserId()).thenReturn(99L);
+         when(itemRepository.findById(8L)).thenReturn(Optional.of(item));
++        when(branchRepository.findById(6L)).thenReturn(Optional.of(branch));
+
+         IllegalArgumentException exception = assertThrows(
+                 IllegalArgumentException.class,
+@@ -167,6 +175,149 @@ class ReservationServiceTests {
+         verify(itemRepository, never()).save(any(Item.class));
+     }
+
++    @Test
++    void createWithIdempotencyKeyStoresCompletedRecord() {
++        Branch branch = branch();
++        Item item = item(ItemStatus.AVAILABLE, branch);
++        Customer customer = customer(branch);
++        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
++        CustomerOrder order = order(55L);
++        ReservationService.CreateReservationRequest request = request(channel.getId(), null);
++        ReservationIdempotencyRecord pendingRecord = new ReservationIdempotencyRecord();
++
++        stubCommonCreateFlow(branch, item, customer, channel);
++        when(idempotencyRepository
++                .findByCompanyIdAndBranchIdAndUserIdAndOperationAndIdempotencyKey(
++                        2L,
++                        6L,
++                        99L,
++                        "RESERVATION_CREATE",
++                        "idem-1"
++                )).thenReturn(Optional.empty());
++        when(idempotencyRepository.saveAndFlush(any(ReservationIdempotencyRecord.class)))
++                .thenReturn(pendingRecord);
++        when(itemRepository.reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED))
++                .thenReturn(1);
++        when(repository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE)).thenReturn(Optional.empty());
++        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> {
++            Reservation reservation = invocation.getArgument(0);
++            ReflectionTestUtils.setField(reservation, "id", 10L);
++            return reservation;
++        });
++        when(customerOrderService.addReservationToOpenOrder(any(Reservation.class))).thenReturn(order);
++        when(customerOrderService.findOrderIdByReservationId(10L)).thenReturn(55L);
++        stubSellerName();
++
++        ReservationResponse response = service.create(request, "idem-1");
++
++        assertEquals(10L, response.getId());
++        assertEquals(ReservationIdempotencyStatus.COMPLETED, pendingRecord.getStatus());
++        assertEquals(10L, pendingRecord.getReservationId());
++        verify(idempotencyRepository).saveAndFlush(any(ReservationIdempotencyRecord.class));
++        verify(idempotencyRepository).save(pendingRecord);
++    }
++
++    @Test
++    void createWithSameIdempotencyKeyAndPayloadReturnsExistingReservation() {
++        Branch branch = branch();
++        Item item = item(ItemStatus.RESERVED, branch);
++        Customer customer = customer(branch);
++        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
++        Reservation existingReservation = reservation(10L, item, customer, branch, channel);
++        ReservationService.CreateReservationRequest request = request(channel.getId(), null);
++        ReservationIdempotencyRecord completedRecord = completedRecord(
++                "idem-1",
++                hashReservationRequest(request),
++                existingReservation.getId()
++        );
++
++        stubCommonCreateFlow(branch, item, customer, channel);
++        when(idempotencyRepository
++                .findByCompanyIdAndBranchIdAndUserIdAndOperationAndIdempotencyKey(
++                        2L,
++                        6L,
++                        99L,
++                        "RESERVATION_CREATE",
++                        "idem-1"
++                )).thenReturn(Optional.of(completedRecord));
++        when(repository.findById(10L)).thenReturn(Optional.of(existingReservation));
++        when(customerOrderService.findOrderIdByReservationId(10L)).thenReturn(55L);
++        stubSellerName();
++
++        ReservationResponse response = service.create(request, "idem-1");
++
++        assertEquals(10L, response.getId());
++        verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
++        verify(repository, never()).save(any(Reservation.class));
++        verify(idempotencyRepository, never()).saveAndFlush(any(ReservationIdempotencyRecord.class));
++    }
++
++    @Test
++    void createWithSameIdempotencyKeyAndDifferentPayloadRejects() {
++        Branch branch = branch();
++        Item item = item(ItemStatus.AVAILABLE, branch);
++        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
++        ReservationService.CreateReservationRequest request = request(channel.getId(), null);
++        ReservationIdempotencyRecord completedRecord = completedRecord(
++                "idem-1",
++                "different-hash",
++                10L
++        );
++
++        when(currentUser.getUserId()).thenReturn(99L);
++        when(itemRepository.findById(8L)).thenReturn(Optional.of(item));
++        when(branchRepository.findById(6L)).thenReturn(Optional.of(branch));
++        when(idempotencyRepository
++                .findByCompanyIdAndBranchIdAndUserIdAndOperationAndIdempotencyKey(
++                        2L,
++                        6L,
++                        99L,
++                        "RESERVATION_CREATE",
++                        "idem-1"
++                )).thenReturn(Optional.of(completedRecord));
++
++        ConflictException exception = assertThrows(
++                ConflictException.class,
++                () -> service.create(request, "idem-1")
++        );
++
++        assertTrue(exception.getMessage().contains("datos distintos"));
++        verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
++        verify(repository, never()).save(any(Reservation.class));
++    }
++
++    @Test
++    void createWithInProgressIdempotencyKeyRejectsWithoutCreatingReservation() {
++        Branch branch = branch();
++        Item item = item(ItemStatus.AVAILABLE, branch);
++        Customer customer = customer(branch);
++        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
++        ReservationService.CreateReservationRequest request = request(channel.getId(), null);
++        ReservationIdempotencyRecord inProgressRecord = inProgressRecord(
++                "idem-1",
++                hashReservationRequest(request)
++        );
++
++        stubCommonCreateFlow(branch, item, customer, channel);
++        when(idempotencyRepository
++                .findByCompanyIdAndBranchIdAndUserIdAndOperationAndIdempotencyKey(
++                        2L,
++                        6L,
++                        99L,
++                        "RESERVATION_CREATE",
++                        "idem-1"
++                )).thenReturn(Optional.of(inProgressRecord));
++
++        ConflictException exception = assertThrows(
++                ConflictException.class,
++                () -> service.create(request, "idem-1")
++        );
++
++        assertTrue(exception.getMessage().contains("sigue en proceso"));
++        verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
++        verify(repository, never()).save(any(Reservation.class));
++    }
++
+     @Test
+     void createLiveReservationKeepsLivePermissionAndUsesAtomicUpdate() {
+         Branch branch = branch();
+@@ -205,6 +356,137 @@ class ReservationServiceTests {
+         verify(itemRepository).reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED);
+     }
+
++    @Test
++    void createLiveReservationWithIdempotencyKeyKeepsLivePermissionAndUsesAtomicUpdate() {
++        Branch branch = branch();
++        Item item = item(ItemStatus.AVAILABLE, branch);
++        Customer customer = customer(branch);
++        SalesChannel channel = channel(3L, ChannelCode.LIVE);
++        Live live = live(branch);
++        CustomerOrder order = order(55L);
++        ReservationService.CreateReservationRequest request = request(channel.getId(), live.getId());
++        ReservationIdempotencyRecord pendingRecord = new ReservationIdempotencyRecord();
++
++        stubCommonCreateFlow(branch, item, customer, channel);
++        when(liveRepository.findById(4L)).thenReturn(Optional.of(live));
++        when(idempotencyRepository
++                .findByCompanyIdAndBranchIdAndUserIdAndOperationAndIdempotencyKey(
++                        2L,
++                        6L,
++                        99L,
++                        "RESERVATION_CREATE",
++                        "live-idem-1"
++                )).thenReturn(Optional.empty());
++        when(idempotencyRepository.saveAndFlush(any(ReservationIdempotencyRecord.class)))
++                .thenReturn(pendingRecord);
++        when(repository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE)).thenReturn(Optional.empty());
++        when(itemRepository.reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED))
++                .thenReturn(1);
++        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> {
++            Reservation reservation = invocation.getArgument(0);
++            ReflectionTestUtils.setField(reservation, "id", 10L);
++            return reservation;
++        });
++        when(customerOrderService.addReservationToOpenOrder(any(Reservation.class))).thenReturn(order);
++        when(customerOrderService.findOrderIdByReservationId(10L)).thenReturn(55L);
++        stubSellerName();
++
++        ReservationResponse response = service.create(request, "live-idem-1");
++
++        assertEquals(10L, response.getId());
++        assertEquals("RESERVED", response.getLiveOperationalStatus());
++        assertEquals(ReservationIdempotencyStatus.COMPLETED, pendingRecord.getStatus());
++        verify(accessService).assertCan(
++                99L,
++                PermissionCode.DO_LIVE_RESERVATION,
++                ChannelCode.LIVE,
++                6L
++        );
++        verify(itemRepository).reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED);
++    }
++
++    private static ReservationIdempotencyRecord completedRecord(String key,
++                                                                String requestHash,
++                                                                Long reservationId) {
++        ReservationIdempotencyRecord record = inProgressRecord(key, requestHash);
++        record.setStatus(ReservationIdempotencyStatus.COMPLETED);
++        record.setReservationId(reservationId);
++        return record;
++    }
++
++    private static ReservationIdempotencyRecord inProgressRecord(String key, String requestHash) {
++        ReservationIdempotencyRecord record = new ReservationIdempotencyRecord();
++        record.setCompanyId(2L);
++        record.setBranchId(6L);
++        record.setUserId(99L);
++        record.setOperation("RESERVATION_CREATE");
++        record.setIdempotencyKey(key);
++        record.setRequestHash(requestHash);
++        record.setStatus(ReservationIdempotencyStatus.IN_PROGRESS);
++        return record;
++    }
++
++    private static Reservation reservation(Long id,
++                                           Item item,
++                                           Customer customer,
++                                           Branch branch,
++                                           SalesChannel channel) {
++        Reservation reservation = new Reservation();
++        ReflectionTestUtils.setField(reservation, "id", id);
++        reservation.setItem(item);
++        reservation.setCustomer(customer);
++        reservation.setBranch(branch);
++        reservation.setSalesChannel(channel);
++        reservation.setSellerUserId(99L);
++        reservation.setPrice(BigDecimal.valueOf(300));
++        reservation.setStatus(ReservationStatus.ACTIVE);
++        return reservation;
++    }
++
++    private static String hashReservationRequest(ReservationService.CreateReservationRequest request) {
++        return sha256(
++                "itemId=" + valuePart(request.getItemId()) + "\n"
++                        + "customerId=" + valuePart(request.getCustomerId()) + "\n"
++                        + "branchId=" + valuePart(request.getBranchId()) + "\n"
++                        + "liveId=" + valuePart(request.getLiveId()) + "\n"
++                        + "salesChannelId=" + valuePart(request.getSalesChannelId()) + "\n"
++                        + "sellerUserId=" + valuePart(request.getSellerUserId()) + "\n"
++                        + "price=" + amountPart(request.getPrice()) + "\n"
++                        + "notes=" + valuePart(request.getNotes())
++        );
++    }
++
++    private static String valuePart(Object value) {
++        if (value == null) {
++            return "";
++        }
++
++        return value.toString().trim();
++    }
++
++    private static String amountPart(BigDecimal value) {
++        if (value == null) {
++            return "";
++        }
++
++        return value.stripTrailingZeros().toPlainString();
++    }
++
++    private static String sha256(String value) {
++        try {
++            byte[] hash = MessageDigest
++                    .getInstance("SHA-256")
++                    .digest(value.getBytes(StandardCharsets.UTF_8));
++            StringBuilder builder = new StringBuilder();
++            for (byte item : hash) {
++                builder.append(String.format("%02x", item));
++            }
++            return builder.toString();
++        } catch (NoSuchAlgorithmException ex) {
++            throw new IllegalStateException(ex);
++        }
++    }
++
+     private void stubCommonCreateFlow(Branch branch, Item item, Customer customer, SalesChannel channel) {
+         when(currentUser.getUserId()).thenReturn(99L);
+         when(itemRepository.findById(8L)).thenReturn(Optional.of(item));
+diff --git a/docs/ERP_BITACORA_CAMBIOS.md b/docs/ERP_BITACORA_CAMBIOS.md
+index e6a2a5e..ff7dff1 100644
+--- a/docs/ERP_BITACORA_CAMBIOS.md
++++ b/docs/ERP_BITACORA_CAMBIOS.md
+@@ -1,5 +1,34 @@
+ # ERP - Bitacora de cambios
+
++## 2026-06-09 - ITEM-Z5B idempotencia backend de reservas
++
++Tipo: backend transaccional, migracion minima, frontend tecnico, evidencia operativa.
++
++Objetivo:
++
++- Evitar doble submit exacto y reintentos de red en creacion de reservas sin tocar pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC ni permisos.
++
++Cambios realizados:
++
++- Se agrego soporte opcional de `X-Idempotency-Key` en `POST /api/reservations`.
++- Se creo la tabla `reservation_idempotency_keys` mediante `V52__reservation_idempotency_keys.sql`.
++- Se guarda hash SHA-256 del payload relevante, no payload completo.
++- Reintentos con la misma llave y mismo payload devuelven la reserva existente.
++- Reutilizar la llave con payload distinto se rechaza como conflicto.
++- El frontend genera una llave por intento de reserva y mantiene `isSavingReservation` como proteccion visual.
++
++Restricciones respetadas:
++
++- No se tocaron pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC ni permisos.
++- No se cambiaron endpoints fuera de reservas.
++- No se cambio la venta financiera.
++
++Pendientes:
++
++- QA API/visual real con usuarios operativos.
++- Constraint de reserva activa por item.
++- Limpieza de llaves expiradas y auditoria de intentos rechazados.
++
+ ## 2026-05-28 - Documentacion integral de cierre AUTH y entrega QA
+
+ Tipo: documentacion de cierre, release handoff, continuidad operativa.
+diff --git a/docs/ERP_RIESGOS_OPERATIVOS.md b/docs/ERP_RIESGOS_OPERATIVOS.md
+index 33d2ebf..bca2c81 100644
+--- a/docs/ERP_RIESGOS_OPERATIVOS.md
++++ b/docs/ERP_RIESGOS_OPERATIVOS.md
+@@ -213,6 +213,7 @@ Probabilidad:
+ - ITEM-Z2 valida en backend que solo prendas `AVAILABLE` puedan ponerse/cambiarse como prenda al aire; siguen pendientes doble reserva/concurrencia, persistencia de prenda preparada, venta financiera, pagos/caja y autorizaciones.
+ - ITEM-Z3B mitiga doble reserva con update atomico `AVAILABLE -> RESERVED` filtrado por company, branch e item; siguen pendientes idempotency key, constraint de reserva activa por item, QA API/visual real y flujos financieros/reversas.
+ - ITEM-Z4 aclara en UI cuando una prenda `AVAILABLE` ya esta al aire; no cambia inventario, por lo que QA debe confirmar que el selector no la muestra solo como `Libre` ni permite prepararla como reemplazo de si misma.
++- ITEM-Z5B agrega idempotencia backend para creacion de reservas con `X-Idempotency-Key`; siguen pendientes constraint de reserva activa por item, limpieza TTL, trazabilidad de intentos rechazados y QA API/visual real.
+ - PRODUCT-ERR-A agrega mapper frontend de errores accionables; modulos fuera de las rutas criticas aun deben migrarse por dominio para evitar que `err.message` exponga mensajes genericos o tecnicos.
+ - Pagos/ventas sin regresion automatizada suficiente.
+ - Auditoria de negocio todavia parcial.
+diff --git a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+index 18179ec..b01ccd2 100644
+--- a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
++++ b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+@@ -9,6 +9,25 @@ Tipo: backlog documental, sin implementacion
+
+ Convertir el analisis de Fase 2A/2B en un backlog tecnico ordenado para implementar multi-compania con bajo riesgo, evitando fuga de datos entre clientes y manteniendo trazabilidad HPSQ-SOFT.
+
++## Actualizacion ITEM-Z5B - Idempotencia backend de reservas
++
++Fecha: 2026-06-09
++Estado: implementado tecnico condicionado.
++
++Alcance ejecutado:
++
++- Contrato opcional `X-Idempotency-Key` para creacion de reservas.
++- Scope por company, branch, usuario, operacion `RESERVATION_CREATE` y llave.
++- Tabla `reservation_idempotency_keys` con hash de payload y constraint unico de scope.
++- Reintento con misma llave/payload devuelve la reserva existente.
++- Reutilizacion de llave con payload distinto se rechaza como conflicto.
++
++Pendiente:
++
++- QA API/visual real con usuarios operativos.
++- Constraint estructural de reserva activa por item si arquitectura lo aprueba.
++- Limpieza TTL de llaves expiradas y trazabilidad de intentos rechazados.
++
+ ## Actualizacion AUTH-F4 - Runtime cross-tenant hardening P0
+
+ Fecha: 2026-05-25
+diff --git a/docs/ITEM_Z5B_RESERVATION_IDEMPOTENCY.md b/docs/ITEM_Z5B_RESERVATION_IDEMPOTENCY.md
+new file mode 100644
+index 0000000..417f08d
+--- /dev/null
++++ b/docs/ITEM_Z5B_RESERVATION_IDEMPOTENCY.md
+@@ -0,0 +1,221 @@
++# ITEM-Z5B - Idempotencia backend de reservas
++
++Fecha: 2026-06-09
++Rama: `feature/item-z5b-reservation-idempotency`
++Tipo: implementacion backend minima, frontend tecnico, documentacion y evidencia.
++
++## Resumen ejecutivo
++
++ITEM-Z5B implementa idempotencia minima para la creacion de reservas. El objetivo es proteger doble submit exacto, doble click, reintentos por red y respuestas perdidas sin modificar pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC ni permisos.
++
++Resultado esperado de la fase:
++
++- `GO_TECNICO` si pruebas backend/frontend pasan.
++- `PENDING_QA_VISUAL` si no hay navegador o screenshots reales.
++- No se declara `QA_PASS` sin evidencia humana/visual.
++
++## Contexto previo validado
++
++ITEM-Z3B ya protegia la carrera principal de inventario con update atomico:
++
++```sql
++UPDATE items
++SET status = 'RESERVED'
++WHERE company_id = ?
++  AND branch_id = ?
++  AND id = ?
++  AND status = 'AVAILABLE'
++```
++
++Ese mecanismo evita que dos solicitudes simultaneas ganen la misma prenda. ITEM-Z5B no reemplaza esa proteccion; la complementa para reconocer reintentos exactos de una misma operacion.
++
++## Contrato elegido
++
++Se eligio header HTTP opcional:
++
++```text
++X-Idempotency-Key
++```
++
++Motivos:
++
++- Mantiene compatibilidad del DTO existente de reserva.
++- Evita mezclar metadatos de transporte con datos de negocio.
++- Permite a clientes web/mobile generar una llave por intento sin cambiar la pantalla.
++- Si el header no viene, el flujo legacy conserva el comportamiento actual.
++
++## Scope de idempotencia
++
++La llave se evalua con este scope:
++
++- `company_id`
++- `branch_id`
++- `user_id`
++- operacion `RESERVATION_CREATE`
++- `idempotency_key`
++
++Esto evita que una misma llave colisione entre tenants, sucursales o usuarios.
++
++## Persistencia
++
++Se crea la tabla:
++
++```text
++reservation_idempotency_keys
++```
++
++Campos principales:
++
++- `company_id`
++- `branch_id`
++- `user_id`
++- `operation`
++- `idempotency_key`
++- `request_hash`
++- `reservation_id`
++- `status`
++- `error_message`
++- `created_at`
++- `updated_at`
++- `expires_at`
++
++Constraint unico:
++
++```text
++company_id + branch_id + user_id + operation + idempotency_key
++```
++
++La tabla guarda hash SHA-256 del payload relevante. No guarda payload completo, tokens, passwords ni datos sensibles innecesarios.
++
++## Hash del request
++
++El hash estable incluye:
++
++- item id;
++- customer id;
++- branch id;
++- live id si aplica;
++- sales channel id;
++- seller user id si aplica;
++- precio capturado si aplica;
++- notas.
++
++El hash normaliza valores nulos y monto decimal para comparar reintentos equivalentes.
++
++## Comportamiento
++
++### Sin `X-Idempotency-Key`
++
++El backend conserva el flujo actual:
++
++- valida tenant/branch/permisos;
++- valida disponibilidad;
++- ejecuta `AVAILABLE -> RESERVED`;
++- crea reserva si el update atomico afecta 1 fila;
++- rechaza si la prenda ya no esta disponible.
++
++### Misma llave y mismo payload
++
++Si ya existe una reserva completada para el mismo scope, llave y hash:
++
++- no crea otra reserva;
++- devuelve la reserva existente o una respuesta equivalente.
++
++### Misma llave y payload distinto
++
++Si la llave se reutiliza con datos distintos:
++
++- rechaza con conflicto;
++- no crea reserva;
++- no cambia inventario.
++
++### Llave en proceso
++
++Si otra solicitud con la misma llave esta en `IN_PROGRESS`:
++
++- rechaza con mensaje seguro;
++- no crea reserva duplicada.
++
++### Falla de disponibilidad
++
++Si la prenda ya no esta `AVAILABLE`:
++
++- no crea reserva;
++- no cambia otros datos;
++- la transaccion revierte el registro de idempotencia si se habia iniciado en el mismo intento.
++
++## Frontend
++
++`services/reservationService.ts` genera una llave unica por intento y la envia en `X-Idempotency-Key`.
++
++La proteccion visual `isSavingReservation` sigue siendo util para UX, pero la proteccion real ante reintentos queda en backend.
++
++No se redisenaron pantallas ni se cambio el flujo operativo.
++
++## Migracion
++
++Migracion creada:
++
++```text
++V52__reservation_idempotency_keys.sql
++```
++
++La migracion solo crea infraestructura de idempotencia para reservas. No modifica pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC ni permisos.
++
++## Pruebas agregadas
++
++Se agregaron pruebas para:
++
++- creacion normal sin idempotency key;
++- creacion con idempotency key;
++- reintento con misma llave y mismo payload;
++- reutilizacion de llave con payload distinto;
++- llave en proceso;
++- reserva LIVE con idempotencia y permiso `DO_LIVE_RESERVATION`;
++- conservacion del update atomico `AVAILABLE -> RESERVED`.
++
++## No alcance
++
++ITEM-Z5B no implementa:
++
++- constraint unico de reserva activa por item;
++- limpieza automatica por TTL;
++- auditoria de intentos rechazados;
++- pagos;
++- caja;
++- precio LIVE;
++- devoluciones;
++- autorizaciones;
++- nuevos permisos;
++- cambios RBAC;
++- venta financiera.
++
++## Pendientes
++
++- ITEM-Z5C: evaluar constraint estructural de reserva activa por item.
++- ITEM-Z5D: trazabilidad/auditoria de intentos rechazados.
++- Fase futura: job de limpieza de llaves expiradas si se aprueba patron de jobs.
++- QA visual/API real con usuarios operativos.
++
++## Rollback
++
++Rollback tecnico:
++
++1. Revertir commit de ITEM-Z5B.
++2. Si la migracion fue aplicada en ambiente QA/dev, revisar si la tabla `reservation_idempotency_keys` puede permanecer sin uso o debe retirarse con rollback controlado por DBA.
++3. Validar que `ReservationService.create` siga usando `reserveIfAvailable(...)`.
++4. Ejecutar pruebas backend y smoke de reserva normal/LIVE.
++
++## GO/NO-GO
++
++GO tecnico condicionado a:
++
++- Maven test PASS;
++- lint PASS;
++- TypeScript PASS;
++- expo export PASS;
++- `git diff --check` PASS;
++- no secretos versionados;
++- no cambios fuera de alcance.
++
++QA visual/API real queda pendiente si no se ejecuta navegador o smoke autenticado con credenciales QA.
+diff --git a/services/reservationService.ts b/services/reservationService.ts
+index 00a1fb6..ab9a9a3 100644
+--- a/services/reservationService.ts
++++ b/services/reservationService.ts
+@@ -22,6 +22,10 @@ export type CreateReservationRequest = {
+   createdByUserId: number;
+ };
+
++type CreateReservationOptions = {
++  idempotencyKey?: string;
++};
++
+ export type Reservation = {
+   id: number;
+   itemId: number;
+@@ -49,14 +53,32 @@ export type Reservation = {
+ };
+
+ export async function createReservation(
+-  payload: CreateReservationRequest
++  payload: CreateReservationRequest,
++  options: CreateReservationOptions = {}
+ ): Promise<Reservation> {
++  const idempotencyKey = options.idempotencyKey ?? createReservationIdempotencyKey();
++
+   return apiRequest<Reservation>('/api/reservations', {
+     method: 'POST',
+     body: payload,
++    headers: {
++      'X-Idempotency-Key': idempotencyKey,
++    },
+   });
+ }
+
++function createReservationIdempotencyKey(): string {
++  const cryptoApi = globalThis.crypto;
++  const randomUUID =
++    cryptoApi && typeof cryptoApi.randomUUID === 'function'
++      ? cryptoApi.randomUUID()
++      : `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random()
++          .toString(36)
++          .slice(2)}`;
++
++  return `reservation-${randomUUID}`;
++}
++
+ export async function getReservationsByBranch(
+   branchId: number
+ ): Promise<Reservation[]> {

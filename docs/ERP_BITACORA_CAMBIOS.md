@@ -1,5 +1,34 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-09 - ITEM-Z5B idempotencia backend de reservas
+
+Tipo: backend transaccional, migracion minima, frontend tecnico, evidencia operativa.
+
+Objetivo:
+
+- Evitar doble submit exacto y reintentos de red en creacion de reservas sin tocar pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC ni permisos.
+
+Cambios realizados:
+
+- Se agrego soporte opcional de `X-Idempotency-Key` en `POST /api/reservations`.
+- Se creo la tabla `reservation_idempotency_keys` mediante `V52__reservation_idempotency_keys.sql`.
+- Se guarda hash SHA-256 del payload relevante, no payload completo.
+- Reintentos con la misma llave y mismo payload devuelven la reserva existente.
+- Reutilizar la llave con payload distinto se rechaza como conflicto.
+- El frontend genera una llave por intento de reserva y mantiene `isSavingReservation` como proteccion visual.
+
+Restricciones respetadas:
+
+- No se tocaron pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC ni permisos.
+- No se cambiaron endpoints fuera de reservas.
+- No se cambio la venta financiera.
+
+Pendientes:
+
+- QA API/visual real con usuarios operativos.
+- Constraint de reserva activa por item.
+- Limpieza de llaves expiradas y auditoria de intentos rechazados.
+
 ## 2026-05-28 - Documentacion integral de cierre AUTH y entrega QA
 
 Tipo: documentacion de cierre, release handoff, continuidad operativa.

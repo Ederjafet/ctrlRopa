@@ -9,6 +9,25 @@ Tipo: backlog documental, sin implementacion
 
 Convertir el analisis de Fase 2A/2B en un backlog tecnico ordenado para implementar multi-compania con bajo riesgo, evitando fuga de datos entre clientes y manteniendo trazabilidad HPSQ-SOFT.
 
+## Actualizacion ITEM-Z5B - Idempotencia backend de reservas
+
+Fecha: 2026-06-09
+Estado: implementado tecnico condicionado.
+
+Alcance ejecutado:
+
+- Contrato opcional `X-Idempotency-Key` para creacion de reservas.
+- Scope por company, branch, usuario, operacion `RESERVATION_CREATE` y llave.
+- Tabla `reservation_idempotency_keys` con hash de payload y constraint unico de scope.
+- Reintento con misma llave/payload devuelve la reserva existente.
+- Reutilizacion de llave con payload distinto se rechaza como conflicto.
+
+Pendiente:
+
+- QA API/visual real con usuarios operativos.
+- Constraint estructural de reserva activa por item si arquitectura lo aprueba.
+- Limpieza TTL de llaves expiradas y trazabilidad de intentos rechazados.
+
 ## Actualizacion AUTH-F4 - Runtime cross-tenant hardening P0
 
 Fecha: 2026-05-25

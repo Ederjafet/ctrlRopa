@@ -22,6 +22,7 @@ import com.hpsqsoft.ctrlropa.security.access.ChannelCode;
 import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
 import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
 import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
+import com.hpsqsoft.ctrlropa.web.error.ConflictException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -31,6 +32,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.mockito.ArgumentMatchers;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.Optional;
 
@@ -48,6 +52,7 @@ import static org.mockito.Mockito.when;
 class ReservationServiceTests {
 
     private final ReservationRepository repository = mock(ReservationRepository.class);
+    private final ReservationIdempotencyRepository idempotencyRepository = mock(ReservationIdempotencyRepository.class);
     private final ItemRepository itemRepository = mock(ItemRepository.class);
     private final CustomerRepository customerRepository = mock(CustomerRepository.class);
     private final BranchRepository branchRepository = mock(BranchRepository.class);
@@ -74,7 +79,8 @@ class ReservationServiceTests {
             customerOrderService,
             jdbcTemplate,
             tenantAccessGuard,
-            liveEventService
+            liveEventService,
+            idempotencyRepository
     );
 
     @Test
@@ -105,6 +111,7 @@ class ReservationServiceTests {
         assertEquals(8L, response.getItemId());
         assertEquals("ACTIVE", response.getStatus());
         verify(itemRepository).reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED);
+        verify(idempotencyRepository, never()).saveAndFlush(any(ReservationIdempotencyRecord.class));
         verify(itemRepository, never()).save(any(Item.class));
         verify(repository).save(any(Reservation.class));
         verify(customerOrderService).refreshStatus(55L);
@@ -126,6 +133,7 @@ class ReservationServiceTests {
 
         when(currentUser.getUserId()).thenReturn(99L);
         when(itemRepository.findById(8L)).thenReturn(Optional.of(item));
+        when(branchRepository.findById(6L)).thenReturn(Optional.of(branch));
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
@@ -168,6 +176,149 @@ class ReservationServiceTests {
     }
 
     @Test
+    void createWithIdempotencyKeyStoresCompletedRecord() {
+        Branch branch = branch();
+        Item item = item(ItemStatus.AVAILABLE, branch);
+        Customer customer = customer(branch);
+        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
+        CustomerOrder order = order(55L);
+        ReservationService.CreateReservationRequest request = request(channel.getId(), null);
+        ReservationIdempotencyRecord pendingRecord = new ReservationIdempotencyRecord();
+
+        stubCommonCreateFlow(branch, item, customer, channel);
+        when(idempotencyRepository
+                .findByCompanyIdAndBranchIdAndUserIdAndOperationAndIdempotencyKey(
+                        2L,
+                        6L,
+                        99L,
+                        "RESERVATION_CREATE",
+                        "idem-1"
+                )).thenReturn(Optional.empty());
+        when(idempotencyRepository.saveAndFlush(any(ReservationIdempotencyRecord.class)))
+                .thenReturn(pendingRecord);
+        when(itemRepository.reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED))
+                .thenReturn(1);
+        when(repository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE)).thenReturn(Optional.empty());
+        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> {
+            Reservation reservation = invocation.getArgument(0);
+            ReflectionTestUtils.setField(reservation, "id", 10L);
+            return reservation;
+        });
+        when(customerOrderService.addReservationToOpenOrder(any(Reservation.class))).thenReturn(order);
+        when(customerOrderService.findOrderIdByReservationId(10L)).thenReturn(55L);
+        stubSellerName();
+
+        ReservationResponse response = service.create(request, "idem-1");
+
+        assertEquals(10L, response.getId());
+        assertEquals(ReservationIdempotencyStatus.COMPLETED, pendingRecord.getStatus());
+        assertEquals(10L, pendingRecord.getReservationId());
+        verify(idempotencyRepository).saveAndFlush(any(ReservationIdempotencyRecord.class));
+        verify(idempotencyRepository).save(pendingRecord);
+    }
+
+    @Test
+    void createWithSameIdempotencyKeyAndPayloadReturnsExistingReservation() {
+        Branch branch = branch();
+        Item item = item(ItemStatus.RESERVED, branch);
+        Customer customer = customer(branch);
+        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
+        Reservation existingReservation = reservation(10L, item, customer, branch, channel);
+        ReservationService.CreateReservationRequest request = request(channel.getId(), null);
+        ReservationIdempotencyRecord completedRecord = completedRecord(
+                "idem-1",
+                hashReservationRequest(request),
+                existingReservation.getId()
+        );
+
+        stubCommonCreateFlow(branch, item, customer, channel);
+        when(idempotencyRepository
+                .findByCompanyIdAndBranchIdAndUserIdAndOperationAndIdempotencyKey(
+                        2L,
+                        6L,
+                        99L,
+                        "RESERVATION_CREATE",
+                        "idem-1"
+                )).thenReturn(Optional.of(completedRecord));
+        when(repository.findById(10L)).thenReturn(Optional.of(existingReservation));
+        when(customerOrderService.findOrderIdByReservationId(10L)).thenReturn(55L);
+        stubSellerName();
+
+        ReservationResponse response = service.create(request, "idem-1");
+
+        assertEquals(10L, response.getId());
+        verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
+        verify(repository, never()).save(any(Reservation.class));
+        verify(idempotencyRepository, never()).saveAndFlush(any(ReservationIdempotencyRecord.class));
+    }
+
+    @Test
+    void createWithSameIdempotencyKeyAndDifferentPayloadRejects() {
+        Branch branch = branch();
+        Item item = item(ItemStatus.AVAILABLE, branch);
+        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
+        ReservationService.CreateReservationRequest request = request(channel.getId(), null);
+        ReservationIdempotencyRecord completedRecord = completedRecord(
+                "idem-1",
+                "different-hash",
+                10L
+        );
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(itemRepository.findById(8L)).thenReturn(Optional.of(item));
+        when(branchRepository.findById(6L)).thenReturn(Optional.of(branch));
+        when(idempotencyRepository
+                .findByCompanyIdAndBranchIdAndUserIdAndOperationAndIdempotencyKey(
+                        2L,
+                        6L,
+                        99L,
+                        "RESERVATION_CREATE",
+                        "idem-1"
+                )).thenReturn(Optional.of(completedRecord));
+
+        ConflictException exception = assertThrows(
+                ConflictException.class,
+                () -> service.create(request, "idem-1")
+        );
+
+        assertTrue(exception.getMessage().contains("datos distintos"));
+        verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
+        verify(repository, never()).save(any(Reservation.class));
+    }
+
+    @Test
+    void createWithInProgressIdempotencyKeyRejectsWithoutCreatingReservation() {
+        Branch branch = branch();
+        Item item = item(ItemStatus.AVAILABLE, branch);
+        Customer customer = customer(branch);
+        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
+        ReservationService.CreateReservationRequest request = request(channel.getId(), null);
+        ReservationIdempotencyRecord inProgressRecord = inProgressRecord(
+                "idem-1",
+                hashReservationRequest(request)
+        );
+
+        stubCommonCreateFlow(branch, item, customer, channel);
+        when(idempotencyRepository
+                .findByCompanyIdAndBranchIdAndUserIdAndOperationAndIdempotencyKey(
+                        2L,
+                        6L,
+                        99L,
+                        "RESERVATION_CREATE",
+                        "idem-1"
+                )).thenReturn(Optional.of(inProgressRecord));
+
+        ConflictException exception = assertThrows(
+                ConflictException.class,
+                () -> service.create(request, "idem-1")
+        );
+
+        assertTrue(exception.getMessage().contains("sigue en proceso"));
+        verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
+        verify(repository, never()).save(any(Reservation.class));
+    }
+
+    @Test
     void createLiveReservationKeepsLivePermissionAndUsesAtomicUpdate() {
         Branch branch = branch();
         Item item = item(ItemStatus.AVAILABLE, branch);
@@ -203,6 +354,137 @@ class ReservationServiceTests {
                 6L
         );
         verify(itemRepository).reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED);
+    }
+
+    @Test
+    void createLiveReservationWithIdempotencyKeyKeepsLivePermissionAndUsesAtomicUpdate() {
+        Branch branch = branch();
+        Item item = item(ItemStatus.AVAILABLE, branch);
+        Customer customer = customer(branch);
+        SalesChannel channel = channel(3L, ChannelCode.LIVE);
+        Live live = live(branch);
+        CustomerOrder order = order(55L);
+        ReservationService.CreateReservationRequest request = request(channel.getId(), live.getId());
+        ReservationIdempotencyRecord pendingRecord = new ReservationIdempotencyRecord();
+
+        stubCommonCreateFlow(branch, item, customer, channel);
+        when(liveRepository.findById(4L)).thenReturn(Optional.of(live));
+        when(idempotencyRepository
+                .findByCompanyIdAndBranchIdAndUserIdAndOperationAndIdempotencyKey(
+                        2L,
+                        6L,
+                        99L,
+                        "RESERVATION_CREATE",
+                        "live-idem-1"
+                )).thenReturn(Optional.empty());
+        when(idempotencyRepository.saveAndFlush(any(ReservationIdempotencyRecord.class)))
+                .thenReturn(pendingRecord);
+        when(repository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE)).thenReturn(Optional.empty());
+        when(itemRepository.reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED))
+                .thenReturn(1);
+        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> {
+            Reservation reservation = invocation.getArgument(0);
+            ReflectionTestUtils.setField(reservation, "id", 10L);
+            return reservation;
+        });
+        when(customerOrderService.addReservationToOpenOrder(any(Reservation.class))).thenReturn(order);
+        when(customerOrderService.findOrderIdByReservationId(10L)).thenReturn(55L);
+        stubSellerName();
+
+        ReservationResponse response = service.create(request, "live-idem-1");
+
+        assertEquals(10L, response.getId());
+        assertEquals("RESERVED", response.getLiveOperationalStatus());
+        assertEquals(ReservationIdempotencyStatus.COMPLETED, pendingRecord.getStatus());
+        verify(accessService).assertCan(
+                99L,
+                PermissionCode.DO_LIVE_RESERVATION,
+                ChannelCode.LIVE,
+                6L
+        );
+        verify(itemRepository).reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED);
+    }
+
+    private static ReservationIdempotencyRecord completedRecord(String key,
+                                                                String requestHash,
+                                                                Long reservationId) {
+        ReservationIdempotencyRecord record = inProgressRecord(key, requestHash);
+        record.setStatus(ReservationIdempotencyStatus.COMPLETED);
+        record.setReservationId(reservationId);
+        return record;
+    }
+
+    private static ReservationIdempotencyRecord inProgressRecord(String key, String requestHash) {
+        ReservationIdempotencyRecord record = new ReservationIdempotencyRecord();
+        record.setCompanyId(2L);
+        record.setBranchId(6L);
+        record.setUserId(99L);
+        record.setOperation("RESERVATION_CREATE");
+        record.setIdempotencyKey(key);
+        record.setRequestHash(requestHash);
+        record.setStatus(ReservationIdempotencyStatus.IN_PROGRESS);
+        return record;
+    }
+
+    private static Reservation reservation(Long id,
+                                           Item item,
+                                           Customer customer,
+                                           Branch branch,
+                                           SalesChannel channel) {
+        Reservation reservation = new Reservation();
+        ReflectionTestUtils.setField(reservation, "id", id);
+        reservation.setItem(item);
+        reservation.setCustomer(customer);
+        reservation.setBranch(branch);
+        reservation.setSalesChannel(channel);
+        reservation.setSellerUserId(99L);
+        reservation.setPrice(BigDecimal.valueOf(300));
+        reservation.setStatus(ReservationStatus.ACTIVE);
+        return reservation;
+    }
+
+    private static String hashReservationRequest(ReservationService.CreateReservationRequest request) {
+        return sha256(
+                "itemId=" + valuePart(request.getItemId()) + "\n"
+                        + "customerId=" + valuePart(request.getCustomerId()) + "\n"
+                        + "branchId=" + valuePart(request.getBranchId()) + "\n"
+                        + "liveId=" + valuePart(request.getLiveId()) + "\n"
+                        + "salesChannelId=" + valuePart(request.getSalesChannelId()) + "\n"
+                        + "sellerUserId=" + valuePart(request.getSellerUserId()) + "\n"
+                        + "price=" + amountPart(request.getPrice()) + "\n"
+                        + "notes=" + valuePart(request.getNotes())
+        );
+    }
+
+    private static String valuePart(Object value) {
+        if (value == null) {
+            return "";
+        }
+
+        return value.toString().trim();
+    }
+
+    private static String amountPart(BigDecimal value) {
+        if (value == null) {
+            return "";
+        }
+
+        return value.stripTrailingZeros().toPlainString();
+    }
+
+    private static String sha256(String value) {
+        try {
+            byte[] hash = MessageDigest
+                    .getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder();
+            for (byte item : hash) {
+                builder.append(String.format("%02x", item));
+            }
+            return builder.toString();
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException(ex);
+        }
     }
 
     private void stubCommonCreateFlow(Branch branch, Item item, Customer customer, SalesChannel channel) {
