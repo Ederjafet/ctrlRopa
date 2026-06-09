@@ -8,6 +8,12 @@
 
 > Complemento LIVE-FIX-A: validar que la accion inversa posterior a una venta LIVE diga `Deshacer cierre de venta LIVE`, que sea distinta de `Cancelar apartado` y que ambos helpers aclaren que no registran pago ni caja.
 
+> Complemento LIVE-FIX-A accionable: validar que el aviso `Falta prenda preparada` permita abrir `Buscar prenda`, `Escanear QR`, `Crear prenda rapida` o `Cerrar`, y que ninguna accion quede sin respuesta.
+
+> Complemento LIVE-FIX-A pagos: validar que el apartado LIVE muestre `Pago registrado`, `Saldo pendiente` y `Estado de pago` cuando el dato esta disponible; si hay pago registrado, `Deshacer cierre de venta LIVE` y `Cancelar apartado` deben bloquearse con autorizacion requerida y no ejecutar reversa/cancelacion silenciosa.
+
+> Complemento LIVE-FIX-A final: validar que `Cerrar como venta LIVE` sea primary, `Deshacer cierre de venta LIVE` sea warning/reversa, `Cancelar apartado` sea danger, y que vendedor centro no reciba acciones habilitadas sin permisos efectivos.
+
 ## Objetivo
 
 PRODUCT-D4 existe para convertir los casos `PENDIENTE_MANUAL` de PRODUCT-D2/D3 en resultados reales: `PASS`, `FAIL`, `BLOQUEADO` o `NO_APLICA`, siempre con evidencia capturada.

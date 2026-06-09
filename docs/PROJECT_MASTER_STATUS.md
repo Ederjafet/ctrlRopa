@@ -101,6 +101,8 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 | Branding solo local | No sirve aun para tenant/backend productivo | PENDING_DECISION |
 | Configuracion por ambiente | QA/staging deben definir env vars requeridas; DEV ya cuenta con scripts seguros para cargar `.env` local | PENDING_QA |
 | Autonomia sin compuerta | Mitigado tecnicamente por PROJECT-GOV-B1; pendiente revision de proceso | PENDING_QA |
+| Reversa/cancelacion de apartados LIVE con pago | LIVE-FIX-A bloquea acciones sensibles si detecta pago o estado no disponible, pero el flujo real de autorizacion supervisor/backend queda pendiente | PENDING_DECISION |
+| Capacidades vendedor para preparar prendas | LIVE-FIX-A mantiene permisos efectivos; si vendedor debe preparar sin controlar prenda al aire, abrir `LIVE-ROLE-A` con permiso granular | PENDING_DECISION |
 
 ## Ultima actualizacion
 

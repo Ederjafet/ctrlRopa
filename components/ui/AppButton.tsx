@@ -7,6 +7,7 @@ type Props = PressableProps & {
     | 'primary'
     | 'secondary'
     | 'neutral'
+    | 'warning'
     | 'operation'
     | 'danger'
     | 'cancel'
@@ -43,6 +44,8 @@ export default function AppButton({
           ? theme.colors.backButtonBackground
           : variant === 'menu'
           ? theme.colors.menuButtonBackground
+          : variant === 'warning'
+            ? theme.colors.warning
           : variant === 'operation'
             ? theme.colors.operationButtonBackground
             : variant === 'neutral'
@@ -64,6 +67,8 @@ export default function AppButton({
           ? theme.colors.backButtonText
           : variant === 'menu'
             ? theme.colors.menuButtonText
+            : variant === 'warning'
+              ? theme.colors.surface
             : variant === 'operation'
               ? theme.colors.operationButtonText
               : variant === 'neutral'
