@@ -8,21 +8,27 @@ type Props = {
   subtitle?: string;
   children?: ReactNode;
   onPress: () => void;
+  disabled?: boolean;
 };
 
-export default function AppOptionRow({ title, subtitle, children, onPress }: Props) {
+export default function AppOptionRow({ title, subtitle, children, onPress, disabled = false }: Props) {
   const { theme } = useAppTheme();
 
   return (
     <Pressable
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.option,
         {
-          backgroundColor: pressed
+          backgroundColor: disabled
+            ? theme.colors.surfaceMuted
+            : pressed
             ? theme.colors.optionPressedBackground
             : theme.colors.optionBackground,
           borderBottomColor: theme.colors.optionBorder,
+          opacity: disabled ? 0.78 : 1,
           paddingVertical: theme.density === 'COMPACT' ? 11 : 14,
         },
       ]}

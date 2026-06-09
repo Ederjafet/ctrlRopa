@@ -212,6 +212,7 @@ Probabilidad:
 - LIVE-PERM-A1 crea permisos LIVE minimos y asignaciones base; QA debe validar roles reales porque `DO_LIVE_RESERVATION` se conserva como compatibilidad y aun no existen permisos de precio, pagos, caja, reversas ni autorizaciones LIVE.
 - ITEM-Z2 valida en backend que solo prendas `AVAILABLE` puedan ponerse/cambiarse como prenda al aire; siguen pendientes doble reserva/concurrencia, persistencia de prenda preparada, venta financiera, pagos/caja y autorizaciones.
 - ITEM-Z3B mitiga doble reserva con update atomico `AVAILABLE -> RESERVED` filtrado por company, branch e item; siguen pendientes idempotency key, constraint de reserva activa por item, QA API/visual real y flujos financieros/reversas.
+- ITEM-Z4 aclara en UI cuando una prenda `AVAILABLE` ya esta al aire; no cambia inventario, por lo que QA debe confirmar que el selector no la muestra solo como `Libre` ni permite prepararla como reemplazo de si misma.
 - PRODUCT-ERR-A agrega mapper frontend de errores accionables; modulos fuera de las rutas criticas aun deben migrarse por dominio para evitar que `err.message` exponga mensajes genericos o tecnicos.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.

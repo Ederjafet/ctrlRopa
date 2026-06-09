@@ -813,4 +813,5 @@ Pendiente backlog:
 | LIVE-Z10C backend precio autorizado | P1 | CRITICO | aprobacion arquitectura | Cambio de precio no simulado y con auditoria |
 | ITEM-Z2 elegibilidad prenda al aire | P0 | ALTO | ITEM-Z1 | `LiveService.setActiveItem` solo acepta prendas `AVAILABLE` |
 | ITEM-Z3B reserva atomica disponibilidad | P0 | CRITICO | ITEM-Z3A | `ReservationService.create` usa update atomico `AVAILABLE -> RESERVED` por company/branch/item |
-| ITEM-Z4 auditoria e idempotencia de reservas | P0 | ALTO | ITEM-Z3B | Doble submit exacto, auditoria y constraint de reserva activa definidos/aprobados |
+| ITEM-Z4 consistencia visual active item | P0 | MEDIO | ITEM-Z2/ITEM-Z3B | Selector LIVE distingue prenda actualmente al aire sin cambiar inventario |
+| ITEM-Z5 auditoria e idempotencia de reservas | P0 | ALTO | ITEM-Z3B | Doble submit exacto, auditoria y constraint de reserva activa definidos/aprobados |

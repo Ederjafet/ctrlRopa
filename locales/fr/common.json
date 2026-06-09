@@ -633,6 +633,8 @@
     "preparedItemRemovedTitle": "Préparé article élément",
     "preparedItemRemovedMessage": "Préparé article élément",
     "itemFilterAvailable": "Disponibles",
+    "activeItemSelectorOnAirBadge": "A l'antenne maintenant",
+    "activeItemSelectorOnAirHelp": "Deja a l'antenne. Il reste disponible pour mise de cote, mais choisissez un autre article pour preparer le changement.",
     "itemFilterReserved": "Reservees",
     "itemFilterUnavailable": "Vendues / indisponibles",
     "itemFilterAll": "Toutes",

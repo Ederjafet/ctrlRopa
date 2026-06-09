@@ -1,0 +1,421 @@
+﻿diff --git a/app/live.tsx b/app/live.tsx
+index 37cc8dd..5914aa9 100644
+--- a/app/live.tsx
++++ b/app/live.tsx
+@@ -6063,8 +6063,11 @@ export default function LiveScreen() {
+           renderItem={({ item }) => {
+             const availability = getItemLiveAvailability(item);
+             const availabilityFilter = getItemAvailabilityFilter(item);
++            const isOnAir = activeItem?.id === item.id;
+             const availabilityColor =
+-              availabilityFilter === 'available'
++              isOnAir
++                ? theme.colors.accent
++                : availabilityFilter === 'available'
+                 ? theme.colors.success
+                 : availabilityFilter === 'reserved'
+                   ? theme.colors.warning
+@@ -6079,6 +6082,7 @@ export default function LiveScreen() {
+                   item.brandName || t('live.noBrand')
+                 } - ${item.sizeName || t('live.noSize')}`}
+                 onPress={() => selectItem(item)}
++                disabled={isOnAir}
+               >
+                 <AppText variant="caption" color={theme.colors.mutedText}>
+                   {t('live.suggestedPrice')}{' '}
+@@ -6093,6 +6097,25 @@ export default function LiveScreen() {
+                 >
+                   {availability.label}
+                 </AppText>
++                {isOnAir ? (
++                  <View
++                    style={[
++                      styles.itemSelectorOnAirPanel,
++                      {
++                        backgroundColor: theme.colors.accentSoft,
++                        borderColor: theme.colors.accent,
++                        borderRadius: theme.radius.sm,
++                      },
++                    ]}
++                  >
++                    <AppText variant="caption" color={theme.colors.accent} bold>
++                      {t('live.activeItemSelectorOnAirBadge')}
++                    </AppText>
++                    <AppText variant="caption" color={theme.colors.mutedText}>
++                      {t('live.activeItemSelectorOnAirHelp')}
++                    </AppText>
++                  </View>
++                ) : null}
+                 {availability.reason ? (
+                   <AppText variant="caption" color={availabilityColor}>
+                     {availability.reason}
+@@ -6507,6 +6530,13 @@ const styles = StyleSheet.create({
+     flexWrap: 'wrap',
+     gap: 8,
+   },
++  itemSelectorOnAirPanel: {
++    borderWidth: 1,
++    gap: 2,
++    marginTop: 4,
++    paddingHorizontal: 8,
++    paddingVertical: 6,
++  },
+   modalList: {
+     maxHeight: 420,
+   },
+diff --git a/components/ui/AppOptionRow.tsx b/components/ui/AppOptionRow.tsx
+index c3caab0..0edd471 100644
+--- a/components/ui/AppOptionRow.tsx
++++ b/components/ui/AppOptionRow.tsx
+@@ -8,21 +8,27 @@ type Props = {
+   subtitle?: string;
+   children?: ReactNode;
+   onPress: () => void;
++  disabled?: boolean;
+ };
+
+-export default function AppOptionRow({ title, subtitle, children, onPress }: Props) {
++export default function AppOptionRow({ title, subtitle, children, onPress, disabled = false }: Props) {
+   const { theme } = useAppTheme();
+
+   return (
+     <Pressable
++      accessibilityState={{ disabled }}
++      disabled={disabled}
+       onPress={onPress}
+       style={({ pressed }) => [
+         styles.option,
+         {
+-          backgroundColor: pressed
++          backgroundColor: disabled
++            ? theme.colors.surfaceMuted
++            : pressed
+             ? theme.colors.optionPressedBackground
+             : theme.colors.optionBackground,
+           borderBottomColor: theme.colors.optionBorder,
++          opacity: disabled ? 0.78 : 1,
+           paddingVertical: theme.density === 'COMPACT' ? 11 : 14,
+         },
+       ]}
+diff --git a/docs/ERP_BITACORA_CAMBIOS.md b/docs/ERP_BITACORA_CAMBIOS.md
+index aea80e6..e6a2a5e 100644
+--- a/docs/ERP_BITACORA_CAMBIOS.md
++++ b/docs/ERP_BITACORA_CAMBIOS.md
+@@ -3293,3 +3293,26 @@ Decision:
+
+ - `GO tecnico` si backend/frontend pasan validaciones.
+ - `PENDING_QA_VISUAL` hasta validar doble submit/API con datos reales.
++
++## 2026-06-09 - ITEM-Z4 consistencia visual de prenda al aire
++
++Tipo: mejora frontend/UI, sin backend, migraciones, endpoints, permisos, RBAC, pagos, caja, precio LIVE, devoluciones ni autorizaciones.
++
++Objetivo:
++
++- Evitar que una prenda actualmente al aire aparezca en el selector LIVE solamente como `Libre`.
++- Mantener `items.status = AVAILABLE` como disponibilidad real de inventario.
++- Distinguir `lives.active_item_id` como estado operativo visual.
++
++Cambios realizados:
++
++- `app/live.tsx`: el selector muestra panel `Actualmente al aire` para la prenda activa.
++- `app/live.tsx`: la prenda activa queda deshabilitada en el selector para no prepararla como reemplazo de si misma.
++- `AppOptionRow`: agrega soporte opcional `disabled`.
++- Locales ES/EN/PT-BR/FR/JA/ZH/KO: agregan microcopy del selector.
++- `docs/ITEM_Z4_LIVE_ACTIVE_ITEM_UX_CONSISTENCY.md`: documenta alcance, restricciones y QA.
++
++Decision:
++
++- `GO tecnico` si frontend pasa validaciones.
++- `PENDING_QA_VISUAL` hasta validar en `/live` con navegador/capturas reales.
+diff --git a/docs/ERP_RIESGOS_OPERATIVOS.md b/docs/ERP_RIESGOS_OPERATIVOS.md
+index f5d2e2a..33d2ebf 100644
+--- a/docs/ERP_RIESGOS_OPERATIVOS.md
++++ b/docs/ERP_RIESGOS_OPERATIVOS.md
+@@ -212,6 +212,7 @@ Probabilidad:
+ - LIVE-PERM-A1 crea permisos LIVE minimos y asignaciones base; QA debe validar roles reales porque `DO_LIVE_RESERVATION` se conserva como compatibilidad y aun no existen permisos de precio, pagos, caja, reversas ni autorizaciones LIVE.
+ - ITEM-Z2 valida en backend que solo prendas `AVAILABLE` puedan ponerse/cambiarse como prenda al aire; siguen pendientes doble reserva/concurrencia, persistencia de prenda preparada, venta financiera, pagos/caja y autorizaciones.
+ - ITEM-Z3B mitiga doble reserva con update atomico `AVAILABLE -> RESERVED` filtrado por company, branch e item; siguen pendientes idempotency key, constraint de reserva activa por item, QA API/visual real y flujos financieros/reversas.
++- ITEM-Z4 aclara en UI cuando una prenda `AVAILABLE` ya esta al aire; no cambia inventario, por lo que QA debe confirmar que el selector no la muestra solo como `Libre` ni permite prepararla como reemplazo de si misma.
+ - PRODUCT-ERR-A agrega mapper frontend de errores accionables; modulos fuera de las rutas criticas aun deben migrarse por dominio para evitar que `err.message` exponga mensajes genericos o tecnicos.
+ - Pagos/ventas sin regresion automatizada suficiente.
+ - Auditoria de negocio todavia parcial.
+diff --git a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+index 001319d..18179ec 100644
+--- a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
++++ b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+@@ -813,4 +813,5 @@ Pendiente backlog:
+ | LIVE-Z10C backend precio autorizado | P1 | CRITICO | aprobacion arquitectura | Cambio de precio no simulado y con auditoria |
+ | ITEM-Z2 elegibilidad prenda al aire | P0 | ALTO | ITEM-Z1 | `LiveService.setActiveItem` solo acepta prendas `AVAILABLE` |
+ | ITEM-Z3B reserva atomica disponibilidad | P0 | CRITICO | ITEM-Z3A | `ReservationService.create` usa update atomico `AVAILABLE -> RESERVED` por company/branch/item |
+-| ITEM-Z4 auditoria e idempotencia de reservas | P0 | ALTO | ITEM-Z3B | Doble submit exacto, auditoria y constraint de reserva activa definidos/aprobados |
++| ITEM-Z4 consistencia visual active item | P0 | MEDIO | ITEM-Z2/ITEM-Z3B | Selector LIVE distingue prenda actualmente al aire sin cambiar inventario |
++| ITEM-Z5 auditoria e idempotencia de reservas | P0 | ALTO | ITEM-Z3B | Doble submit exacto, auditoria y constraint de reserva activa definidos/aprobados |
+diff --git a/docs/ITEM_Z4_LIVE_ACTIVE_ITEM_UX_CONSISTENCY.md b/docs/ITEM_Z4_LIVE_ACTIVE_ITEM_UX_CONSISTENCY.md
+new file mode 100644
+index 0000000..f0c2414
+--- /dev/null
++++ b/docs/ITEM_Z4_LIVE_ACTIVE_ITEM_UX_CONSISTENCY.md
+@@ -0,0 +1,61 @@
++# ITEM-Z4 - Consistencia visual de prenda al aire en selector LIVE
++
++Fecha: 2026-06-09
++Rama: `feature/item-z4-live-active-item-ux-consistency`
++Tipo: mejora frontend/UI, sin cambios de inventario real.
++
++## Resumen ejecutivo
++
++ITEM-Z4 corrige una confusion visual en `/live`: cuando una prenda ya esta al aire y el operador abre `Seleccionar prenda`, esa misma prenda podia verse solamente como `Libre` dentro de `Disponibles`.
++
++Tecnicamente el item sigue `AVAILABLE`, porque `lives.active_item_id` no bloquea inventario ni cambia `items.status`. Operativamente, sin embargo, el selector debe explicar que esa prenda ya esta en el LIVE.
++
++## Decision aplicada
++
++- La prenda al aire sigue apareciendo en `Disponibles` si su `items.status` es `AVAILABLE`.
++- El selector agrega un panel visible `Actualmente al aire`.
++- El panel aclara que la prenda sigue disponible para apartado, pero no debe elegirse como reemplazo de si misma.
++- La fila queda deshabilitada para evitar preparar/cambiar por la misma prenda actualmente al aire.
++
++## Lo que no cambio
++
++- No se cambio `items.status`.
++- No se creo estado nuevo de inventario.
++- No se tocaron backend, migraciones ni endpoints.
++- No se tocaron permisos ni RBAC.
++- No se tocaron pagos, caja, precio LIVE, devoluciones ni autorizaciones.
++
++## Archivos principales
++
++- `app/live.tsx`
++- `components/ui/AppOptionRow.tsx`
++- `locales/es/common.json`
++- `locales/en/common.json`
++- `locales/pt-BR/common.json`
++- `locales/fr/common.json`
++- `locales/ja/common.json`
++- `locales/zh/common.json`
++- `locales/ko/common.json`
++
++## QA visual esperado
++
++1. Abrir `/live`.
++2. Poner una prenda al aire.
++3. Abrir `Buscar prenda` / `Seleccionar prenda`.
++4. Confirmar que la prenda al aire aparece en `Disponibles` si sigue `AVAILABLE`.
++5. Confirmar que no se ve solo como `Libre`.
++6. Confirmar que muestra `Actualmente al aire`.
++7. Confirmar que el texto aclara que sigue disponible para apartado.
++8. Confirmar que no se puede seleccionarla como prenda preparada/reemplazo de si misma.
++9. Confirmar que ninguna accion cambia `items.status` solo por estar al aire.
++
++## Riesgos pendientes
++
++- Falta QA visual con navegador/capturas reales.
++- La separacion entre disponibilidad tecnica y estado operativo LIVE debe seguir explicandose en futuras pantallas.
++- ITEM-Z5 debe continuar con auditoria/idempotencia y trazabilidad de reservas si se aprueba.
++
++## GO/NO-GO
++
++- `GO_TECNICO` si lint, TypeScript, export web y checks Git pasan.
++- `PENDING_QA_VISUAL` hasta tener evidencia visual real.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index 2866dac..5ab3880 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -269,6 +269,8 @@
+     "priceConfirmedForReservation": "Confirmed hold price: {{price}}",
+     "itemNotAvailableForReservation": "The item is not available for reservation.",
+     "itemFree": "Free",
++    "activeItemSelectorOnAirBadge": "On air now",
++    "activeItemSelectorOnAirHelp": "Already on air. It remains available for holds, but choose another item to prepare a switch.",
+     "itemReservedWithoutPayment": "Reserved without payment",
+     "itemReservedWithoutPaymentWarning": "This item is reserved without payment. You can put it on air under operational criteria.",
+     "itemNotAvailableSold": "Not available: sold",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index 2571c97..932a8d4 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -269,6 +269,8 @@
+     "priceConfirmedForReservation": "Precio confirmado para apartado: {{price}}",
+     "itemNotAvailableForReservation": "La prenda no esta disponible para reservar.",
+     "itemFree": "Libre",
++    "activeItemSelectorOnAirBadge": "Actualmente al aire",
++    "activeItemSelectorOnAirHelp": "Ya esta al aire. Sigue disponible para apartado, pero elige otra prenda para preparar el cambio.",
+     "itemReservedWithoutPayment": "Reservada sin pago",
+     "itemReservedWithoutPaymentWarning": "Esta prenda esta reservada sin pago. Puedes ponerla al aire bajo criterio operativo.",
+     "itemNotAvailableSold": "No disponible: vendida",
+diff --git a/locales/fr/common.json b/locales/fr/common.json
+index da07489..c807d4d 100644
+--- a/locales/fr/common.json
++++ b/locales/fr/common.json
+@@ -633,6 +633,8 @@
+     "preparedItemRemovedTitle": "Préparé article élément",
+     "preparedItemRemovedMessage": "Préparé article élément",
+     "itemFilterAvailable": "Disponibles",
++    "activeItemSelectorOnAirBadge": "A l'antenne maintenant",
++    "activeItemSelectorOnAirHelp": "Deja a l'antenne. Il reste disponible pour mise de cote, mais choisissez un autre article pour preparer le changement.",
+     "itemFilterReserved": "Reservees",
+     "itemFilterUnavailable": "Vendues / indisponibles",
+     "itemFilterAll": "Toutes",
+diff --git a/locales/ja/common.json b/locales/ja/common.json
+index 3146432..32f7c43 100644
+--- a/locales/ja/common.json
++++ b/locales/ja/common.json
+@@ -269,6 +269,8 @@
+     "priceConfirmedForReservation": "取り置き確認価格: {{price}}",
+     "itemNotAvailableForReservation": "商品 項目 利用可能 取り置き",
+     "itemFree": "商品 無料",
++    "activeItemSelectorOnAirBadge": "現在オンエア中",
++    "activeItemSelectorOnAirHelp": "すでにオンエア中です。取り置きは可能ですが、切り替え準備には別の商品を選択してください。",
+     "itemReservedWithoutPayment": "商品 取り置き済み なし 支払い",
+     "itemReservedWithoutPaymentWarning": "商品 取り置き済み なし 支払い 警告",
+     "itemNotAvailableSold": "商品 項目 利用可能 販売済み",
+diff --git a/locales/ko/common.json b/locales/ko/common.json
+index f9e6f63..d2373e2 100644
+--- a/locales/ko/common.json
++++ b/locales/ko/common.json
+@@ -269,6 +269,8 @@
+     "priceConfirmedForReservation": "홀드 확정 가격: {{price}}",
+     "itemNotAvailableForReservation": "상품 항목 사용 가능 홀드",
+     "itemFree": "상품 무료",
++    "activeItemSelectorOnAirBadge": "현재 방송 중",
++    "activeItemSelectorOnAirHelp": "이미 방송 중입니다. 홀드는 가능하지만 전환 준비에는 다른 상품을 선택하세요.",
+     "itemReservedWithoutPayment": "상품 홀드됨 없음 결제",
+     "itemReservedWithoutPaymentWarning": "상품 홀드됨 없음 결제 경고",
+     "itemNotAvailableSold": "상품 항목 사용 가능 판매됨",
+diff --git a/locales/pt-BR/common.json b/locales/pt-BR/common.json
+index 29bd9da..e818304 100644
+--- a/locales/pt-BR/common.json
++++ b/locales/pt-BR/common.json
+@@ -633,6 +633,8 @@
+     "preparedItemRemovedTitle": "Preparado peça campo",
+     "preparedItemRemovedMessage": "Preparado peça campo",
+     "itemFilterAvailable": "Disponiveis",
++    "activeItemSelectorOnAirBadge": "No ar agora",
++    "activeItemSelectorOnAirHelp": "Ja esta no ar. Continua disponivel para apartado, mas escolha outra peca para preparar a troca.",
+     "itemFilterReserved": "Reservadas",
+     "itemFilterUnavailable": "Vendidas / indisponiveis",
+     "itemFilterAll": "Todas",
+diff --git a/locales/zh/common.json b/locales/zh/common.json
+index e81de44..f6f74ed 100644
+--- a/locales/zh/common.json
++++ b/locales/zh/common.json
+@@ -269,6 +269,8 @@
+     "priceConfirmedForReservation": "预留确认价格：{{price}}",
+     "itemNotAvailableForReservation": "商品项目可用预留",
+     "itemFree": "商品免费",
++    "activeItemSelectorOnAirBadge": "当前直播中",
++    "activeItemSelectorOnAirHelp": "该商品已在直播中。仍可用于预留，但请选另一件商品准备切换。",
+     "itemReservedWithoutPayment": "商品已预留无付款",
+     "itemReservedWithoutPaymentWarning": "商品已预留无付款警告",
+     "itemNotAvailableSold": "商品项目可用已售",
+diff --git a/qa-reports/ITEM-Z4-live-active-item-ux-consistency-report-20260609-135404.md b/qa-reports/ITEM-Z4-live-active-item-ux-consistency-report-20260609-135404.md
+new file mode 100644
+index 0000000..a7d8a36
+--- /dev/null
++++ b/qa-reports/ITEM-Z4-live-active-item-ux-consistency-report-20260609-135404.md
+@@ -0,0 +1,104 @@
++# ITEM-Z4 - Live active item UX consistency report
++
++Fecha: 2026-06-09 13:54:04
++Rama: `feature/item-z4-live-active-item-ux-consistency`
++Resultado: `GO_TECNICO` / `PENDING_QA_VISUAL`
++
++## Objetivo
++
++Corregir la confusion visual donde una prenda actualmente al aire seguia apareciendo en el selector LIVE solamente como `Libre`.
++
++## Historial previo validado
++
++Comandos ejecutados:
++
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z1"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z2"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z3A"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z3B"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-PERM-A1"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-PERM-A2"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-PERM-A3"`
++
++Commits confirmados:
++
++- `6aa2eda ITEM-Z1 documenta handoff inventario live`
++- `80a8aa1 ITEM-Z2 valida elegibilidad de prenda live`
++- `5748040 ITEM-Z3A documenta handoff atomicidad reservas`
++- `92e937a ITEM-Z3B protege reserva atomica`
++- `5f5cf4d LIVE-PERM-A1 agrega permisos live minimos`
++- `4975138 LIVE-PERM-A1B corrige dependencias de permisos live`
++- `6c757c9 LIVE-PERM-A1 documenta cierre final`
++- `5c7aced LIVE-PERM-A2 ajusta capacidades live por rol`
++- `c818cb1 LIVE-PERM-A3 documenta smoke visual por rol`
++
++## Archivos tocados
++
++- `app/live.tsx`
++- `components/ui/AppOptionRow.tsx`
++- `locales/es/common.json`
++- `locales/en/common.json`
++- `locales/pt-BR/common.json`
++- `locales/fr/common.json`
++- `locales/ja/common.json`
++- `locales/zh/common.json`
++- `locales/ko/common.json`
++- `docs/ITEM_Z4_LIVE_ACTIVE_ITEM_UX_CONSISTENCY.md`
++- `docs/ERP_RIESGOS_OPERATIVOS.md`
++- `docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md`
++- `docs/ERP_BITACORA_CAMBIOS.md`
++
++## Implementacion
++
++- El selector de prendas LIVE detecta si `item.id === activeItem.id`.
++- La fila de esa prenda muestra un panel `Actualmente al aire`.
++- El panel aclara que la prenda sigue disponible para apartado, pero debe elegirse otra para preparar cambio.
++- La fila queda deshabilitada para evitar preparar la misma prenda como reemplazo de si misma.
++- `AppOptionRow` agrega soporte opcional `disabled`.
++- Se agrego microcopy i18n en ES/EN/PT-BR/FR/JA/ZH/KO.
++
++## Confirmacion de alcance
++
++No se tocaron:
++
++- backend;
++- inventario real;
++- `items.status`;
++- migraciones;
++- endpoints;
++- permisos;
++- RBAC;
++- pagos;
++- caja;
++- precio LIVE;
++- devoluciones;
++- autorizaciones;
++- venta financiera.
++
++## Validaciones ejecutadas
++
++- PASS: JSON parse de locales ES/EN/PT-BR/FR/JA/ZH/KO.
++- PASS: `npm.cmd run lint`
++  - 0 errores.
++  - 53 warnings historicos fuera de alcance.
++- PASS: `npx.cmd tsc --noEmit`
++- PASS: `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`
++
++Maven no se ejecuto porque no se tocaron backend ni migraciones.
++
++## Checklist visual pendiente
++
++1. Abrir `/live`.
++2. Tener una prenda al aire.
++3. Abrir `Seleccionar prenda`.
++4. Confirmar que la prenda al aire no aparece solo como `Libre`.
++5. Confirmar badge/panel `Actualmente al aire`.
++6. Confirmar texto de ayuda sobre apartado y cambio.
++7. Confirmar que la fila no permite seleccionarse como reemplazo de si misma.
++8. Confirmar que `items.status` no cambia solo por estar al aire.
++
++## GO/NO-GO
++
++- `GO_TECNICO`: validaciones frontend pasan.
++- `PENDING_QA_VISUAL`: falta evidencia real en navegador/capturas.
++- `NO_GO`: no aplica en esta corrida.
