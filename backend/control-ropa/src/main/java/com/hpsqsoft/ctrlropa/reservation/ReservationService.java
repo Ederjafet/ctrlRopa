@@ -173,6 +173,18 @@ public class ReservationService {
             throw new IllegalArgumentException("El item ya tiene una reserva activa");
         }
 
+        int reservedRows = itemRepository.reserveIfAvailable(
+                item.getCompany().getId(),
+                item.getBranch().getId(),
+                item.getId(),
+                ItemStatus.AVAILABLE,
+                ItemStatus.RESERVED
+        );
+
+        if (reservedRows != 1) {
+            throw new IllegalArgumentException("La prenda ya no esta disponible para apartar");
+        }
+
         BigDecimal effectivePrice = request.getPrice();
 
         if (effectivePrice == null) {
@@ -184,7 +196,9 @@ public class ReservationService {
         }
 
         if (request.getPrice() != null) {
+            item.setStatus(ItemStatus.RESERVED);
             item.setPrice(request.getPrice());
+            itemRepository.save(item);
         }
 
         Reservation entity = new Reservation();
@@ -202,9 +216,6 @@ public class ReservationService {
             entity.setLiveOperationalStatusUpdatedAt(LocalDateTime.now());
             entity.setLiveOperationalStatusUpdatedByUserId(userId);
         }
-
-        item.setStatus(ItemStatus.RESERVED);
-        itemRepository.save(item);
 
         Reservation saved = repository.save(entity);
 
