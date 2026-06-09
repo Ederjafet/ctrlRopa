@@ -1,0 +1,505 @@
+diff --git a/docs/LIVE_AUTH_A_OPERATIONAL_AUTHORIZATION_DESIGN.md b/docs/LIVE_AUTH_A_OPERATIONAL_AUTHORIZATION_DESIGN.md
+new file mode 100644
+index 0000000..4cd1c7d
+--- /dev/null
++++ b/docs/LIVE_AUTH_A_OPERATIONAL_AUTHORIZATION_DESIGN.md
+@@ -0,0 +1,339 @@
++# LIVE-AUTH-A - Diseno de autorizaciones operativas LIVE
++
++## 1. Resumen ejecutivo
++
++LIVE-AUTH-A define un modelo general para autorizaciones operativas en LIVE, apartados e inventario bloqueado. Esta fase no implementa codigo, endpoints, migraciones ni cambios de permisos. El objetivo es evitar que futuras fases resuelvan cada bloqueo con excepciones locales y, en su lugar, usen un contrato uniforme, auditable y tenant-aware.
++
++Resultado de diseno:
++
++- Usar una entidad generica `operational_authorization_requests`.
++- Mantener acciones sensibles bloqueadas si no hay autorizacion real.
++- Separar actor visual de permiso/capacidad efectiva.
++- Usar aprobadores por permiso como MVP.
++- Evaluar tabla de jerarquia empleado-supervisor como mejora si negocio requiere rutas por supervisor directo.
++
++Estado recomendado: `DESIGN_READY / PENDING_ARCH_REVIEW`.
++
++## 2. Problemas detectados por QA
++
++QA encontro casos donde la UI no debe ejecutar libremente una accion operativa:
++
++- Una prenda ya apartada no puede apartarse otra vez.
++- Liberar una prenda apartada requiere autorizacion o flujo formal.
++- Cancelar o deshacer cierre LIVE de un apartado con pago requiere autorizacion y reversa controlada.
++- Cambio de precio LIVE no debe simular autorizacion si no hay backend real.
++- Vendedor/operador/supervisor deben ver acciones segun permisos reales, no solo por actor.
++
++Estos casos mezclan inventario, apartados, LIVE, pagos, caja y permisos. Por eso cualquier implementacion debe pasar por aprobacion arquitectonica antes de tocar backend.
++
++## 3. Casos que requieren autorizacion
++
++| Caso | Regla propuesta | Comentario |
++| --- | --- | --- |
++| Liberar prenda apartada | Requiere autorizacion | Debe validar que no tenga pago y que no exista venta/caja asociada. |
++| Cancelar apartado sin pago | Puede ejecutarse con permiso `CANCEL_RESERVATION` y motivo obligatorio | No requiere aprobacion adicional si no hay pago ni estado cerrado. |
++| Cancelar apartado con pago | Requiere autorizacion y flujo formal de reversa | No debe tocar caja sin contrato de pagos/reversa. |
++| Deshacer cierre de venta LIVE sin pago | Puede ejecutarse con permiso operativo si no hay pago | Requiere auditoria y motivo. |
++| Deshacer cierre de venta LIVE con pago | Requiere autorizacion y flujo formal de reversa | Bloquear si no hay backend real de autorizacion/reversa. |
++| Cambiar precio LIVE | Requiere autorizacion real o permiso dedicado | No mostrar solicitud pendiente si no existe backend. |
++| Reasignar apartado a otro cliente | Requiere autorizacion | Impacta trazabilidad de cliente, reportes y posibles pagos. |
++| Editar prenda relacionada con apartado o venta operativa | Requiere autorizacion | Debe bloquear campos sensibles si hay venta/pago. |
++| Vendedor prepara prenda sin controlar prenda al aire | Requiere permiso granular futuro | No conceder por actor; disenar `PREPARE_LIVE_ITEM` o equivalente. |
++
++## 4. Modelo de empleados y supervisores
++
++### Estado actual observado
++
++- La sesion frontend tiene `userId`, `companyId`, `branchId`, `roles`, `channels` y `effectivePermissions`.
++- El backend usa relaciones `user_companies` y `user_branches`.
++- La administracion de usuarios permite `branchId` principal y `branchIds`.
++- Existen roles como `ADMIN`, `SUPERVISOR`, `SELLER`, `QA_TENANT_ADMIN` y `QA_TENANT_SELLER`.
++- No se encontro una relacion explicita de supervisor directo por empleado en el contrato frontend actual.
++
++### Respuestas de arquitectura
++
++| Pregunta | Respuesta actual | Decision sugerida |
++| --- | --- | --- |
++| Existe relacion usuario-sucursal/company? | Si, por sesion y tablas `user_companies` / `user_branches`. | Usarla como scope obligatorio. |
++| Existe supervisor asignado? | No confirmado. | No depender de supervisor directo en MVP. |
++| Existe rol suficiente para aprobar? | Existen roles/permisos efectivos. | Aprobar por permiso dedicado, no solo por rol. |
++| Hace falta tabla de jerarquia? | Para aprobacion por jefe directo, si. | MVP con permisos; fase futura para jerarquia. |
++
++### Jerarquia futura sugerida
++
++Si negocio requiere supervisor directo, agregar una relacion separada, por ejemplo:
++
++`employee_supervisor_assignments`
++
++Campos sugeridos:
++
++- `id`
++- `employee_user_id`
++- `supervisor_user_id`
++- `company_id`
++- `branch_id`
++- `status`
++- `valid_from`
++- `valid_until`
++- `created_at`
++- `updated_at`
++
++Regla: aun con supervisor directo, el aprobador debe tener permiso efectivo para aprobar el tipo de solicitud.
++
++## 5. Modelo de autorizacion propuesto
++
++Entidad sugerida:
++
++`operational_authorization_requests`
++
++Campos minimos:
++
++| Campo | Tipo sugerido | Uso |
++| --- | --- | --- |
++| `id` | bigint | Identificador. |
++| `request_type` | varchar/enum | Tipo de solicitud. |
++| `status` | varchar/enum | Estado actual. |
++| `requested_by_user_id` | bigint | Solicitante. |
++| `requested_at` | datetime | Fecha de solicitud. |
++| `approved_by_user_id` | bigint nullable | Aprobador. |
++| `decided_at` | datetime nullable | Fecha de decision. |
++| `reason` | text | Motivo del solicitante. |
++| `decision_reason` | text nullable | Motivo de aprobacion/rechazo. |
++| `target_type` | varchar | `ITEM`, `RESERVATION`, `LIVE`, etc. |
++| `target_id` | bigint | Recurso principal. |
++| `live_id` | bigint nullable | LIVE relacionado. |
++| `item_id` | bigint nullable | Prenda relacionada. |
++| `reservation_id` | bigint nullable | Apartado relacionado. |
++| `current_state` | varchar/json | Estado antes de solicitar. |
++| `requested_state` | varchar/json | Estado esperado. |
++| `payload_json` | json | Datos especificos y snapshot seguro. |
++| `expires_at` | datetime | Vencimiento. |
++| `company_id` | bigint | Tenant. |
++| `branch_id` | bigint | Sucursal. |
++| `created_at` | datetime | Auditoria. |
++| `updated_at` | datetime | Auditoria. |
++
++Estados:
++
++- `PENDING`
++- `APPROVED`
++- `REJECTED`
++- `EXPIRED`
++- `CANCELLED`
++- `APPLIED`
++
++Tipos:
++
++- `RELEASE_RESERVED_ITEM`
++- `CANCEL_RESERVATION_WITH_PAYMENT`
++- `UNDO_LIVE_SALE_WITH_PAYMENT`
++- `LIVE_PRICE_CHANGE`
++- `REASSIGN_RESERVATION`
++- `EDIT_LOCKED_ITEM`
++- `PREPARE_LIVE_ITEM_AS_SELLER`
++
++## 6. Reglas de negocio
++
++### Acciones sin autorizacion adicional
++
++- Apartar prenda disponible con permiso operativo.
++- Cancelar apartado sin pago con `CANCEL_RESERVATION` y motivo obligatorio.
++- Deshacer cierre LIVE sin pago si el usuario tiene capacidad operativa y el estado lo permite.
++- Ver detalle, consultar estado y refrescar informacion.
++
++### Acciones con autorizacion
++
++- Liberar prenda apartada.
++- Cancelar apartado con pago.
++- Deshacer cierre LIVE con pago.
++- Cambiar precio LIVE si el usuario no tiene permiso dedicado.
++- Reasignar apartado a otro cliente.
++- Editar prenda bloqueada por apartado, venta operativa o pago.
++- Permitir a vendedor preparar prenda sin controlar la prenda al aire.
++
++### Acciones bloqueadas completamente
++
++- Modificar prenda vendida sin flujo formal de devolucion/reversa.
++- Cancelar pago o caja desde LIVE.
++- Aplicar autorizacion vencida, rechazada o de otra sucursal/company.
++- Aprobar una solicitud con target que ya cambio de estado y no coincide con `current_state`.
++
++### Pago registrado
++
++Si hay pago mayor a cero:
++
++- No cancelar directamente.
++- No deshacer cierre LIVE directamente.
++- No liberar inventario sin reversa formal.
++- Requerir autorizacion y contrato de reversa.
++
++Si el frontend/backend no puede confirmar pago:
++
++- No asumir que no hay pago.
++- Bloquear o pedir revision hasta obtener estado confiable.
++
++### Doble solicitud pendiente
++
++Para el mismo `request_type + target_type + target_id`:
++
++- No crear duplicado si ya existe `PENDING`.
++- Mostrar solicitud existente y su estado.
++- Permitir cancelar la propia solicitud si sigue `PENDING`.
++
++### Solicitante y aprobador
++
++- El mismo usuario no debe aprobar su propia solicitud.
++- Admin global/tenant puede aprobar solo si tiene permiso dedicado y misma company/branch o scope permitido.
++- Supervisor por rol no basta si no tiene permiso de aprobacion.
++
++### Auditoria obligatoria
++
++Registrar eventos para:
++
++- Solicitud creada.
++- Solicitud aprobada.
++- Solicitud rechazada.
++- Solicitud vencida.
++- Solicitud cancelada.
++- Solicitud aplicada.
++- Intento de aplicar solicitud invalida.
++- Intento cross-tenant/cross-branch.
++
++## 7. Permisos sugeridos
++
++Permisos futuros posibles:
++
++- `REQUEST_LIVE_OPERATION_AUTHORIZATION`
++- `APPROVE_LIVE_OPERATION_AUTHORIZATION`
++- `APPROVE_RELEASE_RESERVED_ITEM`
++- `APPROVE_RESERVATION_PAYMENT_REVERSAL`
++- `APPROVE_LIVE_PRICE_CHANGE`
++- `APPROVE_REASSIGN_RESERVATION`
++- `APPROVE_EDIT_LOCKED_ITEM`
++- `PREPARE_LIVE_ITEM`
++
++Regla: los permisos finos deben mapearse en backend, frontend y QA. No deben habilitarse solo por nombre de rol.
++
++## 8. Endpoints sugeridos
++
++No se implementan en esta fase. Propuesta para fase futura:
++
++| Metodo | Ruta | Uso |
++| --- | --- | --- |
++| `POST` | `/api/operational-authorizations` | Crear solicitud. |
++| `GET` | `/api/operational-authorizations/pending` | Cola de aprobador por tenant/branch/permisos. |
++| `GET` | `/api/operational-authorizations/my-requests` | Solicitudes del usuario. |
++| `GET` | `/api/operational-authorizations/{id}` | Detalle con snapshot. |
++| `PATCH` | `/api/operational-authorizations/{id}/approve` | Aprobar. |
++| `PATCH` | `/api/operational-authorizations/{id}/reject` | Rechazar. |
++| `PATCH` | `/api/operational-authorizations/{id}/cancel` | Cancelar solicitud pendiente. |
++| `POST` | `/api/operational-authorizations/{id}/apply` | Aplicar accion aprobada con revalidacion. |
++
++Requisitos de endpoints:
++
++- Validar sesion, company y branch.
++- Validar permiso del solicitante.
++- Validar permiso del aprobador.
++- Revalidar estado del recurso antes de aplicar.
++- No tocar pagos/caja salvo contrato especifico aprobado.
++
++## 9. Eventos de auditoria
++
++Eventos sugeridos:
++
++- `LIVE_AUTH_REQUEST_CREATED`
++- `LIVE_AUTH_REQUEST_APPROVED`
++- `LIVE_AUTH_REQUEST_REJECTED`
++- `LIVE_AUTH_REQUEST_CANCELLED`
++- `LIVE_AUTH_REQUEST_EXPIRED`
++- `LIVE_AUTH_REQUEST_APPLIED`
++- `LIVE_AUTH_REQUEST_APPLY_DENIED`
++- `LIVE_AUTH_CROSS_TENANT_DENIED`
++- `LIVE_AUTH_PAYMENT_GUARD_BLOCKED`
++- `LIVE_AUTH_DUPLICATE_PENDING_BLOCKED`
++
++Cada evento debe incluir:
++
++- `request_id`
++- `request_type`
++- `target_type`
++- `target_id`
++- `requested_by_user_id`
++- `approved_by_user_id` si aplica
++- `company_id`
++- `branch_id`
++- `live_id`, `item_id`, `reservation_id` si aplican
++- resultado y motivo
++
++## 10. UX por rol
++
++### Solicitante
++
++- Si la accion requiere autorizacion, mostrar `Solicitar autorizacion`.
++- Motivo obligatorio.
++- Mostrar impacto: prenda, cliente, apartado, pago, precio actual/nuevo.
++- Mostrar estado: pendiente, aprobada, rechazada, vencida.
++- Si no hay flujo real, mostrar mensaje honesto y no simular pendiente.
++
++### Supervisor/Admin aprobador
++
++- Cola de solicitudes pendientes.
++- Filtros por sucursal, tipo, prioridad y antiguedad.
++- Ver snapshot antes/despues.
++- Ver pago registrado y saldo si aplica.
++- Aprobar/rechazar con motivo.
++- No aprobar solicitud propia.
++
++### Vendedor
++
++- Ver acciones permitidas por permisos reales.
++- Si no puede controlar prenda al aire, explicar bloqueo.
++- Si se define permiso futuro, permitir preparar prenda sin ponerla al aire solo con `PREPARE_LIVE_ITEM`.
++
++## 11. Riesgos
++
++| Riesgo | Impacto | Mitigacion |
++| --- | --- | --- |
++| Autorizar sin revalidar estado | Inventario o pago inconsistente | Revalidar antes de aplicar. |
++| Aprobador sin scope correcto | Cross-branch/tenant | Validar company/branch y permisos. |
++| Misma persona solicita y aprueba | Control interno debil | Bloquear self-approval. |
++| Duplicar solicitudes pendientes | Confusion operativa | Unicidad logica por target/tipo. |
++| Reversa con pago sin caja | Riesgo financiero | Bloquear hasta contrato formal. |
++| Permisos por rol visual | Acciones indebidas | Usar permisos efectivos. |
++
++## 12. Decisiones pendientes
++
++- Confirmar si el MVP aprueba por permisos o por supervisor directo.
++- Definir si se necesita tabla de jerarquia empleado-supervisor.
++- Definir permisos exactos y roles que los recibirian.
++- Definir TTL por tipo de solicitud.
++- Definir si `APPROVED` aplica automaticamente o requiere `APPLIED` manual.
++- Definir contratos de reversa para pagos/caja antes de permitir cancelaciones con pago.
++- Definir si vendedor puede preparar prendas sin controlar prenda al aire.
++
++## 13. Fases futuras
++
++| Fase | Objetivo | Sensibilidad |
++| --- | --- | --- |
++| LIVE-AUTH-B | Contrato backend y migracion de autorizaciones operativas | Alta |
++| LIVE-AUTH-C | UI de solicitud y cola de aprobacion | Media/alta |
++| LIVE-PAYMENT-GUARD-A | Reversa autorizada de apartados con pago | Critica |
++| LIVE-Z10B | Autorizacion real de cambio de precio LIVE | Alta |
++| LIVE-ROLE-A | Permiso granular para vendedor preparando prendas | Alta |
++| AUTH-LIVE-PERMISSIONS-A | Matriz final de permisos LIVE finos | Alta |
++
++## 14. Criterio GO/NO-GO
++
++GO para:
++
++- Usar este documento como base de revision arquitectonica.
++- Mantener bloqueos honestos en UI mientras no exista backend.
++- Preparar handoff para fases futuras.
++
++NO-GO para:
++
++- Implementar endpoints sin aprobacion arquitectonica.
++- Tocar pagos/caja desde LIVE sin contrato formal.
++- Simular solicitudes pendientes.
++- Aprobar por rol visual sin permiso efectivo.
++- Permitir reversa/cancelacion con pago sin auditoria y revalidacion.
+diff --git a/docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md b/docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md
+index 83f09e0..816638f 100644
+--- a/docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md
++++ b/docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md
+@@ -43,6 +43,7 @@
+ | D4R-040 | LIVE operador / pagos | `qa.admin@local.test` | `/live` | Cancelar apartado bloqueado con pago | Apartado LIVE con pago registrado | Presionar `Cancelar apartado` | No cancela silenciosamente; muestra autorizacion requerida y flujo no disponible | Pendiente | PENDING_QA | S1 | Pendiente | Pendiente |
+ | D4R-041 | LIVE operador / pagos | `qa.admin@local.test` | `/live` | Jerarquia visual de acciones LIVE | Apartado con acciones `Ver detalle`, `Cerrar como venta LIVE`, `Deshacer cierre de venta LIVE`, `Cancelar apartado` | Revisar botones en light/dark y mobile/tablet | `Ver detalle` es neutral, `Cerrar como venta LIVE` es primary, `Deshacer cierre` es warning/reversa y `Cancelar apartado` es danger/destructiva | Pendiente | PENDING_QA | S2 | Pendiente | Pendiente |
+ | D4R-042 | LIVE vendedor / permisos | `qa.vendedor.centro@local.test` | `/live` | Actor vendedor usa permisos reales | Vendedor centro con permisos actuales | Revisar acciones de buscar, escanear, crear, poner al aire, cambiar prenda y apartar | No se habilita ninguna accion sin permiso real; las acciones bloqueadas muestran feedback o no se presentan como boton mudo; si se requiere preparar sin controlar prenda, se documenta `LIVE-ROLE-A` | Pendiente | PENDING_QA | S1 | Pendiente | Pendiente |
++| D4R-043 | Arquitectura LIVE | Arquitectura | Docs | Revision LIVE-AUTH-A | Documento `LIVE_AUTH_A_OPERATIONAL_AUTHORIZATION_DESIGN.md` creado | Revisar casos, permisos, endpoints sugeridos, eventos y modelo supervisor/aprobador | Arquitectura entrega GO/NO-GO o ajustes; no marca implementacion funcional | Pendiente | PENDING_ARCH_REVIEW | S1 | Pendiente | Pendiente |
+ | D4R-017 | Apartados / reservas | `qa.admin@local.test` | `/reservations` | Apartados visibles y navegables | Apartados existentes | Abrir listado y detalle si aplica | Datos visibles, AppShell correcto, sin layout legacy | Pendiente | PENDING_QA | S2 | Pendiente | Pendiente |
+ | D4R-018 | UI Kit / diseno visual | `qa.admin@local.test` | `/ui-kit` | Revisar diseno visual | Admin logueado | Abrir editor visual | Flujo guiado visible; modo avanzado no satura; preview correcta | Pendiente | PENDING_QA | S3 | Pendiente | Pendiente |
+ | D4R-019 | UI Kit / diseno visual | `qa.admin@local.test` | `/ui-kit` | Cambiar/restaurar tema local | Admin logueado | Cambiar colores marca; aplicar; restaurar plantilla | Preview cambia; app refleja tema; restaurar vuelve al preset | Pendiente | PENDING_QA | S3 | Pendiente | Pendiente |
+diff --git a/docs/PROJECT_BACKLOG_PRIORITIZED.md b/docs/PROJECT_BACKLOG_PRIORITIZED.md
+index 960d83b..620cd59 100644
+--- a/docs/PROJECT_BACKLOG_PRIORITIZED.md
++++ b/docs/PROJECT_BACKLOG_PRIORITIZED.md
+@@ -18,6 +18,7 @@ No se debe cerrar un pendiente sin evidencia, validaciones y commit de fase.
+ | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+ | P0 | QA | Corrida QA manual real con evidencia | PRODUCT-D4 | Sin QA formal no hay release confiable | S1 | PRODUCT-D4 REAL | Plan, matriz y plantilla listos; ejecutar casos con evidencia y registrar PASS/FAIL/BLOCKED | READY_FOR_QA |
+ | P0 | Gobierno | Compuerta arquitectura para backlog autonomo | PROJECT-GOV-B | Evita ejecucion autonoma de cambios sensibles sin revision | S1 | PROJECT-GOV-B1 | Runbook actualizado; siguientes corridas deben detenerse y entregar handoff si el bloque es sensible | DONE_TECH |
++| P0 | LIVE / autorizaciones | Diseno autorizaciones operativas LIVE | LIVE-FIX-A QA / LIVE-Z10A | Varias acciones requieren aprobacion formal antes de ejecutarse | S1 | LIVE-AUTH-A | Documento de arquitectura creado; revisar modelo, permisos, endpoints y reglas antes de implementar | DESIGN_READY |
+ | P0 | LIVE | Autorizacion real de cambio de precio | LIVE-Z10A | Vendedor no puede solicitar aprobacion dentro del sistema | S1 | LIVE-Z10B | Backend + UI real de solicitud/aprobacion/auditoria o decision producto firmada | PENDING_DECISION |
+ | P0 | LIVE / pagos | Autorizacion de reversa para apartados con pago | LIVE-FIX-A QA | Cancelar o deshacer apartados con pago requiere flujo formal; LIVE-FIX-A solo bloquea frontend sin simular autorizacion | S1 | LIVE-PAYMENT-GUARD-A | Definir contrato backend/permisos/auditoria para reversa autorizada de apartados con pago; no tocar caja sin aprobacion arquitectonica | PENDING_DECISION |
+ | P1 | LIVE / roles | Capacidades del vendedor para preparar prendas sin controlar prenda al aire | LIVE-FIX-A QA | Vendedor centro puede requerir preparar prendas, pero hoy preparar/poner al aire depende de capacidades reales de control LIVE/inventario | S2 | LIVE-ROLE-A | Definir permiso granular, UX, contrato y QA para preparar prendas sin conceder control completo de prenda al aire | PENDING_DECISION |
+@@ -40,6 +41,8 @@ No se debe cerrar un pendiente sin evidencia, validaciones y commit de fase.
+ ## Reglas de cierre de backlog
+
+ - `DONE_TECH`: implementado, validaciones tecnicas pasan, commit existe.
++- `DESIGN_READY`: documento de arquitectura listo; no implica implementacion funcional.
++- `PENDING_ARCH_REVIEW`: pendiente de aprobacion/revision arquitectonica.
+ - `READY_FOR_QA`: material de ejecucion preparado; falta QA humano.
+ - `DEV_VALIDATED`: nota operativa de entorno DEV; no equivale a `QA_PASS`.
+ - `PENDING_QA_RESULTS`: esperando resultados reales para decidir fase correctiva.
+@@ -54,6 +57,7 @@ No se debe cerrar un pendiente sin evidencia, validaciones y commit de fase.
+ - No mezclar LIVE-Z10B con pagos/caja.
+ - No mezclar LIVE-PAYMENT-GUARD-A con cambio de precio ni con caja/pagos sin handoff de arquitectura.
+ - No mezclar LIVE-ROLE-A con RBAC/backend sin aprobacion arquitectonica; primero definir permiso granular.
++- No implementar LIVE-AUTH-B/C sin revisar y aprobar LIVE-AUTH-A.
+ - No mezclar PRODUCT-C3 con cambios visuales de /ui-kit.
+ - No mezclar LIVE-REF-A con cambios funcionales LIVE.
+ - No mezclar PRODUCT-D4 REAL con fixes; si QA falla, abrir fase correctiva puntual.
+diff --git a/docs/PROJECT_MASTER_STATUS.md b/docs/PROJECT_MASTER_STATUS.md
+index 19f9aaf..648e2a8 100644
+--- a/docs/PROJECT_MASTER_STATUS.md
++++ b/docs/PROJECT_MASTER_STATUS.md
+@@ -16,6 +16,7 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
+
+ | Fase | Commit | Estado tecnico | Estado QA |
+ | --- | --- | --- | --- |
++| LIVE-AUTH-A | pendiente commit | DESIGN_READY | PENDING_ARCH_REVIEW |
+ | PRODUCT-D4 REAL | commit PRODUCT-D4 REAL | READY_FOR_QA | PENDING_QA |
+ | PROJECT-GOV-C | `a772390` | DONE_TECH | PENDING_QA |
+ | PROJECT-GOV-B1 | commit PROJECT-GOV-B1 | DONE_TECH | PENDING_QA |
+@@ -36,7 +37,7 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
+ | Bloque | Estado tecnico | Estado QA | Comentario |
+ | --- | --- | --- | --- |
+ | AUTH | DONE_TECH | QA_PASS | Hay smokes y reportes AUTH con resultados automatizados; mantener QA manual de roles y regresion. |
+-| LIVE | DONE_TECH | PENDING_QA | LIVE-Z0 a LIVE-Z10A estan documentados; falta corrida manual multiusuario/multidispositivo completa. |
++| LIVE | DONE_TECH / DESIGN_READY | PENDING_QA / PENDING_ARCH_REVIEW | LIVE-Z0 a LIVE-Z10A estan documentados; LIVE-AUTH-A disena autorizaciones operativas sin implementar codigo. Falta corrida manual multiusuario/multidispositivo completa. |
+ | PRODUCT-C / Diseno | DONE_TECH | PENDING_QA | Sistema visual, UI Kit y editor de marca cerrados tecnicamente; falta validacion visual formal. |
+ | PRODUCT-D / QA visual | READY_FOR_QA | PENDING_QA | PRODUCT-D4 REAL prepara plan, matriz y plantilla; ejecucion humana con evidencia sigue pendiente. |
+ | I18N | DONE_TECH | PENDING_QA | Soporte multidioma base y limpieza de claves; falta revision humana/nativa. |
+@@ -60,6 +61,7 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
+ | LIVE-Z9I.1 | Layout responsive acciones tarjetas LIVE | `feature/live-z9i-1-card-action-layout` | `6a4b26c` | DONE_TECH | PENDING_QA | Validar desktop/tablet/mobile. |
+ | LIVE-Z9J | Sincronizacion apartados operador/admin | `feature/live-z9j-operator-reservation-sync` | `f92aa24` | DONE_TECH | PENDING_QA | Vendedor crea apartado y operador lo ve sin salir. |
+ | LIVE-Z10A | Auditoria autorizacion precio LIVE | `feature/live-z10a-price-authorization-audit` | `61b7ba8` | DONE_TECH | PENDING_QA | Validar que no hay solicitud pendiente simulada. |
++| LIVE-AUTH-A | Diseno autorizaciones operativas LIVE | `feature/live-auth-a-operational-authorization-design` | pendiente commit | DESIGN_READY | PENDING_ARCH_REVIEW | Arquitectura debe revisar modelo, permisos, endpoints sugeridos y jerarquia empleado-supervisor antes de implementar. |
+ | PRODUCT-C/C1 | Sistema visual premium global | varias | varios | DONE_TECH | PENDING_QA | Validar light/dark/presets en rutas principales. |
+ | PRODUCT-C2.1-C2.6 | Editor visual, paletas, contraste y marca | varias | `31c3a4f` a `39b35fd` | DONE_TECH | PENDING_QA | Validar /ui-kit y /appearance con mobile/tablet. |
+ | PRODUCT-D5/D6.x | Navegacion, AppShell, legacy routes e i18n visible | varias | varios | DONE_TECH | PENDING_QA | Confirmar ausencia de layouts legacy en rutas priorizadas. |
+@@ -85,10 +87,10 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
+ ## Proximas 5 prioridades
+
+ 1. Ejecutar PRODUCT-D4 REAL: corrida QA manual con evidencia.
+-2. LIVE-Z10B: backend real para autorizacion de cambio de precio, o decision de producto formal.
+-3. ITEM-Z1: edicion/correccion segura de prendas capturadas.
+-4. PRODUCT-ERR-B: extender errores accionables a dominios restantes.
+-5. SECURITY-A: hardening CORS/sesion/headers por ambiente.
++2. Revisar LIVE-AUTH-A con arquitectura antes de implementar autorizaciones operativas.
++3. LIVE-Z10B: backend real para autorizacion de cambio de precio, o decision de producto formal.
++4. ITEM-Z1: edicion/correccion segura de prendas capturadas.
++5. PRODUCT-ERR-B: extender errores accionables a dominios restantes.
+
+ ## Riesgos abiertos
+
+@@ -103,7 +105,8 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
+ | Autonomia sin compuerta | Mitigado tecnicamente por PROJECT-GOV-B1; pendiente revision de proceso | PENDING_QA |
+ | Reversa/cancelacion de apartados LIVE con pago | LIVE-FIX-A bloquea acciones sensibles si detecta pago o estado no disponible, pero el flujo real de autorizacion supervisor/backend queda pendiente | PENDING_DECISION |
+ | Capacidades vendedor para preparar prendas | LIVE-FIX-A mantiene permisos efectivos; si vendedor debe preparar sin controlar prenda al aire, abrir `LIVE-ROLE-A` con permiso granular | PENDING_DECISION |
++| Autorizaciones operativas sin contrato backend | LIVE-AUTH-A propone modelo general; cualquier implementacion requiere aprobacion arquitectonica, permisos y auditoria | PENDING_ARCH_REVIEW |
+
+ ## Ultima actualizacion
+
+-2026-06-08, `feature/product-d4-real-manual-qa-evidence`.
++2026-06-08, `feature/live-auth-a-operational-authorization-design`.
+diff --git a/docs/QA_TODO_HANDOFF.md b/docs/QA_TODO_HANDOFF.md
+index e0facfc..b0add71 100644
+--- a/docs/QA_TODO_HANDOFF.md
++++ b/docs/QA_TODO_HANDOFF.md
+@@ -94,6 +94,7 @@ Usar `docs/QA_RESULTS_LOG.md` y la plantilla `qa-reports/manual-evidence/PRODUCT
+ | LIVE-024 | `qa.admin@local.test` | `/live` | Jerarquia visual de acciones de apartado | Comparar `Ver detalle`, `Cerrar como venta LIVE`, `Deshacer cierre de venta LIVE` y `Cancelar apartado` | Las acciones tienen colores/intencion distintos: neutral, primary, warning/reversa y danger | Apartado con acciones visibles | PENDING_QA | Pendiente | Pendiente | S2 |
+ | LIVE-025 | `qa.vendedor.centro@local.test` | `/live` | Vendedor centro no recibe acciones sin permiso | Revisar buscar, escanear, crear, poner al aire, cambiar prenda y apartar | No se habilitan acciones sin permiso real; las acciones bloqueadas muestran feedback o no aparecen como botones mudos | Permisos actuales de vendedor centro | PENDING_QA | Pendiente | Pendiente | S1 |
+ | LIVE-026 | Arquitectura / producto | Backlog | Separar preparar prenda de controlar prenda al aire | Revisar si vendedor debe preparar prendas sin ponerlas al aire | Si negocio lo requiere, abrir `LIVE-ROLE-A`; no resolver dentro de LIVE-FIX-A | Decision producto/arquitectura | PENDING_QA | Pendiente | Pendiente | S2 |
++| LIVE-AUTH-001 | Arquitectura | Docs | Revisar diseno de autorizaciones operativas LIVE | Leer `docs/LIVE_AUTH_A_OPERATIONAL_AUTHORIZATION_DESIGN.md`; revisar casos, permisos, endpoints, eventos y modelo empleado/supervisor | Arquitectura emite GO/NO-GO o ajustes antes de implementar `LIVE-AUTH-B/C`, `LIVE-PAYMENT-GUARD-A`, `LIVE-Z10B` o `LIVE-ROLE-A` | Documento LIVE-AUTH-A | PENDING_ARCH_REVIEW | Pendiente | Pendiente | S1 |
+ | UI-001 | `qa.admin@local.test` | `/ui-kit` | Flujo diseno visual | Abrir editor; revisar pasos visibles | Titulo comunica diseno de aplicacion; tecnico queda avanzado | N/A | PENDING_QA | Pendiente | Pendiente | S3 |
+ | UI-002 | `qa.admin@local.test` | `/ui-kit` | Cambiar colores marca | Cambiar primario/secundario/acento con picker propio | No abre selector nativo como experiencia principal; preview cambia | N/A | PENDING_QA | Pendiente | Pendiente | S3 |
+ | UI-003 | `qa.admin@local.test` | `/ui-kit` | Restaurar plantilla | Aplicar paleta local; restaurar plantilla | Tema vuelve a preset activo | N/A | PENDING_QA | Pendiente | Pendiente | S3 |
+diff --git a/qa-reports/LIVE-AUTH-A-operational-authorization-design-report-20260608-192625.md b/qa-reports/LIVE-AUTH-A-operational-authorization-design-report-20260608-192625.md
+new file mode 100644
+index 0000000..ffbcc7f
+--- /dev/null
++++ b/qa-reports/LIVE-AUTH-A-operational-authorization-design-report-20260608-192625.md
+@@ -0,0 +1,47 @@
++# LIVE-AUTH-A - Reporte de diseno de autorizaciones operativas LIVE
++
++## Alcance
++
++Fase documental de arquitectura. No se modifico codigo funcional, backend, frontend, permisos, pagos, caja, endpoints ni migraciones.
++
++## Documentos creados
++
++- `docs/LIVE_AUTH_A_OPERATIONAL_AUTHORIZATION_DESIGN.md`
++
++## Documentos actualizados
++
++- `docs/PROJECT_MASTER_STATUS.md`
++- `docs/PROJECT_BACKLOG_PRIORITIZED.md`
++- `docs/QA_TODO_HANDOFF.md`
++- `docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md`
++
++## Hallazgos de arquitectura
++
++- La sesion y administracion de usuarios ya exponen usuario, roles, permisos efectivos, company y branch.
++- Existen relaciones `user_companies` y `user_branches`.
++- No se encontro una relacion explicita de supervisor directo en el contrato frontend actual.
++- MVP recomendado: aprobacion por permisos efectivos y scope tenant/branch.
++- Mejora futura: tabla de jerarquia empleado-supervisor si negocio requiere rutas por jefe directo.
++
++## Resultado
++
++- Estado documental: `DESIGN_READY`.
++- Estado de revision: `PENDING_ARCH_REVIEW`.
++- No se marca como implementado.
++- No se marca QA_PASS.
++
++## Validaciones
++
++Ejecutadas:
++
++- `git status`: PASS, cambios documentales esperados.
++- `git --no-pager diff --stat`: PASS.
++- `git --no-pager diff --name-only`: PASS.
++- `git --no-pager diff --check`: PASS, sin errores de whitespace.
++
++No se ejecuta npm/maven porque la fase no toca codigo.
++
++## GO/NO-GO
++
++- GO para revision arquitectonica.
++- NO-GO para implementacion sin aprobacion previa.

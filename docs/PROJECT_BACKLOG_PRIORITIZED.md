@@ -18,6 +18,7 @@ No se debe cerrar un pendiente sin evidencia, validaciones y commit de fase.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | P0 | QA | Corrida QA manual real con evidencia | PRODUCT-D4 | Sin QA formal no hay release confiable | S1 | PRODUCT-D4 REAL | Plan, matriz y plantilla listos; ejecutar casos con evidencia y registrar PASS/FAIL/BLOCKED | READY_FOR_QA |
 | P0 | Gobierno | Compuerta arquitectura para backlog autonomo | PROJECT-GOV-B | Evita ejecucion autonoma de cambios sensibles sin revision | S1 | PROJECT-GOV-B1 | Runbook actualizado; siguientes corridas deben detenerse y entregar handoff si el bloque es sensible | DONE_TECH |
+| P0 | LIVE / autorizaciones | Diseno autorizaciones operativas LIVE | LIVE-FIX-A QA / LIVE-Z10A | Varias acciones requieren aprobacion formal antes de ejecutarse | S1 | LIVE-AUTH-A | Documento de arquitectura creado; revisar modelo, permisos, endpoints y reglas antes de implementar | DESIGN_READY |
 | P0 | LIVE | Autorizacion real de cambio de precio | LIVE-Z10A | Vendedor no puede solicitar aprobacion dentro del sistema | S1 | LIVE-Z10B | Backend + UI real de solicitud/aprobacion/auditoria o decision producto firmada | PENDING_DECISION |
 | P0 | LIVE / pagos | Autorizacion de reversa para apartados con pago | LIVE-FIX-A QA | Cancelar o deshacer apartados con pago requiere flujo formal; LIVE-FIX-A solo bloquea frontend sin simular autorizacion | S1 | LIVE-PAYMENT-GUARD-A | Definir contrato backend/permisos/auditoria para reversa autorizada de apartados con pago; no tocar caja sin aprobacion arquitectonica | PENDING_DECISION |
 | P1 | LIVE / roles | Capacidades del vendedor para preparar prendas sin controlar prenda al aire | LIVE-FIX-A QA | Vendedor centro puede requerir preparar prendas, pero hoy preparar/poner al aire depende de capacidades reales de control LIVE/inventario | S2 | LIVE-ROLE-A | Definir permiso granular, UX, contrato y QA para preparar prendas sin conceder control completo de prenda al aire | PENDING_DECISION |
@@ -40,6 +41,8 @@ No se debe cerrar un pendiente sin evidencia, validaciones y commit de fase.
 ## Reglas de cierre de backlog
 
 - `DONE_TECH`: implementado, validaciones tecnicas pasan, commit existe.
+- `DESIGN_READY`: documento de arquitectura listo; no implica implementacion funcional.
+- `PENDING_ARCH_REVIEW`: pendiente de aprobacion/revision arquitectonica.
 - `READY_FOR_QA`: material de ejecucion preparado; falta QA humano.
 - `DEV_VALIDATED`: nota operativa de entorno DEV; no equivale a `QA_PASS`.
 - `PENDING_QA_RESULTS`: esperando resultados reales para decidir fase correctiva.
@@ -54,6 +57,7 @@ No se debe cerrar un pendiente sin evidencia, validaciones y commit de fase.
 - No mezclar LIVE-Z10B con pagos/caja.
 - No mezclar LIVE-PAYMENT-GUARD-A con cambio de precio ni con caja/pagos sin handoff de arquitectura.
 - No mezclar LIVE-ROLE-A con RBAC/backend sin aprobacion arquitectonica; primero definir permiso granular.
+- No implementar LIVE-AUTH-B/C sin revisar y aprobar LIVE-AUTH-A.
 - No mezclar PRODUCT-C3 con cambios visuales de /ui-kit.
 - No mezclar LIVE-REF-A con cambios funcionales LIVE.
 - No mezclar PRODUCT-D4 REAL con fixes; si QA falla, abrir fase correctiva puntual.
