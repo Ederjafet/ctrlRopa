@@ -16,7 +16,8 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 
 | Fase | Commit | Estado tecnico | Estado QA |
 | --- | --- | --- | --- |
-| LIVE-AUTH-A | pendiente commit | DESIGN_READY | PENDING_ARCH_REVIEW |
+| LIVE-ROLE-A | pendiente commit | DESIGN_READY | PENDING_ARCH_REVIEW |
+| LIVE-AUTH-A | `ca1ed47` | DESIGN_READY | PENDING_ARCH_REVIEW |
 | PRODUCT-D4 REAL | commit PRODUCT-D4 REAL | READY_FOR_QA | PENDING_QA |
 | PROJECT-GOV-C | `a772390` | DONE_TECH | PENDING_QA |
 | PROJECT-GOV-B1 | commit PROJECT-GOV-B1 | DONE_TECH | PENDING_QA |
@@ -37,7 +38,7 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 | Bloque | Estado tecnico | Estado QA | Comentario |
 | --- | --- | --- | --- |
 | AUTH | DONE_TECH | QA_PASS | Hay smokes y reportes AUTH con resultados automatizados; mantener QA manual de roles y regresion. |
-| LIVE | DONE_TECH / DESIGN_READY | PENDING_QA / PENDING_ARCH_REVIEW | LIVE-Z0 a LIVE-Z10A estan documentados; LIVE-AUTH-A disena autorizaciones operativas sin implementar codigo. Falta corrida manual multiusuario/multidispositivo completa. |
+| LIVE | DONE_TECH / DESIGN_READY | PENDING_QA / PENDING_ARCH_REVIEW | LIVE-Z0 a LIVE-Z10A estan documentados; LIVE-AUTH-A disena autorizaciones operativas y LIVE-ROLE-A audita permisos/capacidades sin implementar codigo. Falta corrida manual multiusuario/multidispositivo completa. |
 | PRODUCT-C / Diseno | DONE_TECH | PENDING_QA | Sistema visual, UI Kit y editor de marca cerrados tecnicamente; falta validacion visual formal. |
 | PRODUCT-D / QA visual | READY_FOR_QA | PENDING_QA | PRODUCT-D4 REAL prepara plan, matriz y plantilla; ejecucion humana con evidencia sigue pendiente. |
 | I18N | DONE_TECH | PENDING_QA | Soporte multidioma base y limpieza de claves; falta revision humana/nativa. |
@@ -61,7 +62,8 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 | LIVE-Z9I.1 | Layout responsive acciones tarjetas LIVE | `feature/live-z9i-1-card-action-layout` | `6a4b26c` | DONE_TECH | PENDING_QA | Validar desktop/tablet/mobile. |
 | LIVE-Z9J | Sincronizacion apartados operador/admin | `feature/live-z9j-operator-reservation-sync` | `f92aa24` | DONE_TECH | PENDING_QA | Vendedor crea apartado y operador lo ve sin salir. |
 | LIVE-Z10A | Auditoria autorizacion precio LIVE | `feature/live-z10a-price-authorization-audit` | `61b7ba8` | DONE_TECH | PENDING_QA | Validar que no hay solicitud pendiente simulada. |
-| LIVE-AUTH-A | Diseno autorizaciones operativas LIVE | `feature/live-auth-a-operational-authorization-design` | pendiente commit | DESIGN_READY | PENDING_ARCH_REVIEW | Arquitectura debe revisar modelo, permisos, endpoints sugeridos y jerarquia empleado-supervisor antes de implementar. |
+| LIVE-AUTH-A | Diseno autorizaciones operativas LIVE | `feature/live-auth-a-operational-authorization-design` | `ca1ed47` | DESIGN_READY | PENDING_ARCH_REVIEW | Arquitectura debe revisar modelo, permisos, endpoints sugeridos y jerarquia empleado-supervisor antes de implementar. |
+| LIVE-ROLE-A | Auditoria permisos/capacidades operativas LIVE | `feature/live-role-a-capabilities-permissions-audit` | pendiente commit | DESIGN_READY | PENDING_ARCH_REVIEW | Arquitectura debe revisar matriz accion-permiso, permisos sugeridos y decision sobre vendedor centro antes de implementar. |
 | PRODUCT-C/C1 | Sistema visual premium global | varias | varios | DONE_TECH | PENDING_QA | Validar light/dark/presets en rutas principales. |
 | PRODUCT-C2.1-C2.6 | Editor visual, paletas, contraste y marca | varias | `31c3a4f` a `39b35fd` | DONE_TECH | PENDING_QA | Validar /ui-kit y /appearance con mobile/tablet. |
 | PRODUCT-D5/D6.x | Navegacion, AppShell, legacy routes e i18n visible | varias | varios | DONE_TECH | PENDING_QA | Confirmar ausencia de layouts legacy en rutas priorizadas. |
@@ -89,8 +91,8 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 1. Ejecutar PRODUCT-D4 REAL: corrida QA manual con evidencia.
 2. Revisar LIVE-AUTH-A con arquitectura antes de implementar autorizaciones operativas.
 3. LIVE-Z10B: backend real para autorizacion de cambio de precio, o decision de producto formal.
-4. ITEM-Z1: edicion/correccion segura de prendas capturadas.
-5. PRODUCT-ERR-B: extender errores accionables a dominios restantes.
+4. AUTH-LIVE-PERMISSIONS-A / LIVE-ROLE-B: aprobar e implementar permisos LIVE finos si arquitectura valida LIVE-ROLE-A.
+5. ITEM-Z1: edicion/correccion segura de prendas capturadas.
 
 ## Riesgos abiertos
 
@@ -106,7 +108,8 @@ El corte actual consolida fases cerradas de AUTH, LIVE, PRODUCT-C, PRODUCT-D, I1
 | Reversa/cancelacion de apartados LIVE con pago | LIVE-FIX-A bloquea acciones sensibles si detecta pago o estado no disponible, pero el flujo real de autorizacion supervisor/backend queda pendiente | PENDING_DECISION |
 | Capacidades vendedor para preparar prendas | LIVE-FIX-A mantiene permisos efectivos; si vendedor debe preparar sin controlar prenda al aire, abrir `LIVE-ROLE-A` con permiso granular | PENDING_DECISION |
 | Autorizaciones operativas sin contrato backend | LIVE-AUTH-A propone modelo general; cualquier implementacion requiere aprobacion arquitectonica, permisos y auditoria | PENDING_ARCH_REVIEW |
+| Permisos LIVE demasiado generales | LIVE-ROLE-A identifica brechas: `DO_LIVE_RESERVATION` cubre demasiadas acciones y faltan permisos como `PREPARE_LIVE_ITEM`, `CHANGE_LIVE_ACTIVE_ITEM` y `VIEW_LIVE` | PENDING_ARCH_REVIEW |
 
 ## Ultima actualizacion
 
-2026-06-08, `feature/live-auth-a-operational-authorization-design`.
+2026-06-08, `feature/live-role-a-capabilities-permissions-audit`.

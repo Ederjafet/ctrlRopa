@@ -21,7 +21,8 @@ No se debe cerrar un pendiente sin evidencia, validaciones y commit de fase.
 | P0 | LIVE / autorizaciones | Diseno autorizaciones operativas LIVE | LIVE-FIX-A QA / LIVE-Z10A | Varias acciones requieren aprobacion formal antes de ejecutarse | S1 | LIVE-AUTH-A | Documento de arquitectura creado; revisar modelo, permisos, endpoints y reglas antes de implementar | DESIGN_READY |
 | P0 | LIVE | Autorizacion real de cambio de precio | LIVE-Z10A | Vendedor no puede solicitar aprobacion dentro del sistema | S1 | LIVE-Z10B | Backend + UI real de solicitud/aprobacion/auditoria o decision producto firmada | PENDING_DECISION |
 | P0 | LIVE / pagos | Autorizacion de reversa para apartados con pago | LIVE-FIX-A QA | Cancelar o deshacer apartados con pago requiere flujo formal; LIVE-FIX-A solo bloquea frontend sin simular autorizacion | S1 | LIVE-PAYMENT-GUARD-A | Definir contrato backend/permisos/auditoria para reversa autorizada de apartados con pago; no tocar caja sin aprobacion arquitectonica | PENDING_DECISION |
-| P1 | LIVE / roles | Capacidades del vendedor para preparar prendas sin controlar prenda al aire | LIVE-FIX-A QA | Vendedor centro puede requerir preparar prendas, pero hoy preparar/poner al aire depende de capacidades reales de control LIVE/inventario | S2 | LIVE-ROLE-A | Definir permiso granular, UX, contrato y QA para preparar prendas sin conceder control completo de prenda al aire | PENDING_DECISION |
+| P1 | LIVE / roles | Capacidades y permisos operativos LIVE | LIVE-FIX-A QA / LIVE-AUTH-A | Vendedor centro puede requerir preparar prendas, y varias acciones LIVE dependen de permisos demasiado generales | S2 | LIVE-ROLE-A | Auditoria accion-permiso creada; arquitectura debe revisar permisos sugeridos antes de implementar | DESIGN_READY |
+| P1 | LIVE / roles | Implementar permisos finos para preparar/cambiar prenda LIVE | LIVE-ROLE-A | Separar preparar prenda de controlar prenda al aire requiere permisos backend/frontend nuevos | S1 | LIVE-ROLE-B / AUTH-LIVE-PERMISSIONS-A | Requiere aprobacion arquitectonica, migraciones, backend, frontend, QA y no mezclar pagos/caja | PENDING_ARCH_REVIEW |
 | P0 | Inventario | Edicion/correccion de prendas capturadas | QA/operacion | Errores de captura quedan sin correccion clara | S1 | ITEM-Z1 | Editar campos permitidos con permisos, auditoria y QA | PENDING_DECISION |
 | P1 | Error handling | Errores accionables en dominios restantes | PRODUCT-ERR-A | Mensajes genericos pueden seguir apareciendo fuera de pantallas criticas | S2 | PRODUCT-ERR-B | Mapper aplicado a dominios restantes y QA de errores | PENDING_QA |
 | P1 | Seguridad | Limpieza de configuracion/secrets | Riesgo operativo | Posible exposicion o configuracion debil en despliegue | S1 | SEC-CONFIG-A | Inventario de env vars, secrets fuera de repo, docs de despliegue seguro | DONE_TECH |
@@ -56,7 +57,8 @@ No se debe cerrar un pendiente sin evidencia, validaciones y commit de fase.
 
 - No mezclar LIVE-Z10B con pagos/caja.
 - No mezclar LIVE-PAYMENT-GUARD-A con cambio de precio ni con caja/pagos sin handoff de arquitectura.
-- No mezclar LIVE-ROLE-A con RBAC/backend sin aprobacion arquitectonica; primero definir permiso granular.
+- LIVE-ROLE-A es auditoria/diseno; no convertirlo en cambios RBAC/backend dentro de la misma fase.
+- No implementar LIVE-ROLE-B/AUTH-LIVE-PERMISSIONS-A sin revisar LIVE-ROLE-A y aprobar catalogo de permisos finos.
 - No implementar LIVE-AUTH-B/C sin revisar y aprobar LIVE-AUTH-A.
 - No mezclar PRODUCT-C3 con cambios visuales de /ui-kit.
 - No mezclar LIVE-REF-A con cambios funcionales LIVE.

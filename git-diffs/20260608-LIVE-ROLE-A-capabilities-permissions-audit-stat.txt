@@ -1,0 +1,9 @@
+﻿ ...LIVE_AUTH_A_OPERATIONAL_AUTHORIZATION_DESIGN.md |  14 +-
+ docs/LIVE_ROLE_A_CAPABILITIES_PERMISSIONS_AUDIT.md | 292 +++++++++++++++++++++
+ docs/LIVE_Z9G_SELLER_CAPABILITIES.md               |   6 +
+ docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md             |   1 +
+ docs/PROJECT_BACKLOG_PRIORITIZED.md                |   6 +-
+ docs/PROJECT_MASTER_STATUS.md                      |  15 +-
+ docs/QA_TODO_HANDOFF.md                            |   1 +
+ ...ies-permissions-audit-report-20260608-211043.md |  41 +++
+ 8 files changed, 366 insertions(+), 10 deletions(-)
