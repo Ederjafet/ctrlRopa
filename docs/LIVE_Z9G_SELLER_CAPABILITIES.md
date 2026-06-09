@@ -93,3 +93,12 @@ LIVE-Z9I mantiene la matriz de capacidades: ver el selector de prendas sigue dep
 ## Continuidad LIVE-Z9J
 
 LIVE-Z9J no cambia capacidades ni concede acciones nuevas. Solo permite que operador/admin sincronice apartados/eventos generados por vendedor u otros usuarios mediante refresh controlado. El vendedor conserva su matriz de permisos reales y `NO_ACCESS` no obtiene polling util.
+
+## Nota LIVE-FIX-A - Actores vs permisos
+
+LIVE-FIX-A mantiene la regla de arquitectura: el actor vendedor clasifica la experiencia, pero no habilita acciones por si solo.
+
+- `qa.vendedor.centro@local.test` conserva las acciones permitidas por capacidades reales.
+- Buscar/preparar/poner al aire/cambiar prenda no se concede por actor si no existe permiso/capacidad efectiva.
+- No se modifico RBAC ni backend.
+- Si negocio requiere que vendedor prepare prendas sin controlar la prenda al aire, abrir `LIVE-ROLE-A` para definir permiso granular, UX y QA.

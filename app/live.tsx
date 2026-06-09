@@ -442,6 +442,7 @@ export default function LiveScreen() {
   const [liveNotice, setLiveNotice] = useState<LiveNotice | null>(null);
   const [closeLiveToConfirm, setCloseLiveToConfirm] = useState<Live | null>(null);
   const [activateLiveToConfirm, setActivateLiveToConfirm] = useState<Live | null>(null);
+  const [operationalSoldToConfirm, setOperationalSoldToConfirm] = useState<number | null>(null);
   const [cancelReservationToConfirm, setCancelReservationToConfirm] = useState<number | null>(null);
   const [reservationIssue, setReservationIssue] = useState<LiveReservationIssue | null>(null);
   const [showDemoMetrics, setShowDemoMetrics] = useState(true);
@@ -502,6 +503,7 @@ export default function LiveScreen() {
   const [isCustomerModalVisible, setIsCustomerModalVisible] = useState(false);
   const [isItemModalVisible, setIsItemModalVisible] = useState(false);
   const [isScannerVisible, setIsScannerVisible] = useState(false);
+  const [isPreparedItemPromptVisible, setIsPreparedItemPromptVisible] = useState(false);
   const getActionableMessage = (error: unknown) => getActionableApiError(error, t).message;
   const refreshLiveLayoutPreferences = useCallback(async (userId?: number | null) => {
     try {
@@ -1148,6 +1150,18 @@ export default function LiveScreen() {
   ) => {
     const customer = getReservationCustomerInfo(reservation);
     const item = getReservationItemInfo(reservation);
+    const paid = paidByReservationId[reservation.id] ?? 0;
+    const pending = Math.max(Number(reservation.price || 0) - paid, 0);
+    const paymentStatusLabel = !canViewPayments
+      ? t('live.paymentStatusUnavailable')
+      : paid > 0
+        ? t('live.paymentStatusPaid')
+        : t('live.paymentStatusUnpaid');
+    const paymentStatusColor = !canViewPayments
+      ? theme.colors.mutedText
+      : paid > 0
+        ? theme.colors.warning
+        : theme.colors.success;
     const liveLabel = reservation.liveId
       ? t('live.liveNumber', { id: reservation.liveId })
       : t('live.noReservationLive');
@@ -1213,6 +1227,30 @@ export default function LiveScreen() {
               {t('live.operationalStatusTitle')}
             </AppText>
             <AppText bold>{statusLabel}</AppText>
+          </View>
+          <View style={styles.recentReservationMeta}>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {t('live.paymentRegistered')}
+            </AppText>
+            <AppText bold>
+              {canViewPayments ? formatMoney(paid) : t('live.paymentStatusUnavailable')}
+            </AppText>
+          </View>
+          <View style={styles.recentReservationMeta}>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {t('live.pendingBalance')}
+            </AppText>
+            <AppText bold>
+              {canViewPayments ? formatMoney(pending) : t('live.paymentStatusUnavailable')}
+            </AppText>
+          </View>
+          <View style={styles.recentReservationMeta}>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {t('live.paymentStatus')}
+            </AppText>
+            <AppText bold color={paymentStatusColor}>
+              {paymentStatusLabel}
+            </AppText>
           </View>
           <View style={styles.recentReservationMeta}>
             <AppText variant="caption" color={theme.colors.mutedText}>
@@ -1868,14 +1906,100 @@ export default function LiveScreen() {
       return;
     }
 
-    Alert.alert(t('live.operationalSoldConfirmTitle'), t('live.operationalSoldConfirmMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('live.confirmOperationalSold'),
-        onPress: () =>
-          handleUpdateReservationOperationalStatus(reservationId, 'OPERATIONAL_SOLD'),
-      },
-    ]);
+    if (!selectedLive) {
+      setLiveNotice({
+        title: t('live.operationalSoldUnavailableTitle'),
+        message: t('live.selectOpenLiveReason'),
+        tone: 'warning',
+      });
+      return;
+    }
+
+    const reservationEntry = recentReservations.find(
+      ({ reservation }) => reservation.id === reservationId
+    );
+
+    if (!reservationEntry) {
+      setLiveNotice({
+        title: t('live.operationalSoldUnavailableTitle'),
+        message: t('live.operationalSoldUnavailableMessage'),
+        tone: 'warning',
+      });
+      return;
+    }
+
+    const paid = paidByReservationId[reservationId] ?? 0;
+    const settled = isReservationSettled(reservationEntry.reservation, paid);
+    const operationalStatus = getLiveReservationOperationalStatus(reservationEntry.reservation);
+
+    if (settled) {
+      setLiveNotice({
+        title: t('live.operationalSoldUnavailableTitle'),
+        message: t('live.operationalSoldAlreadySettledMessage'),
+        tone: 'warning',
+      });
+      return;
+    }
+
+    if (operationalStatus === 'OPERATIONAL_SOLD') {
+      setLiveNotice({
+        title: t('live.operationalStatusNoChangesTitle'),
+        message: t('live.operationalSoldAlreadyClosedMessage'),
+        tone: 'warning',
+      });
+      return;
+    }
+
+    if (operationalStatus === 'CANCELLED') {
+      setLiveNotice({
+        title: t('live.operationalSoldUnavailableTitle'),
+        message: t('live.operationalSoldCancelledMessage'),
+        tone: 'warning',
+      });
+      return;
+    }
+
+    setOperationalSoldToConfirm(reservationId);
+  };
+
+  const showPaymentGuardNotice = (paymentKnown: boolean) => {
+    setLiveNotice({
+      title: t('live.paymentGuardAuthorizationTitle'),
+      message: paymentKnown
+        ? `${t('live.paymentGuardAuthorizationMessage')}\n\n${t('live.paymentGuardAuthorizationUnavailableMessage')}`
+        : t('live.paymentGuardUnknownMessage'),
+      tone: 'warning',
+    });
+  };
+
+  const canRunPaymentSensitiveReservationAction = (reservationId: number) => {
+    if (!canViewPayments) {
+      showPaymentGuardNotice(false);
+      return false;
+    }
+
+    if ((paidByReservationId[reservationId] ?? 0) > 0) {
+      showPaymentGuardNotice(true);
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleUndoOperationalSold = async (reservationId: number) => {
+    if (!canRunPaymentSensitiveReservationAction(reservationId)) {
+      return;
+    }
+
+    await handleUpdateReservationOperationalStatus(reservationId, 'RESERVED');
+  };
+
+  const confirmOperationalSold = async () => {
+    if (!operationalSoldToConfirm) return;
+
+    const reservationId = operationalSoldToConfirm;
+    setOperationalSoldToConfirm(null);
+    await handleUpdateReservationOperationalStatus(reservationId, 'OPERATIONAL_SOLD');
   };
 
   const handleCancelLiveReservation = (reservationId: number) => {
@@ -1888,6 +2012,10 @@ export default function LiveScreen() {
       return;
     }
 
+    if (!canRunPaymentSensitiveReservationAction(reservationId)) {
+      return;
+    }
+
     setCancelReservationToConfirm(reservationId);
   };
 
@@ -1895,6 +2023,11 @@ export default function LiveScreen() {
     if (!cancelReservationToConfirm) return;
 
     const reservationId = cancelReservationToConfirm;
+    if (!canRunPaymentSensitiveReservationAction(reservationId)) {
+      setCancelReservationToConfirm(null);
+      return;
+    }
+
     setCancelReservationToConfirm(null);
     await handleUpdateReservationOperationalStatus(reservationId, 'CANCELLED', reason);
   };
@@ -2261,6 +2394,63 @@ export default function LiveScreen() {
     } finally {
       setIsSavingActiveItem(false);
     }
+  };
+
+  const handleChangeToPreparedItem = () => {
+    const hasPreparedItemForSwitch =
+      !!activeItem && !!selectedItem && activeItem.id !== selectedItem.id;
+
+    if (!hasPreparedItemForSwitch) {
+      setIsPreparedItemPromptVisible(true);
+      return;
+    }
+
+    void handleSetSelectedItemActive();
+  };
+
+  const handlePreparedItemPromptSearch = () => {
+    setIsPreparedItemPromptVisible(false);
+
+    if (!mayPrepareItem || !canSelectLiveItem(session)) {
+      setLiveNotice({
+        title: t('live.permissionDeniedTitle'),
+        message: t('live.itemPermissionError'),
+        tone: 'warning',
+      });
+      return;
+    }
+
+    setIsItemModalVisible(true);
+  };
+
+  const handlePreparedItemPromptScan = () => {
+    setIsPreparedItemPromptVisible(false);
+
+    if (!mayPrepareItem || !canSelectLiveItem(session)) {
+      setLiveNotice({
+        title: t('live.permissionDeniedTitle'),
+        message: t('live.itemPermissionError'),
+        tone: 'warning',
+      });
+      return;
+    }
+
+    setIsScannerVisible(true);
+  };
+
+  const handlePreparedItemPromptQuickItem = () => {
+    setIsPreparedItemPromptVisible(false);
+
+    if (!mayCreateItem) {
+      setLiveNotice({
+        title: t('live.permissionDeniedTitle'),
+        message: t('live.itemPermissionError'),
+        tone: 'warning',
+      });
+      return;
+    }
+
+    router.push('/items-create?returnTo=/live' as any);
   };
 
   const handleRemovePreparedItem = () => {
@@ -2985,11 +3175,10 @@ export default function LiveScreen() {
                 <AppButton
                   title={t('live.changeItemOnAir')}
                   variant="secondary"
-                  onPress={handleSetSelectedItemActive}
+                  onPress={handleChangeToPreparedItem}
                   loading={isSavingActiveItem}
                   disabled={
                     isSavingActiveItem ||
-                    !preparedItem ||
                     !operatorFlowEnabled ||
                     !maySetActiveItem
                   }
@@ -2998,9 +3187,7 @@ export default function LiveScreen() {
                       ? t('live.liveOperatePermissionError')
                       : !operatorFlowEnabled
                         ? t('live.selectOpenLiveReason')
-                        : !preparedItem
-                          ? t('live.prepareItemBeforeSwitch')
-                          : undefined
+                        : undefined
                   }
                 />
                 <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
@@ -3885,7 +4072,7 @@ export default function LiveScreen() {
                   )}
                   <AppButton
                     title={t('live.viewDetail')}
-                    variant="secondary"
+                    variant="neutral"
                     onPress={() => goToReservationDetail(reservation.id)}
                   />
                 </Pressable>
@@ -4484,7 +4671,7 @@ export default function LiveScreen() {
                               <View style={styles.buttonFill}>
                                 <AppButton
                                   title={t('live.viewDetail')}
-                                  variant="secondary"
+                                  variant="neutral"
                                   onPress={() => goToReservationDetail(reservation.id)}
                                 />
                               </View>
@@ -4505,18 +4692,26 @@ export default function LiveScreen() {
                               mayChangeLiveReservationStatus ? (
                                 <View style={styles.buttonFill}>
                                   <AppButton
-                                    title={t('live.returnToReserved')}
-                                    variant="secondary"
+                                    title={
+                                      operationalSold
+                                        ? t('live.undoOperationalSold')
+                                        : t('live.returnToReserved')
+                                    }
+                                    variant={operationalSold ? 'warning' : 'secondary'}
                                     loading={isUpdatingOperationalStatus}
                                     onPress={() =>
-                                      handleUpdateReservationOperationalStatus(
-                                        reservation.id,
-                                        'RESERVED'
-                                      )
+                                      operationalSold
+                                        ? handleUndoOperationalSold(reservation.id)
+                                        : handleUpdateReservationOperationalStatus(
+                                            reservation.id,
+                                            'RESERVED'
+                                          )
                                     }
                                   />
                                   <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
-                                    {t('live.returnToReservedHelp')}
+                                    {operationalSold
+                                      ? t('live.undoOperationalSoldHelp')
+                                      : t('live.returnToReservedHelp')}
                                   </AppText>
                                 </View>
                               ) : null}
@@ -5554,7 +5749,7 @@ export default function LiveScreen() {
                     <View style={styles.buttonFill}>
                       <AppButton
                         title={t('live.viewDetail')}
-                        variant="secondary"
+                        variant="neutral"
                         onPress={() => goToReservationDetail(reservation.id)}
                       />
                     </View>
@@ -5592,18 +5787,13 @@ export default function LiveScreen() {
                     {operationalSold && mayChangeLiveReservationStatus ? (
                       <View style={styles.buttonFill}>
                         <AppButton
-                          title={t('live.returnToReserved')}
-                          variant="secondary"
+                          title={t('live.undoOperationalSold')}
+                          variant="warning"
                           loading={isUpdatingOperationalStatus}
-                          onPress={() =>
-                            handleUpdateReservationOperationalStatus(
-                              reservation.id,
-                              'RESERVED'
-                            )
-                          }
+                          onPress={() => handleUndoOperationalSold(reservation.id)}
                         />
                         <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
-                          {t('live.returnToReservedHelp')}
+                          {t('live.undoOperationalSoldHelp')}
                         </AppText>
                       </View>
                     ) : null}
@@ -5741,6 +5931,39 @@ export default function LiveScreen() {
         onClose={() => setIsScannerVisible(false)}
         onScanned={handleCameraScanned}
       />
+
+      <AppBottomModal
+        visible={isPreparedItemPromptVisible}
+        title={t('live.preparedItemRequiredTitle')}
+        onClose={() => setIsPreparedItemPromptVisible(false)}
+        showCancelButton={false}
+        scroll={false}
+      >
+        <AppText color={theme.colors.mutedText}>
+          {t('live.preparedItemRequiredMessage')}
+        </AppText>
+        <View style={styles.preparedItemPromptActions}>
+          <AppButton
+            title={t('live.searchItem')}
+            onPress={handlePreparedItemPromptSearch}
+          />
+          <AppButton
+            title={t('live.scanQr')}
+            variant="secondary"
+            onPress={handlePreparedItemPromptScan}
+          />
+          <AppButton
+            title={t('live.quickItem')}
+            variant="neutral"
+            onPress={handlePreparedItemPromptQuickItem}
+          />
+          <AppButton
+            title={t('common.close')}
+            variant="cancel"
+            onPress={() => setIsPreparedItemPromptVisible(false)}
+          />
+        </View>
+      </AppBottomModal>
 
       <AppBottomModal
         visible={isCustomerModalVisible}
@@ -5884,6 +6107,38 @@ export default function LiveScreen() {
             </AppText>
           }
         />
+      </AppBottomModal>
+
+      <AppBottomModal
+        visible={operationalSoldToConfirm !== null}
+        title={t('live.operationalSoldConfirmTitle')}
+        onClose={() => setOperationalSoldToConfirm(null)}
+        showCancelButton={false}
+      >
+        <AppText>
+          {t('live.operationalSoldConfirmMessage')}
+        </AppText>
+        <AppText color={theme.colors.warning} bold>
+          {t('live.operationalSoldConfirmNoPaymentWarning')}
+        </AppText>
+        <View style={styles.buttonRow}>
+          <View style={styles.buttonFill}>
+            <AppButton
+              title={t('common.cancel')}
+              variant="secondary"
+              onPress={() => setOperationalSoldToConfirm(null)}
+              disabled={updatingOperationalReservationId !== null}
+            />
+          </View>
+          <View style={styles.buttonFill}>
+            <AppButton
+              title={t('live.confirmOperationalSold')}
+              onPress={confirmOperationalSold}
+              loading={updatingOperationalReservationId !== null}
+              disabled={updatingOperationalReservationId !== null}
+            />
+          </View>
+        </View>
       </AppBottomModal>
 
       <AppBottomModal
@@ -6033,6 +6288,10 @@ const styles = StyleSheet.create({
   },
   preparedItemActions: {
     gap: 8,
+  },
+  preparedItemPromptActions: {
+    gap: 8,
+    marginTop: 12,
   },
   liveItemActionColumn: {
     flex: 1,
