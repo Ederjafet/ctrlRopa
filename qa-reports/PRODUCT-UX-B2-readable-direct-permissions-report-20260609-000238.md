@@ -4,9 +4,9 @@
 
 - Fecha: 2026-06-09 00:02:38 America/Mexico_City.
 - Rama: `feature/product-ux-b2-hide-visible-internal-codes`.
-- Alcance: presentacion legible de permisos directos adicionales y ocultamiento de codigo interno por defecto.
+- Alcance: presentación legible de permisos directos adicionales y ocultamiento de código interno por defecto.
 
-## Permisos que se veian en ingles
+## Permisos que se veían en inglés
 
 - `APPROVE_REFUND`
 - `CANCEL_CONSIGNMENTS`
@@ -24,17 +24,17 @@
 ## Cambios realizados
 
 - El mapper visible de permisos ahora acepta idioma activo.
-- En espanol, `Permisos directos adicionales` usa etiquetas en espanol y no mezcla ingles devuelto por backend.
-- En ingles, la lista usa etiquetas principales en ingles.
-- `Codigo interno` queda oculto por defecto en roles y permisos directos.
-- Se agrego el toggle `Ver detalles tecnicos` / `Ocultar detalles tecnicos`.
+- En español, `Permisos directos adicionales` usa etiquetas en español y no mezcla inglés devuelto por backend.
+- En inglés, la lista usa etiquetas principales en inglés.
+- `Código interno` queda oculto por defecto en roles y permisos directos.
+- Se agregó el toggle `Ver detalles técnicos` / `Ocultar detalles técnicos`.
 - Se agregaron claves i18n del toggle a ES/EN/PT-BR/FR/JA/ZH/KO.
-- Se actualizo QA handoff y matriz PRODUCT-D4 REAL con el caso de validacion.
+- Se actualizó QA handoff y matriz PRODUCT-D4 REAL con el caso de validación.
 
 ## Restricciones respetadas
 
-- No se modifico backend.
-- No se modifico RBAC.
+- No se modificó backend.
+- No se modificó RBAC.
 - No se crearon permisos reales.
 - No se cambiaron asignaciones de roles/permisos.
 - No se habilitaron capacidades frontend nuevas.
@@ -49,6 +49,6 @@
 
 ## GO/NO-GO
 
-GO tecnico para la presentacion legible de permisos.
+GO técnico para la presentación legible de permisos.
 
 NO-GO para cambios backend/RBAC/permisos reales en esta fase.

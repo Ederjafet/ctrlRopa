@@ -2,7 +2,7 @@
 
 ## Problema
 
-QA confirmo que la seccion `Permisos directos adicionales` podia mezclar etiquetas en espanol con nombres crudos en ingles devueltos por el catalogo backend.
+QA confirmó que la sección `Permisos directos adicionales` podía mezclar etiquetas en español con nombres crudos en inglés devueltos por el catálogo backend.
 
 Ejemplos detectados:
 
@@ -19,15 +19,15 @@ Ejemplos detectados:
 - `Settle Consignments`
 - `View Deposit Reports`
 
-## Decision UX
+## Decisión UX
 
 La UI debe usar el mapper visible de permisos como fuente de etiqueta principal:
 
-- En espanol, mostrar etiquetas en espanol.
-- En ingles, mostrar etiquetas en ingles.
-- En pt-BR/fr/ja/zh/ko, usar etiqueta basica legible cuando no exista traduccion nativa completa.
-- Ocultar `Codigo interno` por defecto.
-- Mostrar codigos solo al abrir `Ver detalles tecnicos`.
+- En español, mostrar etiquetas en español.
+- En inglés, mostrar etiquetas en inglés.
+- En pt-BR/fr/ja/zh/ko, usar etiqueta básica legible cuando no exista traducción nativa completa.
+- Ocultar `Código interno` por defecto.
+- Mostrar códigos solo al abrir `Ver detalles técnicos`.
 
 ## Cambios realizados
 
@@ -39,27 +39,27 @@ La UI debe usar el mapper visible de permisos como fuente de etiqueta principal:
 
 ## Traducciones ES agregadas/corregidas
 
-| Codigo | Etiqueta ES |
+| Código | Etiqueta ES |
 | --- | --- |
-| `APPROVE_REFUND` | Aprobar devolucion |
+| `APPROVE_REFUND` | Aprobar devolución |
 | `CANCEL_CONSIGNMENTS` | Cancelar consignaciones |
-| `CANCEL_REFUND` | Cancelar devolucion |
+| `CANCEL_REFUND` | Cancelar devolución |
 | `CANCEL_TRANSFERS` | Cancelar transferencias |
 | `MANAGE_BRANDING` | Administrar apariencia y marca |
 | `MANAGE_CUSTOMER_PACKAGES` | Administrar paquetes de cliente |
-| `PROCESS_REFUND` | Procesar devolucion |
+| `PROCESS_REFUND` | Procesar devolución |
 | `RECEIVE_TRANSFERS` | Recibir transferencias |
-| `REQUEST_REFUND` | Solicitar devolucion |
+| `REQUEST_REFUND` | Solicitar devolución |
 | `SEND_TRANSFERS` | Enviar transferencias |
 | `SETTLE_CONSIGNMENTS` | Liquidar consignaciones |
-| `VIEW_DEPOSIT_REPORTS` | Ver reporte de depositos |
+| `VIEW_DEPOSIT_REPORTS` | Ver reporte de depósitos |
 
-Tambien se normalizaron alias/codigos relacionados como `EXECUTE_REFUND`, `MANAGE_CHANNELS`, `MANAGE_CASH_CUTS`, `ADMIN_ROLES`, `ADMIN_SECURITY`, `ADMIN_SHIPMENTS`, `ADMIN_TRANSFERS`, `ADMIN_USERS` y permisos LIVE futuros propuestos.
+También se normalizaron alias/códigos relacionados como `EXECUTE_REFUND`, `MANAGE_CHANNELS`, `MANAGE_CASH_CUTS`, `ADMIN_ROLES`, `ADMIN_SECURITY`, `ADMIN_SHIPMENTS`, `ADMIN_TRANSFERS`, `ADMIN_USERS` y permisos LIVE futuros propuestos.
 
-## Que no cambio
+## Qué no cambió
 
-- No se modifico backend.
-- No se modifico RBAC.
+- No se modificó backend.
+- No se modificó RBAC.
 - No se crearon permisos reales.
 - No se cambiaron roles ni asignaciones.
 - No se habilitaron capacidades nuevas.
@@ -69,18 +69,18 @@ Tambien se normalizaron alias/codigos relacionados como `EXECUTE_REFUND`, `MANAG
 1. Entrar como `qa.admin@local.test`.
 2. Abrir editar/crear usuario.
 3. Revisar `Permisos directos adicionales`.
-4. Confirmar que en espanol no aparecen permisos mezclados en ingles.
-5. Confirmar que no se ven codigos internos por defecto.
-6. Abrir `Ver detalles tecnicos` y confirmar que ahi si aparece el codigo interno.
-7. Cambiar a ingles y confirmar etiquetas principales en ingles.
-8. Confirmar que RBAC no cambio y que solo se pueden asignar permisos existentes devueltos por backend.
+4. Confirmar que en español no aparecen permisos mezclados en inglés.
+5. Confirmar que no se ven códigos internos por defecto.
+6. Abrir `Ver detalles técnicos` y confirmar que ahí sí aparece el código interno.
+7. Cambiar a inglés y confirmar etiquetas principales en inglés.
+8. Confirmar que RBAC no cambió y que solo se pueden asignar permisos existentes devueltos por backend.
 
 ## Nota i18n
 
-pt-BR, fr, ja, zh y ko conservan textos basicos para el toggle tecnico. Las etiquetas de permisos usan fallback ingles legible si no existe mapa nativo completo. Requieren revision humana/nativa futura para una localizacion comercial perfecta.
+pt-BR, fr, ja, zh y ko conservan textos básicos para el toggle técnico. Las etiquetas de permisos usan fallback inglés legible si no existe mapa nativo completo. Requieren revisión humana/nativa futura para una localización comercial perfecta.
 
 ## GO/NO-GO
 
-GO para presentacion legible y defensa contra nombres crudos del catalogo.
+GO para presentación legible y defensa contra nombres crudos del catálogo.
 
 NO-GO para crear permisos, modificar RBAC, tocar backend o habilitar capacidades no existentes.
