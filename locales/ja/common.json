@@ -892,6 +892,8 @@
     "searchPermission": "検索 権限",
     "noPermissionsFound": "なし 権限 項目",
     "internalCode": "内部 コード {{code}}",
+    "showTechnicalDetails": "技術詳細を表示",
+    "hideTechnicalDetails": "技術詳細を非表示",
     "included": "含む",
     "add": "追加"
   },

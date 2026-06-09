@@ -1,0 +1,16 @@
+﻿ app/system-roles.tsx                               |  45 +++++--
+ app/users-form.tsx                                 |  67 ++++++++--
+ components/ui/RestrictedSection.tsx                |   4 +-
+ docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md             |   1 +
+ docs/PRODUCT_UX_B2_READABLE_DIRECT_PERMISSIONS.md  |  86 +++++++++++++
+ docs/QA_TODO_HANDOFF.md                            |   1 +
+ locales/en/common.json                             |   2 +
+ locales/es/common.json                             |   2 +
+ locales/fr/common.json                             |   2 +
+ locales/ja/common.json                             |   2 +
+ locales/ko/common.json                             |   2 +
+ locales/pt-BR/common.json                          |   2 +
+ locales/zh/common.json                             |   2 +
+ ...le-direct-permissions-report-20260609-000238.md |  54 ++++++++
+ services/permissionDependencies.ts                 | 136 +++++++++++++++++++--
+ 15 files changed, 374 insertions(+), 34 deletions(-)

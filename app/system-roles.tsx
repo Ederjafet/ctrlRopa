@@ -48,7 +48,7 @@ function toggleId(ids: number[], id: number) {
 
 export default function SystemRolesScreen() {
   const { theme } = useAppTheme();
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
 
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [permissions, setPermissions] = useState<AdminPermission[]>([]);
@@ -58,6 +58,7 @@ export default function SystemRolesScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [search, setSearch] = useState('');
   const [loadError, setLoadError] = useState('');
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -86,9 +87,10 @@ export default function SystemRolesScreen() {
 
   const filteredPermissions = useMemo(() => {
     return groupPermissionsForDisplay(
-      permissions.filter((permission) => matchesPermissionSearch(permission, search))
+      permissions.filter((permission) => matchesPermissionSearch(permission, search, i18n.language)),
+      i18n.language
     );
-  }, [permissions, search]);
+  }, [i18n.language, permissions, search]);
 
   const selectedPermissionCodes = useMemo(
     () =>
@@ -101,6 +103,7 @@ export default function SystemRolesScreen() {
   const openNew = () => {
     setForm(emptyForm);
     setSearch('');
+    setShowTechnicalDetails(false);
     setModalVisible(true);
   };
 
@@ -112,6 +115,7 @@ export default function SystemRolesScreen() {
       permissionIds: permissionIds(role),
     });
     setSearch('');
+    setShowTechnicalDetails(false);
     setModalVisible(true);
   };
 
@@ -190,7 +194,7 @@ export default function SystemRolesScreen() {
                 <View style={styles.roleText}>
                   <AppText bold>{role.name}</AppText>
                   <AppText variant="caption" color={theme.colors.mutedText}>
-                    {formatPermissionCode(role.code)}
+                    {formatPermissionCode(role.code, i18n.language)}
                   </AppText>
                   <AppText variant="caption" color={theme.colors.mutedText}>
                     {t('systemRoles.includedPermissions', { count: permissionIds(role).length })}
@@ -251,6 +255,18 @@ export default function SystemRolesScreen() {
             onChangeText={setSearch}
           />
 
+          <View style={styles.technicalToggle}>
+            <AppButton
+              title={
+                showTechnicalDetails
+                  ? t('systemRoles.hideTechnicalDetails')
+                  : t('systemRoles.showTechnicalDetails')
+              }
+              variant="secondary"
+              onPress={() => setShowTechnicalDetails((current) => !current)}
+            />
+          </View>
+
           {filteredPermissions.length === 0 ? (
             <AppText color={theme.colors.mutedText} style={styles.emptyPermissions}>
               {t('systemRoles.noPermissionsFound')}
@@ -265,7 +281,12 @@ export default function SystemRolesScreen() {
                 {group.permissions.map((permission) => {
                   const selected = form.permissionIds.includes(permission.id);
                   const dependencyWarnings = selected
-                    ? getSuggestedDependencyWarnings(permission.code, selectedPermissionCodes, permissions)
+                    ? getSuggestedDependencyWarnings(
+                        permission.code,
+                        selectedPermissionCodes,
+                        permissions,
+                        i18n.language
+                      )
                     : [];
                   return (
                     <Pressable
@@ -282,10 +303,12 @@ export default function SystemRolesScreen() {
                       ]}
                     >
                       <View style={styles.permissionText}>
-                        <AppText bold={selected}>{formatPermissionCode(permission.code)}</AppText>
-                        <AppText variant="caption" color={theme.colors.mutedText}>
-                          {t('systemRoles.internalCode', { code: permission.code })}
-                        </AppText>
+                        <AppText bold={selected}>{formatPermissionCode(permission.code, i18n.language)}</AppText>
+                        {showTechnicalDetails ? (
+                          <AppText variant="caption" color={theme.colors.mutedText}>
+                            {t('systemRoles.internalCode', { code: permission.code })}
+                          </AppText>
+                        ) : null}
                         <AppText color={selected ? theme.colors.accent : theme.colors.mutedText} bold={selected}>
                           {selected ? t('systemRoles.included') : t('systemRoles.add')}
                         </AppText>
@@ -336,6 +359,10 @@ const styles = StyleSheet.create({
   },
   permissionGroup: {
     marginTop: 14,
+  },
+  technicalToggle: {
+    alignItems: 'flex-start',
+    marginTop: 10,
   },
   roleAction: {
     minWidth: 110,
