@@ -102,3 +102,9 @@ LIVE-FIX-A mantiene la regla de arquitectura: el actor vendedor clasifica la exp
 - Buscar/preparar/poner al aire/cambiar prenda no se concede por actor si no existe permiso/capacidad efectiva.
 - No se modifico RBAC ni backend.
 - Si negocio requiere que vendedor prepare prendas sin controlar la prenda al aire, abrir `LIVE-ROLE-A` para definir permiso granular, UX y QA.
+
+## Continuidad LIVE-ROLE-A
+
+LIVE-ROLE-A deja la auditoria de permisos/capacidades lista para revision arquitectonica. La recomendacion principal es separar `PREPARE_LIVE_ITEM` de `CHANGE_LIVE_ACTIVE_ITEM`: vendedor centro podria preparar prendas solo si recibe una capacidad explicita, mientras que poner, cambiar o retirar la prenda al aire seguiria reservado a permisos operativos mas sensibles.
+
+Esta fase no cambia la matriz funcional de Z9G ni concede acciones nuevas al vendedor. Cualquier implementacion futura debe pasar por `LIVE-ROLE-B` o `AUTH-LIVE-PERMISSIONS-A`, con migracion, backend, frontend, i18n y QA propios.

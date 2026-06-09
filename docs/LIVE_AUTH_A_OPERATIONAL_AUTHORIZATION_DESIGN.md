@@ -319,8 +319,18 @@ Cada evento debe incluir:
 | LIVE-AUTH-C | UI de solicitud y cola de aprobacion | Media/alta |
 | LIVE-PAYMENT-GUARD-A | Reversa autorizada de apartados con pago | Critica |
 | LIVE-Z10B | Autorizacion real de cambio de precio LIVE | Alta |
-| LIVE-ROLE-A | Permiso granular para vendedor preparando prendas | Alta |
-| AUTH-LIVE-PERMISSIONS-A | Matriz final de permisos LIVE finos | Alta |
+| LIVE-ROLE-A | Auditoria accion-permiso/capacidad LIVE antes de tocar RBAC | Media |
+| LIVE-ROLE-B / AUTH-LIVE-PERMISSIONS-A | Implementacion de permisos LIVE finos aprobados | Alta |
+
+## 13.1 Continuidad LIVE-ROLE-A
+
+LIVE-ROLE-A complementa este diseno con una auditoria documental de permisos actuales, capacidades frontend, chequeos backend y brechas por accion operativa. Sus conclusiones no implementan RBAC, pero dejan como criterio previo que cualquier fase `LIVE-ROLE-B`, `AUTH-LIVE-PERMISSIONS-A`, `LIVE-AUTH-B` o `LIVE-AUTH-C` debe aprobar primero:
+
+- catalogo exacto de permisos LIVE finos;
+- separacion entre preparar prenda y controlar prenda al aire;
+- reglas para vendedor centro;
+- autorizaciones requeridas para pago, reversa, cancelacion y cambio de precio;
+- migraciones, endpoints y QA de regresion.
 
 ## 14. Criterio GO/NO-GO
 
