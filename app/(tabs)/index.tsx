@@ -11,6 +11,7 @@ import {
   isAdmin,
 } from '@/services/accessControl';
 import { logout as logoutSession, refreshSession } from '@/services/authService';
+import { canViewLive } from '@/services/livePermissionGuards';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -21,6 +22,7 @@ type DashboardAccess = {
   route?: string;
   channelCode?: string;
   permissionCode?: string;
+  liveAccess?: boolean;
   adminOnly?: boolean;
   pending?: boolean;
 };
@@ -79,8 +81,7 @@ const operationAccessGroups: DashboardAccessGroup[] = [
     accesses: [
       {
         label: 'En vivo',
-        channelCode: 'LIVE',
-        permissionCode: 'DO_LIVE_RESERVATION',
+        liveAccess: true,
         route: '/live',
       },
       {
@@ -204,6 +205,10 @@ const operationAccessGroups: DashboardAccessGroup[] = [
 function canShowAccess(user: UserSession | null, access: DashboardAccess) {
   if (access.adminOnly) {
     return isAdmin(user);
+  }
+
+  if (access.liveAccess) {
+    return canViewLive(user);
   }
 
   if (access.channelCode && access.permissionCode) {
