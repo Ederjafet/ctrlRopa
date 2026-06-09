@@ -209,6 +209,7 @@ Probabilidad:
 - AUTH-F2 propone catalogo minimo pero no lo implementa; hasta crear migracion, seeds, frontend y enforcement, `CREATE_CUSTOMER`, `EDIT_CUSTOMER`, `VIEW_PAYMENTS` y `VIEW_SALES` siguen siendo decisiones pendientes, no permisos reales.
 - AUTH-F3 crea permisos y enforcement P0 inicial; roles productivos reales no reciben permisos nuevos, por lo que QA/productivo deben actualizar asignaciones de forma controlada antes de validar flujos completos.
 - AUTH-F3 protege consultas de pagos/ventas; pantallas o integraciones que antes dependian solo de `REGISTER_PAYMENTS` o `DO_DOOR_SALE` pueden requerir `VIEW_PAYMENTS`/`VIEW_SALES` en roles.
+- LIVE-PERM-A1 crea permisos LIVE minimos y asignaciones base; QA debe validar roles reales porque `DO_LIVE_RESERVATION` se conserva como compatibilidad y aun no existen permisos de precio, pagos, caja, reversas ni autorizaciones LIVE.
 - PRODUCT-ERR-A agrega mapper frontend de errores accionables; modulos fuera de las rutas criticas aun deben migrarse por dominio para evitar que `err.message` exponga mensajes genericos o tecnicos.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.

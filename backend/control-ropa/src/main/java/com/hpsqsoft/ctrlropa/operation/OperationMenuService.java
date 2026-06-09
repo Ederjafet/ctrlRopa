@@ -32,13 +32,15 @@ public class OperationMenuService {
         modules.add(permissionOnly("CUSTOMERS", "Clientes", userId, PermissionCode.VIEW_CUSTOMERS));
         modules.add(permissionOnly("INVENTORY", "Inventario", userId, PermissionCode.VIEW_INVENTORY));
 
-        modules.add(permissionAndChannel(
+        modules.add(permissionAndChannelAny(
                 "LIVE",
                 "Live",
                 userId,
                 user.branchId(),
-                PermissionCode.DO_LIVE_RESERVATION,
-                ChannelCode.LIVE
+                ChannelCode.LIVE,
+                PermissionCode.VIEW_LIVE,
+                PermissionCode.OPERATE_LIVE,
+                PermissionCode.DO_LIVE_RESERVATION
         ));
 
         modules.add(permissionAndChannel(
@@ -118,6 +120,38 @@ public class OperationMenuService {
 
         if (!hasPermission) {
             reason = "Permiso requerido: " + permissionCode;
+        } else if (!channelEnabled) {
+            reason = "Canal deshabilitado: " + channelCode;
+        }
+
+        return new OperationMenuResponse.MenuModule(
+                code,
+                name,
+                enabled,
+                reason
+        );
+    }
+
+    private OperationMenuResponse.MenuModule permissionAndChannelAny(String code,
+                                                                     String name,
+                                                                     Long userId,
+                                                                     Long branchId,
+                                                                     String channelCode,
+                                                                     String... permissionCodes) {
+        boolean hasPermission = false;
+        for (String permissionCode : permissionCodes) {
+            if (hasPermission(userId, permissionCode)) {
+                hasPermission = true;
+                break;
+            }
+        }
+
+        boolean channelEnabled = isChannelEnabled(branchId, channelCode);
+        boolean enabled = hasPermission && channelEnabled;
+        String reason = null;
+
+        if (!hasPermission) {
+            reason = "Permiso requerido: " + String.join(" o ", permissionCodes);
         } else if (!channelEnabled) {
             reason = "Canal deshabilitado: " + channelCode;
         }

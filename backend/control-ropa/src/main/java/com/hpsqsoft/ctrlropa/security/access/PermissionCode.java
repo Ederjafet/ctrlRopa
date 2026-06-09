@@ -20,6 +20,11 @@ public final class PermissionCode {
     public static final String VIEW_INVENTORY = "VIEW_INVENTORY";
     public static final String MANAGE_INVENTORY = "MANAGE_INVENTORY";
 
+    public static final String VIEW_LIVE = "VIEW_LIVE";
+    public static final String OPERATE_LIVE = "OPERATE_LIVE";
+    public static final String PREPARE_LIVE_ITEM = "PREPARE_LIVE_ITEM";
+    public static final String CHANGE_LIVE_ACTIVE_ITEM = "CHANGE_LIVE_ACTIVE_ITEM";
+    public static final String REMOVE_LIVE_ACTIVE_ITEM = "REMOVE_LIVE_ACTIVE_ITEM";
     public static final String DO_LIVE_RESERVATION = "DO_LIVE_RESERVATION";
     public static final String DO_DOOR_SALE = "DO_DOOR_SALE";
     public static final String DO_DOOR_RESERVATION = "DO_DOOR_RESERVATION";

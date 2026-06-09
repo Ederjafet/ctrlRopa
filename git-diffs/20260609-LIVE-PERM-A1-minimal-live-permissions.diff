@@ -1,0 +1,793 @@
+﻿diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveService.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveService.java
+index b1a16dc..0dbdcd9 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveService.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveService.java
+@@ -48,6 +48,7 @@ public class LiveService {
+
+     @Transactional(readOnly = true)
+     public List<LiveResponse> findByBranch(Long branchId) {
++        assertCanViewLive(branchId);
+         assertBranchBelongsToCurrentTenant(branchId);
+
+         return repository.findByBranchIdOrderByCreatedAtDesc(branchId)
+@@ -59,13 +60,14 @@ public class LiveService {
+     @Transactional(readOnly = true)
+     public LiveResponse findById(Long id) {
+         Live live = findEntityById(id);
++        assertCanViewLive(live.getBranch().getId());
+         assertLiveBelongsToCurrentTenant(live);
+         return toResponse(live);
+     }
+
+     public LiveResponse create(Long branchId, Live entity) {
+         Long userId = currentUser.getUserId();
+-        assertCanOperateLive(branchId);
++        assertCanOperateLiveSession(branchId);
+         assertBranchBelongsToCurrentTenant(branchId);
+
+         Branch branch = branchRepository.findById(branchId)
+@@ -85,7 +87,7 @@ public class LiveService {
+     public LiveResponse activate(Long id) {
+         Live existing = findEntityById(id);
+
+-        assertCanOperateLive(existing.getBranch().getId());
++        assertCanOperateLiveSession(existing.getBranch().getId());
+         assertLiveBelongsToCurrentTenant(existing);
+
+         existing.setStatus(LiveStatus.ACTIVE);
+@@ -109,7 +111,7 @@ public class LiveService {
+     public LiveResponse close(Long id) {
+         Live existing = findEntityById(id);
+
+-        assertCanOperateLive(existing.getBranch().getId());
++        assertCanOperateLiveSession(existing.getBranch().getId());
+         assertLiveBelongsToCurrentTenant(existing);
+
+         existing.setStatus(LiveStatus.CLOSED);
+@@ -131,13 +133,18 @@ public class LiveService {
+     @Transactional(readOnly = true)
+     public ItemResponse getActiveItem(Long id) {
+         Live live = findEntityById(id);
++        assertCanViewLive(live.getBranch().getId());
+         assertLiveBelongsToCurrentTenant(live);
+         return live.getActiveItem() == null ? null : toItemResponse(live.getActiveItem());
+     }
+
+     public LiveResponse setActiveItem(Long id, LiveActiveItemRequest request) {
+         Live live = findEntityById(id);
+-        assertCanOperateLive(live.getBranch().getId());
++        if (request == null || request.getItemId() == null) {
++            assertCanRemoveLiveActiveItem(live.getBranch().getId());
++        } else {
++            assertCanChangeLiveActiveItem(live.getBranch().getId());
++        }
+         assertLiveBelongsToCurrentTenant(live);
+
+         if (live.getStatus() == LiveStatus.CLOSED) {
+@@ -169,6 +176,8 @@ public class LiveService {
+
+     @Transactional(readOnly = true)
+     public List<LiveEventResponse> findEvents(Long id) {
++        Live live = findEntityById(id);
++        assertCanViewLive(live.getBranch().getId());
+         return liveEventService.findByLive(id);
+     }
+
+@@ -193,15 +202,57 @@ public class LiveService {
+                 .orElseThrow(() -> new IllegalArgumentException("Live no encontrado con id: " + id));
+     }
+
+-    private void assertCanOperateLive(Long branchId) {
+-        accessService.assertCan(
+-                currentUser.getUserId(),
+-                PermissionCode.DO_LIVE_RESERVATION,
+-                ChannelCode.LIVE,
+-                branchId
++    private void assertCanViewLive(Long branchId) {
++        assertCanAnyLivePermission(
++                branchId,
++                PermissionCode.VIEW_LIVE,
++                PermissionCode.OPERATE_LIVE,
++                PermissionCode.DO_LIVE_RESERVATION
+         );
+     }
+
++    private void assertCanOperateLiveSession(Long branchId) {
++        assertCanAnyLivePermission(
++                branchId,
++                PermissionCode.OPERATE_LIVE,
++                PermissionCode.DO_LIVE_RESERVATION
++        );
++    }
++
++    private void assertCanChangeLiveActiveItem(Long branchId) {
++        assertCanAnyLivePermission(
++                branchId,
++                PermissionCode.CHANGE_LIVE_ACTIVE_ITEM,
++                PermissionCode.DO_LIVE_RESERVATION
++        );
++    }
++
++    private void assertCanRemoveLiveActiveItem(Long branchId) {
++        assertCanAnyLivePermission(
++                branchId,
++                PermissionCode.REMOVE_LIVE_ACTIVE_ITEM,
++                PermissionCode.DO_LIVE_RESERVATION
++        );
++    }
++
++    private void assertCanAnyLivePermission(Long branchId, String primaryPermission, String... fallbackPermissions) {
++        Long userId = currentUser.getUserId();
++
++        if (accessService.can(userId, primaryPermission)) {
++            accessService.assertCan(userId, primaryPermission, ChannelCode.LIVE, branchId);
++            return;
++        }
++
++        for (String fallbackPermission : fallbackPermissions) {
++            if (accessService.can(userId, fallbackPermission)) {
++                accessService.assertCan(userId, fallbackPermission, ChannelCode.LIVE, branchId);
++                return;
++            }
++        }
++
++        accessService.assertCan(userId, primaryPermission, ChannelCode.LIVE, branchId);
++    }
++
+     private void assertBranchBelongsToCurrentTenant(Long branchId) {
+         CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+         tenantResolver.assertBranchBelongsToCompany(branchId, tenant.getCompanyId());
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operation/OperationMenuService.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operation/OperationMenuService.java
+index 2b376bf..cceccb6 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operation/OperationMenuService.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operation/OperationMenuService.java
+@@ -32,13 +32,15 @@ public class OperationMenuService {
+         modules.add(permissionOnly("CUSTOMERS", "Clientes", userId, PermissionCode.VIEW_CUSTOMERS));
+         modules.add(permissionOnly("INVENTORY", "Inventario", userId, PermissionCode.VIEW_INVENTORY));
+
+-        modules.add(permissionAndChannel(
++        modules.add(permissionAndChannelAny(
+                 "LIVE",
+                 "Live",
+                 userId,
+                 user.branchId(),
+-                PermissionCode.DO_LIVE_RESERVATION,
+-                ChannelCode.LIVE
++                ChannelCode.LIVE,
++                PermissionCode.VIEW_LIVE,
++                PermissionCode.OPERATE_LIVE,
++                PermissionCode.DO_LIVE_RESERVATION
+         ));
+
+         modules.add(permissionAndChannel(
+@@ -130,6 +132,38 @@ public class OperationMenuService {
+         );
+     }
+
++    private OperationMenuResponse.MenuModule permissionAndChannelAny(String code,
++                                                                     String name,
++                                                                     Long userId,
++                                                                     Long branchId,
++                                                                     String channelCode,
++                                                                     String... permissionCodes) {
++        boolean hasPermission = false;
++        for (String permissionCode : permissionCodes) {
++            if (hasPermission(userId, permissionCode)) {
++                hasPermission = true;
++                break;
++            }
++        }
++
++        boolean channelEnabled = isChannelEnabled(branchId, channelCode);
++        boolean enabled = hasPermission && channelEnabled;
++        String reason = null;
++
++        if (!hasPermission) {
++            reason = "Permiso requerido: " + String.join(" o ", permissionCodes);
++        } else if (!channelEnabled) {
++            reason = "Canal deshabilitado: " + channelCode;
++        }
++
++        return new OperationMenuResponse.MenuModule(
++                code,
++                name,
++                enabled,
++                reason
++        );
++    }
++
+     private UserBranchRow findUserBranch(Long userId) {
+         return jdbcTemplate.queryForObject(
+                 """
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/security/access/PermissionCode.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/security/access/PermissionCode.java
+index 4e40629..d32602a 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/security/access/PermissionCode.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/security/access/PermissionCode.java
+@@ -20,6 +20,11 @@ public final class PermissionCode {
+     public static final String VIEW_INVENTORY = "VIEW_INVENTORY";
+     public static final String MANAGE_INVENTORY = "MANAGE_INVENTORY";
+
++    public static final String VIEW_LIVE = "VIEW_LIVE";
++    public static final String OPERATE_LIVE = "OPERATE_LIVE";
++    public static final String PREPARE_LIVE_ITEM = "PREPARE_LIVE_ITEM";
++    public static final String CHANGE_LIVE_ACTIVE_ITEM = "CHANGE_LIVE_ACTIVE_ITEM";
++    public static final String REMOVE_LIVE_ACTIVE_ITEM = "REMOVE_LIVE_ACTIVE_ITEM";
+     public static final String DO_LIVE_RESERVATION = "DO_LIVE_RESERVATION";
+     public static final String DO_DOOR_SALE = "DO_DOOR_SALE";
+     public static final String DO_DOOR_RESERVATION = "DO_DOOR_RESERVATION";
+diff --git a/backend/control-ropa/src/main/resources/db/migration/V50__live_minimal_permissions.sql b/backend/control-ropa/src/main/resources/db/migration/V50__live_minimal_permissions.sql
+new file mode 100644
+index 0000000..b2c8afa
+--- /dev/null
++++ b/backend/control-ropa/src/main/resources/db/migration/V50__live_minimal_permissions.sql
+@@ -0,0 +1,51 @@
++SET NAMES utf8mb4;
++START TRANSACTION;
++
++-- LIVE-PERM-A1: permisos LIVE mínimos reales.
++-- Mantiene DO_LIVE_RESERVATION como permiso legacy de apartado LIVE.
++INSERT IGNORE INTO permissions (code, name) VALUES
++  ('VIEW_LIVE', 'Ver LIVE'),
++  ('OPERATE_LIVE', 'Operar LIVE'),
++  ('PREPARE_LIVE_ITEM', 'Preparar prenda para LIVE'),
++  ('CHANGE_LIVE_ACTIVE_ITEM', 'Cambiar prenda al aire'),
++  ('REMOVE_LIVE_ACTIVE_ITEM', 'Retirar prenda del aire');
++
++-- ADMIN: todos los permisos LIVE mínimos.
++INSERT IGNORE INTO role_permissions (role_id, permission_id)
++SELECT r.id, p.id
++FROM roles r
++JOIN permissions p ON p.code IN (
++  'VIEW_LIVE',
++  'OPERATE_LIVE',
++  'PREPARE_LIVE_ITEM',
++  'CHANGE_LIVE_ACTIVE_ITEM',
++  'REMOVE_LIVE_ACTIVE_ITEM'
++)
++WHERE r.code = 'ADMIN';
++
++-- SUPERVISOR: puede operar y supervisar el flujo mínimo aprobado.
++INSERT IGNORE INTO role_permissions (role_id, permission_id)
++SELECT r.id, p.id
++FROM roles r
++JOIN permissions p ON p.code IN (
++  'VIEW_LIVE',
++  'OPERATE_LIVE',
++  'PREPARE_LIVE_ITEM',
++  'CHANGE_LIVE_ACTIVE_ITEM',
++  'REMOVE_LIVE_ACTIVE_ITEM'
++)
++WHERE r.code = 'SUPERVISOR';
++
++-- SELLER: puede apoyar/operar el flujo aprobado, sin retirar prenda del aire.
++INSERT IGNORE INTO role_permissions (role_id, permission_id)
++SELECT r.id, p.id
++FROM roles r
++JOIN permissions p ON p.code IN (
++  'VIEW_LIVE',
++  'OPERATE_LIVE',
++  'PREPARE_LIVE_ITEM',
++  'CHANGE_LIVE_ACTIVE_ITEM'
++)
++WHERE r.code = 'SELLER';
++
++COMMIT;
+diff --git a/docs/AUTH_F_RBAC_PERMISSION_MATRIX.md b/docs/AUTH_F_RBAC_PERMISSION_MATRIX.md
+index c64f2b8..91fb946 100644
+--- a/docs/AUTH_F_RBAC_PERMISSION_MATRIX.md
++++ b/docs/AUTH_F_RBAC_PERMISSION_MATRIX.md
+@@ -19,6 +19,8 @@ Nota AUTH-I2: el permiso dedicado `VIEW_SECURITY_AUDIT` queda documentado en `do
+
+ Nota AUTH-Z: el cierre integral de seguridad queda documentado en `docs/AUTH_Z_SECURITY_FINAL_VALIDATION.md` y se ejecuta con `docs/qa/99-auth-z-final-security-smoke.sh`. Orquesta los smokes AUTH-F6, AUTH-H, AUTH-I2, AUTH-J2, AUTH-J4 y AUTH-J5.
+
++Nota LIVE-PERM-A1: los permisos LIVE minimos reales quedan documentados en `docs/LIVE_PERM_A1_MINIMAL_LIVE_PERMISSIONS.md`. Agrega `VIEW_LIVE`, `OPERATE_LIVE`, `PREPARE_LIVE_ITEM`, `CHANGE_LIVE_ACTIVE_ITEM` y `REMOVE_LIVE_ACTIVE_ITEM`, manteniendo `DO_LIVE_RESERVATION` como compatibilidad para apartados LIVE.
++
+ ## Objetivo
+
+ Iniciar AUTH-F como fase de diagnostico y matriz RBAC. Esta fase no cambia permisos productivos, no agrega migraciones, no toca SQL y no modifica enforcement funcional. El resultado es una base formal para decidir subfases posteriores de RBAC avanzado.
+@@ -61,7 +63,7 @@ Fuera de alcance:
+ | Ventas | `DO_DOOR_SALE`, `CANCEL_SALE` |
+ | Reservas | `DO_LIVE_RESERVATION`, `DO_DOOR_RESERVATION`, `CANCEL_RESERVATION` |
+ | Reportes | `VIEW_REPORTS`, `VIEW_DEPOSIT_REPORTS` en migracion/dataset, no presente en `PermissionCode.java` |
+-| En vivo | `DO_LIVE_RESERVATION` |
++| En vivo | `VIEW_LIVE`, `OPERATE_LIVE`, `PREPARE_LIVE_ITEM`, `CHANGE_LIVE_ACTIVE_ITEM`, `REMOVE_LIVE_ACTIVE_ITEM`, `DO_LIVE_RESERVATION` |
+ | Sistema/Usuarios | `MANAGE_USERS`, `MANAGE_ROLES`, `MANAGE_SECURITY_SETTINGS`, `VIEW_SECURITY_AUDIT`, `MANAGE_BRANCHES`, `MANAGE_BRANCH_CHANNELS`, `MANAGE_CATALOGS`, `MANAGE_BRANDING` |
+ | Transferencias | `MANAGE_TRANSFERS`, `SEND_TRANSFERS`, `RECEIVE_TRANSFERS`, `CANCEL_TRANSFERS` |
+ | Consignaciones | `MANAGE_CONSIGNMENTS`, `SETTLE_CONSIGNMENTS`, `CANCEL_CONSIGNMENTS` |
+@@ -128,8 +130,8 @@ Notas:
+ | Lotes | `GET /api/batches/**` | `BatchController` | Si | Batches tenant-aware | `VIEW_INVENTORY` | Mantener o crear permiso lote lectura | Medio |
+ | Lotes | `POST/PATCH/PUT /api/batches/**` | `BatchController` | Si | Batches tenant-aware | `MANAGE_INVENTORY` | Mantener o crear permisos lote finos | Medio |
+ | Ubicaciones/Cajas | `/api/storage-locations/**`, `/api/boxes/**` | Inventario | Si | Branch | No confirmado permiso funcional completo | `VIEW_INVENTORY`/`MANAGE_INVENTORY` | Alto |
+-| En vivo | `/api/lives/branch/{branchId}`, `/{id}` | `LiveController` | Si | Branch/company | `DO_LIVE_RESERVATION` observado | Separar `VIEW_LIVE` futuro si se requiere presentadora solo vista | Medio |
+-| En vivo | `POST /api/lives/branch/{branchId}`, activar/cerrar | `LiveController` | Si | Branch/company | `DO_LIVE_RESERVATION` | `MANAGE_LIVE` futuro si se separa operacion | Medio |
++| En vivo | `/api/lives/branch/{branchId}`, `/{id}` | `LiveController` | Si | Branch/company | `VIEW_LIVE`, `OPERATE_LIVE` o `DO_LIVE_RESERVATION` legacy | Mantener separacion minima LIVE-PERM-A1 | Medio |
++| En vivo | `POST /api/lives/branch/{branchId}`, activar/cerrar | `LiveController` | Si | Branch/company | `OPERATE_LIVE` o `DO_LIVE_RESERVATION` legacy | Mantener operacion minima LIVE-PERM-A1 | Medio |
+ | Reservas | `GET /api/reservations/**` | `ReservationController` | Si | Branch/reservation | No confirmado permiso lectura fino | `DO_LIVE_RESERVATION`/`DO_DOOR_RESERVATION` o `VIEW_RESERVATIONS` futuro | Alto |
+ | Reservas | `POST /api/reservations` | `ReservationController` | Si | Branch/canal | `DO_LIVE_RESERVATION` o `DO_DOOR_RESERVATION` por canal | Mantener | Medio |
+ | Reservas | `PATCH /api/reservations/{id}/cancel` | `ReservationController` | Si | Reservation | `CANCEL_RESERVATION` | Mantener | Medio |
+@@ -162,7 +164,7 @@ Notas:
+ | `/items` | `VIEW_INVENTORY` o `MANAGE_INVENTORY` | `/api/items/**` | Si | Bajo/medio |
+ | `/items-create` | Operacion inventario | `/api/items` | Pendiente de confirmar directo | No hay `CREATE_ITEM` persistido |
+ | `/batches` | `VIEW_INVENTORY` o `MANAGE_INVENTORY` | `/api/batches/**` | Si | Permiso fino lote pendiente |
+-| `/live` | `DO_LIVE_RESERVATION` y helpers LIVE | `/api/lives`, customers/items/reservations | Si | Separacion presentadora/operador aun no existe en backend |
++| `/live` | `VIEW_LIVE`, `OPERATE_LIVE`, `PREPARE_LIVE_ITEM`, `CHANGE_LIVE_ACTIVE_ITEM`, `REMOVE_LIVE_ACTIVE_ITEM` y `DO_LIVE_RESERVATION` legacy | `/api/lives`, customers/items/reservations | Si | Separacion minima implementada; autorizaciones/precio/pagos siguen fuera de alcance |
+ | `/payments` | `REGISTER_PAYMENTS` en menu | `/api/payments/**` | Parcial | Falta `VIEW_PAYMENTS` para consulta |
+ | `/door-sale` | `DO_DOOR_SALE` | ventas/pagos/items | Por menu/canal | Backend create cubierto; lectura venta pendiente |
+ | `/door-reservation`, `/reservations` | `DO_DOOR_RESERVATION` | `/api/reservations/**` | Por menu/canal | Lectura reserva fina pendiente |
+@@ -198,7 +200,7 @@ Notas:
+
+ - `/customers` bloquea con `VIEW_CUSTOMERS`, pero backend de clientes debe ser fuente final.
+ - `/payments` se expone por `REGISTER_PAYMENTS`, pero las consultas de pagos no tienen permiso de lectura dedicado.
+-- LIVE usa helpers frontend por rol/capacidad; backend todavia opera principalmente con `DO_LIVE_RESERVATION`.
++- LIVE-PERM-A1 separa permisos minimos de ver/operar/preparar/cambiar/retirar prenda al aire; `DO_LIVE_RESERVATION` queda como compatibilidad de apartado LIVE. Precio, pagos, reversas y autorizaciones siguen pendientes.
+
+ ### Permisos sugeridos que no existen
+
+diff --git a/docs/ERP_BITACORA_CAMBIOS.md b/docs/ERP_BITACORA_CAMBIOS.md
+index 32a156c..9d7fecc 100644
+--- a/docs/ERP_BITACORA_CAMBIOS.md
++++ b/docs/ERP_BITACORA_CAMBIOS.md
+@@ -3226,3 +3226,27 @@ Decision:
+
+ - `GO tecnico condicionado`.
+ - Pendiente ejecutar script QA y smoke QA con roles A/B antes de declarar cierre runtime final AUTH-F3.
++
++## 2026-06-09 - LIVE-PERM-A1 permisos LIVE minimos reales
++
++Tipo: cambio controlado RBAC/LIVE con migracion Flyway, enforcement minimo backend, capacidades frontend y documentacion.
++
++Objetivo:
++
++- Crear permisos reales minimos para separar visualizacion, operacion, preparacion de prenda y control de prenda al aire.
++- Mantener `DO_LIVE_RESERVATION` como compatibilidad para apartados LIVE.
++- No tocar precio LIVE, pagos, caja, devoluciones ni autorizaciones complejas.
++
++Cambios realizados:
++
++- `V50__live_minimal_permissions.sql`: inserta `VIEW_LIVE`, `OPERATE_LIVE`, `PREPARE_LIVE_ITEM`, `CHANGE_LIVE_ACTIVE_ITEM` y `REMOVE_LIVE_ACTIVE_ITEM`.
++- `PermissionCode.java`: agrega constantes de permisos LIVE minimos.
++- `LiveService`: aplica enforcement minimo con fallback legacy.
++- `OperationMenuService`: muestra LIVE con `VIEW_LIVE`, `OPERATE_LIVE` o `DO_LIVE_RESERVATION`.
++- `services/liveCapabilities.ts`: alinea capacidades frontend con permisos minimos.
++- `docs/LIVE_PERM_A1_MINIMAL_LIVE_PERMISSIONS.md`: documenta alcance, permisos creados y exclusiones.
++
++Decision:
++
++- `GO tecnico` si backend/frontend pasan validaciones.
++- `PENDING_QA_VISUAL` hasta validar roles y pantalla LIVE con evidencia real.
+diff --git a/docs/ERP_RIESGOS_OPERATIVOS.md b/docs/ERP_RIESGOS_OPERATIVOS.md
+index c648551..bc35f28 100644
+--- a/docs/ERP_RIESGOS_OPERATIVOS.md
++++ b/docs/ERP_RIESGOS_OPERATIVOS.md
+@@ -209,6 +209,7 @@ Probabilidad:
+ - AUTH-F2 propone catalogo minimo pero no lo implementa; hasta crear migracion, seeds, frontend y enforcement, `CREATE_CUSTOMER`, `EDIT_CUSTOMER`, `VIEW_PAYMENTS` y `VIEW_SALES` siguen siendo decisiones pendientes, no permisos reales.
+ - AUTH-F3 crea permisos y enforcement P0 inicial; roles productivos reales no reciben permisos nuevos, por lo que QA/productivo deben actualizar asignaciones de forma controlada antes de validar flujos completos.
+ - AUTH-F3 protege consultas de pagos/ventas; pantallas o integraciones que antes dependian solo de `REGISTER_PAYMENTS` o `DO_DOOR_SALE` pueden requerir `VIEW_PAYMENTS`/`VIEW_SALES` en roles.
++- LIVE-PERM-A1 crea permisos LIVE minimos y asignaciones base; QA debe validar roles reales porque `DO_LIVE_RESERVATION` se conserva como compatibilidad y aun no existen permisos de precio, pagos, caja, reversas ni autorizaciones LIVE.
+ - PRODUCT-ERR-A agrega mapper frontend de errores accionables; modulos fuera de las rutas criticas aun deben migrarse por dominio para evitar que `err.message` exponga mensajes genericos o tecnicos.
+ - Pagos/ventas sin regresion automatizada suficiente.
+ - Auditoria de negocio todavia parcial.
+diff --git a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+index 9351092..a0a47fb 100644
+--- a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
++++ b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+@@ -789,3 +789,25 @@ Pendiente backlog:
+ | Validar frontend completo | P0 | ALTO | build web | Pantallas no quedan ocultas para roles QA actualizados |
+ | AUTH-F4 extender direcciones cliente | P1 | ALTO | decision negocio | Direcciones respetan `EDIT_CUSTOMER` si se aprueba |
+ | AUTH-F5 asignacion productiva controlada | P1 | CRITICO | smoke QA | Roles reales reciben permisos nuevos con aprobacion |
++
++## Avance LIVE-PERM-A1
++
++Epic: permisos LIVE minimos reales.
++
++Completado:
++
++- Crear migracion `V50__live_minimal_permissions.sql`.
++- Agregar permisos `VIEW_LIVE`, `OPERATE_LIVE`, `PREPARE_LIVE_ITEM`, `CHANGE_LIVE_ACTIVE_ITEM` y `REMOVE_LIVE_ACTIVE_ITEM`.
++- Mantener `DO_LIVE_RESERVATION` como permiso legacy de apartado LIVE.
++- Aplicar enforcement minimo en `LiveService` para lectura/operacion/cambio/retiro de prenda al aire.
++- Alinear menu operativo y capacidades frontend.
++- Documentar que precio, pagos, caja, devoluciones y autorizaciones quedan fuera de alcance.
++
++Pendiente backlog:
++
++| Tarea | Prioridad | Riesgo | Dependencia | Criterio de aceptacion |
++|---|---|---|---|---|
++| QA visual LIVE-PERM-A1 | P0 | ALTO | build y backend QA | Admin/supervisor/vendedor/sin permisos validan capacidades reales |
++| LIVE-PERM-A2 enforcement fino reservas/reversas | P0 | CRITICO | aprobacion arquitectura | Cancelacion/reversa con pago no depende de permiso general |
++| LIVE-AUTH implementacion autorizaciones | P0 | CRITICO | LIVE-AUTH-A/LIVE-ROLE-A/LIVE-Z10B aprobados | Solicitud/aprobacion real auditada |
++| LIVE-Z10C backend precio autorizado | P1 | CRITICO | aprobacion arquitectura | Cambio de precio no simulado y con auditoria |
+diff --git a/docs/LIVE_PERM_A1_MINIMAL_LIVE_PERMISSIONS.md b/docs/LIVE_PERM_A1_MINIMAL_LIVE_PERMISSIONS.md
+new file mode 100644
+index 0000000..5e5d30b
+--- /dev/null
++++ b/docs/LIVE_PERM_A1_MINIMAL_LIVE_PERMISSIONS.md
+@@ -0,0 +1,156 @@
++# LIVE-PERM-A1 - Permisos LIVE minimos reales
++
++Fecha: 2026-06-09
++
++Rama: `feature/live-perm-a1-minimal-live-permissions`
++
++Commit base de aprobacion: `0809994 LIVE-PERM-A0 documenta handoff arquitectonico`
++
++## Resumen ejecutivo
++
++LIVE-PERM-A1 implementa el MVP aprobado de permisos LIVE reales para separar visualizacion, operacion, preparacion de prenda y control de la prenda al aire.
++
++La fase crea solo cinco permisos autorizados:
++
++- `VIEW_LIVE`
++- `OPERATE_LIVE`
++- `PREPARE_LIVE_ITEM`
++- `CHANGE_LIVE_ACTIVE_ITEM`
++- `REMOVE_LIVE_ACTIVE_ITEM`
++
++No se implementan autorizaciones de precio, autorizaciones operativas complejas, pagos, caja, devoluciones, reversas con pago, endpoints nuevos ni migraciones fuera del catalogo minimo aprobado.
++
++## Problema
++
++Antes de esta fase, `DO_LIVE_RESERVATION` concentraba demasiadas capacidades LIVE. Ese permiso permitia apartar en LIVE y tambien funcionaba como permiso operativo legacy para ver/operar sesion y manejar prendas al aire.
++
++Esto dificultaba separar escenarios como:
++
++- usuario que solo puede ver LIVE;
++- usuario que puede operar la sesion;
++- usuario que puede preparar una prenda;
++- usuario que puede cambiar la prenda al aire;
++- usuario que puede retirar la prenda del aire.
++
++## Permisos creados
++
++| Permiso | Uso previsto | Alcance de A1 |
++| --- | --- | --- |
++| `VIEW_LIVE` | Ver estado, eventos e historial LIVE. | Catalogo backend, UI legible y menu operativo. |
++| `OPERATE_LIVE` | Operar flujo LIVE basico. | Catalogo backend, capacidades frontend y compatibilidad con menu. |
++| `PREPARE_LIVE_ITEM` | Preparar una prenda para el flujo LIVE. | Catalogo backend y capacidades frontend. |
++| `CHANGE_LIVE_ACTIVE_ITEM` | Poner o cambiar la prenda al aire. | Catalogo backend, enforcement minimo backend y capacidades frontend. |
++| `REMOVE_LIVE_ACTIVE_ITEM` | Retirar la prenda al aire. | Catalogo backend, enforcement minimo backend y capacidades frontend. |
++
++## Permisos no creados
++
++Estos permisos siguen como futuros/propuestos. No se crean ni se hacen asignables en esta fase:
++
++- `CHANGE_LIVE_PRICE`
++- `REQUEST_LIVE_PRICE_CHANGE`
++- `APPROVE_LIVE_PRICE_CHANGE`
++- `APPLY_APPROVED_LIVE_PRICE_CHANGE`
++- `VIEW_LIVE_PRICE_AUTHORIZATIONS`
++- `REQUEST_LIVE_OPERATION_AUTHORIZATION`
++- `APPROVE_LIVE_OPERATION_AUTHORIZATION`
++- `VIEW_LIVE_OPERATION_AUTHORIZATIONS`
++- `APPLY_LIVE_OPERATION_AUTHORIZATION`
++- `CLOSE_LIVE_OPERATIONAL_SALE`
++- `UNDO_LIVE_OPERATIONAL_SALE`
++- `RELEASE_RESERVED_ITEM`
++- `CANCEL_RESERVATION_WITH_PAYMENT`
++- `REASSIGN_RESERVATION`
++- `EDIT_LOCKED_ITEM`
++- `VIEW_PAYMENT_STATUS`
++
++## Migracion
++
++Se agrega `backend/control-ropa/src/main/resources/db/migration/V50__live_minimal_permissions.sql`.
++
++La migracion:
++
++- inserta de forma idempotente los cinco permisos aprobados;
++- asigna a `ADMIN` los cinco permisos;
++- asigna a `SUPERVISOR` los cinco permisos;
++- asigna a `SELLER` `VIEW_LIVE`, `OPERATE_LIVE`, `PREPARE_LIVE_ITEM` y `CHANGE_LIVE_ACTIVE_ITEM`;
++- no asigna `REMOVE_LIVE_ACTIVE_ITEM` a `SELLER`;
++- no modifica pagos, caja, devoluciones, precio, autorizaciones ni permisos fuera de alcance.
++
++`DO_LIVE_RESERVATION` se conserva como permiso legacy para apartados LIVE y compatibilidad durante la transicion.
++
++## Backend
++
++Cambios principales:
++
++- `PermissionCode.java` declara los cinco permisos nuevos.
++- `LiveService` separa enforcement minimo para:
++  - ver LIVE;
++  - operar sesion LIVE;
++  - cambiar prenda al aire;
++  - retirar prenda al aire.
++- `LiveService` mantiene fallback compatible con `DO_LIVE_RESERVATION`.
++- `OperationMenuService` permite mostrar el modulo LIVE con `VIEW_LIVE`, `OPERATE_LIVE` o `DO_LIVE_RESERVATION`.
++
++No se crean endpoints nuevos.
++
++## Frontend
++
++Cambios principales:
++
++- `services/liveCapabilities.ts` reconoce los permisos minimos nuevos.
++- `DO_LIVE_RESERVATION` queda acotado a apartados LIVE y compatibilidad legacy.
++- Preparar prenda usa `PREPARE_LIVE_ITEM` cuando existe.
++- Cambiar prenda al aire usa `CHANGE_LIVE_ACTIVE_ITEM` cuando existe.
++- Retirar prenda al aire usa `REMOVE_LIVE_ACTIVE_ITEM` cuando existe.
++- `services/permissionDependencies.ts` agrega etiqueta visible para `VIEW_LIVE` y dependencias sugeridas entre permisos LIVE minimos.
++
++No se hardcodean permisos nuevos en pantallas; las pantallas siguen consumiendo capacidades resueltas.
++
++## Compatibilidad
++
++Para no romper ambientes con roles legacy:
++
++- `DO_LIVE_RESERVATION` sigue habilitando operacion LIVE donde antes lo hacia.
++- Los apartados LIVE siguen dependiendo de `DO_LIVE_RESERVATION`.
++- La separacion fina queda disponible para roles actualizados por V50.
++
++## Fuera de alcance
++
++Queda fuera de A1:
++
++- cambio de precio LIVE;
++- solicitud/aprobacion de autorizaciones;
++- cancelacion o reversa de apartados con pago;
++- caja;
++- pagos;
++- devoluciones;
++- permisos sensibles no aprobados;
++- migraciones de datos ajenos;
++- cambios de endpoints.
++
++## Riesgos
++
++| Riesgo | Mitigacion |
++| --- | --- |
++| Roles con permisos legacy pueden seguir operando por `DO_LIVE_RESERVATION`. | Se conserva como compatibilidad temporal y se documenta migracion gradual. |
++| UI y backend pueden divergir si roles productivos no se actualizan. | V50 asigna roles base conocidos; QA debe revisar roles reales antes de release. |
++| `SELLER` recibe capacidad de preparar/cambiar prenda segun aprobacion A1. | No recibe `REMOVE_LIVE_ACTIVE_ITEM`; acciones sensibles quedan fuera. |
++| Permisos sensibles futuros podrian confundirse con implementados. | Documento lista explicitamente permisos no creados. |
++
++## QA requerido
++
++QA debe validar:
++
++1. Admin ve y opera LIVE.
++2. Supervisor ve y opera flujo minimo aprobado.
++3. Vendedor puede ver, preparar y cambiar prenda si su rol recibio permisos A1.
++4. Vendedor no puede retirar prenda del aire si no tiene `REMOVE_LIVE_ACTIVE_ITEM`.
++5. Usuario sin permisos no accede a LIVE.
++6. `DO_LIVE_RESERVATION` sigue permitiendo apartar en LIVE.
++7. Precio, pagos, caja y autorizaciones no muestran funciones nuevas.
++
++Sin evidencia visual real, el estado funcional queda `PENDING_QA_VISUAL`.
++
++## Resultado
++
++Resultado esperado de la fase: `GO_TECNICO` si pasan pruebas backend/frontend y `PENDING_QA_VISUAL` hasta ejecutar QA real.
+diff --git a/qa-reports/LIVE-PERM-A1-minimal-live-permissions-report-20260609-011548.md b/qa-reports/LIVE-PERM-A1-minimal-live-permissions-report-20260609-011548.md
+new file mode 100644
+index 0000000..74b077b
+--- /dev/null
++++ b/qa-reports/LIVE-PERM-A1-minimal-live-permissions-report-20260609-011548.md
+@@ -0,0 +1,138 @@
++# LIVE-PERM-A1 - Reporte tecnico
++
++Fecha: 2026-06-09 01:15:48
++
++Rama: `feature/live-perm-a1-minimal-live-permissions`
++
++Fase: LIVE-PERM-A1 - Permisos LIVE minimos reales
++
++## Resumen
++
++Se implemento el MVP aprobado de permisos LIVE reales:
++
++- `VIEW_LIVE`
++- `OPERATE_LIVE`
++- `PREPARE_LIVE_ITEM`
++- `CHANGE_LIVE_ACTIVE_ITEM`
++- `REMOVE_LIVE_ACTIVE_ITEM`
++
++No se implementaron permisos de precio, pagos, caja, devoluciones, autorizaciones operativas, reversas con pago ni endpoints nuevos.
++
++## Comandos ejecutados
++
++Comandos iniciales:
++
++- `git branch --show-current`
++- `git status`
++- `git log --oneline -15`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-PERM-A0"`
++- `git --no-pager log --oneline --all --decorate --grep="PRODUCT-UX-B2"`
++
++Auditoria:
++
++- `git grep` sobre `PermissionCode`, permisos actuales, enforcement backend, migraciones y mapper frontend.
++- Revision de `LiveService`, `OperationMenuService`, `PermissionCode.java`, migraciones Flyway y capacidades frontend.
++
++Validaciones:
++
++- `.\mvnw.cmd test`
++- `npm.cmd run lint`
++- `npx.cmd tsc --noEmit`
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`
++- `git --no-pager diff --check`
++
++## Resultado de comandos
++
++Backend:
++
++- Primer intento `.\mvnw.cmd test`: fallo por configuracion local, `Access denied for user 'root'@'localhost' (using password: NO)`.
++- Segundo intento cargando `.env`: fallo porque el loader local de prueba dejo comillas literales en `CONTROL_ROPA_DB_URL`.
++- Tercer intento cargando `.env` con saneo de comillas: `PASS`.
++- Flyway valido `50 migrations`.
++- Schema actual reportado por Flyway: version `50`.
++
++Frontend:
++
++- `npm.cmd run lint`: `PASS` con warnings preexistentes, 0 errores.
++- `npx.cmd tsc --noEmit`: `PASS`.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: `PASS`.
++
++Git:
++
++- `git --no-pager diff --check`: `PASS` sin errores; solo warnings CRLF.
++
++## Archivos tocados
++
++Backend:
++
++- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/security/access/PermissionCode.java`
++- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveService.java`
++- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operation/OperationMenuService.java`
++- `backend/control-ropa/src/main/resources/db/migration/V50__live_minimal_permissions.sql`
++
++Frontend:
++
++- `services/liveCapabilities.ts`
++- `services/permissionDependencies.ts`
++
++Documentacion:
++
++- `docs/LIVE_PERM_A1_MINIMAL_LIVE_PERMISSIONS.md`
++- `docs/AUTH_F_RBAC_PERMISSION_MATRIX.md`
++- `docs/ERP_BITACORA_CAMBIOS.md`
++- `docs/ERP_RIESGOS_OPERATIVOS.md`
++- `docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md`
++
++## Permisos creados
++
++Solo se crearon los cinco permisos aprobados:
++
++- `VIEW_LIVE`
++- `OPERATE_LIVE`
++- `PREPARE_LIVE_ITEM`
++- `CHANGE_LIVE_ACTIVE_ITEM`
++- `REMOVE_LIVE_ACTIVE_ITEM`
++
++## Permisos no creados
++
++No se crearon:
++
++- `CHANGE_LIVE_PRICE`
++- `REQUEST_LIVE_PRICE_CHANGE`
++- `APPROVE_LIVE_PRICE_CHANGE`
++- `APPLY_APPROVED_LIVE_PRICE_CHANGE`
++- `VIEW_LIVE_PRICE_AUTHORIZATIONS`
++- `REQUEST_LIVE_OPERATION_AUTHORIZATION`
++- `APPROVE_LIVE_OPERATION_AUTHORIZATION`
++- `VIEW_LIVE_OPERATION_AUTHORIZATIONS`
++- `APPLY_LIVE_OPERATION_AUTHORIZATION`
++- `CLOSE_LIVE_OPERATIONAL_SALE`
++- `UNDO_LIVE_OPERATIONAL_SALE`
++- `RELEASE_RESERVED_ITEM`
++- `CANCEL_RESERVATION_WITH_PAYMENT`
++- `REASSIGN_RESERVATION`
++- `EDIT_LOCKED_ITEM`
++- `VIEW_PAYMENT_STATUS`
++
++## Migracion
++
++Migracion creada: `V50__live_minimal_permissions.sql`.
++
++La migracion:
++
++- inserta permisos con `INSERT IGNORE`;
++- asigna permisos base a `ADMIN`, `SUPERVISOR` y `SELLER` siguiendo el alcance aprobado;
++- no modifica datos de pagos, caja, devoluciones, precio ni autorizaciones;
++- no borra ni renombra `DO_LIVE_RESERVATION`.
++
++## Riesgos
++
++- `DO_LIVE_RESERVATION` sigue como compatibilidad legacy. QA debe validar roles reales para evitar permisos excesivos en operacion.
++- No hay evidencia visual real en esta fase.
++- Precio, pagos, caja, reversas y autorizaciones siguen pendientes para fases aprobadas por arquitectura.
++
++## Resultado
++
++Resultado tecnico: `GO_TECNICO`.
++
++Resultado QA visual: `PENDING_QA_VISUAL`.
+diff --git a/services/liveCapabilities.ts b/services/liveCapabilities.ts
+index eb0db65..7fc04e7 100644
+--- a/services/liveCapabilities.ts
++++ b/services/liveCapabilities.ts
+@@ -1,5 +1,4 @@
+ import {
+-  canAccess,
+   canAccessByPermission,
+   hasEffectivePermission,
+   hasPermission,
+@@ -81,15 +80,25 @@ export function resolveLiveCapabilities(user: UserSession | null): LiveCapabilit
+   const seller = hasRole(user, 'SELLER') || hasRole(user, 'QA_TENANT_SELLER');
+   const supervisor = hasRole(user, 'SUPERVISOR');
+   const liveReservation = hasPermission(user, 'DO_LIVE_RESERVATION');
++  const viewLivePermission = hasPermission(user, 'VIEW_LIVE');
++  const operateLivePermission = hasPermission(user, 'OPERATE_LIVE');
++  const prepareLiveItemPermission = hasPermission(user, 'PREPARE_LIVE_ITEM');
++  const changeLiveActiveItemPermission = hasPermission(user, 'CHANGE_LIVE_ACTIVE_ITEM');
++  const removeLiveActiveItemPermission = hasPermission(user, 'REMOVE_LIVE_ACTIVE_ITEM');
+   const viewReports = hasPermission(user, 'VIEW_REPORTS');
+-  const operate = canAccess(user, LIVE_CHANNEL, 'DO_LIVE_RESERVATION');
+-  const canViewLive = liveChannelEnabled && (admin || seller || supervisor || liveReservation || viewReports);
+-  const canSelectCustomer = operate && canAccessByPermission(user, 'VIEW_CUSTOMERS');
++  const operate = liveChannelEnabled && (operateLivePermission || liveReservation);
++  const canViewLive =
++    liveChannelEnabled &&
++    (admin || viewLivePermission || operateLivePermission || liveReservation || viewReports);
++  const canSelectCustomer = liveChannelEnabled && liveReservation && canAccessByPermission(user, 'VIEW_CUSTOMERS');
+   const canSelectItem = operate && canAccessByPermission(user, 'VIEW_INVENTORY');
+   const canManageInventory = canAccessByPermission(user, 'MANAGE_INVENTORY');
+   const canCreateDoorSale = canAccessByPermission(user, 'DO_DOOR_SALE');
+   const canManageLiveSession = operate && (admin || (!seller && !supervisor));
+   const canManageLiveItem = canManageLiveSession && canSelectItem;
++  const canPrepareLiveItem = canSelectItem && (prepareLiveItemPermission || canManageLiveItem);
++  const canSetLiveActiveItem = canSelectItem && (changeLiveActiveItemPermission || canManageLiveItem);
++  const canClearLiveActiveItem = canSelectItem && (removeLiveActiveItemPermission || canManageLiveItem);
+   const canCancelReservation = operate && canAccessByPermission(user, 'CANCEL_RESERVATION');
+   const canMarkOperationalSold = operate && (admin || canCreateDoorSale);
+   const canViewPayments = hasEffectivePermission(user, 'VIEW_PAYMENTS');
+@@ -122,12 +131,12 @@ export function resolveLiveCapabilities(user: UserSession | null): LiveCapabilit
+     canOperateLive: operate,
+     canStartLive: canManageLiveSession,
+     canCloseLive: canManageLiveSession,
+-    canPrepareItem: canManageLiveItem,
+-    canSetActiveItem: canManageLiveItem,
+-    canClearActiveItem: canManageLiveItem,
+-    canCreateReservation: operate,
++    canPrepareItem: canPrepareLiveItem,
++    canSetActiveItem: canSetLiveActiveItem,
++    canClearActiveItem: canClearLiveActiveItem,
++    canCreateReservation: liveChannelEnabled && liveReservation,
+     canCancelReservation,
+-    canMarkPending: operate,
++    canMarkPending: liveChannelEnabled && liveReservation,
+     canMarkOperationalSold,
+     canReleaseReservedItem: canCancelReservation && canManageInventory && canViewPayments,
+     canChangeLivePrice,
+diff --git a/services/permissionDependencies.ts b/services/permissionDependencies.ts
+index fd5d917..196e7e7 100644
+--- a/services/permissionDependencies.ts
++++ b/services/permissionDependencies.ts
+@@ -9,6 +9,10 @@ export const SUGGESTED_PERMISSION_DEPENDENCIES: Record<string, string[]> = {
+   EDIT_ITEM: ['VIEW_INVENTORY'],
+   REGISTER_PAYMENTS: ['VIEW_PAYMENTS'],
+   VOID_PAYMENT: ['VIEW_PAYMENTS'],
++  OPERATE_LIVE: ['VIEW_LIVE'],
++  PREPARE_LIVE_ITEM: ['VIEW_LIVE'],
++  CHANGE_LIVE_ACTIVE_ITEM: ['OPERATE_LIVE'],
++  REMOVE_LIVE_ACTIVE_ITEM: ['OPERATE_LIVE'],
+ };
+
+ const PERMISSION_GROUP_ORDER = [
+@@ -94,6 +98,7 @@ const PERMISSION_LABELS_ES: Record<string, string> = {
+   VIEW_CUSTOMERS: 'Ver clientes',
+   VIEW_DEPOSIT_REPORTS: 'Ver reporte de depósitos',
+   VIEW_INVENTORY: 'Ver inventario',
++  VIEW_LIVE: 'Ver LIVE',
+   VIEW_LIVE_OPERATION_AUTHORIZATIONS: 'Ver autorizaciones operativas LIVE',
+   VIEW_LIVE_PRICE_AUTHORIZATIONS: 'Ver autorizaciones de precio LIVE',
+   VIEW_PAYMENT_STATUS: 'Ver estado de pago',
+@@ -173,6 +178,7 @@ const PERMISSION_LABELS_EN: Record<string, string> = {
+   VIEW_CUSTOMERS: 'View customers',
+   VIEW_DEPOSIT_REPORTS: 'View deposit reports',
+   VIEW_INVENTORY: 'View inventory',
++  VIEW_LIVE: 'View LIVE',
+   VIEW_LIVE_OPERATION_AUTHORIZATIONS: 'View LIVE operational authorizations',
+   VIEW_LIVE_PRICE_AUTHORIZATIONS: 'View LIVE price authorizations',
+   VIEW_PAYMENT_STATUS: 'View payment status',

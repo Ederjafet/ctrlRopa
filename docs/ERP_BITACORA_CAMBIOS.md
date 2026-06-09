@@ -3226,3 +3226,27 @@ Decision:
 
 - `GO tecnico condicionado`.
 - Pendiente ejecutar script QA y smoke QA con roles A/B antes de declarar cierre runtime final AUTH-F3.
+
+## 2026-06-09 - LIVE-PERM-A1 permisos LIVE minimos reales
+
+Tipo: cambio controlado RBAC/LIVE con migracion Flyway, enforcement minimo backend, capacidades frontend y documentacion.
+
+Objetivo:
+
+- Crear permisos reales minimos para separar visualizacion, operacion, preparacion de prenda y control de prenda al aire.
+- Mantener `DO_LIVE_RESERVATION` como compatibilidad para apartados LIVE.
+- No tocar precio LIVE, pagos, caja, devoluciones ni autorizaciones complejas.
+
+Cambios realizados:
+
+- `V50__live_minimal_permissions.sql`: inserta `VIEW_LIVE`, `OPERATE_LIVE`, `PREPARE_LIVE_ITEM`, `CHANGE_LIVE_ACTIVE_ITEM` y `REMOVE_LIVE_ACTIVE_ITEM`.
+- `PermissionCode.java`: agrega constantes de permisos LIVE minimos.
+- `LiveService`: aplica enforcement minimo con fallback legacy.
+- `OperationMenuService`: muestra LIVE con `VIEW_LIVE`, `OPERATE_LIVE` o `DO_LIVE_RESERVATION`.
+- `services/liveCapabilities.ts`: alinea capacidades frontend con permisos minimos.
+- `docs/LIVE_PERM_A1_MINIMAL_LIVE_PERMISSIONS.md`: documenta alcance, permisos creados y exclusiones.
+
+Decision:
+
+- `GO tecnico` si backend/frontend pasan validaciones.
+- `PENDING_QA_VISUAL` hasta validar roles y pantalla LIVE con evidencia real.

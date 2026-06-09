@@ -789,3 +789,25 @@ Pendiente backlog:
 | Validar frontend completo | P0 | ALTO | build web | Pantallas no quedan ocultas para roles QA actualizados |
 | AUTH-F4 extender direcciones cliente | P1 | ALTO | decision negocio | Direcciones respetan `EDIT_CUSTOMER` si se aprueba |
 | AUTH-F5 asignacion productiva controlada | P1 | CRITICO | smoke QA | Roles reales reciben permisos nuevos con aprobacion |
+
+## Avance LIVE-PERM-A1
+
+Epic: permisos LIVE minimos reales.
+
+Completado:
+
+- Crear migracion `V50__live_minimal_permissions.sql`.
+- Agregar permisos `VIEW_LIVE`, `OPERATE_LIVE`, `PREPARE_LIVE_ITEM`, `CHANGE_LIVE_ACTIVE_ITEM` y `REMOVE_LIVE_ACTIVE_ITEM`.
+- Mantener `DO_LIVE_RESERVATION` como permiso legacy de apartado LIVE.
+- Aplicar enforcement minimo en `LiveService` para lectura/operacion/cambio/retiro de prenda al aire.
+- Alinear menu operativo y capacidades frontend.
+- Documentar que precio, pagos, caja, devoluciones y autorizaciones quedan fuera de alcance.
+
+Pendiente backlog:
+
+| Tarea | Prioridad | Riesgo | Dependencia | Criterio de aceptacion |
+|---|---|---|---|---|
+| QA visual LIVE-PERM-A1 | P0 | ALTO | build y backend QA | Admin/supervisor/vendedor/sin permisos validan capacidades reales |
+| LIVE-PERM-A2 enforcement fino reservas/reversas | P0 | CRITICO | aprobacion arquitectura | Cancelacion/reversa con pago no depende de permiso general |
+| LIVE-AUTH implementacion autorizaciones | P0 | CRITICO | LIVE-AUTH-A/LIVE-ROLE-A/LIVE-Z10B aprobados | Solicitud/aprobacion real auditada |
+| LIVE-Z10C backend precio autorizado | P1 | CRITICO | aprobacion arquitectura | Cambio de precio no simulado y con auditoria |

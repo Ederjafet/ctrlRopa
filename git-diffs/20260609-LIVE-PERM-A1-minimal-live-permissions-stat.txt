@@ -1,0 +1,13 @@
+﻿ .../com/hpsqsoft/ctrlropa/live/LiveService.java    |  71 ++++++++--
+ .../ctrlropa/operation/OperationMenuService.java   |  40 +++++-
+ .../ctrlropa/security/access/PermissionCode.java   |   5 +
+ .../db/migration/V50__live_minimal_permissions.sql |  51 +++++++
+ docs/AUTH_F_RBAC_PERMISSION_MATRIX.md              |  12 +-
+ docs/ERP_BITACORA_CAMBIOS.md                       |  24 ++++
+ docs/ERP_RIESGOS_OPERATIVOS.md                     |   1 +
+ docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md          |  22 +++
+ docs/LIVE_PERM_A1_MINIMAL_LIVE_PERMISSIONS.md      | 156 +++++++++++++++++++++
+ ...imal-live-permissions-report-20260609-011548.md | 138 ++++++++++++++++++
+ services/liveCapabilities.ts                       |  27 ++--
+ services/permissionDependencies.ts                 |   6 +
+ 12 files changed, 526 insertions(+), 27 deletions(-)
