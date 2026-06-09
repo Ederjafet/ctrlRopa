@@ -3271,3 +3271,25 @@ Decision:
 
 - `GO tecnico` si backend/frontend pasan validaciones.
 - `PENDING_QA_VISUAL` hasta validar en pantalla o API con datos reales.
+
+## 2026-06-09 - ITEM-Z3B reserva atomica de apartados
+
+Tipo: hardening backend minimo de reservas, sin migracion, endpoints nuevos, pagos, caja, precio LIVE, devoluciones, autorizaciones, permisos ni RBAC.
+
+Objetivo:
+
+- Proteger la transicion `AVAILABLE -> RESERVED` ante doble submit o concurrencia.
+- Mantener `ReservationService.create` como flujo unico de bloqueo de inventario al apartar.
+- Conservar `DO_LIVE_RESERVATION` para apartados LIVE.
+
+Cambios realizados:
+
+- `ItemRepository`: agrega update atomico condicional `reserveIfAvailable(...)`.
+- `ReservationService`: crea la reserva solo si el update atomico afecta una fila.
+- `ReservationServiceTests`: cubre exito `AVAILABLE`, rechazo por estados no disponibles, fallo atomico con cero filas y apartado LIVE.
+- `docs/ITEM_Z3B_RESERVATION_ATOMIC_UPDATE.md`: documenta alcance, rollback, riesgos y QA.
+
+Decision:
+
+- `GO tecnico` si backend/frontend pasan validaciones.
+- `PENDING_QA_VISUAL` hasta validar doble submit/API con datos reales.

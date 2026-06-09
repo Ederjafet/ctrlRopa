@@ -1,6 +1,9 @@
 package com.hpsqsoft.ctrlropa.item;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -24,6 +27,21 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
     long countByCompanyIdAndBatchId(Long companyId, Long batchId);
 
     List<Item> findByCompanyIdAndStorageLocationIdOrderByCreatedAtDesc(Long companyId, Long storageLocationId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            update Item item
+            set item.status = :reservedStatus
+            where item.company.id = :companyId
+              and item.branch.id = :branchId
+              and item.id = :itemId
+              and item.status = :availableStatus
+            """)
+    int reserveIfAvailable(@Param("companyId") Long companyId,
+                           @Param("branchId") Long branchId,
+                           @Param("itemId") Long itemId,
+                           @Param("availableStatus") ItemStatus availableStatus,
+                           @Param("reservedStatus") ItemStatus reservedStatus);
 
     Optional<Item> findByCode(String code);
 

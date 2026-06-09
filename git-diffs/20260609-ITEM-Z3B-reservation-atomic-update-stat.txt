@@ -1,0 +1,9 @@
+﻿ .../com/hpsqsoft/ctrlropa/item/ItemRepository.java |  18 ++
+ .../ctrlropa/reservation/ReservationService.java   |  17 +-
+ .../reservation/ReservationServiceTests.java       | 297 +++++++++++++++++++++
+ docs/ERP_BITACORA_CAMBIOS.md                       |  22 ++
+ docs/ERP_RIESGOS_OPERATIVOS.md                     |   1 +
+ docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md          |   3 +-
+ docs/ITEM_Z3B_RESERVATION_ATOMIC_UPDATE.md         | 106 ++++++++
+ ...rvation-atomic-update-report-20260609-130513.md | 103 +++++++
+ 8 files changed, 563 insertions(+), 4 deletions(-)
