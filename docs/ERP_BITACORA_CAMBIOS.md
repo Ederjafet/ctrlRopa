@@ -3250,3 +3250,24 @@ Decision:
 
 - `GO tecnico` si backend/frontend pasan validaciones.
 - `PENDING_QA_VISUAL` hasta validar roles y pantalla LIVE con evidencia real.
+
+## 2026-06-09 - ITEM-Z2 elegibilidad de prenda al aire LIVE
+
+Tipo: hardening backend minimo de inventario LIVE, sin migracion, endpoints nuevos, pagos, caja, precio LIVE, devoluciones, autorizaciones, permisos ni RBAC.
+
+Objetivo:
+
+- Reforzar `LiveService.setActiveItem` para que solo prendas `AVAILABLE` puedan ponerse o cambiarse como prenda al aire.
+- Mantener `lives.active_item_id` como referencia LIVE sin cambiar `items.status`.
+- Conservar `ReservationService` como responsable de bloquear inventario al apartar.
+
+Cambios realizados:
+
+- `LiveService`: valida `ItemStatus.AVAILABLE` antes de asignar active item.
+- `LiveServiceTests`: agrega cobertura para `RESERVED`, `SOLD`, `DISABLED`, `ON_CONSIGNMENT` y retiro sin cambio de inventario.
+- `docs/ITEM_Z2_LIVE_ACTIVE_ITEM_ELIGIBILITY.md`: documenta alcance, reglas, exclusiones y QA.
+
+Decision:
+
+- `GO tecnico` si backend/frontend pasan validaciones.
+- `PENDING_QA_VISUAL` hasta validar en pantalla o API con datos reales.
