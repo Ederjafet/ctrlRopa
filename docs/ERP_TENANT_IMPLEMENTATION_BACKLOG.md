@@ -9,6 +9,25 @@ Tipo: backlog documental, sin implementacion
 
 Convertir el analisis de Fase 2A/2B en un backlog tecnico ordenado para implementar multi-compania con bajo riesgo, evitando fuga de datos entre clientes y manteniendo trazabilidad HPSQ-SOFT.
 
+## Actualizacion ITEM-Z7 - Vendido operativo LIVE seguro
+
+Fecha: 2026-06-10
+Estado: implementado tecnico condicionado.
+
+Alcance ejecutado:
+
+- Cierre `OPERATIONAL_SOLD` limitado a reservas LIVE `ACTIVE`.
+- Bloqueo de reservas `CANCELLED` y `CONVERTED_TO_SALE`.
+- Bloqueo de apartado LIVE operativamente `CANCELLED`.
+- Validacion de item `RESERVED` antes de cerrar como vendido operativo.
+- Conservacion de `ReservationStatus`, `item.status`, pagos, caja y venta financiera sin cambios.
+- Evento operativo `LIVE_OPERATIONAL_SOLD` conserva el patron existente de `live_events`.
+
+Pendiente:
+
+- QA API/visual real con apartado LIVE desechable.
+- Definir fase futura para conversion financiera real, pagos/caja y reversas con autorizacion formal.
+
 ## Actualizacion ITEM-Z6B - Cancelacion y liberacion segura de apartados
 
 Fecha: 2026-06-09

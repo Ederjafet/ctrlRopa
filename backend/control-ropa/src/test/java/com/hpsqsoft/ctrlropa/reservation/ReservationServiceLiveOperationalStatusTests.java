@@ -23,6 +23,8 @@ import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
 import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
 import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -35,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -95,6 +98,7 @@ class ReservationServiceLiveOperationalStatusTests {
         assertEquals("ACTIVE", response.getStatus());
         assertEquals("OPERATIONAL_SOLD", response.getLiveOperationalStatus());
         assertEquals(99L, response.getLiveOperationalStatusUpdatedByUserId());
+        assertEquals(ItemStatus.RESERVED, reservation.getItem().getStatus());
         verify(tenantAccessGuard).requireBranch(6L, "La reserva no pertenece a la sucursal activa");
         verify(accessService).assertCan(
                 99L,
@@ -118,6 +122,77 @@ class ReservationServiceLiveOperationalStatusTests {
                 10L,
                 "{\"reservationId\":10,\"previousStatus\":\"RESERVED\",\"newStatus\":\"OPERATIONAL_SOLD\"}"
         );
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ReservationStatus.class, names = {"CANCELLED", "CONVERTED_TO_SALE"})
+    void updateLiveOperationalStatusRejectsOperationalSoldForHistoricalReservation(ReservationStatus status) {
+        Reservation reservation = liveReservation(10L, 6L);
+        reservation.setStatus(status);
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(10L)).thenReturn(Optional.of(reservation));
+
+        ReservationService.UpdateLiveOperationalStatusRequest request =
+                new ReservationService.UpdateLiveOperationalStatusRequest();
+        request.setStatus(LiveReservationOperationalStatus.OPERATIONAL_SOLD);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.updateLiveOperationalStatus(10L, request)
+        );
+
+        assertEquals(status, reservation.getStatus());
+        assertEquals(LiveReservationOperationalStatus.RESERVED, reservation.getLiveOperationalStatus());
+        assertEquals(ItemStatus.RESERVED, reservation.getItem().getStatus());
+        verify(repository, never()).save(any(Reservation.class));
+        verify(liveEventService, never()).record(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void updateLiveOperationalStatusRejectsOperationalSoldForOperationallyCancelledReservation() {
+        Reservation reservation = liveReservation(10L, 6L);
+        reservation.setLiveOperationalStatus(LiveReservationOperationalStatus.CANCELLED);
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(10L)).thenReturn(Optional.of(reservation));
+
+        ReservationService.UpdateLiveOperationalStatusRequest request =
+                new ReservationService.UpdateLiveOperationalStatusRequest();
+        request.setStatus(LiveReservationOperationalStatus.OPERATIONAL_SOLD);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.updateLiveOperationalStatus(10L, request)
+        );
+
+        assertEquals(ReservationStatus.ACTIVE, reservation.getStatus());
+        assertEquals(LiveReservationOperationalStatus.CANCELLED, reservation.getLiveOperationalStatus());
+        assertEquals(ItemStatus.RESERVED, reservation.getItem().getStatus());
+        verify(repository, never()).save(any(Reservation.class));
+        verify(liveEventService, never()).record(any(), any(), any(), any(), any(), any());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ItemStatus.class, names = {"AVAILABLE", "SOLD", "DISABLED", "ON_CONSIGNMENT"})
+    void updateLiveOperationalStatusRejectsOperationalSoldWhenItemIsNotReserved(ItemStatus itemStatus) {
+        Reservation reservation = liveReservation(10L, 6L);
+        reservation.getItem().setStatus(itemStatus);
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(10L)).thenReturn(Optional.of(reservation));
+
+        ReservationService.UpdateLiveOperationalStatusRequest request =
+                new ReservationService.UpdateLiveOperationalStatusRequest();
+        request.setStatus(LiveReservationOperationalStatus.OPERATIONAL_SOLD);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.updateLiveOperationalStatus(10L, request)
+        );
+
+        assertEquals(ReservationStatus.ACTIVE, reservation.getStatus());
+        assertEquals(LiveReservationOperationalStatus.RESERVED, reservation.getLiveOperationalStatus());
+        assertEquals(itemStatus, reservation.getItem().getStatus());
+        verify(repository, never()).save(any(Reservation.class));
+        verify(liveEventService, never()).record(any(), any(), any(), any(), any(), any());
     }
 
     @Test

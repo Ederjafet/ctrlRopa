@@ -1,5 +1,33 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-10 - ITEM-Z7 vendido operativo LIVE seguro
+
+Tipo: backend defensivo, LIVE operativo, pruebas, evidencia.
+
+Objetivo:
+
+- Asegurar que `OPERATIONAL_SOLD` sea solo un cierre operativo LIVE seguro, sin convertirlo en venta financiera ni tocar inventario fuera del apartado.
+
+Cambios realizados:
+
+- `ReservationService.updateLiveOperationalStatus` valida que el cierre `OPERATIONAL_SOLD` solo aplique sobre reserva LIVE `ACTIVE`.
+- Se bloquea `CANCELLED`, `CONVERTED_TO_SALE` y apartado LIVE operativamente `CANCELLED`.
+- Se exige que el item asociado siga `RESERVED`.
+- Se conserva `item.status` sin cambiar a `SOLD` ni liberar a `AVAILABLE`.
+- Se conserva trazabilidad existente en `live_events` con `LIVE_OPERATIONAL_SOLD`.
+- Se agregaron pruebas de exito y rechazo para estados historicos y items no reservados.
+
+Restricciones respetadas:
+
+- No se tocaron pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC ni permisos.
+- No se crearon endpoints ni migraciones.
+- No se implemento venta financiera.
+
+Pendientes:
+
+- QA API/visual real con dataset LIVE desechable.
+- Flujo futuro de conversion financiera y reversas con autorizacion formal.
+
 ## 2026-06-09 - ITEM-Z6B cancelacion y liberacion segura de apartados
 
 Tipo: backend defensivo, inventario transaccional, pruebas, evidencia operativa.
