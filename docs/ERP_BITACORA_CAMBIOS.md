@@ -25,6 +25,31 @@ Pendientes:
 - Smoke API autenticado con dataset desechable y vendedor real: esperar `403` al retirar active item.
 - QA visual si se requiere evidencia de UI.
 
+## 2026-06-10 - HOME-LIVE-A card de LIVE activo en inicio
+
+Tipo: frontend read-only, UX operativa, documentacion, evidencia.
+
+Objetivo:
+
+- Mostrar en inicio un resumen corto del LIVE activo para usuarios con acceso LIVE, sin reemplazar el contenido actual del dashboard.
+
+Cambios realizados:
+
+- Se agrego un card superior en `app/index.tsx` antes de metricas, pendientes y accesos rapidos.
+- Se reutilizaron servicios existentes de LIVE, reservas y eventos en modo lectura.
+- Se agregaron textos i18n ES/EN para el card.
+- No se agrego backend ni endpoints.
+
+Restricciones respetadas:
+
+- No se tocaron pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC ni permisos.
+- No se cambio venta financiera ni logica de inventario/reservas.
+- No se ejecutaron mutaciones reales.
+
+Pendientes:
+
+- QA visual real por rol con navegador/screenshot.
+
 ## 2026-06-10 - ITEM-Z8 consistencia final LIVE, inventario y reservas
 
 Tipo: auditoria tecnica, consistencia operativa, documentacion, evidencia.

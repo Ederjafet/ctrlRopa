@@ -1,0 +1,646 @@
+diff --git a/app/index.tsx b/app/index.tsx
+index 9f9d06c..0bb79d7 100644
+--- a/app/index.tsx
++++ b/app/index.tsx
+@@ -2,6 +2,8 @@ import AppShell from '@/components/layout/AppShell';
+ import { buildMainNavSections } from '@/components/layout/appNavigation';
+ import DashboardTemplate from '@/components/templates/DashboardTemplate';
+ import ActionTile from '@/components/ui/ActionTile';
++import AppButton from '@/components/ui/AppButton';
++import AppCard from '@/components/ui/AppCard';
+ import EmptyState from '@/components/ui/EmptyState';
+ import EntitySummaryCard from '@/components/ui/EntitySummaryCard';
+ import MetricCard from '@/components/ui/MetricCard';
+@@ -13,11 +15,14 @@ import { useAppTheme } from '@/context/AppThemeContext';
+ import { canAccess, canAccessByPermission, isAdmin, isNoAccess } from '@/services/accessControl';
+ import { getUserDashboard, UserDashboard } from '@/services/dashboardService';
+ import { canViewLive } from '@/services/livePermissionGuards';
++import { getLiveEvents, getLivesByBranch, Live } from '@/services/liveService';
++import { getReservationsByBranch, Reservation } from '@/services/reservationService';
+ import { resolveLiveActorContext } from '@/services/liveActorResolver';
+ import { ensureSessionActive, getSession, UserSession } from '@/services/sessionStorage';
+ import { MaterialIcons } from '@expo/vector-icons';
+ import { Redirect, useRouter } from 'expo-router';
+ import { useEffect, useMemo, useState } from 'react';
++import { useTranslation } from 'react-i18next';
+ import { ActivityIndicator, StyleSheet, View } from 'react-native';
+
+ type QuickAction = {
+@@ -28,6 +33,14 @@ type QuickAction = {
+   allowed: boolean;
+ };
+
++type ActiveLiveSummary = {
++  live: Live;
++  activeReservationCount?: number;
++  operationalSoldCount?: number;
++  lastActivityAt?: string | null;
++  partialData: boolean;
++};
++
+ function money(value: number | string | null | undefined) {
+   return Number(value ?? 0).toLocaleString('es-MX', {
+     style: 'currency',
+@@ -35,6 +48,56 @@ function money(value: number | string | null | undefined) {
+   });
+ }
+
++function liveTimestamp(live: Live) {
++  return new Date(live.startedAt || live.createdAt || 0).getTime();
++}
++
++function pickActiveLive(lives: Live[]) {
++  return [...lives]
++    .filter((live) => live.status === 'ACTIVE')
++    .sort((a, b) => liveTimestamp(b) - liveTimestamp(a))[0] ?? null;
++}
++
++function reservationBelongsToLive(reservation: Reservation, liveId: number) {
++  return reservation.liveId === liveId;
++}
++
++function getActiveLiveReservationCount(reservations: Reservation[]) {
++  return reservations.filter(
++    (reservation) =>
++      reservation.status === 'ACTIVE' &&
++      reservation.liveOperationalStatus !== 'CANCELLED' &&
++      reservation.liveOperationalStatus !== 'OPERATIONAL_SOLD'
++  ).length;
++}
++
++function getOperationalSoldCount(reservations: Reservation[]) {
++  return reservations.filter(
++    (reservation) => reservation.liveOperationalStatus === 'OPERATIONAL_SOLD'
++  ).length;
++}
++
++function formatDateTime(value: string | null | undefined, locale: string) {
++  if (!value) return null;
++  const date = new Date(value);
++  if (Number.isNaN(date.getTime())) return null;
++
++  return new Intl.DateTimeFormat(locale, {
++    dateStyle: 'short',
++    timeStyle: 'short',
++  }).format(date);
++}
++
++function formatActiveItem(live: Live, t: (key: string, options?: Record<string, unknown>) => string) {
++  if (!live.activeItemId) {
++    return t('home.activeLiveCard.noActiveItem');
++  }
++
++  const name = live.activeItemProductTypeName || live.activeItemCode || `#${live.activeItemId}`;
++  const meta = [live.activeItemBrandName, live.activeItemSizeName].filter(Boolean).join(' / ');
++  return meta ? `${name} - ${meta}` : name;
++}
++
+ function buildQuickActions(session: UserSession | null): QuickAction[] {
+   return [
+     {
+@@ -88,12 +151,16 @@ function buildQuickActions(session: UserSession | null): QuickAction[] {
+ export default function HomeDashboard() {
+   const router = useRouter();
+   const { theme } = useAppTheme();
++  const { i18n, t } = useTranslation('common');
+   const [loading, setLoading] = useState(true);
+   const [isLogged, setIsLogged] = useState(false);
+   const [mustChangePassword, setMustChangePassword] = useState(false);
+   const [session, setSession] = useState<UserSession | null>(null);
+   const [dashboard, setDashboard] = useState<UserDashboard | null>(null);
+   const [loadIssue, setLoadIssue] = useState('');
++  const [activeLiveLoading, setActiveLiveLoading] = useState(false);
++  const [activeLiveIssue, setActiveLiveIssue] = useState(false);
++  const [activeLiveSummary, setActiveLiveSummary] = useState<ActiveLiveSummary | null>(null);
+
+   useEffect(() => {
+     let cancelled = false;
+@@ -135,6 +202,81 @@ export default function HomeDashboard() {
+   const selectedBranch = dashboard?.branches[0] ?? null;
+   const roles = session?.roles.map((role) => role.code).join(', ') || 'Sin rol';
+
++  useEffect(() => {
++    let cancelled = false;
++
++    const loadActiveLive = async () => {
++      setActiveLiveIssue(false);
++      setActiveLiveSummary(null);
++
++      if (!session || !selectedBranch?.branchId || !canViewLive(session)) {
++        return;
++      }
++
++      setActiveLiveLoading(true);
++
++      try {
++        const lives = await getLivesByBranch(selectedBranch.branchId);
++        if (cancelled) return;
++
++        const activeLive = pickActiveLive(lives);
++        if (!activeLive) {
++          setActiveLiveSummary(null);
++          return;
++        }
++
++        const [reservationResult, eventResult] = await Promise.allSettled([
++          getReservationsByBranch(selectedBranch.branchId),
++          getLiveEvents(activeLive.id),
++        ]);
++
++        if (cancelled) return;
++
++        const liveReservations =
++          reservationResult.status === 'fulfilled'
++            ? reservationResult.value.filter((reservation) =>
++                reservationBelongsToLive(reservation, activeLive.id)
++              )
++            : [];
++        const latestEvent =
++          eventResult.status === 'fulfilled'
++            ? [...eventResult.value].sort(
++                (a, b) =>
++                  new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
++              )[0]
++            : null;
++
++        setActiveLiveSummary({
++          live: activeLive,
++          activeReservationCount:
++            reservationResult.status === 'fulfilled'
++              ? getActiveLiveReservationCount(liveReservations)
++              : undefined,
++          operationalSoldCount:
++            reservationResult.status === 'fulfilled'
++              ? getOperationalSoldCount(liveReservations)
++              : undefined,
++          lastActivityAt: latestEvent?.createdAt || activeLive.startedAt || activeLive.createdAt,
++          partialData: reservationResult.status === 'rejected' || eventResult.status === 'rejected',
++        });
++      } catch {
++        if (!cancelled) {
++          setActiveLiveIssue(true);
++        }
++      } finally {
++        if (!cancelled) {
++          setActiveLiveLoading(false);
++        }
++      }
++    };
++
++    loadActiveLive();
++
++    return () => {
++      cancelled = true;
++    };
++  }, [selectedBranch?.branchId, session]);
++
+   if (loading) {
+     return (
+       <View style={[styles.loadingScreen, { backgroundColor: theme.colors.background }]}>
+@@ -198,6 +340,18 @@ export default function HomeDashboard() {
+             ]}
+           />
+         }
++        summary={
++          canViewLive(session) ? (
++            <ActiveLiveHomeCard
++              loading={activeLiveLoading}
++              issue={activeLiveIssue}
++              summary={activeLiveSummary}
++              locale={i18n.language}
++              onOpenLive={() => router.push('/live' as any)}
++              t={t}
++            />
++          ) : null
++        }
+         metrics={
+           <>
+
+@@ -319,7 +473,172 @@ export default function HomeDashboard() {
+   );
+ }
+
++function ActiveLiveHomeCard({
++  loading,
++  issue,
++  summary,
++  locale,
++  onOpenLive,
++  t,
++}: {
++  loading: boolean;
++  issue: boolean;
++  summary: ActiveLiveSummary | null;
++  locale: string;
++  onOpenLive: () => void;
++  t: (key: string, options?: Record<string, unknown>) => string;
++}) {
++  const { theme } = useAppTheme();
++
++  if (loading) {
++    return (
++      <AppCard variant="info" style={styles.activeLiveCard}>
++        <View style={styles.activeLiveHeader}>
++          <View style={styles.activeLiveTitleBlock}>
++            <StatusBadge label={t('home.activeLiveCard.checkingStatus')} tone="live" />
++            <AppText bold style={styles.activeLiveTitle}>
++              {t('home.activeLiveCard.title')}
++            </AppText>
++          </View>
++          <ActivityIndicator />
++        </View>
++      </AppCard>
++    );
++  }
++
++  if (issue) {
++    return (
++      <AppCard variant="warning" style={styles.activeLiveCard}>
++        <View style={styles.activeLiveHeader}>
++          <View style={styles.activeLiveTitleBlock}>
++            <StatusBadge label={t('home.activeLiveCard.unavailableStatus')} tone="warning" />
++            <AppText bold style={styles.activeLiveTitle}>
++              {t('home.activeLiveCard.title')}
++            </AppText>
++            <AppText variant="caption" color={theme.colors.mutedText}>
++              {t('home.activeLiveCard.loadError')}
++            </AppText>
++          </View>
++          <AppButton
++            title={t('home.activeLiveCard.openLive')}
++            variant="secondary"
++            onPress={onOpenLive}
++            style={styles.activeLiveButton}
++          />
++        </View>
++      </AppCard>
++    );
++  }
++
++  if (!summary) {
++    return null;
++  }
++
++  const liveName =
++    summary.live.notes?.trim() ||
++    t('home.activeLiveCard.liveIdentifier', { id: summary.live.id });
++  const lastActivity = formatDateTime(summary.lastActivityAt, locale);
++
++  return (
++    <AppCard variant="info" style={styles.activeLiveCard}>
++      <View style={styles.activeLiveHeader}>
++        <View style={styles.activeLiveTitleBlock}>
++          <StatusBadge label={t('home.activeLiveCard.liveStatus')} tone="live" />
++          <AppText bold style={styles.activeLiveTitle} numberOfLines={2}>
++            {liveName}
++          </AppText>
++          <AppText variant="caption" color={theme.colors.mutedText}>
++            {t('home.activeLiveCard.subtitle')}
++          </AppText>
++        </View>
++        <AppButton
++          title={t('home.activeLiveCard.openLive')}
++          variant="primary"
++          onPress={onOpenLive}
++          style={styles.activeLiveButton}
++        />
++      </View>
++
++      <View style={styles.activeLiveFacts}>
++        <View style={[styles.activeLiveFact, { borderColor: theme.colors.borderSubtle }]}>
++          <AppText variant="caption" color={theme.colors.mutedText}>
++            {t('home.activeLiveCard.activeItemLabel')}
++          </AppText>
++          <AppText bold numberOfLines={2}>
++            {formatActiveItem(summary.live, t)}
++          </AppText>
++        </View>
++        {summary.activeReservationCount !== undefined ? (
++          <View style={[styles.activeLiveFact, { borderColor: theme.colors.borderSubtle }]}>
++            <AppText variant="caption" color={theme.colors.mutedText}>
++              {t('home.activeLiveCard.activeReservationsLabel')}
++            </AppText>
++            <AppText bold>{String(summary.activeReservationCount)}</AppText>
++          </View>
++        ) : null}
++        {summary.operationalSoldCount !== undefined ? (
++          <View style={[styles.activeLiveFact, { borderColor: theme.colors.borderSubtle }]}>
++            <AppText variant="caption" color={theme.colors.mutedText}>
++              {t('home.activeLiveCard.operationalSoldLabel')}
++            </AppText>
++            <AppText bold>{String(summary.operationalSoldCount)}</AppText>
++          </View>
++        ) : null}
++        {lastActivity ? (
++          <View style={[styles.activeLiveFact, { borderColor: theme.colors.borderSubtle }]}>
++            <AppText variant="caption" color={theme.colors.mutedText}>
++              {t('home.activeLiveCard.lastActivityLabel')}
++            </AppText>
++            <AppText bold numberOfLines={1}>
++              {lastActivity}
++            </AppText>
++          </View>
++        ) : null}
++      </View>
++
++      {summary.partialData ? (
++        <AppText variant="caption" color={theme.colors.mutedText}>
++          {t('home.activeLiveCard.partialData')}
++        </AppText>
++      ) : null}
++    </AppCard>
++  );
++}
++
+ const styles = StyleSheet.create({
++  activeLiveButton: {
++    minWidth: 132,
++  },
++  activeLiveCard: {
++    gap: 12,
++  },
++  activeLiveFact: {
++    borderWidth: 1,
++    flex: 1,
++    gap: 4,
++    minWidth: 150,
++    padding: 12,
++  },
++  activeLiveFacts: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 10,
++  },
++  activeLiveHeader: {
++    alignItems: 'flex-start',
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 12,
++    justifyContent: 'space-between',
++  },
++  activeLiveTitle: {
++    fontSize: 20,
++  },
++  activeLiveTitleBlock: {
++    flex: 1,
++    gap: 6,
++    minWidth: 220,
++  },
+   loadingScreen: {
+     alignItems: 'center',
+     flex: 1,
+diff --git a/docs/ERP_BITACORA_CAMBIOS.md b/docs/ERP_BITACORA_CAMBIOS.md
+index f10679a..43fde9e 100644
+--- a/docs/ERP_BITACORA_CAMBIOS.md
++++ b/docs/ERP_BITACORA_CAMBIOS.md
+@@ -1,5 +1,30 @@
+ # ERP - Bitacora de cambios
+
++## 2026-06-10 - HOME-LIVE-A card de LIVE activo en inicio
++
++Tipo: frontend read-only, UX operativa, documentacion, evidencia.
++
++Objetivo:
++
++- Mostrar en inicio un resumen corto del LIVE activo para usuarios con acceso LIVE, sin reemplazar el contenido actual del dashboard.
++
++Cambios realizados:
++
++- Se agrego un card superior en `app/index.tsx` antes de metricas, pendientes y accesos rapidos.
++- Se reutilizaron servicios existentes de LIVE, reservas y eventos en modo lectura.
++- Se agregaron textos i18n ES/EN para el card.
++- No se agrego backend ni endpoints.
++
++Restricciones respetadas:
++
++- No se tocaron pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC ni permisos.
++- No se cambio venta financiera ni logica de inventario/reservas.
++- No se ejecutaron mutaciones reales.
++
++Pendientes:
++
++- QA visual real por rol con navegador/screenshot.
++
+ ## 2026-06-10 - ITEM-Z8 consistencia final LIVE, inventario y reservas
+
+ Tipo: auditoria tecnica, consistencia operativa, documentacion, evidencia.
+diff --git a/docs/HOME_LIVE_A_ACTIVE_LIVE_CARD.md b/docs/HOME_LIVE_A_ACTIVE_LIVE_CARD.md
+new file mode 100644
+index 0000000..b2bd600
+--- /dev/null
++++ b/docs/HOME_LIVE_A_ACTIVE_LIVE_CARD.md
+@@ -0,0 +1,67 @@
++# HOME-LIVE-A - Card de LIVE activo en inicio
++
++Fecha: 2026-06-10
++
++## Alcance
++
++Se agrego un card superior en la pantalla de inicio operativa para mostrar un resumen corto del LIVE activo cuando el usuario tiene acceso LIVE. El contenido existente del home se conserva debajo del card mediante `DashboardTemplate.summary`.
++
++## Implementacion
++
++- Pantalla tocada: `app/index.tsx`.
++- Textos i18n: `locales/es/common.json` y `locales/en/common.json`.
++- Backend: no tocado.
++- Endpoints nuevos: ninguno.
++- Mutaciones reales: ninguna.
++
++## Fuentes de datos
++
++El card usa llamadas read-only existentes:
++
++- `getLivesByBranch(branchId)` para localizar el LIVE con `status === ACTIVE`.
++- `getReservationsByBranch(branchId)` para contar reservas activas y vendidos operativos del LIVE, solo si el dato responde.
++- `getLiveEvents(liveId)` para tomar la ultima actividad disponible, solo si el dato responde.
++
++No se inventan metricas. Si reservas o eventos no responden, el card conserva el resumen seguro del LIVE activo y marca datos parciales.
++
++## Datos mostrados
++
++- Estado del LIVE activo.
++- Nombre/notas del LIVE o identificador `LIVE #id`.
++- Prenda al aire si existe `activeItemId`.
++- Reservas activas del LIVE si el endpoint de reservas responde.
++- Vendidos operativos si el endpoint de reservas responde.
++- Ultima actividad si hay evento o fecha disponible.
++- Boton `Ir a LIVE`.
++
++No se muestra precio LIVE en el card.
++
++## Comportamiento por rol
++
++| Rol / usuario | Resultado esperado |
++| --- | --- |
++| Admin con acceso LIVE | Ve el card si hay LIVE activo y puede navegar a `/live`. |
++| Supervisor con acceso LIVE | Ve el card si sus capacidades permiten `canViewLive`; el boton solo navega a `/live`. |
++| Vendedor con acceso LIVE | Ve el card si tiene visibilidad LIVE; el boton solo navega a `/live`. |
++| Usuario sin permisos LIVE | No ve el card ni boton LIVE en este bloque. |
++
++La visibilidad se apoya en `canViewLive(session)`, que reutiliza las capacidades existentes basadas en `VIEW_LIVE`, `OPERATE_LIVE`, `DO_LIVE_RESERVATION` y reglas actuales del proyecto.
++
++## Estados
++
++- Loading: muestra card breve mientras se consulta el LIVE activo.
++- Error al listar LIVE: muestra aviso no bloqueante con boton a `/live`.
++- Sin LIVE activo: no muestra card para mantener el home limpio.
++- Error en reservas/eventos: muestra datos disponibles y nota de datos parciales.
++
++## Pendientes
++
++- QA visual real por rol con navegador/screenshot.
++- Confirmar en dataset real que el conteo de reservas activas y vendidos operativos coincide con la operacion esperada por branch.
++
++## Restricciones respetadas
++
++- No se tocaron pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC ni permisos.
++- No se cambio venta financiera.
++- No se cambio inventario/reservas.
++- No se crearon endpoints ni migraciones.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index 5ab3880..63b078b 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -24,6 +24,24 @@
+     "branch": "Branch",
+     "search": "Search"
+   },
++  "home": {
++    "activeLiveCard": {
++      "title": "Active LIVE",
++      "subtitle": "Quick summary of the current live session.",
++      "liveStatus": "Live now",
++      "checkingStatus": "Checking LIVE",
++      "unavailableStatus": "Unavailable",
++      "loadError": "The summary could not be loaded. You can open LIVE to review the status.",
++      "openLive": "Go to LIVE",
++      "liveIdentifier": "LIVE #{{id}}",
++      "activeItemLabel": "Item on air",
++      "noActiveItem": "No item on air",
++      "activeReservationsLabel": "Active holds",
++      "operationalSoldLabel": "Operational sold",
++      "lastActivityLabel": "Last activity",
++      "partialData": "Some secondary data was unavailable; the safe summary is shown."
++    }
++  },
+   "system": {
+     "title": "System",
+     "languageTitle": "Application language",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index 932a8d4..a91e127 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -24,6 +24,24 @@
+     "branch": "Sucursal",
+     "search": "Buscar"
+   },
++  "home": {
++    "activeLiveCard": {
++      "title": "LIVE activo",
++      "subtitle": "Resumen rapido del en vivo actual.",
++      "liveStatus": "En vivo",
++      "checkingStatus": "Revisando LIVE",
++      "unavailableStatus": "No disponible",
++      "loadError": "No se pudo cargar el resumen. Puedes entrar a LIVE para revisar el estado.",
++      "openLive": "Ir a LIVE",
++      "liveIdentifier": "LIVE #{{id}}",
++      "activeItemLabel": "Prenda al aire",
++      "noActiveItem": "Sin prenda al aire",
++      "activeReservationsLabel": "Reservas activas",
++      "operationalSoldLabel": "Vendidos operativos",
++      "lastActivityLabel": "Ultima actividad",
++      "partialData": "Algunos datos secundarios no estuvieron disponibles; se muestra el resumen seguro."
++    }
++  },
+   "system": {
+     "title": "Sistema",
+     "languageTitle": "Idioma de la aplicación",
+diff --git a/qa-reports/HOME-LIVE-A-active-live-card-report-20260610-105713.md b/qa-reports/HOME-LIVE-A-active-live-card-report-20260610-105713.md
+new file mode 100644
+index 0000000..c45520e
+--- /dev/null
++++ b/qa-reports/HOME-LIVE-A-active-live-card-report-20260610-105713.md
+@@ -0,0 +1,83 @@
++# HOME-LIVE-A - QA report active live card
++
++Fecha: 2026-06-10 10:57:13
++
++## Rama
++
++`feature/home-live-a-active-live-card`
++
++## Comandos ejecutados
++
++- `git branch --show-current`
++- `git status`
++- `git log --oneline -100`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-QA-C"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-QA-B"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-QA-A"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z8"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z7"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-PERM-A1"`
++- Auditorias `git grep` solicitadas para home/dashboard, servicios LIVE y permisos LIVE.
++- `npx.cmd tsc --noEmit`
++- `npm.cmd run lint`
++- Validacion JSON de `locales/**/common.json`
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`
++- `git --no-pager diff --check`
++- `git --no-pager diff --cached --check`
++- `git status --short`
++
++## Historial confirmado
++
++- `612d82e LIVE-QA-C ejecuta QA live con dataset desechable`
++- `db8bbee LIVE-QA-B ejecuta smoke real live por rol`
++- `33ba0c3 LIVE-QA-A prepara matriz smoke live por rol`
++- `90ab2eb ITEM-Z8 valida consistencia live inventario reservas`
++- `a5541e4 ITEM-Z7 endurece vendido operativo live`
++- `5f5cf4d LIVE-PERM-A1 agrega permisos minimos live`
++
++## Implementacion
++
++Se agrego card superior read-only en `app/index.tsx` usando:
++
++- `canViewLive(session)` para visibilidad.
++- `getLivesByBranch(branchId)` para LIVE activo.
++- `getReservationsByBranch(branchId)` para conteos disponibles.
++- `getLiveEvents(liveId)` para ultima actividad disponible.
++
++No se toco backend ni se ejecutaron mutaciones reales.
++
++## Permisos / capabilities usados
++
++- `canViewLive(session)`.
++- Capacidades existentes derivadas de `VIEW_LIVE`, `OPERATE_LIVE`, `DO_LIVE_RESERVATION` y reglas actuales del proyecto.
++
++## Checklist visual
++
++| Caso | Resultado |
++| --- | --- |
++| Admin ve card si hay LIVE activo | PENDING_QA_VISUAL |
++| Supervisor ve card si tiene permisos | PENDING_QA_VISUAL |
++| Vendedor ve card si tiene permisos | PENDING_QA_VISUAL |
++| Usuario sin permisos no ve card | PENDING_QA_VISUAL |
++| Boton navega a LIVE | PENDING_QA_VISUAL |
++| Contenido anterior del home sigue visible debajo | PENDING_QA_VISUAL |
++
++No se capturaron screenshots reales durante este reporte. Se intento detectar herramienta de navegador local y no hubo capacidad de browser/screenshot disponible en esta sesion.
++
++## Validaciones tecnicas
++
++| Validacion | Resultado |
++| --- | --- |
++| `npm.cmd run lint` | PASS, sin errores; 53 warnings preexistentes/no relacionados. |
++| JSON locales | PASS, todos los `common.json` parsean. |
++| `npx.cmd tsc --noEmit` | PASS. |
++| `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export` | PASS. |
++| `git --no-pager diff --check` | PASS. |
++| `git --no-pager diff --cached --check` | PASS sin staged changes al momento de la validacion. |
++| Backend tests | No ejecutado; backend no fue tocado. |
++
++## Resultado
++
++`GO_TECNICO / PENDING_QA_VISUAL`
++
++Validaciones tecnicas completas pasan. QA visual queda pendiente por falta de navegador/screenshot real disponible.

@@ -24,6 +24,24 @@
     "branch": "Branch",
     "search": "Search"
   },
+  "home": {
+    "activeLiveCard": {
+      "title": "Active LIVE",
+      "subtitle": "Quick summary of the current live session.",
+      "liveStatus": "Live now",
+      "checkingStatus": "Checking LIVE",
+      "unavailableStatus": "Unavailable",
+      "loadError": "The summary could not be loaded. You can open LIVE to review the status.",
+      "openLive": "Go to LIVE",
+      "liveIdentifier": "LIVE #{{id}}",
+      "activeItemLabel": "Item on air",
+      "noActiveItem": "No item on air",
+      "activeReservationsLabel": "Active holds",
+      "operationalSoldLabel": "Operational sold",
+      "lastActivityLabel": "Last activity",
+      "partialData": "Some secondary data was unavailable; the safe summary is shown."
+    }
+  },
   "system": {
     "title": "System",
     "languageTitle": "Application language",

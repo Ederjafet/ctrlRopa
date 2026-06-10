@@ -2,6 +2,8 @@ import AppShell from '@/components/layout/AppShell';
 import { buildMainNavSections } from '@/components/layout/appNavigation';
 import DashboardTemplate from '@/components/templates/DashboardTemplate';
 import ActionTile from '@/components/ui/ActionTile';
+import AppButton from '@/components/ui/AppButton';
+import AppCard from '@/components/ui/AppCard';
 import EmptyState from '@/components/ui/EmptyState';
 import EntitySummaryCard from '@/components/ui/EntitySummaryCard';
 import MetricCard from '@/components/ui/MetricCard';
@@ -13,11 +15,14 @@ import { useAppTheme } from '@/context/AppThemeContext';
 import { canAccess, canAccessByPermission, isAdmin, isNoAccess } from '@/services/accessControl';
 import { getUserDashboard, UserDashboard } from '@/services/dashboardService';
 import { canViewLive } from '@/services/livePermissionGuards';
+import { getLiveEvents, getLivesByBranch, Live } from '@/services/liveService';
+import { getReservationsByBranch, Reservation } from '@/services/reservationService';
 import { resolveLiveActorContext } from '@/services/liveActorResolver';
 import { ensureSessionActive, getSession, UserSession } from '@/services/sessionStorage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Redirect, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 type QuickAction = {
@@ -28,11 +33,69 @@ type QuickAction = {
   allowed: boolean;
 };
 
+type ActiveLiveSummary = {
+  live: Live;
+  activeReservationCount?: number;
+  operationalSoldCount?: number;
+  lastActivityAt?: string | null;
+  partialData: boolean;
+};
+
 function money(value: number | string | null | undefined) {
   return Number(value ?? 0).toLocaleString('es-MX', {
     style: 'currency',
     currency: 'MXN',
   });
+}
+
+function liveTimestamp(live: Live) {
+  return new Date(live.startedAt || live.createdAt || 0).getTime();
+}
+
+function pickActiveLive(lives: Live[]) {
+  return [...lives]
+    .filter((live) => live.status === 'ACTIVE')
+    .sort((a, b) => liveTimestamp(b) - liveTimestamp(a))[0] ?? null;
+}
+
+function reservationBelongsToLive(reservation: Reservation, liveId: number) {
+  return reservation.liveId === liveId;
+}
+
+function getActiveLiveReservationCount(reservations: Reservation[]) {
+  return reservations.filter(
+    (reservation) =>
+      reservation.status === 'ACTIVE' &&
+      reservation.liveOperationalStatus !== 'CANCELLED' &&
+      reservation.liveOperationalStatus !== 'OPERATIONAL_SOLD'
+  ).length;
+}
+
+function getOperationalSoldCount(reservations: Reservation[]) {
+  return reservations.filter(
+    (reservation) => reservation.liveOperationalStatus === 'OPERATIONAL_SOLD'
+  ).length;
+}
+
+function formatDateTime(value: string | null | undefined, locale: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(date);
+}
+
+function formatActiveItem(live: Live, t: (key: string, options?: Record<string, unknown>) => string) {
+  if (!live.activeItemId) {
+    return t('home.activeLiveCard.noActiveItem');
+  }
+
+  const name = live.activeItemProductTypeName || live.activeItemCode || `#${live.activeItemId}`;
+  const meta = [live.activeItemBrandName, live.activeItemSizeName].filter(Boolean).join(' / ');
+  return meta ? `${name} - ${meta}` : name;
 }
 
 function buildQuickActions(session: UserSession | null): QuickAction[] {
@@ -88,12 +151,16 @@ function buildQuickActions(session: UserSession | null): QuickAction[] {
 export default function HomeDashboard() {
   const router = useRouter();
   const { theme } = useAppTheme();
+  const { i18n, t } = useTranslation('common');
   const [loading, setLoading] = useState(true);
   const [isLogged, setIsLogged] = useState(false);
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [session, setSession] = useState<UserSession | null>(null);
   const [dashboard, setDashboard] = useState<UserDashboard | null>(null);
   const [loadIssue, setLoadIssue] = useState('');
+  const [activeLiveLoading, setActiveLiveLoading] = useState(false);
+  const [activeLiveIssue, setActiveLiveIssue] = useState(false);
+  const [activeLiveSummary, setActiveLiveSummary] = useState<ActiveLiveSummary | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -134,6 +201,81 @@ export default function HomeDashboard() {
   );
   const selectedBranch = dashboard?.branches[0] ?? null;
   const roles = session?.roles.map((role) => role.code).join(', ') || 'Sin rol';
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadActiveLive = async () => {
+      setActiveLiveIssue(false);
+      setActiveLiveSummary(null);
+
+      if (!session || !selectedBranch?.branchId || !canViewLive(session)) {
+        return;
+      }
+
+      setActiveLiveLoading(true);
+
+      try {
+        const lives = await getLivesByBranch(selectedBranch.branchId);
+        if (cancelled) return;
+
+        const activeLive = pickActiveLive(lives);
+        if (!activeLive) {
+          setActiveLiveSummary(null);
+          return;
+        }
+
+        const [reservationResult, eventResult] = await Promise.allSettled([
+          getReservationsByBranch(selectedBranch.branchId),
+          getLiveEvents(activeLive.id),
+        ]);
+
+        if (cancelled) return;
+
+        const liveReservations =
+          reservationResult.status === 'fulfilled'
+            ? reservationResult.value.filter((reservation) =>
+                reservationBelongsToLive(reservation, activeLive.id)
+              )
+            : [];
+        const latestEvent =
+          eventResult.status === 'fulfilled'
+            ? [...eventResult.value].sort(
+                (a, b) =>
+                  new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+              )[0]
+            : null;
+
+        setActiveLiveSummary({
+          live: activeLive,
+          activeReservationCount:
+            reservationResult.status === 'fulfilled'
+              ? getActiveLiveReservationCount(liveReservations)
+              : undefined,
+          operationalSoldCount:
+            reservationResult.status === 'fulfilled'
+              ? getOperationalSoldCount(liveReservations)
+              : undefined,
+          lastActivityAt: latestEvent?.createdAt || activeLive.startedAt || activeLive.createdAt,
+          partialData: reservationResult.status === 'rejected' || eventResult.status === 'rejected',
+        });
+      } catch {
+        if (!cancelled) {
+          setActiveLiveIssue(true);
+        }
+      } finally {
+        if (!cancelled) {
+          setActiveLiveLoading(false);
+        }
+      }
+    };
+
+    loadActiveLive();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedBranch?.branchId, session]);
 
   if (loading) {
     return (
@@ -197,6 +339,18 @@ export default function HomeDashboard() {
               { label: 'Estado', value: 'Acceso activo' },
             ]}
           />
+        }
+        summary={
+          canViewLive(session) ? (
+            <ActiveLiveHomeCard
+              loading={activeLiveLoading}
+              issue={activeLiveIssue}
+              summary={activeLiveSummary}
+              locale={i18n.language}
+              onOpenLive={() => router.push('/live' as any)}
+              t={t}
+            />
+          ) : null
         }
         metrics={
           <>
@@ -319,7 +473,172 @@ export default function HomeDashboard() {
   );
 }
 
+function ActiveLiveHomeCard({
+  loading,
+  issue,
+  summary,
+  locale,
+  onOpenLive,
+  t,
+}: {
+  loading: boolean;
+  issue: boolean;
+  summary: ActiveLiveSummary | null;
+  locale: string;
+  onOpenLive: () => void;
+  t: (key: string, options?: Record<string, unknown>) => string;
+}) {
+  const { theme } = useAppTheme();
+
+  if (loading) {
+    return (
+      <AppCard variant="info" style={styles.activeLiveCard}>
+        <View style={styles.activeLiveHeader}>
+          <View style={styles.activeLiveTitleBlock}>
+            <StatusBadge label={t('home.activeLiveCard.checkingStatus')} tone="live" />
+            <AppText bold style={styles.activeLiveTitle}>
+              {t('home.activeLiveCard.title')}
+            </AppText>
+          </View>
+          <ActivityIndicator />
+        </View>
+      </AppCard>
+    );
+  }
+
+  if (issue) {
+    return (
+      <AppCard variant="warning" style={styles.activeLiveCard}>
+        <View style={styles.activeLiveHeader}>
+          <View style={styles.activeLiveTitleBlock}>
+            <StatusBadge label={t('home.activeLiveCard.unavailableStatus')} tone="warning" />
+            <AppText bold style={styles.activeLiveTitle}>
+              {t('home.activeLiveCard.title')}
+            </AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {t('home.activeLiveCard.loadError')}
+            </AppText>
+          </View>
+          <AppButton
+            title={t('home.activeLiveCard.openLive')}
+            variant="secondary"
+            onPress={onOpenLive}
+            style={styles.activeLiveButton}
+          />
+        </View>
+      </AppCard>
+    );
+  }
+
+  if (!summary) {
+    return null;
+  }
+
+  const liveName =
+    summary.live.notes?.trim() ||
+    t('home.activeLiveCard.liveIdentifier', { id: summary.live.id });
+  const lastActivity = formatDateTime(summary.lastActivityAt, locale);
+
+  return (
+    <AppCard variant="info" style={styles.activeLiveCard}>
+      <View style={styles.activeLiveHeader}>
+        <View style={styles.activeLiveTitleBlock}>
+          <StatusBadge label={t('home.activeLiveCard.liveStatus')} tone="live" />
+          <AppText bold style={styles.activeLiveTitle} numberOfLines={2}>
+            {liveName}
+          </AppText>
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            {t('home.activeLiveCard.subtitle')}
+          </AppText>
+        </View>
+        <AppButton
+          title={t('home.activeLiveCard.openLive')}
+          variant="primary"
+          onPress={onOpenLive}
+          style={styles.activeLiveButton}
+        />
+      </View>
+
+      <View style={styles.activeLiveFacts}>
+        <View style={[styles.activeLiveFact, { borderColor: theme.colors.borderSubtle }]}>
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            {t('home.activeLiveCard.activeItemLabel')}
+          </AppText>
+          <AppText bold numberOfLines={2}>
+            {formatActiveItem(summary.live, t)}
+          </AppText>
+        </View>
+        {summary.activeReservationCount !== undefined ? (
+          <View style={[styles.activeLiveFact, { borderColor: theme.colors.borderSubtle }]}>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {t('home.activeLiveCard.activeReservationsLabel')}
+            </AppText>
+            <AppText bold>{String(summary.activeReservationCount)}</AppText>
+          </View>
+        ) : null}
+        {summary.operationalSoldCount !== undefined ? (
+          <View style={[styles.activeLiveFact, { borderColor: theme.colors.borderSubtle }]}>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {t('home.activeLiveCard.operationalSoldLabel')}
+            </AppText>
+            <AppText bold>{String(summary.operationalSoldCount)}</AppText>
+          </View>
+        ) : null}
+        {lastActivity ? (
+          <View style={[styles.activeLiveFact, { borderColor: theme.colors.borderSubtle }]}>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {t('home.activeLiveCard.lastActivityLabel')}
+            </AppText>
+            <AppText bold numberOfLines={1}>
+              {lastActivity}
+            </AppText>
+          </View>
+        ) : null}
+      </View>
+
+      {summary.partialData ? (
+        <AppText variant="caption" color={theme.colors.mutedText}>
+          {t('home.activeLiveCard.partialData')}
+        </AppText>
+      ) : null}
+    </AppCard>
+  );
+}
+
 const styles = StyleSheet.create({
+  activeLiveButton: {
+    minWidth: 132,
+  },
+  activeLiveCard: {
+    gap: 12,
+  },
+  activeLiveFact: {
+    borderWidth: 1,
+    flex: 1,
+    gap: 4,
+    minWidth: 150,
+    padding: 12,
+  },
+  activeLiveFacts: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  activeLiveHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  activeLiveTitle: {
+    fontSize: 20,
+  },
+  activeLiveTitleBlock: {
+    flex: 1,
+    gap: 6,
+    minWidth: 220,
+  },
   loadingScreen: {
     alignItems: 'center',
     flex: 1,

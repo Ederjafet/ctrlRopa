@@ -24,6 +24,24 @@
     "branch": "Sucursal",
     "search": "Buscar"
   },
+  "home": {
+    "activeLiveCard": {
+      "title": "LIVE activo",
+      "subtitle": "Resumen rapido del en vivo actual.",
+      "liveStatus": "En vivo",
+      "checkingStatus": "Revisando LIVE",
+      "unavailableStatus": "No disponible",
+      "loadError": "No se pudo cargar el resumen. Puedes entrar a LIVE para revisar el estado.",
+      "openLive": "Ir a LIVE",
+      "liveIdentifier": "LIVE #{{id}}",
+      "activeItemLabel": "Prenda al aire",
+      "noActiveItem": "Sin prenda al aire",
+      "activeReservationsLabel": "Reservas activas",
+      "operationalSoldLabel": "Vendidos operativos",
+      "lastActivityLabel": "Ultima actividad",
+      "partialData": "Algunos datos secundarios no estuvieron disponibles; se muestra el resumen seguro."
+    }
+  },
   "system": {
     "title": "Sistema",
     "languageTitle": "Idioma de la aplicación",
