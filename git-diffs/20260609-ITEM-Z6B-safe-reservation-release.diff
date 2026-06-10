@@ -1,0 +1,891 @@
+﻿diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/item/ItemRepository.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/item/ItemRepository.java
+index 2750268..58d1fa2 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/item/ItemRepository.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/item/ItemRepository.java
+@@ -43,6 +43,21 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
+                            @Param("availableStatus") ItemStatus availableStatus,
+                            @Param("reservedStatus") ItemStatus reservedStatus);
+
++    @Modifying(flushAutomatically = true)
++    @Query("""
++            update Item item
++            set item.status = :availableStatus
++            where item.company.id = :companyId
++              and item.branch.id = :branchId
++              and item.id = :itemId
++              and item.status = :reservedStatus
++            """)
++    int releaseIfReserved(@Param("companyId") Long companyId,
++                          @Param("branchId") Long branchId,
++                          @Param("itemId") Long itemId,
++                          @Param("reservedStatus") ItemStatus reservedStatus,
++                          @Param("availableStatus") ItemStatus availableStatus);
++
+     Optional<Item> findByCode(String code);
+
+     Optional<Item> findByQrCode(String qrCode);
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
+index 19670a0..975a2b9 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
+@@ -18,6 +18,11 @@ import com.hpsqsoft.ctrlropa.live.LiveRepository;
+ import com.hpsqsoft.ctrlropa.live.LiveStatus;
+ import com.hpsqsoft.ctrlropa.order.CustomerOrder;
+ import com.hpsqsoft.ctrlropa.order.CustomerOrderService;
++import com.hpsqsoft.ctrlropa.payment.Payment;
++import com.hpsqsoft.ctrlropa.payment.PaymentAllocation;
++import com.hpsqsoft.ctrlropa.payment.PaymentAllocationRepository;
++import com.hpsqsoft.ctrlropa.payment.PaymentRepository;
++import com.hpsqsoft.ctrlropa.payment.PaymentStatus;
+ import com.hpsqsoft.ctrlropa.security.access.AccessService;
+ import com.hpsqsoft.ctrlropa.security.access.ChannelCode;
+ import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
+@@ -61,6 +66,8 @@ public class ReservationService {
+     private final LiveEventService liveEventService;
+     private final ReservationIdempotencyRepository idempotencyRepository;
+     private final ReservationRejectionTraceService rejectionTraceService;
++    private final PaymentAllocationRepository paymentAllocationRepository;
++    private final PaymentRepository paymentRepository;
+
+     public ReservationService(ReservationRepository repository,
+                               ItemRepository itemRepository,
+@@ -76,7 +83,9 @@ public class ReservationService {
+                               TenantAccessGuard tenantAccessGuard,
+                               LiveEventService liveEventService,
+                               ReservationIdempotencyRepository idempotencyRepository,
+-                              ReservationRejectionTraceService rejectionTraceService) {
++                              ReservationRejectionTraceService rejectionTraceService,
++                              PaymentAllocationRepository paymentAllocationRepository,
++                              PaymentRepository paymentRepository) {
+         this.repository = repository;
+         this.itemRepository = itemRepository;
+         this.customerRepository = customerRepository;
+@@ -92,6 +101,8 @@ public class ReservationService {
+         this.liveEventService = liveEventService;
+         this.idempotencyRepository = idempotencyRepository;
+         this.rejectionTraceService = rejectionTraceService;
++        this.paymentAllocationRepository = paymentAllocationRepository;
++        this.paymentRepository = paymentRepository;
+     }
+
+     @Transactional(readOnly = true)
+@@ -703,10 +714,78 @@ public class ReservationService {
+
+         Reservation existing = findEntityById(reservationId);
+
++        if (existing.getStatus() == ReservationStatus.CANCELLED) {
++            traceCancellationRejection(
++                    existing,
++                    userId,
++                    "La reserva ya esta cancelada"
++            );
++            throw new IllegalArgumentException("La reserva ya esta cancelada");
++        }
++
++        if (existing.getStatus() == ReservationStatus.CONVERTED_TO_SALE) {
++            traceCancellationRejection(
++                    existing,
++                    userId,
++                    "La reserva ya fue convertida a venta y no puede cancelarse como apartado"
++            );
++            throw new IllegalArgumentException(
++                    "La reserva ya fue convertida a venta y no puede cancelarse como apartado"
++            );
++        }
++
+         if (existing.getStatus() != ReservationStatus.ACTIVE) {
++            traceCancellationRejection(
++                    existing,
++                    userId,
++                    "Solo se pueden cancelar reservas activas"
++            );
+             throw new IllegalArgumentException("Solo se pueden cancelar reservas activas");
+         }
+
++        BigDecimal activePaid = calculateActiveAppliedToReservation(existing.getId());
++        if (activePaid.compareTo(BigDecimal.ZERO) > 0) {
++            traceCancellationRejection(
++                    existing,
++                    userId,
++                    "Este apartado tiene pago registrado y no puede cancelarse por el flujo normal"
++            );
++            throw new IllegalArgumentException(
++                    "Este apartado tiene pago registrado. Para cancelar o liberar la prenda se requiere un flujo formal de reversa."
++            );
++        }
++
++        Item item = existing.getItem();
++        if (item.getStatus() != ItemStatus.RESERVED) {
++            traceCancellationRejection(
++                    existing,
++                    userId,
++                    "La prenda no esta en estado reservado y no puede liberarse automaticamente"
++            );
++            throw new IllegalArgumentException(
++                    "La prenda no esta en estado reservado y no puede liberarse automaticamente"
++            );
++        }
++
++        int releasedRows = itemRepository.releaseIfReserved(
++                item.getCompany().getId(),
++                item.getBranch().getId(),
++                item.getId(),
++                ItemStatus.RESERVED,
++                ItemStatus.AVAILABLE
++        );
++
++        if (releasedRows != 1) {
++            traceCancellationRejection(
++                    existing,
++                    userId,
++                    "La prenda ya no esta en estado reservado y no puede liberarse automaticamente"
++            );
++            throw new IllegalArgumentException(
++                    "La prenda ya no esta en estado reservado y no puede liberarse automaticamente"
++            );
++        }
++
+         existing.setStatus(ReservationStatus.CANCELLED);
+         existing.setCancelledAt(LocalDateTime.now());
+         existing.setCancelReason(reason);
+@@ -725,14 +804,41 @@ public class ReservationService {
+             );
+         }
+
+-        Item item = existing.getItem();
+-        item.setStatus(ItemStatus.AVAILABLE);
+-        itemRepository.save(item);
+-
+         Reservation saved = repository.save(existing);
+         return toResponse(saved);
+     }
+
++    private BigDecimal calculateActiveAppliedToReservation(Long reservationId) {
++        return paymentAllocationRepository.findByReservationIdOrderByCreatedAtAsc(reservationId)
++                .stream()
++                .map(this::activeReservationAllocationAmount)
++                .reduce(BigDecimal.ZERO, BigDecimal::add);
++    }
++
++    private BigDecimal activeReservationAllocationAmount(PaymentAllocation allocation) {
++        Payment payment = paymentRepository.findById(allocation.getPaymentId())
++                .orElseThrow(() -> new IllegalArgumentException(
++                        "Pago no encontrado con id: " + allocation.getPaymentId()));
++
++        return payment.getStatus() == PaymentStatus.ACTIVE ? allocation.getAmount() : BigDecimal.ZERO;
++    }
++
++    private void traceCancellationRejection(Reservation reservation, Long userId, String message) {
++        Item item = reservation.getItem();
++        traceReservationRejection(
++                item.getCompany().getId(),
++                reservation.getBranch().getId(),
++                userId,
++                item.getId(),
++                reservation.getLive() != null ? reservation.getLive().getId() : null,
++                reservation.getId(),
++                ReservationRejectionReason.VALIDATION_REJECTED,
++                message,
++                null,
++                (String) null
++        );
++    }
++
+     public ReservationResponse updateLiveOperationalStatus(
+             Long reservationId,
+             UpdateLiveOperationalStatusRequest request
+diff --git a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java
+index 35d02ca..d9dc580 100644
+--- a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java
++++ b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java
+@@ -15,6 +15,8 @@ import com.hpsqsoft.ctrlropa.live.LiveEventType;
+ import com.hpsqsoft.ctrlropa.live.LiveRepository;
+ import com.hpsqsoft.ctrlropa.live.LiveStatus;
+ import com.hpsqsoft.ctrlropa.order.CustomerOrderService;
++import com.hpsqsoft.ctrlropa.payment.PaymentAllocationRepository;
++import com.hpsqsoft.ctrlropa.payment.PaymentRepository;
+ import com.hpsqsoft.ctrlropa.security.access.AccessService;
+ import com.hpsqsoft.ctrlropa.security.access.ChannelCode;
+ import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
+@@ -53,6 +55,8 @@ class ReservationServiceLiveOperationalStatusTests {
+     private final LiveEventService liveEventService = mock(LiveEventService.class);
+     private final ReservationIdempotencyRepository idempotencyRepository = mock(ReservationIdempotencyRepository.class);
+     private final ReservationRejectionTraceService rejectionTraceService = mock(ReservationRejectionTraceService.class);
++    private final PaymentAllocationRepository paymentAllocationRepository = mock(PaymentAllocationRepository.class);
++    private final PaymentRepository paymentRepository = mock(PaymentRepository.class);
+
+     private final ReservationService service = new ReservationService(
+             repository,
+@@ -69,7 +73,9 @@ class ReservationServiceLiveOperationalStatusTests {
+             tenantAccessGuard,
+             liveEventService,
+             idempotencyRepository,
+-            rejectionTraceService
++            rejectionTraceService,
++            paymentAllocationRepository,
++            paymentRepository
+     );
+
+     @Test
+diff --git a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java
+index 4a8b395..b40cd56 100644
+--- a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java
++++ b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java
+@@ -13,10 +13,16 @@ import com.hpsqsoft.ctrlropa.item.ItemRepository;
+ import com.hpsqsoft.ctrlropa.item.ItemStatus;
+ import com.hpsqsoft.ctrlropa.live.Live;
+ import com.hpsqsoft.ctrlropa.live.LiveEventService;
++import com.hpsqsoft.ctrlropa.live.LiveEventType;
+ import com.hpsqsoft.ctrlropa.live.LiveRepository;
+ import com.hpsqsoft.ctrlropa.live.LiveStatus;
+ import com.hpsqsoft.ctrlropa.order.CustomerOrder;
+ import com.hpsqsoft.ctrlropa.order.CustomerOrderService;
++import com.hpsqsoft.ctrlropa.payment.Payment;
++import com.hpsqsoft.ctrlropa.payment.PaymentAllocation;
++import com.hpsqsoft.ctrlropa.payment.PaymentAllocationRepository;
++import com.hpsqsoft.ctrlropa.payment.PaymentRepository;
++import com.hpsqsoft.ctrlropa.payment.PaymentStatus;
+ import com.hpsqsoft.ctrlropa.security.access.AccessService;
+ import com.hpsqsoft.ctrlropa.security.access.ChannelCode;
+ import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
+@@ -67,6 +73,8 @@ class ReservationServiceTests {
+     private final TenantAccessGuard tenantAccessGuard = mock(TenantAccessGuard.class);
+     private final LiveEventService liveEventService = mock(LiveEventService.class);
+     private final ReservationRejectionTraceService rejectionTraceService = mock(ReservationRejectionTraceService.class);
++    private final PaymentAllocationRepository paymentAllocationRepository = mock(PaymentAllocationRepository.class);
++    private final PaymentRepository paymentRepository = mock(PaymentRepository.class);
+
+     private final ReservationService service = new ReservationService(
+             repository,
+@@ -83,7 +91,9 @@ class ReservationServiceTests {
+             tenantAccessGuard,
+             liveEventService,
+             idempotencyRepository,
+-            rejectionTraceService
++            rejectionTraceService,
++            paymentAllocationRepository,
++            paymentRepository
+     );
+
+     @Test
+@@ -561,6 +571,233 @@ class ReservationServiceTests {
+         verify(itemRepository).reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED);
+     }
+
++    @Test
++    void cancelActiveReservationReleasesReservedItemAtomically() {
++        Branch branch = branch();
++        Item item = item(ItemStatus.RESERVED, branch);
++        Customer customer = customer(branch);
++        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
++        Reservation reservation = reservation(10L, item, customer, branch, channel);
++
++        stubCancelFlow(reservation);
++        when(itemRepository.releaseIfReserved(2L, 6L, 8L, ItemStatus.RESERVED, ItemStatus.AVAILABLE))
++                .thenReturn(1);
++        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
++        stubSellerName();
++
++        ReservationResponse response = service.cancel(10L, "cliente cancela");
++
++        assertEquals("CANCELLED", response.getStatus());
++        assertEquals("cliente cancela", response.getCancelReason());
++        assertEquals(99L, response.getCancelledByUserId());
++        verify(accessService).assertCan(99L, PermissionCode.CANCEL_RESERVATION);
++        verify(itemRepository).releaseIfReserved(2L, 6L, 8L, ItemStatus.RESERVED, ItemStatus.AVAILABLE);
++        verify(itemRepository, never()).save(any(Item.class));
++        verify(repository).save(reservation);
++        verify(rejectionTraceService, never()).record(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
++    }
++
++    @ParameterizedTest
++    @EnumSource(value = ReservationStatus.class, names = {"CANCELLED", "CONVERTED_TO_SALE"})
++    void cancelRejectsHistoricalReservations(ReservationStatus status) {
++        Branch branch = branch();
++        Item item = item(ItemStatus.RESERVED, branch);
++        Customer customer = customer(branch);
++        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
++        Reservation reservation = reservation(10L, item, customer, branch, channel);
++        reservation.setStatus(status);
++
++        when(currentUser.getUserId()).thenReturn(99L);
++        when(repository.findById(10L)).thenReturn(Optional.of(reservation));
++
++        IllegalArgumentException exception = assertThrows(
++                IllegalArgumentException.class,
++                () -> service.cancel(10L, "cancelacion duplicada")
++        );
++
++        assertTrue(exception.getMessage().contains("cancelada")
++                || exception.getMessage().contains("convertida a venta"));
++        verify(itemRepository, never()).releaseIfReserved(any(), any(), any(), any(), any());
++        verify(repository, never()).save(any(Reservation.class));
++        verify(rejectionTraceService).record(
++                eq(2L),
++                eq(6L),
++                eq(99L),
++                eq(8L),
++                any(),
++                eq(10L),
++                eq(ReservationRejectionReason.VALIDATION_REJECTED),
++                anyString(),
++                any(),
++                any()
++        );
++    }
++
++    @ParameterizedTest
++    @EnumSource(value = ItemStatus.class, names = {"AVAILABLE", "SOLD", "DISABLED", "ON_CONSIGNMENT"})
++    void cancelRejectsWhenItemIsNotReserved(ItemStatus status) {
++        Branch branch = branch();
++        Item item = item(status, branch);
++        Customer customer = customer(branch);
++        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
++        Reservation reservation = reservation(10L, item, customer, branch, channel);
++
++        stubCancelFlow(reservation);
++
++        IllegalArgumentException exception = assertThrows(
++                IllegalArgumentException.class,
++                () -> service.cancel(10L, "cliente cancela")
++        );
++
++        assertTrue(exception.getMessage().contains("estado reservado"));
++        verify(itemRepository, never()).releaseIfReserved(any(), any(), any(), any(), any());
++        verify(repository, never()).save(any(Reservation.class));
++        verify(rejectionTraceService).record(
++                eq(2L),
++                eq(6L),
++                eq(99L),
++                eq(8L),
++                any(),
++                eq(10L),
++                eq(ReservationRejectionReason.VALIDATION_REJECTED),
++                eq("La prenda no esta en estado reservado y no puede liberarse automaticamente"),
++                any(),
++                any()
++        );
++    }
++
++    @Test
++    void cancelRejectsWhenReservedReleaseAffectsNoRows() {
++        Branch branch = branch();
++        Item item = item(ItemStatus.RESERVED, branch);
++        Customer customer = customer(branch);
++        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
++        Reservation reservation = reservation(10L, item, customer, branch, channel);
++
++        stubCancelFlow(reservation);
++        when(itemRepository.releaseIfReserved(2L, 6L, 8L, ItemStatus.RESERVED, ItemStatus.AVAILABLE))
++                .thenReturn(0);
++
++        IllegalArgumentException exception = assertThrows(
++                IllegalArgumentException.class,
++                () -> service.cancel(10L, "cliente cancela")
++        );
++
++        assertTrue(exception.getMessage().contains("estado reservado"));
++        verify(repository, never()).save(any(Reservation.class));
++        verify(rejectionTraceService).record(
++                eq(2L),
++                eq(6L),
++                eq(99L),
++                eq(8L),
++                any(),
++                eq(10L),
++                eq(ReservationRejectionReason.VALIDATION_REJECTED),
++                eq("La prenda ya no esta en estado reservado y no puede liberarse automaticamente"),
++                any(),
++                any()
++        );
++    }
++
++    @Test
++    void cancelRejectsWhenReservationHasActivePaymentAllocation() {
++        Branch branch = branch();
++        Item item = item(ItemStatus.RESERVED, branch);
++        Customer customer = customer(branch);
++        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
++        Reservation reservation = reservation(10L, item, customer, branch, channel);
++        PaymentAllocation allocation = allocation(77L, BigDecimal.valueOf(120));
++
++        stubCancelFlow(reservation);
++        when(paymentAllocationRepository.findByReservationIdOrderByCreatedAtAsc(10L))
++                .thenReturn(List.of(allocation));
++        when(paymentRepository.findById(77L)).thenReturn(Optional.of(payment(PaymentStatus.ACTIVE)));
++
++        IllegalArgumentException exception = assertThrows(
++                IllegalArgumentException.class,
++                () -> service.cancel(10L, "cliente cancela")
++        );
++
++        assertTrue(exception.getMessage().contains("pago registrado"));
++        verify(itemRepository, never()).releaseIfReserved(any(), any(), any(), any(), any());
++        verify(repository, never()).save(any(Reservation.class));
++        verify(rejectionTraceService).record(
++                eq(2L),
++                eq(6L),
++                eq(99L),
++                eq(8L),
++                any(),
++                eq(10L),
++                eq(ReservationRejectionReason.VALIDATION_REJECTED),
++                eq("Este apartado tiene pago registrado y no puede cancelarse por el flujo normal"),
++                any(),
++                any()
++        );
++    }
++
++    @Test
++    void cancelIgnoresVoidedPaymentAllocationAndReleasesReservedItem() {
++        Branch branch = branch();
++        Item item = item(ItemStatus.RESERVED, branch);
++        Customer customer = customer(branch);
++        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
++        Reservation reservation = reservation(10L, item, customer, branch, channel);
++        PaymentAllocation allocation = allocation(77L, BigDecimal.valueOf(120));
++
++        stubCancelFlow(reservation);
++        when(paymentAllocationRepository.findByReservationIdOrderByCreatedAtAsc(10L))
++                .thenReturn(List.of(allocation));
++        when(paymentRepository.findById(77L)).thenReturn(Optional.of(payment(PaymentStatus.VOIDED)));
++        when(itemRepository.releaseIfReserved(2L, 6L, 8L, ItemStatus.RESERVED, ItemStatus.AVAILABLE))
++                .thenReturn(1);
++        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
++        stubSellerName();
++
++        ReservationResponse response = service.cancel(10L, "cliente cancela");
++
++        assertEquals("CANCELLED", response.getStatus());
++        verify(itemRepository).releaseIfReserved(2L, 6L, 8L, ItemStatus.RESERVED, ItemStatus.AVAILABLE);
++    }
++
++    @Test
++    void cancelLiveReservationUsesSameSafeReleaseAndRecordsLiveEvents() {
++        Branch branch = branch();
++        Item item = item(ItemStatus.RESERVED, branch);
++        Customer customer = customer(branch);
++        SalesChannel channel = channel(3L, ChannelCode.LIVE);
++        Reservation reservation = reservation(10L, item, customer, branch, channel);
++        reservation.setLive(live(branch));
++        reservation.setLiveOperationalStatus(LiveReservationOperationalStatus.RESERVED);
++
++        stubCancelFlow(reservation);
++        when(itemRepository.releaseIfReserved(2L, 6L, 8L, ItemStatus.RESERVED, ItemStatus.AVAILABLE))
++                .thenReturn(1);
++        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
++        stubSellerName();
++
++        ReservationResponse response = service.cancel(10L, "cliente cancela");
++
++        assertEquals("CANCELLED", response.getStatus());
++        assertEquals("CANCELLED", response.getLiveOperationalStatus());
++        verify(itemRepository).releaseIfReserved(2L, 6L, 8L, ItemStatus.RESERVED, ItemStatus.AVAILABLE);
++        verify(liveEventService).record(
++                reservation.getLive(),
++                LiveEventType.LIVE_RESERVATION_STATUS_CHANGED,
++                99L,
++                "RESERVATION",
++                10L,
++                "{\"reservationId\":10,\"previousStatus\":\"RESERVED\",\"newStatus\":\"CANCELLED\"}"
++        );
++        verify(liveEventService).record(
++                reservation.getLive(),
++                LiveEventType.LIVE_RESERVATION_CANCELLED,
++                99L,
++                "RESERVATION",
++                10L,
++                "{\"reservationId\":10,\"previousStatus\":\"RESERVED\",\"newStatus\":\"CANCELLED\"}"
++        );
++    }
++
+     private static ReservationIdempotencyRecord completedRecord(String key,
+                                                                 String requestHash,
+                                                                 Long reservationId) {
+@@ -659,6 +896,32 @@ class ReservationServiceTests {
+         )).thenReturn(List.of("Seller"));
+     }
+
++    private void stubCancelFlow(Reservation reservation) {
++        when(currentUser.getUserId()).thenReturn(99L);
++        when(repository.findById(reservation.getId())).thenReturn(Optional.of(reservation));
++        when(paymentAllocationRepository.findByReservationIdOrderByCreatedAtAsc(reservation.getId()))
++                .thenReturn(List.of());
++    }
++
++    private static PaymentAllocation allocation(Long paymentId, BigDecimal amount) {
++        PaymentAllocation allocation = new PaymentAllocation();
++        allocation.setPaymentId(paymentId);
++        allocation.setReservationId(10L);
++        allocation.setAmount(amount);
++        return allocation;
++    }
++
++    private static Payment payment(PaymentStatus status) {
++        Payment payment = new Payment();
++        payment.setCustomerId(27L);
++        payment.setBranchId(6L);
++        payment.setReceivedAmount(BigDecimal.valueOf(120));
++        payment.setPaymentMethodId(1L);
++        payment.setStatus(status);
++        payment.setCreatedByUserId(99L);
++        return payment;
++    }
++
+     private static ReservationService.CreateReservationRequest request(Long salesChannelId, Long liveId) {
+         ReservationService.CreateReservationRequest request = new ReservationService.CreateReservationRequest();
+         request.setItemId(8L);
+diff --git a/docs/ERP_BITACORA_CAMBIOS.md b/docs/ERP_BITACORA_CAMBIOS.md
+index a14237f..e7e3b4c 100644
+--- a/docs/ERP_BITACORA_CAMBIOS.md
++++ b/docs/ERP_BITACORA_CAMBIOS.md
+@@ -1,5 +1,33 @@
+ # ERP - Bitacora de cambios
+
++## 2026-06-09 - ITEM-Z6B cancelacion y liberacion segura de apartados
++
++Tipo: backend defensivo, inventario transaccional, pruebas, evidencia operativa.
++
++Objetivo:
++
++- Cancelar solo reservas `ACTIVE` sin pago activo y liberar inventario de forma condicional.
++
++Cambios realizados:
++
++- `ReservationService.cancel` rechaza `CANCELLED` y `CONVERTED_TO_SALE` con mensajes claros.
++- Se bloquea cancelacion normal si la reserva tiene allocation de pago `ACTIVE`.
++- Se agrego `ItemRepository.releaseIfReserved(...)` para liberar `RESERVED -> AVAILABLE` con update condicional.
++- Se evita forzar `AVAILABLE` si el item esta `SOLD`, `DISABLED`, `ON_CONSIGNMENT`, `AVAILABLE` o si el update condicional afecta 0 filas.
++- Se conserva trazabilidad de rechazo con `VALIDATION_REJECTED`.
++- Se agregaron pruebas focalizadas de cancelacion normal, pagos activos/anulados, estados historicos, item no reservado y reserva LIVE.
++
++Restricciones respetadas:
++
++- No se tocaron caja, precio LIVE, devoluciones, autorizaciones, RBAC ni permisos.
++- No se crearon endpoints ni migraciones.
++- No se implemento reversa financiera.
++
++Pendientes:
++
++- QA API/visual real con ambiente MySQL configurado.
++- Flujo formal de reversa/autorizacion para apartados con pago activo.
++
+ ## 2026-06-09 - ITEM-Z5D trazabilidad de reservas rechazadas
+
+ Tipo: backend defensivo, migracion aditiva, retencion operativa, pruebas, evidencia.
+diff --git a/docs/ERP_RIESGOS_OPERATIVOS.md b/docs/ERP_RIESGOS_OPERATIVOS.md
+index 394b5dd..7a5c65b 100644
+--- a/docs/ERP_RIESGOS_OPERATIVOS.md
++++ b/docs/ERP_RIESGOS_OPERATIVOS.md
+@@ -37,6 +37,7 @@ Probabilidad:
+ | Codificacion rota en textos | MEDIO | MEDIA | Mala experiencia, mensajes poco confiables. | Barridos de mojibake, usar UTF-8, QA visual. | Revertir archivo o corregir texto. |
+ | Artefactos no rastreados en Git | MEDIO | ALTA | Release con archivos no controlados o ruido en diff. | Limpiar/ignorar antes de release; checklist Git. | No incluir artefactos; restaurar working tree limpio. |
+ | Auditoria insuficiente | ALTO | ALTA | No se puede explicar quien hizo una accion sensible. | Fase de auditoria, eventos de negocio, revision de logs. | No aplica rollback completo; se mitiga hacia adelante. |
++| Cancelacion de apartado libera inventario indebidamente | CRITICO | BAJA despues de ITEM-Z6B | Una reserva con pago, convertida a venta o con item no reservado podria liberar prenda de forma incorrecta. | ITEM-Z6B bloquea reservas `CANCELLED`/`CONVERTED_TO_SALE`, pagos `ACTIVE` por allocation y libera solo con update condicional `RESERVED -> AVAILABLE`. | Revertir ITEM-Z6B y bloquear cancelacion normal hasta revisar datos; no ejecutar reversas financieras sin procedimiento. |
+ | Rechazos de reserva sin trazabilidad operativa | ALTO | BAJA despues de ITEM-Z5D | Soporte no podria explicar por que se rechazo un apartado en doble click, concurrencia o idempotencia. | ITEM-Z5D registra `reservation_rejection_events` con motivo, usuario, item, branch, hashes seguros y fecha; queda pendiente consola/consulta operativa. | Revertir instrumentacion si bloquea operacion; conservar tabla como diagnostico o retirarla con DBA. |
+ | Auditoria de seguridad sin consola de consulta | MEDIO | MEDIA despues de AUTH-G | Los eventos quedan persistidos, pero soporte aun necesita SQL o herramienta tecnica para revisarlos. | AUTH-G crea `security_audit_events`; AUTH-G2 debe exponer consulta protegida con filtros. | Consultar tabla por SQL en soporte controlado hasta crear consola. |
+ | Consulta de auditoria sin permiso dedicado | MEDIO | BAJA despues de AUTH-I2 | `MANAGE_SECURITY_SETTINGS` permitia consultar auditoria y era demasiado amplio para soporte de solo lectura. | AUTH-I2 crea `VIEW_SECURITY_AUDIT` y cambia backend/frontend para exigirlo en auditoria. | Retirar el tile o revocar `VIEW_SECURITY_AUDIT` si se detecta asignacion indebida. |
+diff --git a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+index 40e68fe..965db62 100644
+--- a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
++++ b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+@@ -9,6 +9,25 @@ Tipo: backlog documental, sin implementacion
+
+ Convertir el analisis de Fase 2A/2B en un backlog tecnico ordenado para implementar multi-compania con bajo riesgo, evitando fuga de datos entre clientes y manteniendo trazabilidad HPSQ-SOFT.
+
++## Actualizacion ITEM-Z6B - Cancelacion y liberacion segura de apartados
++
++Fecha: 2026-06-09
++Estado: implementado tecnico condicionado.
++
++Alcance ejecutado:
++
++- Cancelacion normal limitada a reservas `ACTIVE`.
++- Bloqueo de reservas `CANCELLED` y `CONVERTED_TO_SALE`.
++- Bloqueo de cancelacion cuando existe pago `ACTIVE` asignado a la reserva.
++- Liberacion de inventario con update condicional `RESERVED -> AVAILABLE`.
++- Trazabilidad de rechazos de cancelacion con `VALIDATION_REJECTED`.
++
++Pendiente:
++
++- QA API/visual real con ambiente MySQL configurado.
++- Definir flujo formal para cancelar/liberar reservas con pago activo.
++- Definir autorizacion operativa para reversas sensibles.
++
+ ## Actualizacion ITEM-Z5D - Trazabilidad de rechazos de reserva
+
+ Fecha: 2026-06-09
+diff --git a/docs/ITEM_Z6B_SAFE_RESERVATION_RELEASE.md b/docs/ITEM_Z6B_SAFE_RESERVATION_RELEASE.md
+new file mode 100644
+index 0000000..cf8c97a
+--- /dev/null
++++ b/docs/ITEM_Z6B_SAFE_RESERVATION_RELEASE.md
+@@ -0,0 +1,129 @@
++# ITEM-Z6B - Cancelacion y liberacion segura de apartados
++
++Fecha: 2026-06-09
++Rama: `feature/item-z6b-safe-reservation-release`
++Estado: `GO_TECNICO` / `PENDING_QA_VISUAL`
++
++## Resumen ejecutivo
++
++ITEM-Z6B corrige la cancelacion normal de reservas para que solo una reserva `ACTIVE` sin pago activo pueda cancelarse y liberar inventario. La prenda se libera con una transicion condicional `RESERVED -> AVAILABLE`; si la prenda ya no esta reservada, la operacion se rechaza y no fuerza disponibilidad.
++
++No se implementaron pagos, caja, devoluciones, precio LIVE, autorizaciones, permisos, RBAC, endpoints ni migraciones.
++
++## Estado previo
++
++Antes de esta fase:
++
++- `ReservationService.create` ya protegia `AVAILABLE -> RESERVED` con update atomico.
++- `X-Idempotency-Key` ya evitaba doble submit exacto de creacion.
++- `reservations` ya tenia proteccion estructural para una sola reserva `ACTIVE` por item.
++- `reservation_rejection_events` ya registraba rechazos operativos de creacion/validacion.
++- `ReservationService.cancel` cambiaba la reserva a `CANCELLED` y liberaba la prenda con `item.setStatus(AVAILABLE)`.
++- No habia validacion backend de pago activo antes de cancelar.
++- La liberacion no era condicional sobre `ItemStatus.RESERVED`.
++
++## Reglas implementadas
++
++- Solo `ReservationStatus.ACTIVE` puede cancelarse por este flujo normal.
++- `ReservationStatus.CANCELLED` se rechaza con mensaje claro.
++- `ReservationStatus.CONVERTED_TO_SALE` se rechaza con mensaje claro.
++- Si existen allocations de pago activo para la reserva, la cancelacion normal se rechaza.
++- Payments `VOIDED` no bloquean la cancelacion normal.
++- La prenda debe estar en `ItemStatus.RESERVED`.
++- La liberacion usa `ItemRepository.releaseIfReserved(...)`.
++- Si el update condicional no afecta exactamente 1 fila, no se cancela la reserva.
++- La cancelacion LIVE conserva los eventos operativos existentes.
++- Los rechazos se registran con `ReservationRejectionReason.VALIDATION_REJECTED` cuando aplica.
++
++## Validacion financiera encontrada
++
++Se encontro una relacion clara entre reserva y pago mediante:
++
++- `PaymentAllocation.reservationId`
++- `PaymentAllocation.paymentId`
++- `Payment.status`
++
++La regla aplicada es conservadora: cualquier monto asignado a la reserva desde un pago `ACTIVE` bloquea la cancelacion normal.
++
++Pendiente fuera de esta fase:
++
++- flujo formal de reversa/devolucion;
++- efecto contable/caja;
++- autorizacion de supervisor/admin;
++- manejo operativo de saldos no modelados como `PaymentAllocation` activa.
++
++## Liberacion de inventario
++
++La liberacion de inventario ocurre solo si:
++
++1. la reserva esta `ACTIVE`;
++2. no tiene pago activo detectable;
++3. el item asociado esta `RESERVED`;
++4. el update condicional `RESERVED -> AVAILABLE` afecta 1 fila.
++
++No se liberan prendas `AVAILABLE`, `SOLD`, `DISABLED` ni `ON_CONSIGNMENT`.
++
++## Archivos principales
++
++- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java`
++- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/item/ItemRepository.java`
++- `backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java`
++- `backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java`
++
++## Pruebas agregadas o ajustadas
++
++Se agregaron pruebas para:
++
++- cancelar reserva `ACTIVE` y liberar item `RESERVED -> AVAILABLE`;
++- rechazar reserva `CANCELLED`;
++- rechazar reserva `CONVERTED_TO_SALE`;
++- rechazar si el item no esta `RESERVED`;
++- rechazar si `releaseIfReserved` afecta 0 filas;
++- bloquear cancelacion con pago `ACTIVE`;
++- permitir cancelacion con allocation de pago `VOIDED`;
++- validar que una reserva LIVE usa la misma liberacion segura y conserva eventos LIVE.
++
++## Validaciones
++
++Ejecutadas:
++
++- `.\mvnw.cmd test`
++  - Resultado: `BUILD SUCCESS`, 106 tests, 0 failures, 0 errors.
++  - Nota: se cargo `.env` al proceso de Maven sin imprimir secretos y se limpiaron comillas externas del JDBC URL.
++- `.\mvnw.cmd "-Dtest=ReservationServiceTests,ReservationServiceLiveOperationalStatusTests" test`
++  - Resultado: `BUILD SUCCESS`, 28 tests, 0 failures, 0 errors.
++- `npm.cmd run lint`
++  - Resultado: PASS, 0 errores, 53 warnings preexistentes.
++- `npx.cmd tsc --noEmit`
++  - Resultado: PASS.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`
++  - Resultado: PASS.
++- `git --no-pager diff --check`
++  - Resultado: PASS.
++- `git --no-pager diff --cached --check`
++  - Resultado: PASS.
++
++## Rollback
++
++Rollback tecnico:
++
++1. Revertir el commit de ITEM-Z6B.
++2. Validar que `ReservationService.cancel` vuelva al comportamiento anterior.
++3. Repetir pruebas de reservas.
++
++No hay migracion que revertir.
++
++## Riesgos pendientes
++
++- QA API/visual real de cancelacion con usuarios operativos.
++- Definir flujo sensible para reservas con pago activo.
++- Definir autorizacion de supervisor/admin para liberar apartados con pago.
++- Confirmar en ambiente integrado que los mensajes backend se presentan claramente en UI.
++
++## GO/NO-GO
++
++Resultado tecnico de la fase: `GO_TECNICO`.
++
++Condicion:
++
++- Queda `PENDING_QA_VISUAL` porque no hubo navegador real ni screenshots.
+diff --git a/qa-reports/ITEM-Z6B-safe-reservation-release-report-20260609-215428.md b/qa-reports/ITEM-Z6B-safe-reservation-release-report-20260609-215428.md
+new file mode 100644
+index 0000000..d5945e0
+--- /dev/null
++++ b/qa-reports/ITEM-Z6B-safe-reservation-release-report-20260609-215428.md
+@@ -0,0 +1,133 @@
++# ITEM-Z6B - Safe reservation release report
++
++Fecha/hora: 2026-06-09 21:54:28
++Rama: `feature/item-z6b-safe-reservation-release`
++Resultado: `GO_TECNICO` / `PENDING_QA_VISUAL`
++
++## Comandos ejecutados
++
++Iniciales:
++
++- `git branch --show-current`
++- `git status`
++- `git log --oneline -50`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z5B"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z5C"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z5D"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z6A"`
++
++Auditoria:
++
++- `git grep -n -E "ReservationService|ReservationController|ReservationRepository|ReservationStatus|cancel|cancelar|release|liberar|CONVERTED_TO_SALE|CANCELLED|ACTIVE|setStatus|ItemStatus.RESERVED|ItemStatus.AVAILABLE" -- backend/control-ropa/src/main/java backend/control-ropa/src/test app services components docs qa-reports`
++- `git grep -n -E "payment|Payment|pago|saldo|balance|amountPaid|paid|sale|Sale|venta|cash|caja|refund|devolucion" -- backend/control-ropa/src/main/java backend/control-ropa/src/test app services components docs qa-reports`
++- `git grep -n -E "reservation_rejection_events|ReservationRejection|reservation_idempotency_keys|active_reservation_item_id|uq_reservations_active_item|trace|trazabilidad" -- backend/control-ropa/src/main/java backend/control-ropa/src/main/resources backend/control-ropa/src/test docs qa-reports`
++
++Backend:
++
++- `.\mvnw.cmd test`
++- `.\mvnw.cmd test` cargando `.env` al proceso sin imprimir secretos y limpiando comillas externas de valores.
++- `.\mvnw.cmd "-Dtest=ReservationServiceTests,ReservationServiceLiveOperationalStatusTests" test`
++
++## Historial previo validado
++
++- `6f1ee15 ITEM-Z5B agrega idempotencia de reservas`
++- `ef8d255 ITEM-Z5C protege reserva activa por item`
++- `3826a43 ITEM-Z5D registra rechazos de reserva`
++- `4744b9c ITEM-Z6A documenta handoff liberacion reservas`
++
++## Hallazgos
++
++- `ReservationService.cancel` ya existia y liberaba el item a `AVAILABLE`.
++- La cancelacion normal solo validaba que la reserva no fuera distinta de `ACTIVE`.
++- No bloqueaba pagos activos ligados por `PaymentAllocation`.
++- No usaba update condicional `RESERVED -> AVAILABLE`.
++- `PaymentAllocationRepository.findByReservationIdOrderByCreatedAtAsc` permite detectar pagos ligados a la reserva.
++- `PaymentStatus.ACTIVE` y `PaymentStatus.VOIDED` permiten diferenciar pagos que bloquean y pagos anulados.
++- `ReservationRejectionTraceService` permite registrar rechazos operativos con motivo `VALIDATION_REJECTED`.
++
++## Implementacion realizada
++
++- Se agrego `ItemRepository.releaseIfReserved(...)` con update condicional por company, branch, item y status `RESERVED`.
++- `ReservationService.cancel` ahora:
++  - rechaza `CANCELLED`;
++  - rechaza `CONVERTED_TO_SALE`;
++  - rechaza cualquier status distinto de `ACTIVE`;
++  - bloquea cancelacion con pago activo asignado a la reserva;
++  - exige que el item este `RESERVED`;
++  - libera con `releaseIfReserved`;
++  - rechaza si el update condicional afecta 0 filas;
++  - conserva eventos LIVE existentes;
++  - registra rechazos operativos cuando aplica.
++
++## Migracion
++
++No se creo migracion.
++
++## Archivos tocados
++
++- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/item/ItemRepository.java`
++- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java`
++- `backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java`
++- `backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java`
++- `docs/ITEM_Z6B_SAFE_RESERVATION_RELEASE.md`
++- `docs/ERP_BITACORA_CAMBIOS.md`
++- `docs/ERP_RIESGOS_OPERATIVOS.md`
++- `docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md`
++- `qa-reports/ITEM-Z6B-safe-reservation-release-report-20260609-215428.md`
++- `git-diffs/20260609-ITEM-Z6B-safe-reservation-release.diff`
++- `git-diffs/20260609-ITEM-Z6B-safe-reservation-release-stat.txt`
++
++## Tests agregados o ajustados
++
++- `cancelActiveReservationReleasesReservedItemAtomically`
++- `cancelRejectsHistoricalReservations`
++- `cancelRejectsWhenItemIsNotReserved`
++- `cancelRejectsWhenReservedReleaseAffectsNoRows`
++- `cancelRejectsWhenReservationHasActivePaymentAllocation`
++- `cancelIgnoresVoidedPaymentAllocationAndReleasesReservedItem`
++- `cancelLiveReservationUsesSameSafeReleaseAndRecordsLiveEvents`
++
++## Validaciones ejecutadas
++
++- `.\mvnw.cmd "-Dtest=ReservationServiceTests,ReservationServiceLiveOperationalStatusTests" test`
++  - PASS: `BUILD SUCCESS`, 28 tests, 0 failures, 0 errors.
++- `.\mvnw.cmd test`
++  - Primer intento sin `.env`: FAIL por ambiente, `Access denied for user 'root'@'localhost' (using password: NO)`.
++  - Reintento cargando `.env` y limpiando comillas externas: PASS, `BUILD SUCCESS`, 106 tests, 0 failures, 0 errors.
++  - Warning no bloqueante: Logback no pudo abrir `C:/HPSQ-SOFT/control-ropa/logs/backend/control-ropa.log` por acceso denegado.
++- `npm.cmd run lint`
++  - PASS: 0 errores, 53 warnings preexistentes.
++- `npx.cmd tsc --noEmit`
++  - PASS.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`
++  - PASS. Export generado en `C:/tmp/control-ropa-web-export`.
++- `git --no-pager diff --check`
++  - PASS.
++- `git --no-pager diff --cached --check`
++  - PASS.
++- `git status`
++  - Revisado antes y despues de staging.
++
++## Restricciones confirmadas
++
++- No se tocaron pagos funcionalmente.
++- No se toco caja.
++- No se toco precio LIVE.
++- No se tocaron devoluciones.
++- No se tocaron autorizaciones.
++- No se tocaron RBAC ni permisos.
++- No se crearon endpoints.
++- No se crearon migraciones.
++- No se cambio venta financiera.
++
++## Riesgos
++
++- La suite Maven completa requiere MySQL local configurado y variables cargadas; se resolvio cargando `.env` al proceso sin imprimir secretos.
++- La cancelacion de reservas con pago activo queda bloqueada, pero la reversa formal de pago/caja sigue pendiente.
++- No hay evidencia visual real de UI.
++
++## GO/NO-GO
++
++- `GO_TECNICO`: backend completo, frontend y checks Git pasan.
++- `PENDING_QA_VISUAL`: no hubo navegador real ni screenshots.
++- No se marca QA_PASS visual/funcional hasta ejecutar smoke API/visual en ambiente QA.

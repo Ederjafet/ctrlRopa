@@ -9,6 +9,25 @@ Tipo: backlog documental, sin implementacion
 
 Convertir el analisis de Fase 2A/2B en un backlog tecnico ordenado para implementar multi-compania con bajo riesgo, evitando fuga de datos entre clientes y manteniendo trazabilidad HPSQ-SOFT.
 
+## Actualizacion ITEM-Z6B - Cancelacion y liberacion segura de apartados
+
+Fecha: 2026-06-09
+Estado: implementado tecnico condicionado.
+
+Alcance ejecutado:
+
+- Cancelacion normal limitada a reservas `ACTIVE`.
+- Bloqueo de reservas `CANCELLED` y `CONVERTED_TO_SALE`.
+- Bloqueo de cancelacion cuando existe pago `ACTIVE` asignado a la reserva.
+- Liberacion de inventario con update condicional `RESERVED -> AVAILABLE`.
+- Trazabilidad de rechazos de cancelacion con `VALIDATION_REJECTED`.
+
+Pendiente:
+
+- QA API/visual real con ambiente MySQL configurado.
+- Definir flujo formal para cancelar/liberar reservas con pago activo.
+- Definir autorizacion operativa para reversas sensibles.
+
 ## Actualizacion ITEM-Z5D - Trazabilidad de rechazos de reserva
 
 Fecha: 2026-06-09

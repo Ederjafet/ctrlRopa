@@ -13,10 +13,16 @@ import com.hpsqsoft.ctrlropa.item.ItemRepository;
 import com.hpsqsoft.ctrlropa.item.ItemStatus;
 import com.hpsqsoft.ctrlropa.live.Live;
 import com.hpsqsoft.ctrlropa.live.LiveEventService;
+import com.hpsqsoft.ctrlropa.live.LiveEventType;
 import com.hpsqsoft.ctrlropa.live.LiveRepository;
 import com.hpsqsoft.ctrlropa.live.LiveStatus;
 import com.hpsqsoft.ctrlropa.order.CustomerOrder;
 import com.hpsqsoft.ctrlropa.order.CustomerOrderService;
+import com.hpsqsoft.ctrlropa.payment.Payment;
+import com.hpsqsoft.ctrlropa.payment.PaymentAllocation;
+import com.hpsqsoft.ctrlropa.payment.PaymentAllocationRepository;
+import com.hpsqsoft.ctrlropa.payment.PaymentRepository;
+import com.hpsqsoft.ctrlropa.payment.PaymentStatus;
 import com.hpsqsoft.ctrlropa.security.access.AccessService;
 import com.hpsqsoft.ctrlropa.security.access.ChannelCode;
 import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
@@ -67,6 +73,8 @@ class ReservationServiceTests {
     private final TenantAccessGuard tenantAccessGuard = mock(TenantAccessGuard.class);
     private final LiveEventService liveEventService = mock(LiveEventService.class);
     private final ReservationRejectionTraceService rejectionTraceService = mock(ReservationRejectionTraceService.class);
+    private final PaymentAllocationRepository paymentAllocationRepository = mock(PaymentAllocationRepository.class);
+    private final PaymentRepository paymentRepository = mock(PaymentRepository.class);
 
     private final ReservationService service = new ReservationService(
             repository,
@@ -83,7 +91,9 @@ class ReservationServiceTests {
             tenantAccessGuard,
             liveEventService,
             idempotencyRepository,
-            rejectionTraceService
+            rejectionTraceService,
+            paymentAllocationRepository,
+            paymentRepository
     );
 
     @Test
@@ -561,6 +571,233 @@ class ReservationServiceTests {
         verify(itemRepository).reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED);
     }
 
+    @Test
+    void cancelActiveReservationReleasesReservedItemAtomically() {
+        Branch branch = branch();
+        Item item = item(ItemStatus.RESERVED, branch);
+        Customer customer = customer(branch);
+        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
+        Reservation reservation = reservation(10L, item, customer, branch, channel);
+
+        stubCancelFlow(reservation);
+        when(itemRepository.releaseIfReserved(2L, 6L, 8L, ItemStatus.RESERVED, ItemStatus.AVAILABLE))
+                .thenReturn(1);
+        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        stubSellerName();
+
+        ReservationResponse response = service.cancel(10L, "cliente cancela");
+
+        assertEquals("CANCELLED", response.getStatus());
+        assertEquals("cliente cancela", response.getCancelReason());
+        assertEquals(99L, response.getCancelledByUserId());
+        verify(accessService).assertCan(99L, PermissionCode.CANCEL_RESERVATION);
+        verify(itemRepository).releaseIfReserved(2L, 6L, 8L, ItemStatus.RESERVED, ItemStatus.AVAILABLE);
+        verify(itemRepository, never()).save(any(Item.class));
+        verify(repository).save(reservation);
+        verify(rejectionTraceService, never()).record(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ReservationStatus.class, names = {"CANCELLED", "CONVERTED_TO_SALE"})
+    void cancelRejectsHistoricalReservations(ReservationStatus status) {
+        Branch branch = branch();
+        Item item = item(ItemStatus.RESERVED, branch);
+        Customer customer = customer(branch);
+        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
+        Reservation reservation = reservation(10L, item, customer, branch, channel);
+        reservation.setStatus(status);
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(10L)).thenReturn(Optional.of(reservation));
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.cancel(10L, "cancelacion duplicada")
+        );
+
+        assertTrue(exception.getMessage().contains("cancelada")
+                || exception.getMessage().contains("convertida a venta"));
+        verify(itemRepository, never()).releaseIfReserved(any(), any(), any(), any(), any());
+        verify(repository, never()).save(any(Reservation.class));
+        verify(rejectionTraceService).record(
+                eq(2L),
+                eq(6L),
+                eq(99L),
+                eq(8L),
+                any(),
+                eq(10L),
+                eq(ReservationRejectionReason.VALIDATION_REJECTED),
+                anyString(),
+                any(),
+                any()
+        );
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ItemStatus.class, names = {"AVAILABLE", "SOLD", "DISABLED", "ON_CONSIGNMENT"})
+    void cancelRejectsWhenItemIsNotReserved(ItemStatus status) {
+        Branch branch = branch();
+        Item item = item(status, branch);
+        Customer customer = customer(branch);
+        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
+        Reservation reservation = reservation(10L, item, customer, branch, channel);
+
+        stubCancelFlow(reservation);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.cancel(10L, "cliente cancela")
+        );
+
+        assertTrue(exception.getMessage().contains("estado reservado"));
+        verify(itemRepository, never()).releaseIfReserved(any(), any(), any(), any(), any());
+        verify(repository, never()).save(any(Reservation.class));
+        verify(rejectionTraceService).record(
+                eq(2L),
+                eq(6L),
+                eq(99L),
+                eq(8L),
+                any(),
+                eq(10L),
+                eq(ReservationRejectionReason.VALIDATION_REJECTED),
+                eq("La prenda no esta en estado reservado y no puede liberarse automaticamente"),
+                any(),
+                any()
+        );
+    }
+
+    @Test
+    void cancelRejectsWhenReservedReleaseAffectsNoRows() {
+        Branch branch = branch();
+        Item item = item(ItemStatus.RESERVED, branch);
+        Customer customer = customer(branch);
+        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
+        Reservation reservation = reservation(10L, item, customer, branch, channel);
+
+        stubCancelFlow(reservation);
+        when(itemRepository.releaseIfReserved(2L, 6L, 8L, ItemStatus.RESERVED, ItemStatus.AVAILABLE))
+                .thenReturn(0);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.cancel(10L, "cliente cancela")
+        );
+
+        assertTrue(exception.getMessage().contains("estado reservado"));
+        verify(repository, never()).save(any(Reservation.class));
+        verify(rejectionTraceService).record(
+                eq(2L),
+                eq(6L),
+                eq(99L),
+                eq(8L),
+                any(),
+                eq(10L),
+                eq(ReservationRejectionReason.VALIDATION_REJECTED),
+                eq("La prenda ya no esta en estado reservado y no puede liberarse automaticamente"),
+                any(),
+                any()
+        );
+    }
+
+    @Test
+    void cancelRejectsWhenReservationHasActivePaymentAllocation() {
+        Branch branch = branch();
+        Item item = item(ItemStatus.RESERVED, branch);
+        Customer customer = customer(branch);
+        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
+        Reservation reservation = reservation(10L, item, customer, branch, channel);
+        PaymentAllocation allocation = allocation(77L, BigDecimal.valueOf(120));
+
+        stubCancelFlow(reservation);
+        when(paymentAllocationRepository.findByReservationIdOrderByCreatedAtAsc(10L))
+                .thenReturn(List.of(allocation));
+        when(paymentRepository.findById(77L)).thenReturn(Optional.of(payment(PaymentStatus.ACTIVE)));
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.cancel(10L, "cliente cancela")
+        );
+
+        assertTrue(exception.getMessage().contains("pago registrado"));
+        verify(itemRepository, never()).releaseIfReserved(any(), any(), any(), any(), any());
+        verify(repository, never()).save(any(Reservation.class));
+        verify(rejectionTraceService).record(
+                eq(2L),
+                eq(6L),
+                eq(99L),
+                eq(8L),
+                any(),
+                eq(10L),
+                eq(ReservationRejectionReason.VALIDATION_REJECTED),
+                eq("Este apartado tiene pago registrado y no puede cancelarse por el flujo normal"),
+                any(),
+                any()
+        );
+    }
+
+    @Test
+    void cancelIgnoresVoidedPaymentAllocationAndReleasesReservedItem() {
+        Branch branch = branch();
+        Item item = item(ItemStatus.RESERVED, branch);
+        Customer customer = customer(branch);
+        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
+        Reservation reservation = reservation(10L, item, customer, branch, channel);
+        PaymentAllocation allocation = allocation(77L, BigDecimal.valueOf(120));
+
+        stubCancelFlow(reservation);
+        when(paymentAllocationRepository.findByReservationIdOrderByCreatedAtAsc(10L))
+                .thenReturn(List.of(allocation));
+        when(paymentRepository.findById(77L)).thenReturn(Optional.of(payment(PaymentStatus.VOIDED)));
+        when(itemRepository.releaseIfReserved(2L, 6L, 8L, ItemStatus.RESERVED, ItemStatus.AVAILABLE))
+                .thenReturn(1);
+        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        stubSellerName();
+
+        ReservationResponse response = service.cancel(10L, "cliente cancela");
+
+        assertEquals("CANCELLED", response.getStatus());
+        verify(itemRepository).releaseIfReserved(2L, 6L, 8L, ItemStatus.RESERVED, ItemStatus.AVAILABLE);
+    }
+
+    @Test
+    void cancelLiveReservationUsesSameSafeReleaseAndRecordsLiveEvents() {
+        Branch branch = branch();
+        Item item = item(ItemStatus.RESERVED, branch);
+        Customer customer = customer(branch);
+        SalesChannel channel = channel(3L, ChannelCode.LIVE);
+        Reservation reservation = reservation(10L, item, customer, branch, channel);
+        reservation.setLive(live(branch));
+        reservation.setLiveOperationalStatus(LiveReservationOperationalStatus.RESERVED);
+
+        stubCancelFlow(reservation);
+        when(itemRepository.releaseIfReserved(2L, 6L, 8L, ItemStatus.RESERVED, ItemStatus.AVAILABLE))
+                .thenReturn(1);
+        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        stubSellerName();
+
+        ReservationResponse response = service.cancel(10L, "cliente cancela");
+
+        assertEquals("CANCELLED", response.getStatus());
+        assertEquals("CANCELLED", response.getLiveOperationalStatus());
+        verify(itemRepository).releaseIfReserved(2L, 6L, 8L, ItemStatus.RESERVED, ItemStatus.AVAILABLE);
+        verify(liveEventService).record(
+                reservation.getLive(),
+                LiveEventType.LIVE_RESERVATION_STATUS_CHANGED,
+                99L,
+                "RESERVATION",
+                10L,
+                "{\"reservationId\":10,\"previousStatus\":\"RESERVED\",\"newStatus\":\"CANCELLED\"}"
+        );
+        verify(liveEventService).record(
+                reservation.getLive(),
+                LiveEventType.LIVE_RESERVATION_CANCELLED,
+                99L,
+                "RESERVATION",
+                10L,
+                "{\"reservationId\":10,\"previousStatus\":\"RESERVED\",\"newStatus\":\"CANCELLED\"}"
+        );
+    }
+
     private static ReservationIdempotencyRecord completedRecord(String key,
                                                                 String requestHash,
                                                                 Long reservationId) {
@@ -657,6 +894,32 @@ class ReservationServiceTests {
                 ArgumentMatchers.<RowMapper<String>>any(),
                 eq(99L)
         )).thenReturn(List.of("Seller"));
+    }
+
+    private void stubCancelFlow(Reservation reservation) {
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(reservation.getId())).thenReturn(Optional.of(reservation));
+        when(paymentAllocationRepository.findByReservationIdOrderByCreatedAtAsc(reservation.getId()))
+                .thenReturn(List.of());
+    }
+
+    private static PaymentAllocation allocation(Long paymentId, BigDecimal amount) {
+        PaymentAllocation allocation = new PaymentAllocation();
+        allocation.setPaymentId(paymentId);
+        allocation.setReservationId(10L);
+        allocation.setAmount(amount);
+        return allocation;
+    }
+
+    private static Payment payment(PaymentStatus status) {
+        Payment payment = new Payment();
+        payment.setCustomerId(27L);
+        payment.setBranchId(6L);
+        payment.setReceivedAmount(BigDecimal.valueOf(120));
+        payment.setPaymentMethodId(1L);
+        payment.setStatus(status);
+        payment.setCreatedByUserId(99L);
+        return payment;
     }
 
     private static ReservationService.CreateReservationRequest request(Long salesChannelId, Long liveId) {

@@ -18,6 +18,11 @@ import com.hpsqsoft.ctrlropa.live.LiveRepository;
 import com.hpsqsoft.ctrlropa.live.LiveStatus;
 import com.hpsqsoft.ctrlropa.order.CustomerOrder;
 import com.hpsqsoft.ctrlropa.order.CustomerOrderService;
+import com.hpsqsoft.ctrlropa.payment.Payment;
+import com.hpsqsoft.ctrlropa.payment.PaymentAllocation;
+import com.hpsqsoft.ctrlropa.payment.PaymentAllocationRepository;
+import com.hpsqsoft.ctrlropa.payment.PaymentRepository;
+import com.hpsqsoft.ctrlropa.payment.PaymentStatus;
 import com.hpsqsoft.ctrlropa.security.access.AccessService;
 import com.hpsqsoft.ctrlropa.security.access.ChannelCode;
 import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
@@ -61,6 +66,8 @@ public class ReservationService {
     private final LiveEventService liveEventService;
     private final ReservationIdempotencyRepository idempotencyRepository;
     private final ReservationRejectionTraceService rejectionTraceService;
+    private final PaymentAllocationRepository paymentAllocationRepository;
+    private final PaymentRepository paymentRepository;
 
     public ReservationService(ReservationRepository repository,
                               ItemRepository itemRepository,
@@ -76,7 +83,9 @@ public class ReservationService {
                               TenantAccessGuard tenantAccessGuard,
                               LiveEventService liveEventService,
                               ReservationIdempotencyRepository idempotencyRepository,
-                              ReservationRejectionTraceService rejectionTraceService) {
+                              ReservationRejectionTraceService rejectionTraceService,
+                              PaymentAllocationRepository paymentAllocationRepository,
+                              PaymentRepository paymentRepository) {
         this.repository = repository;
         this.itemRepository = itemRepository;
         this.customerRepository = customerRepository;
@@ -92,6 +101,8 @@ public class ReservationService {
         this.liveEventService = liveEventService;
         this.idempotencyRepository = idempotencyRepository;
         this.rejectionTraceService = rejectionTraceService;
+        this.paymentAllocationRepository = paymentAllocationRepository;
+        this.paymentRepository = paymentRepository;
     }
 
     @Transactional(readOnly = true)
@@ -703,8 +714,76 @@ public class ReservationService {
 
         Reservation existing = findEntityById(reservationId);
 
+        if (existing.getStatus() == ReservationStatus.CANCELLED) {
+            traceCancellationRejection(
+                    existing,
+                    userId,
+                    "La reserva ya esta cancelada"
+            );
+            throw new IllegalArgumentException("La reserva ya esta cancelada");
+        }
+
+        if (existing.getStatus() == ReservationStatus.CONVERTED_TO_SALE) {
+            traceCancellationRejection(
+                    existing,
+                    userId,
+                    "La reserva ya fue convertida a venta y no puede cancelarse como apartado"
+            );
+            throw new IllegalArgumentException(
+                    "La reserva ya fue convertida a venta y no puede cancelarse como apartado"
+            );
+        }
+
         if (existing.getStatus() != ReservationStatus.ACTIVE) {
+            traceCancellationRejection(
+                    existing,
+                    userId,
+                    "Solo se pueden cancelar reservas activas"
+            );
             throw new IllegalArgumentException("Solo se pueden cancelar reservas activas");
+        }
+
+        BigDecimal activePaid = calculateActiveAppliedToReservation(existing.getId());
+        if (activePaid.compareTo(BigDecimal.ZERO) > 0) {
+            traceCancellationRejection(
+                    existing,
+                    userId,
+                    "Este apartado tiene pago registrado y no puede cancelarse por el flujo normal"
+            );
+            throw new IllegalArgumentException(
+                    "Este apartado tiene pago registrado. Para cancelar o liberar la prenda se requiere un flujo formal de reversa."
+            );
+        }
+
+        Item item = existing.getItem();
+        if (item.getStatus() != ItemStatus.RESERVED) {
+            traceCancellationRejection(
+                    existing,
+                    userId,
+                    "La prenda no esta en estado reservado y no puede liberarse automaticamente"
+            );
+            throw new IllegalArgumentException(
+                    "La prenda no esta en estado reservado y no puede liberarse automaticamente"
+            );
+        }
+
+        int releasedRows = itemRepository.releaseIfReserved(
+                item.getCompany().getId(),
+                item.getBranch().getId(),
+                item.getId(),
+                ItemStatus.RESERVED,
+                ItemStatus.AVAILABLE
+        );
+
+        if (releasedRows != 1) {
+            traceCancellationRejection(
+                    existing,
+                    userId,
+                    "La prenda ya no esta en estado reservado y no puede liberarse automaticamente"
+            );
+            throw new IllegalArgumentException(
+                    "La prenda ya no esta en estado reservado y no puede liberarse automaticamente"
+            );
         }
 
         existing.setStatus(ReservationStatus.CANCELLED);
@@ -725,12 +804,39 @@ public class ReservationService {
             );
         }
 
-        Item item = existing.getItem();
-        item.setStatus(ItemStatus.AVAILABLE);
-        itemRepository.save(item);
-
         Reservation saved = repository.save(existing);
         return toResponse(saved);
+    }
+
+    private BigDecimal calculateActiveAppliedToReservation(Long reservationId) {
+        return paymentAllocationRepository.findByReservationIdOrderByCreatedAtAsc(reservationId)
+                .stream()
+                .map(this::activeReservationAllocationAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal activeReservationAllocationAmount(PaymentAllocation allocation) {
+        Payment payment = paymentRepository.findById(allocation.getPaymentId())
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Pago no encontrado con id: " + allocation.getPaymentId()));
+
+        return payment.getStatus() == PaymentStatus.ACTIVE ? allocation.getAmount() : BigDecimal.ZERO;
+    }
+
+    private void traceCancellationRejection(Reservation reservation, Long userId, String message) {
+        Item item = reservation.getItem();
+        traceReservationRejection(
+                item.getCompany().getId(),
+                reservation.getBranch().getId(),
+                userId,
+                item.getId(),
+                reservation.getLive() != null ? reservation.getLive().getId() : null,
+                reservation.getId(),
+                ReservationRejectionReason.VALIDATION_REJECTED,
+                message,
+                null,
+                (String) null
+        );
     }
 
     public ReservationResponse updateLiveOperationalStatus(
