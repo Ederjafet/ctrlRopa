@@ -1,0 +1,3 @@
+﻿ docs/LIVE_QA_E_MANUAL_VISUAL_EVIDENCE.md           | 196 +++++++++++++++++++++
+ ...anual-visual-evidence-report-20260610-123329.md | 124 +++++++++++++
+ 2 files changed, 320 insertions(+)
