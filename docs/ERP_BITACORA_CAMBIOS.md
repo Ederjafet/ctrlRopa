@@ -1,5 +1,33 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-10 - LIVE-PRICE-C autorizacion cambio de precio LIVE
+
+Tipo: backend, frontend minimo, permisos, migracion, autorizaciones LIVE, documentacion.
+
+Objetivo:
+
+- Implementar un MVP seguro para solicitar, aprobar y aplicar cambio de precio LIVE sin tocar pagos, caja, devoluciones ni venta financiera.
+
+Cambios realizados:
+
+- Se reutiliza `operational_authorization_requests` con `LIVE_PRICE_CHANGE`.
+- Se agrega migracion `V57__live_price_authorization_permissions.sql`.
+- Se agregan permisos `REQUEST_LIVE_PRICE_CHANGE`, `APPROVE_LIVE_PRICE_CHANGE`, `APPLY_APPROVED_LIVE_PRICE_CHANGE`, `VIEW_LIVE_PRICE_AUTHORIZATIONS` y `CHANGE_LIVE_PRICE`.
+- La aplicacion cambia solo `reservations.price` de apartado LIVE activo sin pago y con prenda `RESERVED`.
+- Se agrega evento `LIVE_PRICE_CHANGE_APPLIED`.
+- La UI minima de `/operational-authorizations` permite crear solicitud de precio con ID de apartado y precio solicitado.
+
+Restricciones respetadas:
+
+- No se tocaron pagos, caja, devoluciones, venta financiera ni precio historico de ventas cerradas.
+- No se invento precio LIVE temporal; queda pendiente hasta que exista modelo.
+
+Pendientes:
+
+- Smoke API real con dataset desechable.
+- QA visual con screenshots por rol.
+- UI contextual desde LIVE/reservas.
+
 ## 2026-06-10 - LIVE-AUTH-B2 UI autorizaciones operativas LIVE
 
 Tipo: frontend, autorizaciones operativas LIVE, documentacion, evidencia.

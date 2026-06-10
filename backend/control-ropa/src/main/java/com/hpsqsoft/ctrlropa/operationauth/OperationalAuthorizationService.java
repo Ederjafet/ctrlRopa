@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -163,6 +164,7 @@ public class OperationalAuthorizationService {
         Long userId = currentUser.getUserId();
         accessService.assertCan(userId, PermissionCode.APPROVE_LIVE_OPERATION_AUTHORIZATION);
         OperationalAuthorizationRequest entity = findScoped(id);
+        assertCanDecideOperation(userId, entity.getOperationType());
         ensureRequested(entity);
         ensureNotExpired(entity);
         if (userId.equals(entity.getRequestedByUserId())) {
@@ -179,6 +181,7 @@ public class OperationalAuthorizationService {
         Long userId = currentUser.getUserId();
         accessService.assertCan(userId, PermissionCode.APPROVE_LIVE_OPERATION_AUTHORIZATION);
         OperationalAuthorizationRequest entity = findScoped(id);
+        assertCanDecideOperation(userId, entity.getOperationType());
         ensureRequested(entity);
         entity.setStatus(OperationalAuthorizationStatus.REJECTED);
         entity.setDecidedByUserId(userId);
@@ -215,11 +218,16 @@ public class OperationalAuthorizationService {
         }
         ensureNotExpired(entity);
 
-        if (entity.getOperationType() != OperationalAuthorizationType.UNDO_LIVE_OPERATIONAL_SALE) {
+        if (entity.getOperationType() != OperationalAuthorizationType.UNDO_LIVE_OPERATIONAL_SALE
+                && entity.getOperationType() != OperationalAuthorizationType.LIVE_PRICE_CHANGE) {
             throw new IllegalArgumentException("La aplicacion de esta accion queda pendiente de contrato funcional");
         }
 
-        applyUndoLiveOperationalSale(entity, userId, request != null ? request.getReason() : null);
+        if (entity.getOperationType() == OperationalAuthorizationType.UNDO_LIVE_OPERATIONAL_SALE) {
+            applyUndoLiveOperationalSale(entity, userId, request != null ? request.getReason() : null);
+        } else {
+            applyLivePriceChange(entity, userId, request != null ? request.getReason() : null);
+        }
         entity.setStatus(OperationalAuthorizationStatus.APPLIED);
         entity.setAppliedByUserId(userId);
         entity.setAppliedAt(LocalDateTime.now());
@@ -282,6 +290,42 @@ public class OperationalAuthorizationService {
         );
     }
 
+    private void applyLivePriceChange(OperationalAuthorizationRequest entity, Long userId, String reason) {
+        accessService.assertCan(userId, PermissionCode.APPLY_APPROVED_LIVE_PRICE_CHANGE);
+        Reservation reservation = reservationRepository.findById(entity.getReservationId())
+                .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada"));
+        tenantAccessGuard.requireBranch(reservation.getBranch().getId(), "La reserva no pertenece a la sucursal activa");
+
+        validateLivePriceChangeReservation(reservation);
+        if (calculateActiveAppliedToReservation(reservation.getId()).compareTo(BigDecimal.ZERO) > 0) {
+            throw new IllegalArgumentException("No se puede cambiar precio LIVE si la reserva tiene pago activo");
+        }
+
+        String currentSnapshot = reservationSnapshot(reservation);
+        if (!sha256(currentSnapshot).equals(entity.getCurrentStateHash())) {
+            throw new ConflictException("El estado de la reserva cambio desde la aprobacion");
+        }
+
+        BigDecimal requestedPrice = requestedPrice(entity.getPayloadJson());
+        BigDecimal previousPrice = reservation.getPrice();
+        reservation.setPrice(requestedPrice);
+        Reservation saved = reservationRepository.save(reservation);
+
+        String payload = "{\"reservationId\":" + saved.getId()
+                + ",\"previousPrice\":" + money(previousPrice)
+                + ",\"newPrice\":" + money(requestedPrice)
+                + ",\"authorizationId\":" + entity.getId()
+                + ",\"reason\":\"" + escapeJson(cleanOptionalText(reason)) + "\"}";
+        liveEventService.record(
+                saved.getLive(),
+                LiveEventType.LIVE_PRICE_CHANGE_APPLIED,
+                userId,
+                "RESERVATION",
+                saved.getId(),
+                payload
+        );
+    }
+
     private TargetSnapshot resolveTarget(OperationalAuthorizationCreateRequest request) {
         if (request.getTargetType() == OperationalAuthorizationTargetType.RESERVATION || request.getReservationId() != null) {
             Long reservationId = request.getReservationId() != null ? request.getReservationId() : request.getTargetId();
@@ -292,6 +336,9 @@ public class OperationalAuthorizationService {
                 throw new AccessDeniedException("La reserva no pertenece a la sucursal solicitada");
             }
             validateReservationOperation(request.getOperationType(), reservation);
+            if (request.getOperationType() == OperationalAuthorizationType.LIVE_PRICE_CHANGE) {
+                requestedPrice(request.getPayloadJson());
+            }
             return new TargetSnapshot(
                     branchId,
                     reservation.getLive() != null ? reservation.getLive().getId() : request.getLiveId(),
@@ -332,6 +379,27 @@ public class OperationalAuthorizationService {
         if (operationType == OperationalAuthorizationType.CANCEL_RESERVATION_WITH_PAYMENT
                 && calculateActiveAppliedToReservation(reservation.getId()).compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("La reserva no tiene pago activo aplicado");
+        }
+        if (operationType == OperationalAuthorizationType.LIVE_PRICE_CHANGE) {
+            validateLivePriceChangeReservation(reservation);
+            if (calculateActiveAppliedToReservation(reservation.getId()).compareTo(BigDecimal.ZERO) > 0) {
+                throw new IllegalArgumentException("No se puede solicitar cambio de precio LIVE con pago activo");
+            }
+        }
+    }
+
+    private void validateLivePriceChangeReservation(Reservation reservation) {
+        if (reservation.getLive() == null) {
+            throw new IllegalArgumentException("La reserva no pertenece a LIVE");
+        }
+        if (reservation.getStatus() != ReservationStatus.ACTIVE) {
+            throw new IllegalArgumentException("Solo una reserva LIVE activa puede cambiar precio");
+        }
+        if (reservation.getLiveOperationalStatus() == LiveReservationOperationalStatus.OPERATIONAL_SOLD) {
+            throw new IllegalArgumentException("No se puede cambiar precio de una reserva cerrada como vendido operativo");
+        }
+        if (reservation.getItem() == null || reservation.getItem().getStatus() != ItemStatus.RESERVED) {
+            throw new IllegalArgumentException("La prenda debe seguir reservada para cambiar precio LIVE");
         }
     }
 
@@ -383,8 +451,15 @@ public class OperationalAuthorizationService {
                     accessService.assertCan(userId, PermissionCode.CANCEL_RESERVATION_WITH_PAYMENT);
             case RELEASE_RESERVED_ITEM -> accessService.assertCan(userId, PermissionCode.RELEASE_RESERVED_ITEM);
             case UNDO_LIVE_OPERATIONAL_SALE -> accessService.assertCan(userId, PermissionCode.UNDO_LIVE_OPERATIONAL_SALE);
+            case LIVE_PRICE_CHANGE -> accessService.assertCan(userId, PermissionCode.REQUEST_LIVE_PRICE_CHANGE);
             case REASSIGN_RESERVATION -> accessService.assertCan(userId, PermissionCode.REASSIGN_RESERVATION);
             case EDIT_LOCKED_ITEM -> accessService.assertCan(userId, PermissionCode.EDIT_LOCKED_ITEM);
+        }
+    }
+
+    private void assertCanDecideOperation(Long userId, OperationalAuthorizationType operationType) {
+        if (operationType == OperationalAuthorizationType.LIVE_PRICE_CHANGE) {
+            accessService.assertCan(userId, PermissionCode.APPROVE_LIVE_PRICE_CHANGE);
         }
     }
 
@@ -438,7 +513,8 @@ public class OperationalAuthorizationService {
                 + ",\"liveId\":" + nullableNumber(reservation.getLive() != null ? reservation.getLive().getId() : null)
                 + ",\"itemId\":" + nullableNumber(reservation.getItem() != null ? reservation.getItem().getId() : null)
                 + ",\"itemStatus\":\"" + (reservation.getItem() != null ? reservation.getItem().getStatus().name() : "null")
-                + "\"}";
+                + "\",\"price\":" + money(reservation.getPrice())
+                + "}";
     }
 
     private String itemSnapshot(Item item) {
@@ -453,6 +529,38 @@ public class OperationalAuthorizationService {
 
     private String nullableNumber(Long value) {
         return value == null ? "null" : value.toString();
+    }
+
+    private BigDecimal requestedPrice(String payloadJson) {
+        String cleaned = cleanOptionalText(payloadJson);
+        if (cleaned == null) {
+            throw new IllegalArgumentException("payloadJson con requestedPrice es obligatorio");
+        }
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("\"requestedPrice\"\\s*:\\s*([0-9]+(?:\\.[0-9]{1,2})?)")
+                .matcher(cleaned);
+        if (!matcher.find()) {
+            throw new IllegalArgumentException("requestedPrice es obligatorio para cambio de precio LIVE");
+        }
+        BigDecimal value = new BigDecimal(matcher.group(1)).setScale(2, RoundingMode.HALF_UP);
+        if (value.signum() <= 0) {
+            throw new IllegalArgumentException("requestedPrice debe ser mayor a 0");
+        }
+        return value;
+    }
+
+    private String money(BigDecimal value) {
+        if (value == null) {
+            return "null";
+        }
+        return value.setScale(2, RoundingMode.HALF_UP).toPlainString();
+    }
+
+    private String escapeJson(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     private String sha256(String value) {

@@ -9,6 +9,24 @@ Tipo: backlog documental, sin implementacion
 
 Convertir el analisis de Fase 2A/2B en un backlog tecnico ordenado para implementar multi-compania con bajo riesgo, evitando fuga de datos entre clientes y manteniendo trazabilidad HPSQ-SOFT.
 
+## Actualizacion LIVE-PRICE-C - Autorizacion precio LIVE
+
+Fecha: 2026-06-10
+Estado: implementado tecnico condicionado.
+
+Alcance ejecutado:
+
+- Permisos y migracion `V57` para autorizacion de precio LIVE.
+- Reuso de `operational_authorization_requests` con `LIVE_PRICE_CHANGE`.
+- Aplicacion segura solo sobre `reservations.price` de apartado LIVE activo sin pago.
+- UI minima en `/operational-authorizations`.
+
+Pendiente:
+
+- Smoke API mutante real con dataset desechable.
+- QA visual por rol.
+- Modelo futuro para precio LIVE temporal antes de crear apartado.
+
 ## Actualizacion LIVE-AUTH-B2 - UI autorizaciones operativas LIVE
 
 Fecha: 2026-06-10

@@ -315,3 +315,22 @@ Asignacion inicial:
 
 Nota: B1 no toca pagos/caja/precio/devoluciones ni venta financiera.
 
+## Actualizacion 2026-06-10 - LIVE-PRICE-C
+
+Permisos de autorizacion de precio LIVE agregados por `V57__live_price_authorization_permissions.sql`:
+
+| Permiso | Estado | Uso |
+|---|---|---|
+| `REQUEST_LIVE_PRICE_CHANGE` | Existe desde LIVE-PRICE-C | Solicitar cambio de precio sobre apartado LIVE seguro |
+| `VIEW_LIVE_PRICE_AUTHORIZATIONS` | Existe desde LIVE-PRICE-C | Ver autorizaciones de precio LIVE |
+| `APPROVE_LIVE_PRICE_CHANGE` | Existe desde LIVE-PRICE-C | Aprobar/rechazar cambios de precio LIVE |
+| `APPLY_APPROVED_LIVE_PRICE_CHANGE` | Existe desde LIVE-PRICE-C | Aplicar precio aprobado |
+| `CHANGE_LIVE_PRICE` | Existe desde LIVE-PRICE-C | Permiso fino de cambio directo/auditable para politica futura |
+
+Asignacion inicial:
+
+- `ADMIN` y `SUPERVISOR`: solicitud, vista, aprobacion, aplicacion y cambio.
+- `SELLER`: solicitud solamente.
+
+Nota: LIVE-PRICE-C aplica solo sobre `reservations.price` de apartado LIVE activo sin pago. No toca `sales.price`, pagos, caja, devoluciones ni venta financiera.
+

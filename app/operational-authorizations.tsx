@@ -30,6 +30,7 @@ import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, View } from 
 
 const OPERATION_OPTIONS: OperationalAuthorizationType[] = [
   'UNDO_LIVE_OPERATIONAL_SALE',
+  'LIVE_PRICE_CHANGE',
   'CANCEL_RESERVATION_WITH_PAYMENT',
   'RELEASE_RESERVED_ITEM',
   'REASSIGN_RESERVATION',
@@ -48,6 +49,7 @@ const OPERATION_PERMISSION: Record<OperationalAuthorizationType, string> = {
   CANCEL_RESERVATION_WITH_PAYMENT: 'CANCEL_RESERVATION_WITH_PAYMENT',
   RELEASE_RESERVED_ITEM: 'RELEASE_RESERVED_ITEM',
   UNDO_LIVE_OPERATIONAL_SALE: 'UNDO_LIVE_OPERATIONAL_SALE',
+  LIVE_PRICE_CHANGE: 'REQUEST_LIVE_PRICE_CHANGE',
   REASSIGN_RESERVATION: 'REASSIGN_RESERVATION',
   EDIT_LOCKED_ITEM: 'EDIT_LOCKED_ITEM',
 };
@@ -58,6 +60,7 @@ type CreateForm = {
   operationType: OperationalAuthorizationType;
   targetType: OperationalAuthorizationTargetType;
   targetId: string;
+  requestedPrice: string;
   reason: string;
 };
 
@@ -109,6 +112,7 @@ export default function OperationalAuthorizationsScreen() {
     operationType: 'UNDO_LIVE_OPERATIONAL_SALE',
     targetType: 'RESERVATION',
     targetId: '',
+    requestedPrice: '',
     reason: '',
   });
   const navSections = useMemo(() => buildMainNavSections(session), [session]);
@@ -116,6 +120,7 @@ export default function OperationalAuthorizationsScreen() {
   const canRequest = hasPermission(session, 'REQUEST_LIVE_OPERATION_AUTHORIZATION');
   const canApprove = hasPermission(session, 'APPROVE_LIVE_OPERATION_AUTHORIZATION');
   const canApply = hasPermission(session, 'APPLY_LIVE_OPERATION_AUTHORIZATION');
+  const canApplyPrice = hasPermission(session, 'APPLY_APPROVED_LIVE_PRICE_CHANGE');
   const availableOperationOptions = useMemo(
     () =>
       OPERATION_OPTIONS.filter((operationType) =>
@@ -174,8 +179,16 @@ export default function OperationalAuthorizationsScreen() {
     if (!session?.branchId) return;
 
     const targetId = Number(form.targetId);
+    const requestedPrice = Number(form.requestedPrice);
     if (!Number.isFinite(targetId) || targetId <= 0 || !form.reason.trim()) {
       Alert.alert(t('liveAuth.validationTitle'), t('liveAuth.validationMessage'));
+      return;
+    }
+    if (
+      form.operationType === 'LIVE_PRICE_CHANGE' &&
+      (!Number.isFinite(requestedPrice) || requestedPrice <= 0)
+    ) {
+      Alert.alert(t('liveAuth.validationTitle'), t('liveAuth.priceValidationMessage'));
       return;
     }
 
@@ -183,15 +196,34 @@ export default function OperationalAuthorizationsScreen() {
       setIsSubmitting(true);
       const created = await createOperationalAuthorization({
         operationType: form.operationType,
-        targetType: form.targetType,
+        targetType: form.operationType === 'LIVE_PRICE_CHANGE' ? 'RESERVATION' : form.targetType,
         targetId,
         branchId: session.branchId,
         reason: form.reason.trim(),
-        liveId: form.targetType === 'LIVE' ? targetId : undefined,
-        reservationId: form.targetType === 'RESERVATION' ? targetId : undefined,
-        itemId: form.targetType === 'ITEM' ? targetId : undefined,
-        paymentId: form.targetType === 'PAYMENT' ? targetId : undefined,
-        saleId: form.targetType === 'SALE' ? targetId : undefined,
+        liveId:
+          form.operationType !== 'LIVE_PRICE_CHANGE' && form.targetType === 'LIVE'
+            ? targetId
+            : undefined,
+        reservationId:
+          form.operationType === 'LIVE_PRICE_CHANGE' || form.targetType === 'RESERVATION'
+            ? targetId
+            : undefined,
+        itemId:
+          form.operationType !== 'LIVE_PRICE_CHANGE' && form.targetType === 'ITEM'
+            ? targetId
+            : undefined,
+        paymentId:
+          form.operationType !== 'LIVE_PRICE_CHANGE' && form.targetType === 'PAYMENT'
+            ? targetId
+            : undefined,
+        saleId:
+          form.operationType !== 'LIVE_PRICE_CHANGE' && form.targetType === 'SALE'
+            ? targetId
+            : undefined,
+        payloadJson:
+          form.operationType === 'LIVE_PRICE_CHANGE'
+            ? JSON.stringify({ requestedPrice })
+            : undefined,
       });
       setCreateVisible(false);
       setSelected(created);
@@ -199,6 +231,7 @@ export default function OperationalAuthorizationsScreen() {
         operationType: 'UNDO_LIVE_OPERATIONAL_SALE',
         targetType: 'RESERVATION',
         targetId: '',
+        requestedPrice: '',
         reason: '',
       });
       await load(true);
@@ -347,6 +380,7 @@ export default function OperationalAuthorizationsScreen() {
         item={selected}
         canApprove={canApprove}
         canApply={canApply}
+        canApplyPrice={canApplyPrice}
         onClose={() => setSelected(null)}
         onDecision={(action) => {
           setDecisionAction(action);
@@ -415,19 +449,35 @@ function CreateRequestModal({
         labelPrefix="liveAuth.operations"
         onSelect={(operationType) => onChange({ ...form, operationType })}
       />
-      <OptionGroup
-        title={t('liveAuth.targetType')}
-        options={TARGET_OPTIONS}
-        value={form.targetType}
-        labelPrefix="liveAuth.targets"
-        onSelect={(targetType) => onChange({ ...form, targetType })}
-      />
+      {form.operationType === 'LIVE_PRICE_CHANGE' ? (
+        <AppText variant="caption">{t('liveAuth.priceReservationOnly')}</AppText>
+      ) : (
+        <OptionGroup
+          title={t('liveAuth.targetType')}
+          options={TARGET_OPTIONS}
+          value={form.targetType}
+          labelPrefix="liveAuth.targets"
+          onSelect={(targetType) => onChange({ ...form, targetType })}
+        />
+      )}
       <AppInput
-        label={t('liveAuth.targetId')}
+        label={
+          form.operationType === 'LIVE_PRICE_CHANGE'
+            ? t('liveAuth.reservationId')
+            : t('liveAuth.targetId')
+        }
         keyboardType="numeric"
         value={form.targetId}
         onChangeText={(targetId) => onChange({ ...form, targetId })}
       />
+      {form.operationType === 'LIVE_PRICE_CHANGE' ? (
+        <AppInput
+          label={t('liveAuth.requestedPrice')}
+          keyboardType="decimal-pad"
+          value={form.requestedPrice}
+          onChangeText={(requestedPrice) => onChange({ ...form, requestedPrice })}
+        />
+      ) : null}
       <AppInput
         label={t('liveAuth.reason')}
         multiline
@@ -443,12 +493,14 @@ function DetailModal({
   item,
   canApprove,
   canApply,
+  canApplyPrice,
   onClose,
   onDecision,
 }: {
   item: OperationalAuthorization | null;
   canApprove: boolean;
   canApply: boolean;
+  canApplyPrice: boolean;
   onClose: () => void;
   onDecision: (action: DecisionAction) => void;
 }) {
@@ -461,9 +513,12 @@ function DetailModal({
   const canApplySupported =
     item.status === 'APPROVED' &&
     canApply &&
-    item.operationType === 'UNDO_LIVE_OPERATIONAL_SALE';
+    (item.operationType === 'UNDO_LIVE_OPERATIONAL_SALE' ||
+      (item.operationType === 'LIVE_PRICE_CHANGE' && canApplyPrice));
   const applyPending =
-    item.status === 'APPROVED' && item.operationType !== 'UNDO_LIVE_OPERATIONAL_SALE';
+    item.status === 'APPROVED' &&
+    item.operationType !== 'UNDO_LIVE_OPERATIONAL_SALE' &&
+    item.operationType !== 'LIVE_PRICE_CHANGE';
 
   return (
     <AppBottomModal visible title={t('liveAuth.detailTitle')} onClose={onClose}>

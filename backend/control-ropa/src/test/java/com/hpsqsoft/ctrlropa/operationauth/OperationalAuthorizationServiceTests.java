@@ -166,6 +166,79 @@ class OperationalAuthorizationServiceTests {
         );
     }
 
+    @Test
+    void createLivePriceChangeRequiresPricePermissionAndPayload() {
+        Reservation reservation = liveReservation(10L, 6L);
+        reservation.setLiveOperationalStatus(LiveReservationOperationalStatus.RESERVED);
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
+        when(paymentAllocationRepository.findByReservationIdOrderByCreatedAtAsc(10L)).thenReturn(List.of());
+        when(tenantAccessGuard.requireBranch(6L, "El target de autorizacion no pertenece a la sucursal activa"))
+                .thenReturn(tenant());
+        when(repository.save(any(OperationalAuthorizationRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OperationalAuthorizationResponse response = service.create(priceChangeRequest("249.50"));
+
+        assertEquals("LIVE_PRICE_CHANGE", response.getOperationType());
+        assertEquals("REQUESTED", response.getStatus());
+        assertEquals(10L, response.getReservationId());
+        verify(accessService).assertCan(99L, PermissionCode.REQUEST_LIVE_OPERATION_AUTHORIZATION);
+        verify(accessService).assertCan(99L, PermissionCode.REQUEST_LIVE_PRICE_CHANGE);
+    }
+
+    @Test
+    void applyLivePriceChangeUpdatesReservationPriceAndRecordsEvent() {
+        Reservation reservation = liveReservation(10L, 6L);
+        reservation.setLiveOperationalStatus(LiveReservationOperationalStatus.RESERVED);
+        OperationalAuthorizationCreateRequest createRequest = priceChangeRequest("249.50");
+        when(currentUser.getUserId()).thenReturn(99L, 100L, 100L);
+        when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
+        when(paymentAllocationRepository.findByReservationIdOrderByCreatedAtAsc(10L)).thenReturn(List.of());
+        when(tenantAccessGuard.requireBranch(6L, "El target de autorizacion no pertenece a la sucursal activa"))
+                .thenReturn(tenant());
+        when(tenantAccessGuard.requireBranch(6L, "La autorizacion no pertenece a la sucursal activa"))
+                .thenReturn(tenant());
+        when(tenantAccessGuard.requireBranch(6L, "La reserva no pertenece a la sucursal activa"))
+                .thenReturn(tenant());
+        when(repository.save(any(OperationalAuthorizationRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(reservationRepository.save(any(Reservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.create(createRequest);
+        OperationalAuthorizationRequest entity = captureCreatedEntity();
+        ReflectionTestUtils.setField(entity, "id", 51L);
+        entity.setStatus(OperationalAuthorizationStatus.APPROVED);
+        entity.setDecidedByUserId(100L);
+        entity.setDecidedAt(LocalDateTime.now());
+        when(repository.findById(51L)).thenReturn(Optional.of(entity));
+
+        OperationalAuthorizationResponse applied = service.apply(51L, decision("Aplicar precio autorizado"));
+
+        assertEquals("APPLIED", applied.getStatus());
+        assertEquals(BigDecimal.valueOf(249.50).setScale(2), reservation.getPrice());
+        verify(accessService).assertCan(100L, PermissionCode.APPLY_LIVE_OPERATION_AUTHORIZATION);
+        verify(accessService).assertCan(100L, PermissionCode.APPLY_APPROVED_LIVE_PRICE_CHANGE);
+        verify(liveEventService).record(
+                reservation.getLive(),
+                LiveEventType.LIVE_PRICE_CHANGE_APPLIED,
+                100L,
+                "RESERVATION",
+                10L,
+                "{\"reservationId\":10,\"previousPrice\":300.00,\"newPrice\":249.50,\"authorizationId\":51,\"reason\":\"Aplicar precio autorizado\"}"
+        );
+    }
+
+    @Test
+    void livePriceChangeRejectsOperationalSoldReservation() {
+        Reservation reservation = liveReservation(10L, 6L);
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.create(priceChangeRequest("249.50"))
+        );
+    }
+
     private OperationalAuthorizationRequest captureCreatedEntity() {
         org.mockito.ArgumentCaptor<OperationalAuthorizationRequest> captor =
                 org.mockito.ArgumentCaptor.forClass(OperationalAuthorizationRequest.class);
@@ -180,6 +253,17 @@ class OperationalAuthorizationServiceTests {
         request.setTargetId(10L);
         request.setReservationId(10L);
         request.setReason("Cliente pidio reabrir seguimiento operativo");
+        return request;
+    }
+
+    private static OperationalAuthorizationCreateRequest priceChangeRequest(String requestedPrice) {
+        OperationalAuthorizationCreateRequest request = new OperationalAuthorizationCreateRequest();
+        request.setOperationType(OperationalAuthorizationType.LIVE_PRICE_CHANGE);
+        request.setTargetType(OperationalAuthorizationTargetType.RESERVATION);
+        request.setTargetId(10L);
+        request.setReservationId(10L);
+        request.setReason("Ajuste autorizado de precio LIVE");
+        request.setPayloadJson("{\"requestedPrice\":" + requestedPrice + "}");
         return request;
     }
 
