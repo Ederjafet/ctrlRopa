@@ -15,6 +15,8 @@ import com.hpsqsoft.ctrlropa.live.LiveEventType;
 import com.hpsqsoft.ctrlropa.live.LiveRepository;
 import com.hpsqsoft.ctrlropa.live.LiveStatus;
 import com.hpsqsoft.ctrlropa.order.CustomerOrderService;
+import com.hpsqsoft.ctrlropa.payment.PaymentAllocationRepository;
+import com.hpsqsoft.ctrlropa.payment.PaymentRepository;
 import com.hpsqsoft.ctrlropa.security.access.AccessService;
 import com.hpsqsoft.ctrlropa.security.access.ChannelCode;
 import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
@@ -53,6 +55,8 @@ class ReservationServiceLiveOperationalStatusTests {
     private final LiveEventService liveEventService = mock(LiveEventService.class);
     private final ReservationIdempotencyRepository idempotencyRepository = mock(ReservationIdempotencyRepository.class);
     private final ReservationRejectionTraceService rejectionTraceService = mock(ReservationRejectionTraceService.class);
+    private final PaymentAllocationRepository paymentAllocationRepository = mock(PaymentAllocationRepository.class);
+    private final PaymentRepository paymentRepository = mock(PaymentRepository.class);
 
     private final ReservationService service = new ReservationService(
             repository,
@@ -69,7 +73,9 @@ class ReservationServiceLiveOperationalStatusTests {
             tenantAccessGuard,
             liveEventService,
             idempotencyRepository,
-            rejectionTraceService
+            rejectionTraceService,
+            paymentAllocationRepository,
+            paymentRepository
     );
 
     @Test

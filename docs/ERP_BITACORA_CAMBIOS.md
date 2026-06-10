@@ -1,5 +1,33 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-09 - ITEM-Z6B cancelacion y liberacion segura de apartados
+
+Tipo: backend defensivo, inventario transaccional, pruebas, evidencia operativa.
+
+Objetivo:
+
+- Cancelar solo reservas `ACTIVE` sin pago activo y liberar inventario de forma condicional.
+
+Cambios realizados:
+
+- `ReservationService.cancel` rechaza `CANCELLED` y `CONVERTED_TO_SALE` con mensajes claros.
+- Se bloquea cancelacion normal si la reserva tiene allocation de pago `ACTIVE`.
+- Se agrego `ItemRepository.releaseIfReserved(...)` para liberar `RESERVED -> AVAILABLE` con update condicional.
+- Se evita forzar `AVAILABLE` si el item esta `SOLD`, `DISABLED`, `ON_CONSIGNMENT`, `AVAILABLE` o si el update condicional afecta 0 filas.
+- Se conserva trazabilidad de rechazo con `VALIDATION_REJECTED`.
+- Se agregaron pruebas focalizadas de cancelacion normal, pagos activos/anulados, estados historicos, item no reservado y reserva LIVE.
+
+Restricciones respetadas:
+
+- No se tocaron caja, precio LIVE, devoluciones, autorizaciones, RBAC ni permisos.
+- No se crearon endpoints ni migraciones.
+- No se implemento reversa financiera.
+
+Pendientes:
+
+- QA API/visual real con ambiente MySQL configurado.
+- Flujo formal de reversa/autorizacion para apartados con pago activo.
+
 ## 2026-06-09 - ITEM-Z5D trazabilidad de reservas rechazadas
 
 Tipo: backend defensivo, migracion aditiva, retencion operativa, pruebas, evidencia.

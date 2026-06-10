@@ -43,6 +43,21 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
                            @Param("availableStatus") ItemStatus availableStatus,
                            @Param("reservedStatus") ItemStatus reservedStatus);
 
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            update Item item
+            set item.status = :availableStatus
+            where item.company.id = :companyId
+              and item.branch.id = :branchId
+              and item.id = :itemId
+              and item.status = :reservedStatus
+            """)
+    int releaseIfReserved(@Param("companyId") Long companyId,
+                          @Param("branchId") Long branchId,
+                          @Param("itemId") Long itemId,
+                          @Param("reservedStatus") ItemStatus reservedStatus,
+                          @Param("availableStatus") ItemStatus availableStatus);
+
     Optional<Item> findByCode(String code);
 
     Optional<Item> findByQrCode(String qrCode);
