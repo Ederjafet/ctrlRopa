@@ -1,0 +1,251 @@
+﻿diff --git a/docs/LIVE_QA_C2_REMOVE_ACTIVE_ITEM_RESMOKE.md b/docs/LIVE_QA_C2_REMOVE_ACTIVE_ITEM_RESMOKE.md
+new file mode 100644
+index 0000000..73af749
+--- /dev/null
++++ b/docs/LIVE_QA_C2_REMOVE_ACTIVE_ITEM_RESMOKE.md
+@@ -0,0 +1,124 @@
++# LIVE-QA-C2 / Re-smoke focalizado REMOVE_LIVE_ACTIVE_ITEM
++
++Fecha: 2026-06-10
++Rama: feature/live-qa-c2-remove-active-item-resmoke
++
++## Alcance
++
++Validacion focalizada del fix de LIVE-PERM-FIX-A1 para confirmar que retirar la prenda al aire exige estrictamente `REMOVE_LIVE_ACTIVE_ITEM` en backend.
++
++Esta fase no implementa logica nueva y no modifica backend funcional, frontend funcional, RBAC, permisos, endpoints ni migraciones.
++
++## Historial confirmado
++
++- `612d82e LIVE-QA-C ejecuta QA live con dataset desechable`
++- `88e55ed LIVE-PERM-FIX-A0 documenta autorizacion retirar prenda live`
++- `020a265 LIVE-PERM-FIX-A1 exige permiso retirar prenda live`
++- `dfe373e HOME-LIVE-A muestra live activo en inicio`
++- `90ab2eb ITEM-Z8 valida consistencia live inventario reservas`
++
++## Ambiente usado
++
++- Backend: `http://localhost:8090`
++- `/api/health`: 200
++- `/api/me` sin token: 401
++- Frontend local: `http://localhost:8081` respondio 200
++- Frontend LAN: `http://192.168.0.128:8081` respondio 200
++
++No se ejecuto smoke visual con navegador real ni screenshots. Resultado visual: `PENDING_QA_VISUAL`.
++
++## Dataset usado
++
++Dataset desechable reutilizado desde LIVE-QA-C:
++
++- Prefijo: `QA_LIVE_DISPOSABLE_20260610104008`
++- LIVE: `15`
++- Cliente: `32`
++- Item A: `105`
++- Item B: `106`
++- Reserva A: `44`
++- Reserva B: `45`
++
++Estado observado antes del smoke focalizado:
++
++- `GET /api/lives/15`: 200
++- Estado LIVE: `ACTIVE`
++- Prenda al aire inicial: item `106`
++
++## Usuarios probados
++
++Se usaron usuarios QA documentados. Las credenciales y tokens se mantuvieron solo en variables temporales y no se documentan.
++
++| Usuario | Login | `/api/me` | Permiso relevante |
++| --- | --- | --- | --- |
++| `qa.admin@local.test` | 200 | 200 | `REMOVE_LIVE_ACTIVE_ITEM=true` |
++| `qa.supervisor.centro@local.test` | 200 | 200 | `REMOVE_LIVE_ACTIVE_ITEM=true` |
++| `qa.vendedor.centro@local.test` | 200 | 200 | `REMOVE_LIVE_ACTIVE_ITEM=false` |
++| `qa.sinpermisos@local.test` | 403 | 401 sin token valido | Sin acceso operativo LIVE confirmado por bloqueo de login |
++
++El vendedor conserva permisos LIVE no equivalentes a retirar prenda:
++
++- `DO_LIVE_RESERVATION=true`
++- `CHANGE_LIVE_ACTIVE_ITEM=true`
++- `REMOVE_LIVE_ACTIVE_ITEM=false`
++
++## Smoke API focalizado
++
++### Caso negativo principal
++
++Usuario: `qa.vendedor.centro@local.test`
++
++Operacion:
++
++```http
++PATCH /api/lives/15/active-item
++Content-Type: application/json
++
++{ "itemId": null }
++```
++
++Resultado:
++
++- Status: 403
++- Resultado: `EXPECTED_403`
++
++Conclusion: el hallazgo de LIVE-QA-C no se reproduce. `DO_LIVE_RESERVATION` y `CHANGE_LIVE_ACTIVE_ITEM` ya no habilitan retirar la prenda al aire.
++
++### Caso positivo
++
++Usuario: `qa.admin@local.test`
++
++Operacion:
++
++```http
++PATCH /api/lives/15/active-item
++Content-Type: application/json
++
++{ "itemId": null }
++```
++
++Resultado:
++
++- Status: 200
++- Resultado: `EXPECTED_ALLOWED`
++
++Mutacion realizada sobre dataset desechable: se retiro la prenda activa `106` del LIVE `15`.
++
++## Validaciones relacionadas
++
++- `GET /api/lives/15` antes del smoke confirmo LIVE activo y prenda al aire.
++- La auditoria de codigo confirmo que `LiveService.assertCanRemoveLiveActiveItem(...)` exige `PermissionCode.REMOVE_LIVE_ACTIVE_ITEM`.
++- No se ejecuto flujo de pagos, caja, precio LIVE, devoluciones, autorizaciones complejas ni venta financiera.
++
++## Resultado
++
++Resultado API: `GO_TECNICO_API`
++
++Resultado visual: `PENDING_QA_VISUAL`
++
++GO/NO-GO: `GO_TECNICO_API`
++
++## Pendientes
++
++- Ejecutar QA visual real con navegador/screenshot si se requiere evidencia UI.
++- Continuar con la siguiente fase funcional sobre LIVE solo despues de merge manual de esta rama.
+diff --git a/qa-reports/LIVE-QA-C2-remove-active-item-resmoke-report-20260610-114507.md b/qa-reports/LIVE-QA-C2-remove-active-item-resmoke-report-20260610-114507.md
+new file mode 100644
+index 0000000..2344d41
+--- /dev/null
++++ b/qa-reports/LIVE-QA-C2-remove-active-item-resmoke-report-20260610-114507.md
+@@ -0,0 +1,115 @@
++# LIVE-QA-C2 remove active item re-smoke report
++
++Fecha: 2026-06-10 11:45:07
++Rama: feature/live-qa-c2-remove-active-item-resmoke
++
++## Resultado ejecutivo
++
++`GO_TECNICO_API`
++
++El re-smoke focalizado confirma que `qa.vendedor.centro@local.test` ya no puede retirar la prenda al aire por API sin `REMOVE_LIVE_ACTIVE_ITEM`. El endpoint respondio 403 para seller y 200 para admin sobre dataset desechable.
++
++Smoke visual queda como `PENDING_QA_VISUAL` porque no se capturaron screenshots con navegador real.
++
++## Commits confirmados
++
++- `612d82e LIVE-QA-C ejecuta QA live con dataset desechable`
++- `88e55ed LIVE-PERM-FIX-A0 documenta autorizacion retirar prenda live`
++- `020a265 LIVE-PERM-FIX-A1 exige permiso retirar prenda live`
++- `dfe373e HOME-LIVE-A muestra live activo en inicio`
++- `90ab2eb ITEM-Z8 valida consistencia live inventario reservas`
++
++## Comandos ejecutados
++
++- `git branch --show-current`
++- `git status`
++- `git log --oneline -100`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-QA-C"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-PERM-FIX-A0"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-PERM-FIX-A1"`
++- `git --no-pager log --oneline --all --decorate --grep="HOME-LIVE-A"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z8"`
++- `git grep -n "assertCanRemoveLiveActiveItem|REMOVE_LIVE_ACTIVE_ITEM|DO_LIVE_RESERVATION|CHANGE_LIVE_ACTIVE_ITEM|setActiveItem|activeItem.*null|itemId.*null|removeActiveItem|clearActiveItem" -- backend/control-ropa/src/main/java backend/control-ropa/src/test app services components docs qa-reports`
++- `git grep -n "qa.admin@local.test|qa.supervisor.centro@local.test|qa.vendedor.centro@local.test|qa.sinpermisos@local.test|QA_LIVE_DISPOSABLE_20260610104008" -- docs backend app services qa-reports git-diffs`
++- Smoke HTTP con PowerShell contra `http://localhost:8090` y `http://localhost:8081`
++
++Las credenciales y tokens se mantuvieron en variables temporales y no se imprimen en este reporte.
++
++## Backend y frontend detectados
++
++- `GET http://localhost:8090/api/health`: 200
++- `GET http://localhost:8090/api/me` sin token: 401
++- `GET http://localhost:8081`: 200
++- `GET http://192.168.0.128:8081`: 200
++
++## Usuarios QA usados
++
++| Usuario | Login | `/api/me` | Resultado |
++| --- | --- | --- | --- |
++| `qa.admin@local.test` | 200 | 200 | Tiene `REMOVE_LIVE_ACTIVE_ITEM` |
++| `qa.supervisor.centro@local.test` | 200 | 200 | Tiene `REMOVE_LIVE_ACTIVE_ITEM` |
++| `qa.vendedor.centro@local.test` | 200 | 200 | No tiene `REMOVE_LIVE_ACTIVE_ITEM`; si tiene `DO_LIVE_RESERVATION` y `CHANGE_LIVE_ACTIVE_ITEM` |
++| `qa.sinpermisos@local.test` | 403 | 401 sin token valido | Bloqueado |
++
++## Dataset usado
++
++Dataset desechable LIVE-QA-C:
++
++- LIVE `15`
++- Item activo inicial `106`
++- Estado LIVE `ACTIVE`
++- Prefijo documentado: `QA_LIVE_DISPOSABLE_20260610104008`
++
++## Smoke API ejecutado
++
++### Seller sin REMOVE_LIVE_ACTIVE_ITEM
++
++- Operacion: `PATCH /api/lives/15/active-item` con `itemId=null`
++- Esperado: 403
++- Obtenido: 403
++- Resultado: PASS
++
++### Admin con REMOVE_LIVE_ACTIVE_ITEM
++
++- Operacion: `PATCH /api/lives/15/active-item` con `itemId=null`
++- Esperado: 200
++- Obtenido: 200
++- Resultado: PASS
++
++Mutacion realizada: admin retiro el item activo `106` del LIVE `15`, dentro del dataset desechable identificado.
++
++## Smoke visual
++
++No se ejecuto navegador real ni screenshots.
++
++Resultado visual: `PENDING_QA_VISUAL`.
++
++## Validaciones tecnicas
++
++- `backend/control-ropa/./mvnw.cmd test`: PASS
++- `npm.cmd run lint`: PASS con 53 warnings preexistentes y 0 errores
++- `npx.cmd tsc --noEmit`: PASS
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: PASS
++- `git --no-pager diff --check`: PASS
++- `git --no-pager diff --cached --check`: PASS
++- `git status`: cambios esperados staged para commit
++
++## Confirmaciones de alcance
++
++- No se implemento logica nueva.
++- No se modifico backend funcional.
++- No se modifico frontend funcional.
++- No se tocaron pagos, caja, precio LIVE, devoluciones ni autorizaciones complejas.
++- No se modifico RBAC.
++- No se crearon permisos.
++- No se crearon endpoints.
++- No se crearon migraciones.
++- No se cambio venta financiera.
++
++## Resultado
++
++- API: `GO_TECNICO_API`
++- Visual: `PENDING_QA_VISUAL`
++- GO/NO-GO: `GO_TECNICO_API`
++
++Siguiente fase recomendada: merge manual de LIVE-QA-C2 y luego continuar con QA visual/formal de LIVE si se requiere evidencia de navegador.
