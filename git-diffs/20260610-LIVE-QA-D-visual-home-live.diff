@@ -1,0 +1,257 @@
+﻿diff --git a/docs/LIVE_QA_D_VISUAL_HOME_LIVE.md b/docs/LIVE_QA_D_VISUAL_HOME_LIVE.md
+new file mode 100644
+index 0000000..6c31e92
+--- /dev/null
++++ b/docs/LIVE_QA_D_VISUAL_HOME_LIVE.md
+@@ -0,0 +1,124 @@
++# LIVE-QA-D / QA visual home + LIVE base
++
++Fecha: 2026-06-10
++Rama: feature/live-qa-d-visual-home-live
++
++## Alcance
++
++Validacion unificada del card HOME-LIVE-A en inicio, navegacion esperada a LIVE y smoke API real por rol para confirmar que el flujo base LIVE sigue protegido despues de LIVE-QA-C2.
++
++Esta fase no implemento features nuevas ni fixes funcionales. No se tocaron backend, frontend funcional, RBAC, permisos, endpoints, migraciones, pagos, caja, precio LIVE, devoluciones ni autorizaciones.
++
++## Historial confirmado
++
++- `619b482 Merge branch 'feature/home-live-a-active-live-card' into develop`
++- `00101a4 LIVE-QA-C2 valida permiso retirar prenda live`
++- `020a265 LIVE-PERM-FIX-A1 exige permiso retirar prenda live`
++- `dfe373e HOME-LIVE-A muestra live activo en inicio`
++- `612d82e LIVE-QA-C ejecuta QA live con dataset desechable`
++- `90ab2eb ITEM-Z8 valida consistencia live inventario reservas`
++
++## Ambiente
++
++- Backend: `http://localhost:8090`
++- Frontend local: `http://localhost:8081`
++- Frontend LAN: `http://192.168.0.128:8081`
++
++Resultados de ambiente:
++
++- `GET /api/health`: 200
++- `GET /api/me` sin token: 401
++- `GET http://localhost:8081`: 200
++- `GET http://192.168.0.128:8081`: 200
++
++## Auditoria del card HOME-LIVE-A
++
++Se reviso `app/index.tsx` y componentes relacionados:
++
++- El home renderiza `DashboardTemplate`.
++- El card de LIVE activo se inyecta como `summary` superior, antes de metricas, pendientes, seguimiento y accesos rapidos.
++- La visibilidad del card usa `canViewLive(session)`.
++- El boton del card ejecuta navegacion a `/live`.
++- Si no hay LIVE activo, el card no se muestra y el contenido anterior del home continua debajo.
++- Si la carga secundaria de reservas/eventos falla, el card conserva resumen seguro y marca datos parciales.
++
++Datos que puede mostrar el card cuando hay LIVE activo:
++
++- estado LIVE activo;
++- identificador o notas del LIVE;
++- prenda al aire, si existe;
++- reservas activas, si el endpoint de reservas responde;
++- vendidos operativos, si el endpoint de reservas responde;
++- ultima actividad, si hay evento o fecha del LIVE.
++
++## Roles probados por API
++
++Credenciales y tokens se usaron solo en variables temporales y no se imprimen.
++
++| Rol QA | Login | `/api/me` | Resultado LIVE |
++| --- | --- | --- | --- |
++| `qa.admin@local.test` | 200 | 200 | `VIEW_LIVE=true`, `OPERATE_LIVE=true`, `REMOVE_LIVE_ACTIVE_ITEM=true` |
++| `qa.supervisor.centro@local.test` | 200 | 200 | `VIEW_LIVE=true`, `OPERATE_LIVE=true`, `REMOVE_LIVE_ACTIVE_ITEM=true` |
++| `qa.vendedor.centro@local.test` | 200 | 200 | `VIEW_LIVE=true`, `OPERATE_LIVE=true`, `REMOVE_LIVE_ACTIVE_ITEM=false` |
++| `qa.sinpermisos@local.test` | 403 | 401 sin token valido | Sin permisos LIVE efectivos |
++
++## Dataset
++
++Se reutilizo solo como referencia el dataset desechable de LIVE-QA-C:
++
++- Prefijo: `QA_LIVE_DISPOSABLE_20260610104008`
++- LIVE activo observado: `15`
++- Sucursal: `4`
++- Prenda al aire observada durante LIVE-QA-D: sin item activo
++
++No se ejecutaron mutaciones destructivas. El intento focalizado de seller para retirar active item con `itemId=null` fue usado como smoke negativo seguro y respondio 403. Como el LIVE ya no tenia prenda al aire despues de C2, el card debe poder mostrar LIVE activo sin prenda al aire.
++
++## Smoke API realizado
++
++Operaciones principales:
++
++- Login QA admin, supervisor, vendedor y sin permisos.
++- `/api/me` por rol para confirmar permisos LIVE.
++- `GET /api/lives/branch/4` con admin para ubicar LIVE activo.
++- `PATCH /api/lives/15/active-item` con seller y `{ "itemId": null }`.
++
++Resultado focal:
++
++- Seller sin `REMOVE_LIVE_ACTIVE_ITEM`: 403 esperado.
++- No se reprodujo el bug de LIVE-QA-C.
++- No se probo retiro positivo por admin en esta fase para evitar mutaciones innecesarias; ya fue validado en LIVE-QA-C2.
++
++## Smoke visual
++
++No se obtuvo navegador/screenshot real en esta sesion:
++
++- La herramienta Browser del plugin requiere Node REPL, pero no estuvo expuesta.
++- No hay `playwright`, `@playwright/test` ni `playwright-core` instalados.
++- No se detecto navegador CLI local con `Get-Command`.
++
++Resultado visual: `PENDING_QA_VISUAL`.
++
++Checklist visual pendiente:
++
++- Admin ve card LIVE arriba si hay LIVE activo.
++- Supervisor ve card LIVE arriba si hay LIVE activo.
++- Vendedor ve card LIVE arriba si hay LIVE activo.
++- Usuario sin permisos no ve card LIVE ni acceso operativo.
++- Boton `Ir a LIVE` navega a `/live`.
++- Contenido anterior del home sigue visible debajo.
++- Seller no ve accion de retirar prenda si no tiene permiso.
++
++## Fixes aplicados
++
++No se aplicaron fixes. La auditoria y el smoke API no evidenciaron inconsistencia critica que habilite una correccion menor segura en esta fase.
++
++## Resultado
++
++- API: `GO_TECNICO_API`
++- Visual: `PENDING_QA_VISUAL`
++- GO/NO-GO: `GO_TECNICO_API`
++
++## Pendientes
++
++- Ejecutar QA visual real con navegador/screenshot por rol.
++- Repetir inspeccion visual cuando el LIVE tenga prenda al aire si se requiere evidencia del detalle del card.
+diff --git a/qa-reports/LIVE-QA-D-visual-home-live-report-20260610-120534.md b/qa-reports/LIVE-QA-D-visual-home-live-report-20260610-120534.md
+new file mode 100644
+index 0000000..641f409
+--- /dev/null
++++ b/qa-reports/LIVE-QA-D-visual-home-live-report-20260610-120534.md
+@@ -0,0 +1,121 @@
++# LIVE-QA-D visual home LIVE report
++
++Fecha: 2026-06-10 12:05:34
++Rama: feature/live-qa-d-visual-home-live
++
++## Resultado ejecutivo
++
++`GO_TECNICO_API` con `PENDING_QA_VISUAL`.
++
++El smoke API real por rol confirma que el acceso LIVE base esta operativo y que seller no puede retirar la prenda al aire sin `REMOVE_LIVE_ACTIVE_ITEM`. La validacion visual queda pendiente porque no hubo navegador/screenshot real disponible en la sesion.
++
++## Commits confirmados
++
++- `619b482 Merge branch 'feature/home-live-a-active-live-card' into develop`
++- `00101a4 LIVE-QA-C2 valida permiso retirar prenda live`
++- `020a265 LIVE-PERM-FIX-A1 exige permiso retirar prenda live`
++- `dfe373e HOME-LIVE-A muestra live activo en inicio`
++- `612d82e LIVE-QA-C ejecuta QA live con dataset desechable`
++- `90ab2eb ITEM-Z8 valida consistencia live inventario reservas`
++
++## Comandos ejecutados
++
++- `git branch --show-current`
++- `git status`
++- `git log --oneline -80`
++- `git --no-pager log --oneline --all --decorate --grep="HOME-LIVE-A"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-QA-C2"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-PERM-FIX-A1"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-QA-C"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z8"`
++- `git grep -n "HOME-LIVE-A|LIVE activo|Ir a LIVE|canViewLive|DashboardTemplate|summary|active live|live activo" -- app components services locales docs qa-reports`
++- `git grep -n "qa.admin@local.test|qa.supervisor.centro|qa.vendedor.centro|qa.sinpermisos" -- docs backend app services qa-reports`
++- `git grep -n "REMOVE_LIVE_ACTIVE_ITEM|canClearActiveItem|assertCanRemoveLiveActiveItem|DO_LIVE_RESERVATION|VIEW_LIVE|OPERATE_LIVE" -- backend/control-ropa/src/main/java backend/control-ropa/src/test app services docs qa-reports`
++- Smoke HTTP/API con PowerShell contra backend y frontend levantados.
++
++Las credenciales y tokens se mantuvieron en memoria local temporal y no se imprimen.
++
++## Backend/frontend detectados
++
++- `GET http://localhost:8090/api/health`: 200
++- `GET http://localhost:8090/api/me` sin token: 401
++- `GET http://localhost:8081`: 200
++- `GET http://192.168.0.128:8081`: 200
++
++## Usuarios QA usados
++
++| Usuario | Login | `/api/me` | Permisos LIVE observados |
++| --- | --- | --- | --- |
++| `qa.admin@local.test` | 200 | 200 | `VIEW_LIVE`, `OPERATE_LIVE`, `REMOVE_LIVE_ACTIVE_ITEM` |
++| `qa.supervisor.centro@local.test` | 200 | 200 | `VIEW_LIVE`, `OPERATE_LIVE`, `REMOVE_LIVE_ACTIVE_ITEM` |
++| `qa.vendedor.centro@local.test` | 200 | 200 | `VIEW_LIVE`, `OPERATE_LIVE`; sin `REMOVE_LIVE_ACTIVE_ITEM` |
++| `qa.sinpermisos@local.test` | 403 | 401 sin token valido | Sin permisos LIVE efectivos |
++
++## Resultados por rol
++
++| Rol | Home card esperado | API LIVE | Resultado |
++| --- | --- | --- | --- |
++| Admin | Ve card si hay LIVE activo; boton a `/live` | Acceso LIVE y retiro permitido por permisos | PASS API; visual pendiente |
++| Supervisor | Ve card si hay LIVE activo; boton a `/live` | Acceso LIVE y retiro permitido por permisos | PASS API; visual pendiente |
++| Vendedor | Ve card si hay LIVE activo; boton a `/live` | Acceso LIVE; retiro bloqueado | PASS API con 403 esperado |
++| Sin permisos | No ve card ni acceso operativo | Login bloqueado | PASS API; visual pendiente |
++
++## Smoke API real
++
++Dataset observado:
++
++- Sucursal `4`
++- LIVE activo `15`
++- `activeItemId` vacio al momento del smoke
++
++Validaciones:
++
++- Admin obtiene lista de lives por sucursal: 200.
++- Seller intenta `PATCH /api/lives/15/active-item` con `itemId=null`: 403.
++- Resultado focal: `SELLER_REMOVE_ACTIVE_ITEM_RESULT=EXPECTED_403`.
++
++No se ejecutaron mutaciones destructivas ni pagos/caja/precio/devoluciones.
++
++## Smoke visual
++
++Resultado: `PENDING_QA_VISUAL`.
++
++Motivo:
++
++- Browser plugin disponible como skill, pero el Node REPL requerido por esa skill no estuvo expuesto.
++- No se encontro Playwright local instalado.
++- No se detecto navegador CLI local para captura real.
++
++## Fixes aplicados
++
++No se aplicaron fixes funcionales ni microcopy. La revision tecnica y API smoke no arrojaron evidencia clara de inconsistencia menor segura.
++
++## Validaciones tecnicas
++
++- `backend/control-ropa/./mvnw.cmd test`: PASS
++- `npm.cmd run lint`: PASS con 53 warnings preexistentes y 0 errores
++- `npx.cmd tsc --noEmit`: PASS
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: PASS
++- `git --no-pager diff --check`: PASS
++- `git --no-pager diff --cached --check`: PASS
++- `git status`: cambios esperados staged para commit
++
++## Confirmaciones de alcance
++
++- No se implementaron features nuevas.
++- No se modifico backend funcional.
++- No se modifico frontend funcional.
++- No se tocaron pagos, caja, precio LIVE, devoluciones ni autorizaciones.
++- No se modifico RBAC.
++- No se crearon permisos.
++- No se crearon endpoints.
++- No se crearon migraciones.
++- No se cambio venta financiera.
++
++## Resultado
++
++- API: `GO_TECNICO_API`
++- Visual: `PENDING_QA_VISUAL`
++- GO/NO-GO: `GO_TECNICO_API`
++
++Siguiente fase recomendada: QA visual manual/real por rol de home y `/live`, preferentemente con un LIVE activo que tenga prenda al aire para capturar el card completo.
