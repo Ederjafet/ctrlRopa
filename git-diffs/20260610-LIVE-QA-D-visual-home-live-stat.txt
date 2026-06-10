@@ -1,0 +1,3 @@
+﻿ docs/LIVE_QA_D_VISUAL_HOME_LIVE.md                 | 124 +++++++++++++++++++++
+ ...QA-D-visual-home-live-report-20260610-120534.md | 121 ++++++++++++++++++++
+ 2 files changed, 245 insertions(+)
