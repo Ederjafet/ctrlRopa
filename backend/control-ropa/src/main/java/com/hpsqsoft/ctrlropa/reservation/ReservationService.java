@@ -252,7 +252,7 @@ public class ReservationService {
             entity.setLiveOperationalStatusUpdatedByUserId(userId);
         }
 
-        Reservation saved = repository.save(entity);
+        Reservation saved = saveCreatedReservation(entity);
 
         CustomerOrder order = customerOrderService.addReservationToOpenOrder(saved);
         customerOrderService.refreshStatus(order.getId());
@@ -359,6 +359,29 @@ public class ReservationService {
         record.setStatus(ReservationIdempotencyStatus.COMPLETED);
         record.setErrorMessage(null);
         idempotencyRepository.save(record);
+    }
+
+    private Reservation saveCreatedReservation(Reservation entity) {
+        try {
+            return repository.saveAndFlush(entity);
+        } catch (DataIntegrityViolationException ex) {
+            if (isActiveReservationConstraintViolation(ex)) {
+                throw new ConflictException("El item ya tiene una reserva activa");
+            }
+            throw ex;
+        }
+    }
+
+    private boolean isActiveReservationConstraintViolation(Throwable ex) {
+        Throwable current = ex;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && message.contains("uq_reservations_active_item")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private String normalizeIdempotencyKey(String idempotencyKey) {

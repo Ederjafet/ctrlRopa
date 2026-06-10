@@ -9,6 +9,25 @@ Tipo: backlog documental, sin implementacion
 
 Convertir el analisis de Fase 2A/2B en un backlog tecnico ordenado para implementar multi-compania con bajo riesgo, evitando fuga de datos entre clientes y manteniendo trazabilidad HPSQ-SOFT.
 
+## Actualizacion ITEM-Z5C - Constraint de reserva activa por item
+
+Fecha: 2026-06-09
+Estado: implementado tecnico condicionado.
+
+Alcance ejecutado:
+
+- Migracion `V53__active_reservation_item_constraint.sql`.
+- Columna generada `active_reservation_item_id` en `reservations`.
+- Unique `uq_reservations_active_item` por `branch_id` y item activo.
+- Traduccion backend de violacion del unique a error de negocio claro.
+- Conservacion de idempotencia ITEM-Z5B y update atomico ITEM-Z3B.
+
+Pendiente:
+
+- Ejecutar prevalidacion de duplicados activos en ambientes legacy antes de aplicar.
+- QA API/visual real con usuarios operativos.
+- ITEM-Z5D para trazabilidad de intentos rechazados y limpieza TTL.
+
 ## Actualizacion ITEM-Z5B - Idempotencia backend de reservas
 
 Fecha: 2026-06-09

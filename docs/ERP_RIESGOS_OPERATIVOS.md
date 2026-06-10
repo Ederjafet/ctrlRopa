@@ -214,6 +214,7 @@ Probabilidad:
 - ITEM-Z3B mitiga doble reserva con update atomico `AVAILABLE -> RESERVED` filtrado por company, branch e item; siguen pendientes idempotency key, constraint de reserva activa por item, QA API/visual real y flujos financieros/reversas.
 - ITEM-Z4 aclara en UI cuando una prenda `AVAILABLE` ya esta al aire; no cambia inventario, por lo que QA debe confirmar que el selector no la muestra solo como `Libre` ni permite prepararla como reemplazo de si misma.
 - ITEM-Z5B agrega idempotencia backend para creacion de reservas con `X-Idempotency-Key`; siguen pendientes constraint de reserva activa por item, limpieza TTL, trazabilidad de intentos rechazados y QA API/visual real.
+- ITEM-Z5C agrega constraint estructural de una reserva `ACTIVE` por item usando columna generada compatible con MySQL 5.7; ambientes con duplicados activos legacy deben resolverse antes de aplicar la migracion.
 - PRODUCT-ERR-A agrega mapper frontend de errores accionables; modulos fuera de las rutas criticas aun deben migrarse por dominio para evitar que `err.message` exponga mensajes genericos o tecnicos.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
