@@ -9,6 +9,24 @@ Tipo: backlog documental, sin implementacion
 
 Convertir el analisis de Fase 2A/2B en un backlog tecnico ordenado para implementar multi-compania con bajo riesgo, evitando fuga de datos entre clientes y manteniendo trazabilidad HPSQ-SOFT.
 
+## Actualizacion ITEM-Z8 - Consistencia final LIVE, inventario y reservas
+
+Fecha: 2026-06-10
+Estado: cierre tecnico/documental.
+
+Alcance ejecutado:
+
+- Auditoria final de `active_item_id`, `items.status`, `reservations.status`, estado operativo LIVE y `live_events`.
+- Confirmacion de que la prenda al aire no cambia inventario.
+- Confirmacion de reserva atomica `AVAILABLE -> RESERVED`, constraint de reserva `ACTIVE` por item y cancelacion segura `RESERVED -> AVAILABLE`.
+- Confirmacion de que `OPERATIONAL_SOLD` solo opera sobre reserva LIVE `ACTIVE` + item `RESERVED`.
+- Confirmacion de que no se tocan venta financiera, pago, caja, precio LIVE, devoluciones ni autorizaciones.
+
+Pendiente:
+
+- QA API/visual real con dataset LIVE desechable.
+- Definir fase futura para conversion financiera real y reversas con autorizacion formal.
+
 ## Actualizacion ITEM-Z7 - Vendido operativo LIVE seguro
 
 Fecha: 2026-06-10
