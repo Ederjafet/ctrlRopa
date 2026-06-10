@@ -1,0 +1,1218 @@
+﻿diff --git a/app/operational-authorizations.tsx b/app/operational-authorizations.tsx
+new file mode 100644
+index 0000000..a4db68d
+--- /dev/null
++++ b/app/operational-authorizations.tsx
+@@ -0,0 +1,724 @@
++import AppShell from '@/components/layout/AppShell';
++import { buildMainNavSections, getSessionScopeLabel } from '@/components/layout/appNavigation';
++import AppBottomModal from '@/components/ui/AppBottomModal';
++import AppButton from '@/components/ui/AppButton';
++import AppCard from '@/components/ui/AppCard';
++import AppInput from '@/components/ui/AppInput';
++import AppText from '@/components/ui/AppText';
++import EmptyState from '@/components/ui/EmptyState';
++import StatusBadge from '@/components/ui/StatusBadge';
++import { useAppTheme } from '@/context/AppThemeContext';
++import { getActionableApiError, getActionableApiErrorMessage } from '@/services/apiError';
++import { hasAnyPermission, hasPermission } from '@/services/accessControl';
++import {
++  applyOperationalAuthorization,
++  approveOperationalAuthorization,
++  createOperationalAuthorization,
++  getMyOperationalAuthorizations,
++  getOperationalAuthorizationsByBranch,
++  type OperationalAuthorization,
++  type OperationalAuthorizationStatus,
++  type OperationalAuthorizationTargetType,
++  type OperationalAuthorizationType,
++  rejectOperationalAuthorization,
++} from '@/services/operationalAuthorizationService';
++import { getSession, type UserSession } from '@/services/sessionStorage';
++import { useFocusEffect, useRouter } from 'expo-router';
++import { useCallback, useMemo, useState } from 'react';
++import { useTranslation } from 'react-i18next';
++import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
++
++const OPERATION_OPTIONS: OperationalAuthorizationType[] = [
++  'UNDO_LIVE_OPERATIONAL_SALE',
++  'CANCEL_RESERVATION_WITH_PAYMENT',
++  'RELEASE_RESERVED_ITEM',
++  'REASSIGN_RESERVATION',
++  'EDIT_LOCKED_ITEM',
++];
++
++const TARGET_OPTIONS: OperationalAuthorizationTargetType[] = [
++  'RESERVATION',
++  'LIVE',
++  'ITEM',
++  'PAYMENT',
++  'SALE',
++];
++
++const OPERATION_PERMISSION: Record<OperationalAuthorizationType, string> = {
++  CANCEL_RESERVATION_WITH_PAYMENT: 'CANCEL_RESERVATION_WITH_PAYMENT',
++  RELEASE_RESERVED_ITEM: 'RELEASE_RESERVED_ITEM',
++  UNDO_LIVE_OPERATIONAL_SALE: 'UNDO_LIVE_OPERATIONAL_SALE',
++  REASSIGN_RESERVATION: 'REASSIGN_RESERVATION',
++  EDIT_LOCKED_ITEM: 'EDIT_LOCKED_ITEM',
++};
++
++type DecisionAction = 'approve' | 'reject' | 'apply';
++
++type CreateForm = {
++  operationType: OperationalAuthorizationType;
++  targetType: OperationalAuthorizationTargetType;
++  targetId: string;
++  reason: string;
++};
++
++function statusTone(status: OperationalAuthorizationStatus) {
++  switch (status) {
++    case 'APPROVED':
++      return 'success';
++    case 'REQUESTED':
++      return 'warning';
++    case 'REJECTED':
++    case 'CANCELLED':
++      return 'danger';
++    case 'APPLIED':
++      return 'info';
++    default:
++      return 'neutral';
++  }
++}
++
++function formatDate(value?: string | null) {
++  if (!value) return '-';
++  const date = new Date(value);
++  if (Number.isNaN(date.getTime())) return value;
++  return date.toLocaleString();
++}
++
++function canOpenScreen(session: UserSession | null) {
++  return hasAnyPermission(session, [
++    'VIEW_LIVE_OPERATION_AUTHORIZATIONS',
++    'REQUEST_LIVE_OPERATION_AUTHORIZATION',
++  ]);
++}
++
++export default function OperationalAuthorizationsScreen() {
++  const router = useRouter();
++  const { t } = useTranslation('common');
++  const { theme } = useAppTheme();
++  const [session, setSession] = useState<UserSession | null>(null);
++  const [items, setItems] = useState<OperationalAuthorization[]>([]);
++  const [isLoading, setIsLoading] = useState(true);
++  const [isRefreshing, setIsRefreshing] = useState(false);
++  const [isSubmitting, setIsSubmitting] = useState(false);
++  const [errorMessage, setErrorMessage] = useState('');
++  const [selected, setSelected] = useState<OperationalAuthorization | null>(null);
++  const [createVisible, setCreateVisible] = useState(false);
++  const [decisionAction, setDecisionAction] = useState<DecisionAction | null>(null);
++  const [decisionReason, setDecisionReason] = useState('');
++  const [form, setForm] = useState<CreateForm>({
++    operationType: 'UNDO_LIVE_OPERATIONAL_SALE',
++    targetType: 'RESERVATION',
++    targetId: '',
++    reason: '',
++  });
++  const navSections = useMemo(() => buildMainNavSections(session), [session]);
++  const canViewQueue = hasPermission(session, 'VIEW_LIVE_OPERATION_AUTHORIZATIONS');
++  const canRequest = hasPermission(session, 'REQUEST_LIVE_OPERATION_AUTHORIZATION');
++  const canApprove = hasPermission(session, 'APPROVE_LIVE_OPERATION_AUTHORIZATION');
++  const canApply = hasPermission(session, 'APPLY_LIVE_OPERATION_AUTHORIZATION');
++  const availableOperationOptions = useMemo(
++    () =>
++      OPERATION_OPTIONS.filter((operationType) =>
++        hasPermission(session, OPERATION_PERMISSION[operationType])
++      ),
++    [session]
++  );
++
++  const load = useCallback(
++    async (refreshing = false) => {
++      const currentSession = await getSession();
++
++      if (!canOpenScreen(currentSession)) {
++        router.replace('/access-denied');
++        return;
++      }
++
++      setSession(currentSession);
++
++      if (!currentSession?.branchId) {
++        setErrorMessage(t('liveAuth.branchMissing'));
++        setIsLoading(false);
++        setIsRefreshing(false);
++        return;
++      }
++
++      try {
++        setErrorMessage('');
++        if (refreshing) {
++          setIsRefreshing(true);
++        } else {
++          setIsLoading(true);
++        }
++
++        const data = hasPermission(currentSession, 'VIEW_LIVE_OPERATION_AUTHORIZATIONS')
++          ? await getOperationalAuthorizationsByBranch(currentSession.branchId)
++          : await getMyOperationalAuthorizations(currentSession.branchId);
++        setItems(data);
++      } catch (error) {
++        setErrorMessage(getActionableApiErrorMessage(error, t));
++      } finally {
++        setIsLoading(false);
++        setIsRefreshing(false);
++      }
++    },
++    [router, t]
++  );
++
++  useFocusEffect(
++    useCallback(() => {
++      void load(false);
++    }, [load])
++  );
++
++  const submitCreate = async () => {
++    if (!session?.branchId) return;
++
++    const targetId = Number(form.targetId);
++    if (!Number.isFinite(targetId) || targetId <= 0 || !form.reason.trim()) {
++      Alert.alert(t('liveAuth.validationTitle'), t('liveAuth.validationMessage'));
++      return;
++    }
++
++    try {
++      setIsSubmitting(true);
++      const created = await createOperationalAuthorization({
++        operationType: form.operationType,
++        targetType: form.targetType,
++        targetId,
++        branchId: session.branchId,
++        reason: form.reason.trim(),
++        liveId: form.targetType === 'LIVE' ? targetId : undefined,
++        reservationId: form.targetType === 'RESERVATION' ? targetId : undefined,
++        itemId: form.targetType === 'ITEM' ? targetId : undefined,
++        paymentId: form.targetType === 'PAYMENT' ? targetId : undefined,
++        saleId: form.targetType === 'SALE' ? targetId : undefined,
++      });
++      setCreateVisible(false);
++      setSelected(created);
++      setForm({
++        operationType: 'UNDO_LIVE_OPERATIONAL_SALE',
++        targetType: 'RESERVATION',
++        targetId: '',
++        reason: '',
++      });
++      await load(true);
++    } catch (error) {
++      const copy = getActionableApiError(error, t);
++      Alert.alert(copy.title, copy.message, [{ text: copy.primaryActionLabel }]);
++    } finally {
++      setIsSubmitting(false);
++    }
++  };
++
++  const submitDecision = async () => {
++    if (!selected || !decisionAction) return;
++
++    try {
++      setIsSubmitting(true);
++      const payload = decisionReason.trim() ? { reason: decisionReason.trim() } : {};
++      const updated =
++        decisionAction === 'approve'
++          ? await approveOperationalAuthorization(selected.id, payload)
++          : decisionAction === 'reject'
++            ? await rejectOperationalAuthorization(selected.id, payload)
++            : await applyOperationalAuthorization(selected.id, payload);
++      setSelected(updated);
++      setDecisionAction(null);
++      setDecisionReason('');
++      await load(true);
++    } catch (error) {
++      const copy = getActionableApiError(error, t);
++      Alert.alert(copy.title, copy.message, [{ text: copy.primaryActionLabel }]);
++    } finally {
++      setIsSubmitting(false);
++    }
++  };
++
++  const renderItem = ({ item }: { item: OperationalAuthorization }) => (
++    <AppCard style={styles.card}>
++      <Pressable onPress={() => setSelected(item)} style={styles.cardPressable}>
++        <View style={styles.cardHeader}>
++          <View style={styles.cardTitle}>
++            <AppText bold>{t(`liveAuth.operations.${item.operationType}`)}</AppText>
++            <AppText variant="caption" color={theme.colors.mutedText}>
++              {t('liveAuth.targetSummary', {
++                target: t(`liveAuth.targets.${item.targetType}`),
++                id: item.targetId,
++              })}
++            </AppText>
++          </View>
++          <StatusBadge
++            label={t(`liveAuth.statuses.${item.status}`)}
++            tone={statusTone(item.status)}
++          />
++        </View>
++        <AppText numberOfLines={2}>{item.reason}</AppText>
++        <AppText variant="caption" color={theme.colors.mutedText}>
++          {t('liveAuth.requestedAt', { value: formatDate(item.requestedAt) })}
++        </AppText>
++      </Pressable>
++    </AppCard>
++  );
++
++  if (isLoading) {
++    return (
++      <AppShell
++        title={t('liveAuth.title')}
++        subtitle={t('liveAuth.subtitle')}
++        contextTitle={t('liveAuth.contextTitle')}
++        contextSubtitle={getSessionScopeLabel(session)}
++        activeRoute="operational-authorizations"
++        session={session}
++        navSections={navSections}
++      >
++        <View style={styles.centered}>
++          <ActivityIndicator color={theme.colors.accent} />
++          <AppText>{t('liveAuth.loading')}</AppText>
++        </View>
++      </AppShell>
++    );
++  }
++
++  return (
++    <AppShell
++      title={t('liveAuth.title')}
++      subtitle={t('liveAuth.subtitle')}
++      contextTitle={t('liveAuth.contextTitle')}
++      contextSubtitle={getSessionScopeLabel(session)}
++      activeRoute="operational-authorizations"
++      session={session}
++      navSections={navSections}
++    >
++      <View style={styles.toolbar}>
++        <AppButton
++          title={t('liveAuth.refresh')}
++          variant="secondary"
++          loading={isRefreshing}
++          onPress={() => void load(true)}
++          style={styles.toolbarButton}
++        />
++        {canRequest ? (
++          <AppButton
++            title={t('liveAuth.newRequest')}
++            variant="operation"
++            onPress={() => setCreateVisible(true)}
++            style={styles.toolbarButton}
++          />
++        ) : null}
++      </View>
++
++      {errorMessage ? (
++        <AppText color={theme.colors.danger} style={styles.errorText}>
++          {errorMessage}
++        </AppText>
++      ) : null}
++
++      {!canViewQueue ? (
++        <AppText variant="caption" color={theme.colors.mutedText}>
++          {t('liveAuth.mineOnly')}
++        </AppText>
++      ) : null}
++
++      <FlatList
++        data={items}
++        keyExtractor={(item) => String(item.id)}
++        renderItem={renderItem}
++        scrollEnabled={false}
++        contentContainerStyle={styles.listContent}
++        ListEmptyComponent={
++          <EmptyState
++            title={t('liveAuth.emptyTitle')}
++            message={t('liveAuth.emptyMessage')}
++          />
++        }
++      />
++
++      <CreateRequestModal
++        form={form}
++        operationOptions={availableOperationOptions}
++        visible={createVisible}
++        isSubmitting={isSubmitting}
++        onChange={setForm}
++        onClose={() => setCreateVisible(false)}
++        onSubmit={submitCreate}
++      />
++
++      <DetailModal
++        item={selected}
++        canApprove={canApprove}
++        canApply={canApply}
++        onClose={() => setSelected(null)}
++        onDecision={(action) => {
++          setDecisionAction(action);
++          setDecisionReason('');
++        }}
++      />
++
++      <DecisionModal
++        action={decisionAction}
++        visible={Boolean(decisionAction)}
++        reason={decisionReason}
++        isSubmitting={isSubmitting}
++        onChangeReason={setDecisionReason}
++        onClose={() => {
++          if (isSubmitting) return;
++          setDecisionAction(null);
++          setDecisionReason('');
++        }}
++        onSubmit={submitDecision}
++      />
++    </AppShell>
++  );
++}
++
++function CreateRequestModal({
++  visible,
++  form,
++  operationOptions,
++  isSubmitting,
++  onChange,
++  onClose,
++  onSubmit,
++}: {
++  visible: boolean;
++  form: CreateForm;
++  operationOptions: OperationalAuthorizationType[];
++  isSubmitting: boolean;
++  onChange: (form: CreateForm) => void;
++  onClose: () => void;
++  onSubmit: () => void;
++}) {
++  const { t } = useTranslation('common');
++
++  return (
++    <AppBottomModal
++      visible={visible}
++      title={t('liveAuth.createTitle')}
++      onClose={onClose}
++      footer={
++        <View style={styles.modalFooter}>
++          <AppButton title={t('common.cancel')} variant="cancel" onPress={onClose} />
++          <AppButton
++            title={t('liveAuth.submitRequest')}
++            variant="operation"
++            loading={isSubmitting}
++            onPress={onSubmit}
++          />
++        </View>
++      }
++    >
++      <AppText>{t('liveAuth.createHelp')}</AppText>
++      <OptionGroup
++        title={t('liveAuth.operationType')}
++        options={operationOptions}
++        value={form.operationType}
++        labelPrefix="liveAuth.operations"
++        onSelect={(operationType) => onChange({ ...form, operationType })}
++      />
++      <OptionGroup
++        title={t('liveAuth.targetType')}
++        options={TARGET_OPTIONS}
++        value={form.targetType}
++        labelPrefix="liveAuth.targets"
++        onSelect={(targetType) => onChange({ ...form, targetType })}
++      />
++      <AppInput
++        label={t('liveAuth.targetId')}
++        keyboardType="numeric"
++        value={form.targetId}
++        onChangeText={(targetId) => onChange({ ...form, targetId })}
++      />
++      <AppInput
++        label={t('liveAuth.reason')}
++        multiline
++        value={form.reason}
++        onChangeText={(reason) => onChange({ ...form, reason })}
++        style={styles.textArea}
++      />
++    </AppBottomModal>
++  );
++}
++
++function DetailModal({
++  item,
++  canApprove,
++  canApply,
++  onClose,
++  onDecision,
++}: {
++  item: OperationalAuthorization | null;
++  canApprove: boolean;
++  canApply: boolean;
++  onClose: () => void;
++  onDecision: (action: DecisionAction) => void;
++}) {
++  const { t } = useTranslation('common');
++  const { theme } = useAppTheme();
++
++  if (!item) return null;
++
++  const canDecide = item.status === 'REQUESTED' && canApprove;
++  const canApplySupported =
++    item.status === 'APPROVED' &&
++    canApply &&
++    item.operationType === 'UNDO_LIVE_OPERATIONAL_SALE';
++  const applyPending =
++    item.status === 'APPROVED' && item.operationType !== 'UNDO_LIVE_OPERATIONAL_SALE';
++
++  return (
++    <AppBottomModal visible title={t('liveAuth.detailTitle')} onClose={onClose}>
++      <View style={styles.detailHeader}>
++        <AppText variant="subtitle" bold>
++          {t(`liveAuth.operations.${item.operationType}`)}
++        </AppText>
++        <StatusBadge
++          label={t(`liveAuth.statuses.${item.status}`)}
++          tone={statusTone(item.status)}
++        />
++      </View>
++      <DetailRow label={t('liveAuth.id')} value={`#${item.id}`} />
++      <DetailRow
++        label={t('liveAuth.target')}
++        value={t('liveAuth.targetSummary', {
++          target: t(`liveAuth.targets.${item.targetType}`),
++          id: item.targetId,
++        })}
++      />
++      <DetailRow label={t('liveAuth.reason')} value={item.reason} />
++      <DetailRow label={t('liveAuth.requestedAtLabel')} value={formatDate(item.requestedAt)} />
++      <DetailRow label={t('liveAuth.expiresAt')} value={formatDate(item.expiresAt)} />
++      {item.decisionReason ? (
++        <DetailRow label={t('liveAuth.decisionReason')} value={item.decisionReason} />
++      ) : null}
++      {applyPending ? (
++        <AppText color={theme.colors.warning} style={styles.pendingText}>
++          {t('liveAuth.applyPending')}
++        </AppText>
++      ) : null}
++      <View style={styles.actionRow}>
++        {canDecide ? (
++          <>
++            <AppButton
++              title={t('liveAuth.approve')}
++              variant="operation"
++              onPress={() => onDecision('approve')}
++              style={styles.actionButton}
++            />
++            <AppButton
++              title={t('liveAuth.reject')}
++              variant="danger"
++              onPress={() => onDecision('reject')}
++              style={styles.actionButton}
++            />
++          </>
++        ) : null}
++        {canApplySupported ? (
++          <AppButton
++            title={t('liveAuth.apply')}
++            variant="warning"
++            onPress={() => onDecision('apply')}
++            style={styles.actionButton}
++          />
++        ) : null}
++      </View>
++    </AppBottomModal>
++  );
++}
++
++function DecisionModal({
++  visible,
++  action,
++  reason,
++  isSubmitting,
++  onChangeReason,
++  onClose,
++  onSubmit,
++}: {
++  visible: boolean;
++  action: DecisionAction | null;
++  reason: string;
++  isSubmitting: boolean;
++  onChangeReason: (reason: string) => void;
++  onClose: () => void;
++  onSubmit: () => void;
++}) {
++  const { t } = useTranslation('common');
++  if (!action) return null;
++
++  return (
++    <AppBottomModal
++      visible={visible}
++      title={t(`liveAuth.${action}Title`)}
++      onClose={onClose}
++      footer={
++        <View style={styles.modalFooter}>
++          <AppButton title={t('common.cancel')} variant="cancel" onPress={onClose} />
++          <AppButton
++            title={t(`liveAuth.${action}`)}
++            variant={action === 'reject' ? 'danger' : action === 'apply' ? 'warning' : 'operation'}
++            loading={isSubmitting}
++            onPress={onSubmit}
++          />
++        </View>
++      }
++    >
++      <AppInput
++        label={t('liveAuth.decisionReason')}
++        value={reason}
++        onChangeText={onChangeReason}
++        multiline
++        style={styles.textArea}
++      />
++    </AppBottomModal>
++  );
++}
++
++function OptionGroup<T extends string>({
++  title,
++  options,
++  value,
++  labelPrefix,
++  onSelect,
++}: {
++  title: string;
++  options: T[];
++  value: T;
++  labelPrefix: string;
++  onSelect: (value: T) => void;
++}) {
++  const { t } = useTranslation('common');
++  const { theme } = useAppTheme();
++
++  return (
++    <View style={styles.optionGroup}>
++      <AppText variant="subtitle">{title}</AppText>
++      <View style={styles.optionRow}>
++        {options.map((option) => {
++          const selected = option === value;
++          return (
++            <Pressable
++              key={option}
++              onPress={() => onSelect(option)}
++              style={({ pressed }) => [
++                styles.optionButton,
++                {
++                  backgroundColor: selected
++                    ? theme.colors.operationButtonBackground
++                    : pressed
++                      ? theme.colors.optionPressedBackground
++                      : theme.colors.surface,
++                  borderColor: selected ? theme.colors.accent : theme.colors.border,
++                  borderRadius: theme.radius.md,
++                },
++              ]}
++            >
++              <AppText
++                bold={selected}
++                color={selected ? theme.colors.operationButtonText : theme.colors.text}
++              >
++                {t(`${labelPrefix}.${option}`)}
++              </AppText>
++            </Pressable>
++          );
++        })}
++      </View>
++    </View>
++  );
++}
++
++function DetailRow({ label, value }: { label: string; value: string }) {
++  const { theme } = useAppTheme();
++  return (
++    <View style={styles.detailRow}>
++      <AppText variant="caption" color={theme.colors.mutedText}>
++        {label}
++      </AppText>
++      <AppText>{value}</AppText>
++    </View>
++  );
++}
++
++const styles = StyleSheet.create({
++  actionButton: {
++    flexGrow: 1,
++    minWidth: 140,
++  },
++  actionRow: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 10,
++    marginTop: 14,
++  },
++  card: {
++    marginBottom: 10,
++  },
++  cardHeader: {
++    alignItems: 'flex-start',
++    flexDirection: 'row',
++    gap: 12,
++    justifyContent: 'space-between',
++  },
++  cardPressable: {
++    gap: 8,
++  },
++  cardTitle: {
++    flex: 1,
++    gap: 4,
++    minWidth: 180,
++  },
++  centered: {
++    alignItems: 'center',
++    gap: 12,
++    paddingVertical: 24,
++  },
++  detailHeader: {
++    alignItems: 'flex-start',
++    flexDirection: 'row',
++    gap: 12,
++    justifyContent: 'space-between',
++    marginBottom: 10,
++  },
++  detailRow: {
++    gap: 3,
++    marginTop: 10,
++  },
++  errorText: {
++    marginBottom: 10,
++  },
++  listContent: {
++    paddingTop: 10,
++  },
++  modalFooter: {
++    gap: 10,
++  },
++  optionButton: {
++    borderWidth: 1,
++    paddingHorizontal: 12,
++    paddingVertical: 10,
++  },
++  optionGroup: {
++    gap: 10,
++    marginTop: 14,
++  },
++  optionRow: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 8,
++  },
++  pendingText: {
++    marginTop: 12,
++  },
++  textArea: {
++    minHeight: 96,
++    textAlignVertical: 'top',
++  },
++  toolbar: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 10,
++    marginBottom: 12,
++  },
++  toolbarButton: {
++    minWidth: 150,
++  },
++});
+diff --git a/components/layout/appNavigation.ts b/components/layout/appNavigation.ts
+index 3e5999a..e4d6fdf 100644
+--- a/components/layout/appNavigation.ts
++++ b/components/layout/appNavigation.ts
+@@ -19,6 +19,10 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
+   const doorReservationAllowed = canAccess(session, 'DOOR_RESERVATION', 'DO_DOOR_RESERVATION');
+   const customersAllowed = canAccessByPermission(session, 'VIEW_CUSTOMERS');
+   const reservationsAllowed = doorReservationAllowed || liveAllowed;
++  const operationalAuthorizationsAllowed = hasAnyPermission(session, [
++    'VIEW_LIVE_OPERATION_AUTHORIZATIONS',
++    'REQUEST_LIVE_OPERATION_AUTHORIZATION',
++  ]);
+   const inventoryAllowed = hasAnyPermission(session, ['VIEW_INVENTORY', 'MANAGE_INVENTORY']);
+   const inventoryManageAllowed = canAccessByPermission(session, 'MANAGE_INVENTORY');
+   const usersAllowed = canAccessByPermission(session, 'MANAGE_USERS') || isAdmin(session);
+@@ -56,6 +60,16 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
+     reservationsAllowed
+       ? { key: 'reservations', label: 'Apartados', labelKey: 'navigation.items.holds', route: '/reservations', activeFor: ['reservations', '/reservations', 'reservation-detail', '/reservation-detail'], icon: 'bookmark' as const }
+       : null,
++    operationalAuthorizationsAllowed
++      ? {
++          key: 'operational-authorizations',
++          label: 'Autorizaciones LIVE',
++          labelKey: 'navigation.items.operationalAuthorizations',
++          route: '/operational-authorizations',
++          activeFor: ['operational-authorizations', '/operational-authorizations'],
++          icon: 'approval' as const,
++        }
++      : null,
+     customersAllowed
+       ? { key: 'customers', label: 'Clientes', labelKey: 'navigation.items.customers', route: '/customers', activeFor: ['customers', '/customers', 'customers-create', '/customers-create'], icon: 'groups' as const }
+       : null,
+diff --git a/docs/ERP_BITACORA_CAMBIOS.md b/docs/ERP_BITACORA_CAMBIOS.md
+index 0264792..b22359c 100644
+--- a/docs/ERP_BITACORA_CAMBIOS.md
++++ b/docs/ERP_BITACORA_CAMBIOS.md
+@@ -1,5 +1,30 @@
+ # ERP - Bitacora de cambios
+
++## 2026-06-10 - LIVE-AUTH-B2 UI autorizaciones operativas LIVE
++
++Tipo: frontend, autorizaciones operativas LIVE, documentacion, evidencia.
++
++Objetivo:
++
++- Exponer una pantalla minima para listar, solicitar, aprobar/rechazar y aplicar autorizaciones operativas LIVE usando el backend MVP de B1.
++
++Cambios realizados:
++
++- Se agrego `/operational-authorizations` con listado, detalle y acciones segun permisos.
++- Se agrego servicio frontend para `/api/operational-authorizations`.
++- Se agrego entrada de navegacion en Operacion solo para usuarios con permisos de autorizacion LIVE.
++- Se agregaron textos i18n ES/EN.
++
++Restricciones respetadas:
++
++- No se tocaron pagos, caja, precio LIVE, devoluciones, venta financiera, RBAC, permisos, endpoints ni migraciones.
++- La aplicacion real queda limitada a `UNDO_LIVE_OPERATIONAL_SALE`, que ya soporta backend B1.
++
++Pendientes:
++
++- QA visual con navegador/screenshots.
++- Smoke API mutante con dataset desechable.
++
+ ## 2026-06-10 - LIVE-PERM-FIX-A1 enforcement retirar prenda al aire
+
+ Tipo: backend autorizacion, LIVE permisos, pruebas, evidencia.
+diff --git a/docs/ERP_RIESGOS_OPERATIVOS.md b/docs/ERP_RIESGOS_OPERATIVOS.md
+index 720c1de..69a510e 100644
+--- a/docs/ERP_RIESGOS_OPERATIVOS.md
++++ b/docs/ERP_RIESGOS_OPERATIVOS.md
+@@ -37,6 +37,8 @@ Probabilidad:
+ | Codificacion rota en textos | MEDIO | MEDIA | Mala experiencia, mensajes poco confiables. | Barridos de mojibake, usar UTF-8, QA visual. | Revertir archivo o corregir texto. |
+ | Artefactos no rastreados en Git | MEDIO | ALTA | Release con archivos no controlados o ruido en diff. | Limpiar/ignorar antes de release; checklist Git. | No incluir artefactos; restaurar working tree limpio. |
+ | Auditoria insuficiente | ALTO | ALTA | No se puede explicar quien hizo una accion sensible. | Fase de auditoria, eventos de negocio, revision de logs. | No aplica rollback completo; se mitiga hacia adelante. |
++| UI de autorizaciones LIVE sin QA visual real | MEDIO | MEDIA despues de LIVE-AUTH-B2 | La pantalla permite operar solicitudes, pero falta evidencia con navegador y usuarios reales por rol. | LIVE-AUTH-B2 deja `PENDING_QA_VISUAL`; ejecutar smoke visual con admin/supervisor/seller/sin permisos antes de liberar operacion formal. | Ocultar navegacion de autorizaciones o revertir UI manteniendo backend MVP. |
++| Aplicacion de autorizaciones sensibles incompleta | ALTO | MEDIA despues de LIVE-AUTH-B2 | Operaciones como cancelar con pago, reasignar o editar bloqueado pueden solicitarse/aprobarse, pero su aplicacion queda pendiente de contrato funcional. | UI muestra aplicacion pendiente salvo `UNDO_LIVE_OPERATIONAL_SALE`; no tocar pagos/caja/devoluciones hasta fase dedicada. | Mantener solicitudes en modo trazabilidad y bloquear boton aplicar para operaciones sin contrato. |
+ | Consistencia LIVE/inventario/reservas sin smoke real | MEDIO | MEDIA despues de ITEM-Z8 | La auditoria tecnica confirma reglas, pero falta ejecutar flujo completo con dataset LIVE desechable. | ITEM-Z8 consolida matriz de consistencia y deja checklist API/visual; no avanzar a venta financiera sin QA real. | Mantener cierre operativo LIVE limitado y bloquear conversion financiera hasta completar smoke. |
+ | Retiro de prenda al aire sin permiso dedicado | ALTO | BAJA despues de LIVE-PERM-FIX-A1 | Un usuario con permiso de apartado LIVE podia retirar `activeItem` por API directa aunque la UI ocultara la accion. | LIVE-PERM-FIX-A1 exige `REMOVE_LIVE_ACTIVE_ITEM` en backend y elimina fallback `DO_LIVE_RESERVATION` para retiro manual; queda pendiente smoke API real por rol. | Revertir A1 solo si bloquea operacion critica y deshabilitar temporalmente retiro manual hasta corregir permisos. |
+ | Vendido operativo LIVE sobre reserva no segura | CRITICO | BAJA despues de ITEM-Z7 | Un apartado cancelado, convertido a venta o con item no reservado podria cerrarse operativamente y confundir inventario/caja. | ITEM-Z7 valida `ACTIVE`, bloquea `CANCELLED`/`CONVERTED_TO_SALE`, exige item `RESERVED` y conserva solo `live_operational_status` + `live_events`. | Revertir ITEM-Z7 y bloquear temporalmente la accion de cierre operativo LIVE. |
+diff --git a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+index 2f47bc7..2c9d017 100644
+--- a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
++++ b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+@@ -9,6 +9,25 @@ Tipo: backlog documental, sin implementacion
+
+ Convertir el analisis de Fase 2A/2B en un backlog tecnico ordenado para implementar multi-compania con bajo riesgo, evitando fuga de datos entre clientes y manteniendo trazabilidad HPSQ-SOFT.
+
++## Actualizacion LIVE-AUTH-B2 - UI autorizaciones operativas LIVE
++
++Fecha: 2026-06-10
++Estado: implementado tecnico condicionado.
++
++Alcance ejecutado:
++
++- Pantalla `/operational-authorizations` para autorizaciones operativas LIVE.
++- Servicio frontend contra endpoints B1.
++- Navegacion protegida por permisos de autorizacion LIVE.
++- Acciones de solicitar, aprobar, rechazar y aplicar segun permisos.
++- Apply real limitado a `UNDO_LIVE_OPERATIONAL_SALE`; otras operaciones muestran pendiente funcional.
++
++Pendiente:
++
++- QA visual real por rol.
++- Smoke API mutante con dataset desechable.
++- Integracion contextual desde LIVE/reservas.
++
+ ## Actualizacion ITEM-Z8 - Consistencia final LIVE, inventario y reservas
+
+ Fecha: 2026-06-10
+diff --git a/docs/LIVE_AUTH_B2_OPERATIONAL_AUTHORIZATIONS_UI_QA.md b/docs/LIVE_AUTH_B2_OPERATIONAL_AUTHORIZATIONS_UI_QA.md
+new file mode 100644
+index 0000000..d8b7f67
+--- /dev/null
++++ b/docs/LIVE_AUTH_B2_OPERATIONAL_AUTHORIZATIONS_UI_QA.md
+@@ -0,0 +1,81 @@
++# LIVE-AUTH-B2 / UI y QA de autorizaciones operativas LIVE
++
++Fecha: 2026-06-10
++Rama: `feature/live-auth-b2-operational-auth-ui-qa`
++
++## Resumen ejecutivo
++
++Se agrego una UI minima para consultar y operar solicitudes de autorizacion operativa LIVE sobre el backend MVP creado en LIVE-AUTH-B1 y reparado con LIVE-AUTH-B1A.
++
++La fase no crea permisos, no modifica RBAC, no crea migraciones y no agrega endpoints backend.
++
++## Pantalla agregada
++
++- Ruta: `/operational-authorizations`
++- Navegacion: se agrega en la seccion `Operacion` cuando el usuario tiene `VIEW_LIVE_OPERATION_AUTHORIZATIONS` o `REQUEST_LIVE_OPERATION_AUTHORIZATION`.
++
++La pantalla permite:
++
++- listar solicitudes de la sucursal si el usuario tiene `VIEW_LIVE_OPERATION_AUTHORIZATIONS`;
++- listar solo solicitudes propias si solo puede solicitar;
++- ver detalle basico;
++- crear solicitud si tiene `REQUEST_LIVE_OPERATION_AUTHORIZATION` y el permiso fino de la operacion;
++- aprobar/rechazar si tiene `APPROVE_LIVE_OPERATION_AUTHORIZATION`;
++- aplicar si tiene `APPLY_LIVE_OPERATION_AUTHORIZATION` y la solicitud esta `APPROVED`.
++
++## Endpoints usados
++
++Base: `/api/operational-authorizations`
++
++- `POST /api/operational-authorizations`
++- `GET /api/operational-authorizations/branch/{branchId}`
++- `GET /api/operational-authorizations/mine/branch/{branchId}`
++- `GET /api/operational-authorizations/{id}`
++- `PATCH /api/operational-authorizations/{id}/approve`
++- `PATCH /api/operational-authorizations/{id}/reject`
++- `POST /api/operational-authorizations/{id}/apply`
++
++No se inventaron endpoints.
++
++## Permisos usados
++
++- `REQUEST_LIVE_OPERATION_AUTHORIZATION`
++- `VIEW_LIVE_OPERATION_AUTHORIZATIONS`
++- `APPROVE_LIVE_OPERATION_AUTHORIZATION`
++- `APPLY_LIVE_OPERATION_AUTHORIZATION`
++- `UNDO_LIVE_OPERATIONAL_SALE`
++- permisos finos ya existentes para cada tipo de solicitud.
++
++## Estados visibles
++
++- `REQUESTED`
++- `APPROVED`
++- `REJECTED`
++- `APPLIED`
++- `EXPIRED`
++- `CANCELLED`
++
++## Apply soportado
++
++El backend B1 solo soporta aplicacion real para:
++
++- `UNDO_LIVE_OPERATIONAL_SALE`
++
++La UI muestra mensaje de aplicacion pendiente para operaciones aprobadas que aun no tienen contrato funcional de apply.
++
++## Pendientes
++
++- QA visual con navegador/screenshots reales.
++- Smoke API mutante con dataset desechable para crear/aprobar/aplicar `UNDO_LIVE_OPERATIONAL_SALE`.
++- UI contextual desde reservas/LIVE para crear solicitudes prellenadas.
++- Aplicacion futura de `CANCEL_RESERVATION_WITH_PAYMENT`, `REASSIGN_RESERVATION`, `EDIT_LOCKED_ITEM` y otros flujos sensibles cuando exista contrato funcional.
++
++## Alcance excluido
++
++- pagos;
++- caja;
++- precio LIVE;
++- devoluciones;
++- venta financiera;
++- RBAC/permisos/migraciones;
++- endpoints backend nuevos.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index 63b078b..0fc4c67 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -856,10 +856,69 @@
+       "securityAudit": "Security audit",
+       "devSecurity": "Dev security",
+       "sessionsLocks": "Sessions and locks",
+-      "uiKit": "UI Kit"
++      "uiKit": "UI Kit",
++      "operationalAuthorizations": "LIVE authorizations"
+     },
+     "noRole": "No role"
+   },
++  "liveAuth": {
++    "title": "LIVE authorizations",
++    "subtitle": "Operational requests for sensitive Live actions.",
++    "contextTitle": "LIVE operational control",
++    "loading": "Loading authorizations...",
++    "refresh": "Refresh",
++    "newRequest": "New request",
++    "mineOnly": "Only your requests are shown because you cannot view the full queue.",
++    "emptyTitle": "No requests",
++    "emptyMessage": "There are no operational authorizations for this branch.",
++    "branchMissing": "No active branch was found in the session.",
++    "validationTitle": "Missing data",
++    "validationMessage": "Enter action type, target, identifier, and reason.",
++    "createTitle": "Request authorization",
++    "createHelp": "Create a request for an existing operational record. It does not run payments, cash, or refunds.",
++    "operationType": "Action type",
++    "targetType": "Target",
++    "targetId": "Target ID",
++    "reason": "Reason",
++    "submitRequest": "Submit request",
++    "detailTitle": "Authorization detail",
++    "id": "ID",
++    "target": "Target",
++    "requestedAt": "Requested: {{value}}",
++    "requestedAtLabel": "Requested",
++    "expiresAt": "Expires",
++    "decisionReason": "Reason / note",
++    "approve": "Approve",
++    "reject": "Reject",
++    "apply": "Apply",
++    "approveTitle": "Approve request",
++    "rejectTitle": "Reject request",
++    "applyTitle": "Apply authorization",
++    "applyPending": "Applying this operation is pending a functional contract.",
++    "targetSummary": "{{target}} #{{id}}",
++    "statuses": {
++      "REQUESTED": "Requested",
++      "APPROVED": "Approved",
++      "REJECTED": "Rejected",
++      "APPLIED": "Applied",
++      "EXPIRED": "Expired",
++      "CANCELLED": "Cancelled"
++    },
++    "operations": {
++      "CANCEL_RESERVATION_WITH_PAYMENT": "Cancel hold with payment",
++      "RELEASE_RESERVED_ITEM": "Release held item",
++      "UNDO_LIVE_OPERATIONAL_SALE": "Undo LIVE operational sale",
++      "REASSIGN_RESERVATION": "Reassign hold",
++      "EDIT_LOCKED_ITEM": "Edit locked item"
++    },
++    "targets": {
++      "LIVE": "LIVE",
++      "RESERVATION": "Hold",
++      "ITEM": "Item",
++      "PAYMENT": "Payment",
++      "SALE": "Sale"
++    }
++  },
+   "theme": {
+     "light": "Light",
+     "dark": "Dark"
+diff --git a/locales/es/common.json b/locales/es/common.json
+index a91e127..8e622c6 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -856,10 +856,69 @@
+       "securityAudit": "Auditoria de seguridad",
+       "devSecurity": "Seguridad dev",
+       "sessionsLocks": "Sesiones y bloqueos",
+-      "uiKit": "UI Kit"
++      "uiKit": "UI Kit",
++      "operationalAuthorizations": "Autorizaciones LIVE"
+     },
+     "noRole": "Sin rol"
+   },
++  "liveAuth": {
++    "title": "Autorizaciones LIVE",
++    "subtitle": "Solicitudes operativas para acciones sensibles de En vivo.",
++    "contextTitle": "Control operativo LIVE",
++    "loading": "Cargando autorizaciones...",
++    "refresh": "Actualizar",
++    "newRequest": "Nueva solicitud",
++    "mineOnly": "Solo se muestran tus solicitudes porque no tienes permiso para ver la cola completa.",
++    "emptyTitle": "Sin solicitudes",
++    "emptyMessage": "No hay autorizaciones operativas para esta sucursal.",
++    "branchMissing": "No se encontro sucursal activa en la sesion.",
++    "validationTitle": "Datos incompletos",
++    "validationMessage": "Captura tipo de accion, objetivo, identificador y motivo.",
++    "createTitle": "Solicitar autorizacion",
++    "createHelp": "Crea una solicitud sobre un dato operativo existente. No ejecuta pagos, caja ni devoluciones.",
++    "operationType": "Tipo de accion",
++    "targetType": "Objetivo",
++    "targetId": "ID del objetivo",
++    "reason": "Motivo",
++    "submitRequest": "Enviar solicitud",
++    "detailTitle": "Detalle de autorizacion",
++    "id": "Folio",
++    "target": "Objetivo",
++    "requestedAt": "Solicitada: {{value}}",
++    "requestedAtLabel": "Solicitada",
++    "expiresAt": "Vence",
++    "decisionReason": "Motivo / nota",
++    "approve": "Aprobar",
++    "reject": "Rechazar",
++    "apply": "Aplicar",
++    "approveTitle": "Aprobar solicitud",
++    "rejectTitle": "Rechazar solicitud",
++    "applyTitle": "Aplicar autorizacion",
++    "applyPending": "La aplicacion de esta operacion queda pendiente de contrato funcional.",
++    "targetSummary": "{{target}} #{{id}}",
++    "statuses": {
++      "REQUESTED": "Solicitada",
++      "APPROVED": "Aprobada",
++      "REJECTED": "Rechazada",
++      "APPLIED": "Aplicada",
++      "EXPIRED": "Expirada",
++      "CANCELLED": "Cancelada"
++    },
++    "operations": {
++      "CANCEL_RESERVATION_WITH_PAYMENT": "Cancelar apartado con pago",
++      "RELEASE_RESERVED_ITEM": "Liberar prenda apartada",
++      "UNDO_LIVE_OPERATIONAL_SALE": "Deshacer vendido operativo LIVE",
++      "REASSIGN_RESERVATION": "Reasignar apartado",
++      "EDIT_LOCKED_ITEM": "Editar prenda bloqueada"
++    },
++    "targets": {
++      "LIVE": "LIVE",
++      "RESERVATION": "Apartado",
++      "ITEM": "Prenda",
++      "PAYMENT": "Pago",
++      "SALE": "Venta"
++    }
++  },
+   "theme": {
+     "light": "Claro",
+     "dark": "Oscuro"
+diff --git a/services/operationalAuthorizationService.ts b/services/operationalAuthorizationService.ts
+new file mode 100644
+index 0000000..5d049db
+--- /dev/null
++++ b/services/operationalAuthorizationService.ts
+@@ -0,0 +1,135 @@
++import { apiRequest } from '@/services/apiClient';
++
++export type OperationalAuthorizationStatus =
++  | 'REQUESTED'
++  | 'APPROVED'
++  | 'REJECTED'
++  | 'APPLIED'
++  | 'EXPIRED'
++  | 'CANCELLED';
++
++export type OperationalAuthorizationType =
++  | 'CANCEL_RESERVATION_WITH_PAYMENT'
++  | 'RELEASE_RESERVED_ITEM'
++  | 'UNDO_LIVE_OPERATIONAL_SALE'
++  | 'REASSIGN_RESERVATION'
++  | 'EDIT_LOCKED_ITEM';
++
++export type OperationalAuthorizationTargetType =
++  | 'LIVE'
++  | 'RESERVATION'
++  | 'ITEM'
++  | 'PAYMENT'
++  | 'SALE';
++
++export type OperationalAuthorization = {
++  id: number;
++  operationType: OperationalAuthorizationType;
++  status: OperationalAuthorizationStatus;
++  companyId: number;
++  branchId: number;
++  requestedByUserId: number;
++  requestedAt: string;
++  decidedByUserId?: number | null;
++  decidedAt?: string | null;
++  appliedByUserId?: number | null;
++  appliedAt?: string | null;
++  expiresAt: string;
++  targetType: OperationalAuthorizationTargetType;
++  targetId: number;
++  liveId?: number | null;
++  reservationId?: number | null;
++  itemId?: number | null;
++  paymentId?: number | null;
++  saleId?: number | null;
++  reason: string;
++  decisionReason?: string | null;
++  currentStateHash?: string | null;
++  snapshotJson?: string | null;
++  payloadJson?: string | null;
++  createdAt: string;
++  updatedAt: string;
++};
++
++export type CreateOperationalAuthorizationRequest = {
++  operationType: OperationalAuthorizationType;
++  targetType: OperationalAuthorizationTargetType;
++  targetId: number;
++  branchId: number;
++  liveId?: number;
++  reservationId?: number;
++  itemId?: number;
++  paymentId?: number;
++  saleId?: number;
++  reason: string;
++  payloadJson?: string;
++};
++
++export type OperationalAuthorizationDecisionRequest = {
++  reason?: string;
++};
++
++const BASE_PATH = '/api/operational-authorizations';
++
++export async function getOperationalAuthorizationsByBranch(
++  branchId: number
++): Promise<OperationalAuthorization[]> {
++  return apiRequest<OperationalAuthorization[]>(`${BASE_PATH}/branch/${branchId}`);
++}
++
++export async function getPendingOperationalAuthorizations(
++  branchId: number
++): Promise<OperationalAuthorization[]> {
++  return apiRequest<OperationalAuthorization[]>(`${BASE_PATH}/pending/branch/${branchId}`);
++}
++
++export async function getMyOperationalAuthorizations(
++  branchId: number
++): Promise<OperationalAuthorization[]> {
++  return apiRequest<OperationalAuthorization[]>(`${BASE_PATH}/mine/branch/${branchId}`);
++}
++
++export async function getOperationalAuthorizationById(
++  id: number
++): Promise<OperationalAuthorization> {
++  return apiRequest<OperationalAuthorization>(`${BASE_PATH}/${id}`);
++}
++
++export async function createOperationalAuthorization(
++  payload: CreateOperationalAuthorizationRequest
++): Promise<OperationalAuthorization> {
++  return apiRequest<OperationalAuthorization>(BASE_PATH, {
++    method: 'POST',
++    body: payload,
++  });
++}
++
++export async function approveOperationalAuthorization(
++  id: number,
++  payload: OperationalAuthorizationDecisionRequest
++): Promise<OperationalAuthorization> {
++  return apiRequest<OperationalAuthorization>(`${BASE_PATH}/${id}/approve`, {
++    method: 'PATCH',
++    body: payload,
++  });
++}
++
++export async function rejectOperationalAuthorization(
++  id: number,
++  payload: OperationalAuthorizationDecisionRequest
++): Promise<OperationalAuthorization> {
++  return apiRequest<OperationalAuthorization>(`${BASE_PATH}/${id}/reject`, {
++    method: 'PATCH',
++    body: payload,
++  });
++}
++
++export async function applyOperationalAuthorization(
++  id: number,
++  payload: OperationalAuthorizationDecisionRequest
++): Promise<OperationalAuthorization> {
++  return apiRequest<OperationalAuthorization>(`${BASE_PATH}/${id}/apply`, {
++    method: 'POST',
++    body: payload,
++  });
++}

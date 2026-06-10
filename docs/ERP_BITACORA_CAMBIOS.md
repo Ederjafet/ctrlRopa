@@ -1,5 +1,30 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-10 - LIVE-AUTH-B2 UI autorizaciones operativas LIVE
+
+Tipo: frontend, autorizaciones operativas LIVE, documentacion, evidencia.
+
+Objetivo:
+
+- Exponer una pantalla minima para listar, solicitar, aprobar/rechazar y aplicar autorizaciones operativas LIVE usando el backend MVP de B1.
+
+Cambios realizados:
+
+- Se agrego `/operational-authorizations` con listado, detalle y acciones segun permisos.
+- Se agrego servicio frontend para `/api/operational-authorizations`.
+- Se agrego entrada de navegacion en Operacion solo para usuarios con permisos de autorizacion LIVE.
+- Se agregaron textos i18n ES/EN.
+
+Restricciones respetadas:
+
+- No se tocaron pagos, caja, precio LIVE, devoluciones, venta financiera, RBAC, permisos, endpoints ni migraciones.
+- La aplicacion real queda limitada a `UNDO_LIVE_OPERATIONAL_SALE`, que ya soporta backend B1.
+
+Pendientes:
+
+- QA visual con navegador/screenshots.
+- Smoke API mutante con dataset desechable.
+
 ## 2026-06-10 - LIVE-PERM-FIX-A1 enforcement retirar prenda al aire
 
 Tipo: backend autorizacion, LIVE permisos, pruebas, evidencia.
