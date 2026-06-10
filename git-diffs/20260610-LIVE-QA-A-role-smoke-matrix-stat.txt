@@ -1,0 +1,3 @@
+ docs/LIVE_QA_A_ROLE_SMOKE_MATRIX.md                | 290 +++++++++++++++++++++
+ ...A-A-role-smoke-matrix-report-20260610-015612.md | 175 +++++++++++++
+ 2 files changed, 465 insertions(+)
