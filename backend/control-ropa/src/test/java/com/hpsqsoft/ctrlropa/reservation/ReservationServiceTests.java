@@ -26,6 +26,7 @@ import com.hpsqsoft.ctrlropa.web.error.ConflictException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -96,7 +97,7 @@ class ReservationServiceTests {
         when(itemRepository.reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED))
                 .thenReturn(1);
         when(repository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE)).thenReturn(Optional.empty());
-        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> {
+        when(repository.saveAndFlush(any(Reservation.class))).thenAnswer(invocation -> {
             Reservation reservation = invocation.getArgument(0);
             ReflectionTestUtils.setField(reservation, "id", 10L);
             return reservation;
@@ -113,7 +114,7 @@ class ReservationServiceTests {
         verify(itemRepository).reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED);
         verify(idempotencyRepository, never()).saveAndFlush(any(ReservationIdempotencyRecord.class));
         verify(itemRepository, never()).save(any(Item.class));
-        verify(repository).save(any(Reservation.class));
+        verify(repository).saveAndFlush(any(Reservation.class));
         verify(customerOrderService).refreshStatus(55L);
         verify(accessService).assertCan(
                 99L,
@@ -148,7 +149,7 @@ class ReservationServiceTests {
                 any(),
                 any()
         );
-        verify(repository, never()).save(any(Reservation.class));
+        verify(repository, never()).saveAndFlush(any(Reservation.class));
     }
 
     @Test
@@ -170,7 +171,7 @@ class ReservationServiceTests {
         );
 
         assertEquals("La prenda ya no esta disponible para apartar", exception.getMessage());
-        verify(repository, never()).save(any(Reservation.class));
+        verify(repository, never()).saveAndFlush(any(Reservation.class));
         verify(customerOrderService, never()).addReservationToOpenOrder(any(Reservation.class));
         verify(itemRepository, never()).save(any(Item.class));
     }
@@ -199,7 +200,7 @@ class ReservationServiceTests {
         when(itemRepository.reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED))
                 .thenReturn(1);
         when(repository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE)).thenReturn(Optional.empty());
-        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> {
+        when(repository.saveAndFlush(any(Reservation.class))).thenAnswer(invocation -> {
             Reservation reservation = invocation.getArgument(0);
             ReflectionTestUtils.setField(reservation, "id", 10L);
             return reservation;
@@ -215,6 +216,31 @@ class ReservationServiceTests {
         assertEquals(10L, pendingRecord.getReservationId());
         verify(idempotencyRepository).saveAndFlush(any(ReservationIdempotencyRecord.class));
         verify(idempotencyRepository).save(pendingRecord);
+    }
+
+    @Test
+    void createTranslatesActiveReservationConstraintViolation() {
+        Branch branch = branch();
+        Item item = item(ItemStatus.AVAILABLE, branch);
+        Customer customer = customer(branch);
+        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
+        ReservationService.CreateReservationRequest request = request(channel.getId(), null);
+
+        stubCommonCreateFlow(branch, item, customer, channel);
+        when(repository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE)).thenReturn(Optional.empty());
+        when(itemRepository.reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED))
+                .thenReturn(1);
+        when(repository.saveAndFlush(any(Reservation.class)))
+                .thenThrow(new DataIntegrityViolationException("Duplicate entry for uq_reservations_active_item"));
+
+        ConflictException exception = assertThrows(
+                ConflictException.class,
+                () -> service.create(request)
+        );
+
+        assertTrue(exception.getMessage().contains("reserva activa"));
+        verify(itemRepository).reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED);
+        verify(customerOrderService, never()).addReservationToOpenOrder(any(Reservation.class));
     }
 
     @Test
@@ -248,7 +274,7 @@ class ReservationServiceTests {
 
         assertEquals(10L, response.getId());
         verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
-        verify(repository, never()).save(any(Reservation.class));
+        verify(repository, never()).saveAndFlush(any(Reservation.class));
         verify(idempotencyRepository, never()).saveAndFlush(any(ReservationIdempotencyRecord.class));
     }
 
@@ -283,7 +309,7 @@ class ReservationServiceTests {
 
         assertTrue(exception.getMessage().contains("datos distintos"));
         verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
-        verify(repository, never()).save(any(Reservation.class));
+        verify(repository, never()).saveAndFlush(any(Reservation.class));
     }
 
     @Test
@@ -315,7 +341,7 @@ class ReservationServiceTests {
 
         assertTrue(exception.getMessage().contains("sigue en proceso"));
         verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
-        verify(repository, never()).save(any(Reservation.class));
+        verify(repository, never()).saveAndFlush(any(Reservation.class));
     }
 
     @Test
@@ -333,7 +359,7 @@ class ReservationServiceTests {
         when(repository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE)).thenReturn(Optional.empty());
         when(itemRepository.reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED))
                 .thenReturn(1);
-        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> {
+        when(repository.saveAndFlush(any(Reservation.class))).thenAnswer(invocation -> {
             Reservation reservation = invocation.getArgument(0);
             ReflectionTestUtils.setField(reservation, "id", 10L);
             return reservation;
@@ -382,7 +408,7 @@ class ReservationServiceTests {
         when(repository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE)).thenReturn(Optional.empty());
         when(itemRepository.reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED))
                 .thenReturn(1);
-        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> {
+        when(repository.saveAndFlush(any(Reservation.class))).thenAnswer(invocation -> {
             Reservation reservation = invocation.getArgument(0);
             ReflectionTestUtils.setField(reservation, "id", 10L);
             return reservation;

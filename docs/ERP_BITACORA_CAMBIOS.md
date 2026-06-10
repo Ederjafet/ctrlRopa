@@ -1,5 +1,34 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-09 - ITEM-Z5C constraint de reserva activa por item
+
+Tipo: migracion de consistencia, backend defensivo, pruebas, evidencia operativa.
+
+Objetivo:
+
+- Impedir multiples reservas `ACTIVE` para el mismo item sin bloquear historicos cancelados o convertidos.
+
+Cambios realizados:
+
+- Se creo `V53__active_reservation_item_constraint.sql`.
+- Se agrego columna generada `active_reservation_item_id` en `reservations`.
+- Se agrego unique `uq_reservations_active_item`.
+- `ReservationService.create` detecta la violacion del unique y devuelve error de negocio claro.
+- Se ajustaron pruebas para usar `saveAndFlush` en la creacion de reserva.
+
+Restricciones respetadas:
+
+- No se tocaron pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC ni permisos.
+- No se crearon endpoints nuevos.
+- No se cambio venta financiera.
+- No se modifico idempotencia ITEM-Z5B.
+
+Pendientes:
+
+- Resolver duplicados activos legacy si existen antes de aplicar en ambientes compartidos.
+- QA API/visual real con usuarios operativos.
+- ITEM-Z5D para trazabilidad de intentos rechazados.
+
 ## 2026-06-09 - ITEM-Z5B idempotencia backend de reservas
 
 Tipo: backend transaccional, migracion minima, frontend tecnico, evidencia operativa.
