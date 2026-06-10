@@ -66,6 +66,7 @@ class ReservationServiceTests {
     private final JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
     private final TenantAccessGuard tenantAccessGuard = mock(TenantAccessGuard.class);
     private final LiveEventService liveEventService = mock(LiveEventService.class);
+    private final ReservationRejectionTraceService rejectionTraceService = mock(ReservationRejectionTraceService.class);
 
     private final ReservationService service = new ReservationService(
             repository,
@@ -81,7 +82,8 @@ class ReservationServiceTests {
             jdbcTemplate,
             tenantAccessGuard,
             liveEventService,
-            idempotencyRepository
+            idempotencyRepository,
+            rejectionTraceService
     );
 
     @Test
@@ -116,6 +118,7 @@ class ReservationServiceTests {
         verify(itemRepository, never()).save(any(Item.class));
         verify(repository).saveAndFlush(any(Reservation.class));
         verify(customerOrderService).refreshStatus(55L);
+        verify(rejectionTraceService, never()).record(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
         verify(accessService).assertCan(
                 99L,
                 PermissionCode.DO_DOOR_RESERVATION,
@@ -150,6 +153,18 @@ class ReservationServiceTests {
                 any()
         );
         verify(repository, never()).saveAndFlush(any(Reservation.class));
+        verify(rejectionTraceService).record(
+                eq(2L),
+                eq(6L),
+                eq(99L),
+                eq(8L),
+                any(),
+                any(),
+                eq(ReservationRejectionReason.ITEM_NOT_AVAILABLE),
+                eq("El item no esta disponible"),
+                any(),
+                any()
+        );
     }
 
     @Test
@@ -174,6 +189,53 @@ class ReservationServiceTests {
         verify(repository, never()).saveAndFlush(any(Reservation.class));
         verify(customerOrderService, never()).addReservationToOpenOrder(any(Reservation.class));
         verify(itemRepository, never()).save(any(Item.class));
+        verify(rejectionTraceService).record(
+                eq(2L),
+                eq(6L),
+                eq(99L),
+                eq(8L),
+                any(),
+                any(),
+                eq(ReservationRejectionReason.ITEM_NOT_AVAILABLE),
+                eq("La prenda ya no esta disponible para apartar"),
+                any(),
+                any()
+        );
+    }
+
+    @Test
+    void createRejectsWhenActiveReservationAlreadyExists() {
+        Branch branch = branch();
+        Item item = item(ItemStatus.AVAILABLE, branch);
+        Customer customer = customer(branch);
+        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
+        ReservationService.CreateReservationRequest request = request(channel.getId(), null);
+        Reservation activeReservation = reservation(44L, item, customer, branch, channel);
+
+        stubCommonCreateFlow(branch, item, customer, channel);
+        when(repository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE))
+                .thenReturn(Optional.of(activeReservation));
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.create(request)
+        );
+
+        assertTrue(exception.getMessage().contains("reserva activa"));
+        verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
+        verify(repository, never()).saveAndFlush(any(Reservation.class));
+        verify(rejectionTraceService).record(
+                eq(2L),
+                eq(6L),
+                eq(99L),
+                eq(8L),
+                any(),
+                eq(44L),
+                eq(ReservationRejectionReason.ACTIVE_RESERVATION_EXISTS),
+                eq("El item ya tiene una reserva activa"),
+                any(),
+                any()
+        );
     }
 
     @Test
@@ -241,6 +303,18 @@ class ReservationServiceTests {
         assertTrue(exception.getMessage().contains("reserva activa"));
         verify(itemRepository).reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED);
         verify(customerOrderService, never()).addReservationToOpenOrder(any(Reservation.class));
+        verify(rejectionTraceService).record(
+                eq(2L),
+                eq(6L),
+                eq(99L),
+                eq(8L),
+                any(),
+                any(),
+                eq(ReservationRejectionReason.ACTIVE_RESERVATION_EXISTS),
+                eq("El item ya tiene una reserva activa"),
+                any(),
+                any()
+        );
     }
 
     @Test
@@ -310,6 +384,18 @@ class ReservationServiceTests {
         assertTrue(exception.getMessage().contains("datos distintos"));
         verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
         verify(repository, never()).saveAndFlush(any(Reservation.class));
+        verify(rejectionTraceService).record(
+                eq(2L),
+                eq(6L),
+                eq(99L),
+                eq(8L),
+                any(),
+                any(),
+                eq(ReservationRejectionReason.IDEMPOTENCY_PAYLOAD_MISMATCH),
+                eq("La llave de idempotencia ya fue usada con datos distintos"),
+                any(),
+                any()
+        );
     }
 
     @Test
@@ -342,6 +428,50 @@ class ReservationServiceTests {
         assertTrue(exception.getMessage().contains("sigue en proceso"));
         verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
         verify(repository, never()).saveAndFlush(any(Reservation.class));
+        verify(rejectionTraceService).record(
+                eq(2L),
+                eq(6L),
+                eq(99L),
+                eq(8L),
+                any(),
+                any(),
+                eq(ReservationRejectionReason.IDEMPOTENCY_CONFLICT_OR_IN_PROGRESS),
+                eq("La solicitud de reserva con esta llave sigue en proceso"),
+                any(),
+                any()
+        );
+    }
+
+    @Test
+    void createRejectsLiveChannelWithoutLiveIdAndTracesValidation() {
+        Branch branch = branch();
+        Item item = item(ItemStatus.AVAILABLE, branch);
+        Customer customer = customer(branch);
+        SalesChannel channel = channel(3L, ChannelCode.LIVE);
+        ReservationService.CreateReservationRequest request = request(channel.getId(), null);
+
+        stubCommonCreateFlow(branch, item, customer, channel);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.create(request)
+        );
+
+        assertTrue(exception.getMessage().contains("liveId"));
+        verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
+        verify(repository, never()).saveAndFlush(any(Reservation.class));
+        verify(rejectionTraceService).record(
+                eq(2L),
+                eq(6L),
+                eq(99L),
+                eq(8L),
+                any(),
+                any(),
+                eq(ReservationRejectionReason.VALIDATION_REJECTED),
+                eq("Las reservas LIVE requieren liveId"),
+                any(),
+                any()
+        );
     }
 
     @Test

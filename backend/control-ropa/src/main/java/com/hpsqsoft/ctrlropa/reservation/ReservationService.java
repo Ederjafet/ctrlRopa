@@ -24,6 +24,8 @@ import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
 import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
 import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
 import com.hpsqsoft.ctrlropa.web.error.ConflictException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -40,6 +42,7 @@ import java.util.List;
 @Transactional
 public class ReservationService {
 
+    private static final Logger log = LoggerFactory.getLogger(ReservationService.class);
     private static final String RESERVATION_CREATE_OPERATION = "RESERVATION_CREATE";
     private static final int IDEMPOTENCY_KEY_MAX_LENGTH = 120;
 
@@ -57,6 +60,7 @@ public class ReservationService {
     private final TenantAccessGuard tenantAccessGuard;
     private final LiveEventService liveEventService;
     private final ReservationIdempotencyRepository idempotencyRepository;
+    private final ReservationRejectionTraceService rejectionTraceService;
 
     public ReservationService(ReservationRepository repository,
                               ItemRepository itemRepository,
@@ -71,7 +75,8 @@ public class ReservationService {
                               JdbcTemplate jdbcTemplate,
                               TenantAccessGuard tenantAccessGuard,
                               LiveEventService liveEventService,
-                              ReservationIdempotencyRepository idempotencyRepository) {
+                              ReservationIdempotencyRepository idempotencyRepository,
+                              ReservationRejectionTraceService rejectionTraceService) {
         this.repository = repository;
         this.itemRepository = itemRepository;
         this.customerRepository = customerRepository;
@@ -86,6 +91,7 @@ public class ReservationService {
         this.tenantAccessGuard = tenantAccessGuard;
         this.liveEventService = liveEventService;
         this.idempotencyRepository = idempotencyRepository;
+        this.rejectionTraceService = rejectionTraceService;
     }
 
     @Transactional(readOnly = true)
@@ -150,6 +156,18 @@ public class ReservationService {
         );
 
         if (existingIdempotency == null && item.getStatus() != ItemStatus.AVAILABLE) {
+            traceReservationRejection(
+                    item.getCompany().getId(),
+                    branch.getId(),
+                    userId,
+                    item.getId(),
+                    request.getLiveId(),
+                    null,
+                    ReservationRejectionReason.ITEM_NOT_AVAILABLE,
+                    "El item no esta disponible",
+                    idempotencyKey,
+                    request
+            );
             throw new IllegalArgumentException("El item no esta disponible");
         }
 
@@ -173,24 +191,72 @@ public class ReservationService {
             tenantAccessGuard.requireBranch(live.getBranch().getId(), "La transmision no pertenece a la sucursal activa");
 
             if (live.getStatus() != LiveStatus.OPEN && live.getStatus() != LiveStatus.ACTIVE) {
+                traceReservationRejection(
+                        item.getCompany().getId(),
+                        branch.getId(),
+                        userId,
+                        item.getId(),
+                        live.getId(),
+                        null,
+                        ReservationRejectionReason.VALIDATION_REJECTED,
+                        "El live no esta disponible para reservar",
+                        idempotencyKey,
+                        request
+                );
                 throw new IllegalArgumentException("El live no está disponible para reservar");
             }
 
             if (!ChannelCode.LIVE.equals(salesChannel.getCode())) {
+                traceReservationRejection(
+                        item.getCompany().getId(),
+                        branch.getId(),
+                        userId,
+                        item.getId(),
+                        live.getId(),
+                        null,
+                        ReservationRejectionReason.VALIDATION_REJECTED,
+                        "Si la reserva viene de live, el canal debe ser LIVE",
+                        idempotencyKey,
+                        request
+                );
                 throw new IllegalArgumentException("Si la reserva viene de live, el canal debe ser LIVE");
             }
 
             if (!live.getBranch().getId().equals(branch.getId())) {
+                traceReservationRejection(
+                        item.getCompany().getId(),
+                        branch.getId(),
+                        userId,
+                        item.getId(),
+                        live.getId(),
+                        null,
+                        ReservationRejectionReason.VALIDATION_REJECTED,
+                        "El live no pertenece a la sucursal indicada",
+                        idempotencyKey,
+                        request
+                );
                 throw new IllegalArgumentException("El live no pertenece a la sucursal indicada");
             }
         }
 
         if (request.getLiveId() == null && ChannelCode.LIVE.equals(salesChannel.getCode())) {
+            traceReservationRejection(
+                    item.getCompany().getId(),
+                    branch.getId(),
+                    userId,
+                    item.getId(),
+                    null,
+                    null,
+                    ReservationRejectionReason.VALIDATION_REJECTED,
+                    "Las reservas LIVE requieren liveId",
+                    idempotencyKey,
+                    request
+            );
             throw new IllegalArgumentException("Las reservas LIVE requieren liveId");
         }
 
         if (existingIdempotency != null) {
-            return resolveExistingIdempotency(existingIdempotency);
+            return resolveExistingIdempotency(existingIdempotency, request);
         }
 
         ReservationIdempotencyRecord idempotencyRecord = createIdempotencyRecord(
@@ -205,6 +271,18 @@ public class ReservationService {
                 .orElse(null);
 
         if (activeReservation != null) {
+            traceReservationRejection(
+                    item.getCompany().getId(),
+                    branch.getId(),
+                    userId,
+                    item.getId(),
+                    request.getLiveId(),
+                    activeReservation.getId(),
+                    ReservationRejectionReason.ACTIVE_RESERVATION_EXISTS,
+                    "El item ya tiene una reserva activa",
+                    idempotencyKey,
+                    request
+            );
             throw new IllegalArgumentException("El item ya tiene una reserva activa");
         }
 
@@ -217,6 +295,18 @@ public class ReservationService {
         );
 
         if (reservedRows != 1) {
+            traceReservationRejection(
+                    item.getCompany().getId(),
+                    branch.getId(),
+                    userId,
+                    item.getId(),
+                    request.getLiveId(),
+                    null,
+                    ReservationRejectionReason.ITEM_NOT_AVAILABLE,
+                    "La prenda ya no esta disponible para apartar",
+                    idempotencyKey,
+                    request
+            );
             throw new IllegalArgumentException("La prenda ya no esta disponible para apartar");
         }
 
@@ -227,6 +317,18 @@ public class ReservationService {
         }
 
         if (effectivePrice == null || effectivePrice.signum() <= 0) {
+            traceReservationRejection(
+                    item.getCompany().getId(),
+                    branch.getId(),
+                    userId,
+                    item.getId(),
+                    request.getLiveId(),
+                    null,
+                    ReservationRejectionReason.VALIDATION_REJECTED,
+                    "El item no tiene precio asignado",
+                    idempotencyKey,
+                    request
+            );
             throw new IllegalArgumentException("El item no tiene precio asignado");
         }
 
@@ -252,7 +354,7 @@ public class ReservationService {
             entity.setLiveOperationalStatusUpdatedByUserId(userId);
         }
 
-        Reservation saved = saveCreatedReservation(entity);
+        Reservation saved = saveCreatedReservation(entity, idempotencyKey, request);
 
         CustomerOrder order = customerOrderService.addReservationToOpenOrder(saved);
         customerOrderService.refreshStatus(order.getId());
@@ -298,6 +400,18 @@ public class ReservationService {
                 .orElse(null);
 
         if (existing != null && !requestHash.equals(existing.getRequestHash())) {
+            traceReservationRejection(
+                    companyId,
+                    branchId,
+                    userId,
+                    request.getItemId(),
+                    request.getLiveId(),
+                    existing.getReservationId(),
+                    ReservationRejectionReason.IDEMPOTENCY_PAYLOAD_MISMATCH,
+                    "La llave de idempotencia ya fue usada con datos distintos",
+                    normalizedKey,
+                    requestHash
+            );
             throw new ConflictException("La llave de idempotencia ya fue usada con datos distintos");
         }
 
@@ -327,24 +441,61 @@ public class ReservationService {
         try {
             return idempotencyRepository.saveAndFlush(record);
         } catch (DataIntegrityViolationException ex) {
+            traceReservationRejection(
+                    companyId,
+                    branchId,
+                    userId,
+                    request.getItemId(),
+                    request.getLiveId(),
+                    null,
+                    ReservationRejectionReason.IDEMPOTENCY_CONFLICT_OR_IN_PROGRESS,
+                    "La solicitud de reserva con esta llave ya esta en proceso",
+                    normalizedKey,
+                    record.getRequestHash()
+            );
             throw new ConflictException(
                     "La solicitud de reserva con esta llave ya esta en proceso. Intenta de nuevo en unos segundos."
             );
         }
     }
 
-    private ReservationResponse resolveExistingIdempotency(ReservationIdempotencyRecord record) {
+    private ReservationResponse resolveExistingIdempotency(ReservationIdempotencyRecord record,
+                                                           CreateReservationRequest request) {
         if (record.getStatus() == ReservationIdempotencyStatus.COMPLETED
                 && record.getReservationId() != null) {
             return toResponse(findEntityById(record.getReservationId()));
         }
 
         if (record.getStatus() == ReservationIdempotencyStatus.IN_PROGRESS) {
+            traceReservationRejection(
+                    record.getCompanyId(),
+                    record.getBranchId(),
+                    record.getUserId(),
+                    request.getItemId(),
+                    request.getLiveId(),
+                    record.getReservationId(),
+                    ReservationRejectionReason.IDEMPOTENCY_CONFLICT_OR_IN_PROGRESS,
+                    "La solicitud de reserva con esta llave sigue en proceso",
+                    record.getIdempotencyKey(),
+                    record.getRequestHash()
+            );
             throw new ConflictException(
                     "La solicitud de reserva con esta llave sigue en proceso. Intenta de nuevo en unos segundos."
             );
         }
 
+        traceReservationRejection(
+                record.getCompanyId(),
+                record.getBranchId(),
+                record.getUserId(),
+                request.getItemId(),
+                request.getLiveId(),
+                record.getReservationId(),
+                ReservationRejectionReason.IDEMPOTENCY_CONFLICT_OR_IN_PROGRESS,
+                "La solicitud de reserva con esta llave quedo en estado ambiguo",
+                record.getIdempotencyKey(),
+                record.getRequestHash()
+        );
         throw new ConflictException(
                 "La solicitud de reserva con esta llave quedo en estado ambiguo. Genera un nuevo intento."
         );
@@ -361,11 +512,25 @@ public class ReservationService {
         idempotencyRepository.save(record);
     }
 
-    private Reservation saveCreatedReservation(Reservation entity) {
+    private Reservation saveCreatedReservation(Reservation entity,
+                                               String idempotencyKey,
+                                               CreateReservationRequest request) {
         try {
             return repository.saveAndFlush(entity);
         } catch (DataIntegrityViolationException ex) {
             if (isActiveReservationConstraintViolation(ex)) {
+                traceReservationRejection(
+                        entity.getItem().getCompany().getId(),
+                        entity.getBranch().getId(),
+                        currentUser.getUserId(),
+                        entity.getItem().getId(),
+                        entity.getLive() != null ? entity.getLive().getId() : null,
+                        null,
+                        ReservationRejectionReason.ACTIVE_RESERVATION_EXISTS,
+                        "El item ya tiene una reserva activa",
+                        idempotencyKey,
+                        request
+                );
                 throw new ConflictException("El item ya tiene una reserva activa");
             }
             throw ex;
@@ -382,6 +547,66 @@ public class ReservationService {
             current = current.getCause();
         }
         return false;
+    }
+
+    private void traceReservationRejection(Long companyId,
+                                           Long branchId,
+                                           Long userId,
+                                           Long itemId,
+                                           Long liveId,
+                                           Long reservationId,
+                                           ReservationRejectionReason reason,
+                                           String message,
+                                           String idempotencyKey,
+                                           CreateReservationRequest request) {
+        traceReservationRejection(
+                companyId,
+                branchId,
+                userId,
+                itemId,
+                liveId,
+                reservationId,
+                reason,
+                message,
+                idempotencyKey,
+                request != null ? hashReservationRequest(request) : null
+        );
+    }
+
+    private void traceReservationRejection(Long companyId,
+                                           Long branchId,
+                                           Long userId,
+                                           Long itemId,
+                                           Long liveId,
+                                           Long reservationId,
+                                           ReservationRejectionReason reason,
+                                           String message,
+                                           String idempotencyKey,
+                                           String requestHash) {
+        try {
+            rejectionTraceService.record(
+                    companyId,
+                    branchId,
+                    userId,
+                    itemId,
+                    liveId,
+                    reservationId,
+                    reason,
+                    message,
+                    hashIdempotencyKeyForTrace(idempotencyKey),
+                    requestHash
+            );
+        } catch (RuntimeException ex) {
+            log.warn("No se pudo registrar rechazo de reserva: {}", message, ex);
+        }
+    }
+
+    private String hashIdempotencyKeyForTrace(String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            return null;
+        }
+
+        return sha256(idempotencyKey.trim());
     }
 
     private String normalizeIdempotencyKey(String idempotencyKey) {
