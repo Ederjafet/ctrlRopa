@@ -1,0 +1,233 @@
+diff --git a/docs/LIVE_PRICE_D_PRICE_QA.md b/docs/LIVE_PRICE_D_PRICE_QA.md
+new file mode 100644
+index 0000000..b3a0ad3
+--- /dev/null
++++ b/docs/LIVE_PRICE_D_PRICE_QA.md
+@@ -0,0 +1,100 @@
++# LIVE-PRICE-D / QA API de cambio de precio LIVE
++
++Fecha: 2026-06-10
++Rama: `feature/live-price-d-price-qa`
++
++## Alcance
++
++Se ejecuto QA API real y mutante controlado del flujo `LIVE_PRICE_CHANGE` implementado en LIVE-PRICE-C. El objetivo fue validar solicitud, bloqueo de aprobacion por vendedor, aprobacion/aplicacion por admin y trazabilidad del evento, usando solo dataset desechable.
++
++No se implemento logica nueva.
++
++## Historial confirmado
++
++- `658c35f LIVE-PRICE-C implementa autorizacion precio live`
++- `6e4bc2e MOBILE-LAN-A documenta diagnostico Expo Go`
++- `9121fe2 LIVE-AUTH-B3 valida autorizaciones operativas`
++- `7f77e80 RELEASE-LIVE-BASE-RC1 documenta release candidate live base`
++
++## Ambiente
++
++- Backend: `http://localhost:8090`
++  - `/api/health`: `200`
++  - `/api/me` sin token: `401`
++- Frontend:
++  - `http://localhost:8081`: `200`
++  - `http://192.168.0.128:8081`: `200`
++
++## Usuarios QA
++
++Se usaron credenciales QA documentadas sin imprimir password ni tokens.
++
++| Usuario | Resultado | Rol | Permisos relevantes |
++| --- | --- | --- | --- |
++| `qa.admin@local.test` | Login OK | `ADMIN` | Solicitar, aprobar, aplicar y ver autorizaciones de precio LIVE |
++| `qa.supervisor.centro@local.test` | Login OK | `SUPERVISOR` | Solicitar, aprobar, aplicar y ver autorizaciones de precio LIVE |
++| `qa.vendedor.centro@local.test` | Login OK | `SELLER` | Solicitar cambio de precio LIVE; sin aprobar/aplicar |
++
++## Dataset usado
++
++Dataset desechable documentado:
++
++- Prefijo: `QA_LIVE_DISPOSABLE_20260610104008`
++- LIVE: `15`
++- Reserva: `45`
++- Item: `106`
++- Item code: `QA_LIVE_DISPOSABLE_20260610104008-ITEM-B`
++
++Estado previo de reserva `45`:
++
++- `status`: `ACTIVE`
++- `liveOperationalStatus`: `RESERVED`
++- `price`: `102.00`
++- Pagos asociados por API: `[]`
++
++## Smoke API ejecutado
++
++1. Seller creo solicitud `LIVE_PRICE_CHANGE` sobre reserva `45`.
++2. Seller intento aprobar la solicitud.
++   - Resultado esperado: `403`
++   - Resultado obtenido: `403`
++3. Admin aprobo la solicitud.
++   - Resultado obtenido: `APPROVED`
++4. Admin aplico la solicitud.
++   - Resultado obtenido: `APPLIED`
++5. Admin reintento aplicar la misma solicitud.
++   - Resultado esperado: no aplicar dos veces.
++   - Resultado obtenido: `400`
++
++Autorizacion creada:
++
++- `authorizationId`: `2`
++
++## Valores antes/despues
++
++| Campo | Antes | Despues | Resultado |
++| --- | ---: | ---: | --- |
++| `reservations.price` reserva `45` | `102.00` | `111.23` | PASS |
++| `items.price` item `106` | `102.00` | `102.00` | PASS |
++| ventas asociadas | `0` | `0` | PASS |
++| pagos asociados | `0` | `0` | PASS |
++| cierres de caja en sucursal | `1` | `1` | PASS |
++| eventos `LIVE_PRICE_CHANGE_APPLIED` | - | `1` | PASS |
++
++## Confirmaciones de alcance
++
++- Solo cambio `reservations.price`.
++- No cambio `items.price`.
++- No cambio `sales.price`.
++- No se creo venta.
++- No se creo pago.
++- No se modifico caja.
++- No se tocaron devoluciones.
++- No se modifico RBAC, permisos, endpoints ni migraciones.
++
++## Resultado
++
++- `GO_TECNICO_API`
++- `PENDING_QA_VISUAL`
++
++No se marca `QA_PASS` porque no hubo evidencia visual/screenshots en esta fase.
+diff --git a/qa-reports/LIVE-PRICE-D-price-qa-report-20260610-171307.md b/qa-reports/LIVE-PRICE-D-price-qa-report-20260610-171307.md
+new file mode 100644
+index 0000000..a409592
+--- /dev/null
++++ b/qa-reports/LIVE-PRICE-D-price-qa-report-20260610-171307.md
+@@ -0,0 +1,121 @@
++# LIVE-PRICE-D price QA report
++
++Fecha: 2026-06-10 17:13:07
++Rama: `feature/live-price-d-price-qa`
++
++## Resumen ejecutivo
++
++Se ejecuto QA API real del flujo de cambio de precio LIVE con autorizacion operativa sobre dataset desechable. El flujo paso: seller solicito, seller no pudo aprobar, admin aprobo, admin aplico, el segundo apply quedo bloqueado y solo cambio `reservations.price`.
++
++Resultado:
++
++- `GO_TECNICO_API`
++- `PENDING_QA_VISUAL`
++
++No se marca `QA_PASS` porque no hubo evidencia visual.
++
++## Comandos ejecutados
++
++- `git branch --show-current`
++- `git status`
++- `git log --oneline -120`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-PRICE-C"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-AUTH-B3"`
++- `git --no-pager log --oneline --all --decorate --grep="MOBILE-LAN-A"`
++- `git --no-pager log --oneline --all --decorate --grep="RELEASE-LIVE-BASE-RC1"`
++- auditorias `git grep` de permisos, precio, autorizaciones y dataset desechable
++- `GET http://localhost:8090/api/health`
++- `GET http://localhost:8090/api/me` sin token
++- `GET http://localhost:8081`
++- `GET http://192.168.0.128:8081`
++- login QA admin/supervisor/vendedor sin imprimir password ni tokens
++- `GET /api/me` por rol
++- `GET /api/reservations/branch/4`
++- `GET /api/reservations/45`
++- `GET /api/items/106`
++- `GET /api/payments/reservation/45`
++- `GET /api/sales/branch/4`
++- `GET /api/cash-closures/branch/4`
++- `POST /api/operational-authorizations`
++- `PATCH /api/operational-authorizations/2/approve`
++- `POST /api/operational-authorizations/2/apply`
++- `GET /api/lives/15/events`
++
++## Commits confirmados
++
++- `658c35f LIVE-PRICE-C implementa autorizacion precio live`
++- `6e4bc2e MOBILE-LAN-A documenta diagnostico Expo Go`
++- `9121fe2 LIVE-AUTH-B3 valida autorizaciones operativas`
++- `7f77e80 RELEASE-LIVE-BASE-RC1 documenta release candidate live base`
++
++## Ambiente detectado
++
++- Backend health: `200`
++- `/api/me` sin token: `401`
++- Frontend local: `200`
++- Frontend LAN: `200`
++
++## Usuarios QA usados
++
++| Usuario | Login | Branch | Rol | Resultado permisos |
++| --- | --- | ---: | --- | --- |
++| `qa.admin@local.test` | OK | `4` | `ADMIN` | Solicita/aprueba/aplica/ver precio LIVE |
++| `qa.supervisor.centro@local.test` | OK | `4` | `SUPERVISOR` | Solicita/aprueba/aplica/ver precio LIVE |
++| `qa.vendedor.centro@local.test` | OK | `4` | `SELLER` | Solicita; no aprueba ni aplica |
++
++## Dataset usado
++
++- Prefijo: `QA_LIVE_DISPOSABLE_20260610104008`
++- LIVE: `15`
++- Reserva: `45`
++- Item: `106`
++- Item code: `QA_LIVE_DISPOSABLE_20260610104008-ITEM-B`
++
++La reserva estaba `ACTIVE`, `RESERVED`, sin pagos por `GET /api/payments/reservation/45 => []`.
++
++## Smoke API mutante
++
++| Paso | Resultado |
++| --- | --- |
++| Seller crea solicitud `LIVE_PRICE_CHANGE` | `REQUESTED`, authorization id `2` |
++| Seller intenta aprobar | `403`, esperado |
++| Admin aprueba | `APPROVED` |
++| Admin aplica | `APPLIED` |
++| Admin reintenta aplicar | `400`, esperado |
++
++## Verificacion antes/despues
++
++| Control | Antes | Despues | Resultado |
++| --- | ---: | ---: | --- |
++| `reservations.price` reserva `45` | `102.00` | `111.23` | PASS |
++| `items.price` item `106` | `102.00` | `102.00` | PASS |
++| ventas asociadas | `0` | `0` | PASS |
++| pagos asociados | `0` | `0` | PASS |
++| cierres de caja en sucursal | `1` | `1` | PASS |
++| evento `LIVE_PRICE_CHANGE_APPLIED` | - | `1` | PASS |
++
++## Confirmacion de no alcance
++
++- No se tocaron pagos funcionalmente.
++- No se toco caja.
++- No se tocaron devoluciones.
++- No se cambio venta financiera.
++- No se crearon permisos.
++- No se modifico RBAC.
++- No se crearon endpoints.
++- No se crearon migraciones.
++- No se implemento logica nueva.
++
++## Validaciones tecnicas
++
++- `./mvnw.cmd test`: PASS, 122 tests; Flyway valido 57 migraciones.
++- `npm.cmd run lint`: PASS sin errores; 53 warnings preexistentes.
++- `npx.cmd tsc --noEmit`: PASS.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: PASS.
++- `git --no-pager diff --check`: PASS.
++- `git --no-pager diff --cached --check`: pendiente de cierre posterior a staging.
++
++## Resultado
++
++- `GO_TECNICO_API`
++- `PENDING_QA_VISUAL`
