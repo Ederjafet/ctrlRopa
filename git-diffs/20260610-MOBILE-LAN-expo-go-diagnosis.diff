@@ -1,0 +1,104 @@
+diff --git a/qa-reports/MOBILE-LAN-expo-go-diagnosis-20260610-160517.md b/qa-reports/MOBILE-LAN-expo-go-diagnosis-20260610-160517.md
+new file mode 100644
+index 0000000..f66a72b
+--- /dev/null
++++ b/qa-reports/MOBILE-LAN-expo-go-diagnosis-20260610-160517.md
+@@ -0,0 +1,98 @@
++# MOBILE-LAN Expo Go diagnosis
++
++Fecha: 2026-06-10 16:05:17
++Rama: `feature/live-price-c-price-authorization`
++
++## Resumen ejecutivo
++
++Se diagnostico la configuracion especifica de Expo Go / React Native para el acceso desde celular/tablet. No se detecto evidencia de que el bundle nativo deba apuntar a `localhost:8090`; la configuracion actual resuelve la API nativa con `EXPO_PUBLIC_API_HOST=192.168.0.128` y `EXPO_PUBLIC_API_PORT=8090`.
++
++Causa probable: Expo Go esta cargando un bundle/cache viejo, Metro fue levantado sin modo LAN, o el dispositivo no esta consumiendo el QR actual del servidor `192.168.0.128:8081`. El navegador web y Expo Go no resuelven la API de la misma forma.
++
++No se tocaron archivos funcionales. Se deja reporte documental y evidencia git.
++
++## Comandos ejecutados
++
++- `git branch --show-current`
++- `git status`
++- `git log --oneline -20`
++- `git grep -n "localhost:8090|127.0.0.1:8090|192.168.0.128|EXPO_PUBLIC|API_BASE|baseURL|apiUrl|Constants.expoConfig|Platform.OS|8090|8081" -- app services components config*.ts app.config.* app.json .env* docs`
++- `git grep -n "fetch|axios|apiClient|NETWORK_ERROR|Network Error|baseURL|timeout|Authorization|token" -- app services components`
++- lectura no interactiva de `constants/api.ts`, `services/apiClient.ts`, `.env`, `app.json`, `package.json` y `plugins/withAndroidNetworkSecurity.js`
++
++## API base detectada
++
++Archivo: `constants/api.ts`
++
++- `EXPO_PUBLIC_API_PORT=8090`
++- `EXPO_PUBLIC_API_HOST=192.168.0.128`
++- `EXPO_PUBLIC_API_BASE_URL` no esta configurada en `.env`
++
++Resolucion actual:
++
++- Web: si existe `window.location.hostname`, usa `http://<hostname>:8090`.
++- Expo Go / nativo: usa `http://192.168.0.128:8090`.
++- Override permitido: `EXPO_PUBLIC_API_BASE_URL`.
++
++Con la `.env` actual, Expo Go deberia llamar a:
++
++```text
++http://192.168.0.128:8090
++```
++
++## Diferencia web vs Expo Go
++
++En web, abrir `http://192.168.0.128:8081` hace que `window.location.hostname` sea `192.168.0.128`; por eso la API se arma dinamicamente como `http://192.168.0.128:8090`.
++
++En Expo Go no existe `window.location.hostname` web. El bundle nativo toma las variables `EXPO_PUBLIC_*` al momento en que Metro sirve el bundle. Si Metro fue iniciado antes de corregir `.env`, si Expo Go conserva cache, o si se escanea un QR de un servidor distinto, puede seguir usando una configuracion vieja.
++
++## Confirmaciones
++
++1. Frontend web y Expo Go no usan exactamente la misma ruta de resolucion:
++   - web deriva el host desde la URL abierta;
++   - nativo usa `EXPO_PUBLIC_API_HOST` o `EXPO_PUBLIC_API_BASE_URL`.
++2. No se encontro `localhost:8090` como fallback activo para nativo en `constants/api.ts`.
++3. `.env` contiene `EXPO_PUBLIC_API_HOST=192.168.0.128` y `EXPO_PUBLIC_API_PORT=8090`.
++4. La diferencia por `Platform.OS` existe y es intencional: web usa host dinamico, nativo usa host LAN configurable.
++5. `services/apiClient.ts` centraliza `fetch` con `API_BASE_URL` y registra `NETWORK_ERROR` con la URL, sin imprimir tokens.
++
++## Hallazgo secundario
++
++`plugins/withAndroidNetworkSecurity.js` contiene una IP antigua en `network_security_config.xml`: `192.168.100.212`.
++
++Ese plugin no explica el problema en Expo Go porque los config plugins no modifican la app Expo Go instalada. Si se usa un dev build o APK propio, conviene actualizar esa IP o permitir el dominio LAN correcto en una fase separada de configuracion nativa.
++
++## Comando correcto para Expo Go
++
++Desde `E:\CtrlPan\2026\control-ropa-app`:
++
++```powershell
++npx.cmd expo start --host lan --port 8081 --clear
++```
++
++El QR debe mostrar una URL LAN accesible desde el telefono/tablet, no `localhost`.
++
++## Limpieza recomendada de cache
++
++1. Detener Metro/Expo.
++2. Cerrar Expo Go completamente en el dispositivo.
++3. Ejecutar `npx.cmd expo start --host lan --port 8081 --clear`.
++4. Escanear el QR nuevo desde Expo Go.
++5. Si persiste, borrar datos/cache de Expo Go desde Android/iOS y repetir.
++6. Verificar que el dispositivo este en la misma WiFi, sin VPN/aislamiento AP.
++7. En la consola Metro, confirmar que las llamadas API impresas por `apiClient` usan `http://192.168.0.128:8090`.
++
++## Resultado
++
++- Codigo funcional tocado: no.
++- Pagos/caja/precio/devoluciones/autorizaciones/RBAC/permisos: no tocados.
++- Migraciones: no creadas.
++- Resultado: `GO_TECNICO_DOCUMENTAL`.
++- Pendiente: smoke real en Expo Go despues de reiniciar Metro con `--host lan --clear`.
++
++## Validaciones
++
++- `npm.cmd run lint`: PASS sin errores; 53 warnings preexistentes.
++- `npx.cmd tsc --noEmit`: PASS.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: PASS.
++- `git --no-pager diff --check`: PASS.
