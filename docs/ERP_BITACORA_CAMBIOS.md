@@ -3538,3 +3538,27 @@ Decision:
 
 - `GO tecnico` si frontend pasa validaciones.
 - `PENDING_QA_VISUAL` hasta validar en `/live` con navegador/capturas reales.
+## 2026-06-10 - LIVE-AUTH-B1 autorizaciones operativas LIVE MVP
+
+Tipo: backend MVP de autorizaciones operativas LIVE, con migracion aditiva y sin pagos/caja/precio/devoluciones/venta financiera.
+
+Objetivo:
+
+- Crear solicitudes persistentes de autorizacion operativa LIVE.
+- Permitir solicitud, listado, aprobacion, rechazo, cancelacion y aplicacion controlada.
+- Aplicar solo `UNDO_LIVE_OPERATIONAL_SALE` cuando no hay pago activo y el snapshot sigue consistente.
+
+Cambios realizados:
+
+- `V55__live_operational_authorizations_mvp.sql`: crea permisos y tabla `operational_authorization_requests`.
+- `PermissionCode.java`: agrega permisos de autorizacion operativa y acciones sensibles.
+- Nuevo paquete backend `operationauth`: entidad, repositorio, service, controller y DTOs.
+- `LiveEventType`: agrega `LIVE_OPERATIONAL_SOLD_UNDONE`.
+- `OperationalAuthorizationServiceTests`: cubre permisos, self-approval, rechazo y aplicacion segura.
+- `docs/LIVE_AUTH_B1_OPERATIONAL_AUTHORIZATIONS_MVP.md`: documenta alcance, endpoints, permisos, rollback y QA.
+
+Decision:
+
+- `GO_TECNICO` si backend/frontend pasan validaciones.
+- `PARTIAL_GO_BACKEND` porque la UI de cola/solicitud queda para fase posterior.
+- `PENDING_QA_VISUAL` hasta validar con navegador/screenshots reales.
