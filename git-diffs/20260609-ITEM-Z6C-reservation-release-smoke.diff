@@ -1,0 +1,268 @@
+﻿diff --git a/docs/ITEM_Z6C_RESERVATION_RELEASE_SMOKE.md b/docs/ITEM_Z6C_RESERVATION_RELEASE_SMOKE.md
+new file mode 100644
+index 0000000..43f7391
+--- /dev/null
++++ b/docs/ITEM_Z6C_RESERVATION_RELEASE_SMOKE.md
+@@ -0,0 +1,133 @@
++# ITEM-Z6C - Smoke tecnico de cancelacion y liberacion segura de apartados
++
++Fecha: 2026-06-09
++Rama: `feature/item-z6c-reservation-release-smoke`
++Estado: `GO_TECNICO_DOCUMENTAL` / `PENDING_QA_API_OR_VISUAL`
++
++## Resumen
++
++ITEM-Z6C valida tecnicamente el cierre de ITEM-Z6B sin implementar logica nueva. La revision confirma que Z6B ya esta en el historial de develop y que el backend conserva la cancelacion segura de reservas:
++
++- solo reservas `ACTIVE` pueden cancelarse por flujo normal;
++- `CANCELLED` se rechaza;
++- `CONVERTED_TO_SALE` se rechaza;
++- pago activo por `PaymentAllocation` bloquea la cancelacion normal;
++- item no `RESERVED` no se fuerza a `AVAILABLE`;
++- la liberacion usa `ItemRepository.releaseIfReserved(...)`;
++- reserva LIVE usa el mismo comportamiento seguro;
++- rechazos de cancelacion usan `VALIDATION_REJECTED`.
++
++No se tocaron pagos funcionalmente, caja, precio LIVE, devoluciones, autorizaciones, RBAC, permisos, endpoints ni migraciones.
++
++## Historial confirmado
++
++- `7490809 ITEM-Z6B libera reservas de forma segura`
++- `ced96e0 Merge branch 'feature/item-z6b-safe-reservation-release' into develop`
++- `4744b9c ITEM-Z6A documenta handoff liberacion reservas`
++- `3826a43 ITEM-Z5D registra rechazos de reserva`
++- `ef8d255 ITEM-Z5C protege reserva activa por item`
++- `6f1ee15 ITEM-Z5B agrega idempotencia de reservas`
++
++## Validacion de codigo
++
++### `ReservationService.cancel`
++
++Confirmado:
++
++- exige `CANCEL_RESERVATION`;
++- carga la reserva por el flujo existente;
++- rechaza `ReservationStatus.CANCELLED`;
++- rechaza `ReservationStatus.CONVERTED_TO_SALE`;
++- rechaza cualquier estado distinto de `ACTIVE`;
++- calcula monto activo aplicado a la reserva;
++- bloquea si hay pago `PaymentStatus.ACTIVE`;
++- exige `ItemStatus.RESERVED`;
++- llama `itemRepository.releaseIfReserved(...)`;
++- rechaza si la liberacion condicional no afecta 1 fila;
++- solo despues marca la reserva `CANCELLED`;
++- si la reserva viene de LIVE, marca estado operativo `CANCELLED` y conserva eventos LIVE;
++- registra rechazos con `ReservationRejectionReason.VALIDATION_REJECTED`.
++
++### `ItemRepository.releaseIfReserved`
++
++Confirmado:
++
++- update condicional por `companyId`, `branchId`, `itemId` y `status`;
++- cambia a `AVAILABLE` solo si el item sigue `RESERVED`;
++- no fuerza `SOLD`, `DISABLED`, `ON_CONSIGNMENT` ni `AVAILABLE`.
++
++### Migraciones
++
++Confirmado:
++
++- no existe migracion Z6B;
++- la ultima migracion numerica es `V54__reservation_rejection_events.sql`;
++- Z6B no creo endpoints ni permisos.
++
++## Validacion de tests
++
++Confirmado en `ReservationServiceTests`:
++
++- `cancelActiveReservationReleasesReservedItemAtomically`;
++- `cancelRejectsHistoricalReservations`;
++- `cancelRejectsWhenItemIsNotReserved`;
++- `cancelRejectsWhenReservedReleaseAffectsNoRows`;
++- `cancelRejectsWhenReservationHasActivePaymentAllocation`;
++- `cancelIgnoresVoidedPaymentAllocationAndReleasesReservedItem`;
++- `cancelLiveReservationUsesSameSafeReleaseAndRecordsLiveEvents`.
++
++Tambien se conserva `ReservationServiceLiveOperationalStatusTests` actualizado para la firma real de `ReservationService`.
++
++## Smoke API real
++
++Se intento un smoke no destructivo:
++
++- `GET http://localhost:8090/api/health`
++  - Resultado: `401 Unauthorized` en el proceso local disponible.
++- `POST http://localhost:8090/api/auth/login` con usuario QA documentado `qa.admin@local.test`
++  - Resultado: `401 Unauthorized`.
++
++No se ejecuto `PATCH /api/reservations/{id}/cancel` porque:
++
++- requiere una reserva de prueba desechable y conocida;
++- cancelar por API muta inventario real;
++- no habia evidencia de dataset seguro para ejecutar la cancelacion sin riesgo.
++
++Resultado API: `PENDING_QA_API_OR_VISUAL`.
++
++## Checklist API/manual pendiente
++
++Ejecutar en ambiente QA controlado, con datos desechables:
++
++1. Crear o identificar reserva `ACTIVE` sin pago y con item `RESERVED`.
++2. Ejecutar `PATCH /api/reservations/{id}/cancel` con motivo.
++3. Confirmar que la reserva queda `CANCELLED`.
++4. Confirmar que el item pasa `RESERVED -> AVAILABLE`.
++5. Reintentar cancelar la misma reserva y confirmar rechazo por `CANCELLED`.
++6. Intentar cancelar reserva `CONVERTED_TO_SALE` y confirmar rechazo.
++7. Intentar cancelar reserva con `PaymentAllocation` de `PaymentStatus.ACTIVE` y confirmar bloqueo.
++8. Intentar cancelar reserva cuyo item ya no esta `RESERVED` y confirmar que no fuerza `AVAILABLE`.
++9. Confirmar `reservation_rejection_events` con `VALIDATION_REJECTED` para rechazos.
++10. Confirmar que reserva LIVE usa el mismo backend y conserva eventos LIVE.
++
++## Riesgos restantes
++
++- Falta smoke API destructivo-controlado con datos desechables.
++- Falta smoke visual en `/live` y detalle de apartado.
++- Flujo formal de reversa para apartados con pago activo sigue pendiente.
++- Autorizacion supervisor/admin para reversas sensibles sigue pendiente.
++
++## Recomendacion para ITEM-Z7
++
++Preparar ITEM-Z7 como fase de QA/API controlado o handoff de reversa/autorizacion:
++
++- crear dataset desechable de reservas para cancelar;
++- cubrir casos con y sin pago;
++- separar cancelacion normal de reversa financiera;
++- no tocar caja ni devoluciones sin aprobacion formal.
++
++## GO/NO-GO
++
++- `GO_TECNICO_DOCUMENTAL`: codigo, tests y evidencia documental de Z6B estan consistentes.
++- `PENDING_QA_API_OR_VISUAL`: no hubo cancelacion API real ni screenshot.
++- No se marca `QA_PASS`.
+diff --git a/qa-reports/ITEM-Z6C-reservation-release-smoke-report-20260609-230554.md b/qa-reports/ITEM-Z6C-reservation-release-smoke-report-20260609-230554.md
+new file mode 100644
+index 0000000..fc6be3a
+--- /dev/null
++++ b/qa-reports/ITEM-Z6C-reservation-release-smoke-report-20260609-230554.md
+@@ -0,0 +1,123 @@
++# ITEM-Z6C - Reservation release smoke report
++
++Fecha/hora: 2026-06-09 23:05:54
++Rama: `feature/item-z6c-reservation-release-smoke`
++Resultado: `GO_TECNICO_DOCUMENTAL` / `PENDING_QA_API_OR_VISUAL`
++
++## Comandos ejecutados
++
++Iniciales:
++
++- `git branch --show-current`
++- `git status`
++- `git log --oneline -50`
++
++Historial:
++
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z6A"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z6B"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z5B"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z5C"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z5D"`
++
++Auditoria:
++
++- `git grep -n -E "ReservationService|cancel|releaseIfReserved|PaymentAllocation|PaymentStatus.ACTIVE|CONVERTED_TO_SALE|CANCELLED|ACTIVE|ItemStatus.RESERVED|ItemStatus.AVAILABLE|VALIDATION_REJECTED" -- backend/control-ropa/src/main/java backend/control-ropa/src/test docs qa-reports`
++- `git grep -n -E "ITEM-Z6B|safe-reservation-release|libera reservas|cancelacion|liberacion|liberacion" -- docs qa-reports git-diffs backend/control-ropa/src/test`
++- lectura por rangos de `ReservationService.java`, `ItemRepository.java`, `ReservationController.java`, `ReservationServiceTests.java`.
++
++Smoke API no destructivo:
++
++- `GET http://localhost:8090/api/health`
++- `POST http://localhost:8090/api/auth/login` con usuario QA documentado, sin imprimir password ni token.
++
++## Commits confirmados
++
++- `7490809 ITEM-Z6B libera reservas de forma segura`
++- `ced96e0 Merge branch 'feature/item-z6b-safe-reservation-release' into develop`
++- `4744b9c ITEM-Z6A documenta handoff liberacion reservas`
++- `3826a43 ITEM-Z5D registra rechazos de reserva`
++- `ef8d255 ITEM-Z5C protege reserva activa por item`
++- `6f1ee15 ITEM-Z5B agrega idempotencia de reservas`
++
++## Archivos revisados
++
++- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java`
++- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/item/ItemRepository.java`
++- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationController.java`
++- `backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java`
++- `backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java`
++- `docs/ITEM_Z6B_SAFE_RESERVATION_RELEASE.md`
++- `qa-reports/ITEM-Z6B-safe-reservation-release-report-20260609-215428.md`
++
++## Resultado tecnico
++
++Confirmado:
++
++- `ReservationService.cancel` valida `ACTIVE`.
++- `CANCELLED` se rechaza.
++- `CONVERTED_TO_SALE` se rechaza.
++- `PaymentAllocation` ligado a `PaymentStatus.ACTIVE` bloquea cancelacion normal.
++- `ItemRepository.releaseIfReserved` existe.
++- El update condicional no fuerza `AVAILABLE` si el item no esta `RESERVED`.
++- Se registra rechazo con `VALIDATION_REJECTED`.
++- Reserva LIVE usa el mismo comportamiento seguro y conserva eventos.
++- No hay migracion Z6B.
++- No hay endpoints nuevos en Z6B.
++
++## Tests confirmados
++
++Se confirmo existencia de pruebas para:
++
++- cancelacion `ACTIVE` libera `RESERVED -> AVAILABLE`;
++- `CANCELLED` y `CONVERTED_TO_SALE` se rechazan;
++- item no `RESERVED` no se libera;
++- liberacion condicional con 0 filas se rechaza;
++- pago `ACTIVE` bloquea cancelacion normal;
++- pago `VOIDED` no bloquea;
++- reserva LIVE usa la misma liberacion segura.
++
++## Smoke API
++
++No se ejecuto cancelacion API real.
++
++Resultado no destructivo:
++
++- `/api/health`: `401 Unauthorized`.
++- `POST /api/auth/login` con `qa.admin@local.test`: `401 Unauthorized`.
++
++Motivo para no ejecutar cancelacion real:
++
++- no habia una reserva desechable identificada;
++- `PATCH /api/reservations/{id}/cancel` muta inventario;
++- ejecutar sobre datos existentes podria liberar una prenda real.
++
++Estado: `PENDING_QA_API_OR_VISUAL`.
++
++## Validaciones ejecutadas
++
++- `.\mvnw.cmd test`: PASS. Se cargo `.env` en el proceso sin imprimir secretos; hubo warnings de Logback por acceso al archivo de log local, no bloqueantes.
++- `npm.cmd run lint`: PASS con 0 errores y 53 warnings preexistentes.
++- `npx.cmd tsc --noEmit`: PASS.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: PASS.
++- `git --no-pager diff --check`: PASS.
++- `git --no-pager diff --cached --check`: PASS.
++- `git status`: PASS antes de commit; solo artefactos Z6C en staging.
++
++## Confirmacion de no implementacion
++
++- No se modifico backend funcional.
++- No se tocaron pagos funcionalmente.
++- No se toco caja.
++- No se toco precio LIVE.
++- No se tocaron devoluciones.
++- No se tocaron autorizaciones.
++- No se tocaron permisos/RBAC.
++- No se crearon endpoints.
++- No se crearon migraciones.
++
++## GO/NO-GO
++
++- `GO_TECNICO_DOCUMENTAL`.
++- `PENDING_QA_API_OR_VISUAL`.
++- No se marca `QA_PASS`.
