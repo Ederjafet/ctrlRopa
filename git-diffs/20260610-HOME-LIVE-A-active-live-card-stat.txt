@@ -1,0 +1,7 @@
+ app/index.tsx                                      | 319 +++++++++++++++++++++
+ docs/ERP_BITACORA_CAMBIOS.md                       |  25 ++
+ docs/HOME_LIVE_A_ACTIVE_LIVE_CARD.md               |  67 +++++
+ locales/en/common.json                             |  18 ++
+ locales/es/common.json                             |  18 ++
+ ...VE-A-active-live-card-report-20260610-105713.md |  83 ++++++
+ 6 files changed, 530 insertions(+)
