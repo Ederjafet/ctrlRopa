@@ -1,5 +1,33 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-10 - ITEM-Z8 consistencia final LIVE, inventario y reservas
+
+Tipo: auditoria tecnica, consistencia operativa, documentacion, evidencia.
+
+Objetivo:
+
+- Cerrar la consistencia entre prenda al aire, inventario, reservas, estado operativo LIVE y eventos antes de avanzar a venta financiera/pagos/caja.
+
+Cambios realizados:
+
+- Se documento la matriz final de consistencia LIVE/inventario/reservas.
+- Se confirmo que `active_item_id` no cambia `items.status`.
+- Se confirmo que la reserva cambia `AVAILABLE -> RESERVED` con update atomico y constraint de reserva `ACTIVE` por item.
+- Se confirmo que la cancelacion segura libera solo `RESERVED -> AVAILABLE` para reserva `ACTIVE` sin pago activo.
+- Se confirmo que `OPERATIONAL_SOLD` exige reserva LIVE `ACTIVE` + item `RESERVED`, registra evento LIVE y no toca venta financiera.
+- No se aplicaron cambios funcionales porque no se detecto inconsistencia nueva dentro del alcance.
+
+Restricciones respetadas:
+
+- No se tocaron pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC ni permisos.
+- No se crearon endpoints ni migraciones.
+- No se implemento venta financiera.
+
+Pendientes:
+
+- QA API/visual real con dataset LIVE desechable.
+- Conversion financiera real y reversas quedan para fase futura con aprobacion explicita.
+
 ## 2026-06-10 - ITEM-Z7 vendido operativo LIVE seguro
 
 Tipo: backend defensivo, LIVE operativo, pruebas, evidencia.

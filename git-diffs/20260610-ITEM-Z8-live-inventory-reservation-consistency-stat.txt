@@ -1,0 +1,6 @@
+ docs/ERP_BITACORA_CAMBIOS.md                       |  28 +++
+ docs/ERP_RIESGOS_OPERATIVOS.md                     |   1 +
+ docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md          |  18 ++
+ ...EM_Z8_LIVE_INVENTORY_RESERVATION_CONSISTENCY.md | 158 +++++++++++++++++
+ ...servation-consistency-report-20260610-005437.md | 188 +++++++++++++++++++++
+ 5 files changed, 393 insertions(+)
