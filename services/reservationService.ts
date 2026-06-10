@@ -22,6 +22,10 @@ export type CreateReservationRequest = {
   createdByUserId: number;
 };
 
+type CreateReservationOptions = {
+  idempotencyKey?: string;
+};
+
 export type Reservation = {
   id: number;
   itemId: number;
@@ -49,12 +53,30 @@ export type Reservation = {
 };
 
 export async function createReservation(
-  payload: CreateReservationRequest
+  payload: CreateReservationRequest,
+  options: CreateReservationOptions = {}
 ): Promise<Reservation> {
+  const idempotencyKey = options.idempotencyKey ?? createReservationIdempotencyKey();
+
   return apiRequest<Reservation>('/api/reservations', {
     method: 'POST',
     body: payload,
+    headers: {
+      'X-Idempotency-Key': idempotencyKey,
+    },
   });
+}
+
+function createReservationIdempotencyKey(): string {
+  const cryptoApi = globalThis.crypto;
+  const randomUUID =
+    cryptoApi && typeof cryptoApi.randomUUID === 'function'
+      ? cryptoApi.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random()
+          .toString(36)
+          .slice(2)}`;
+
+  return `reservation-${randomUUID}`;
 }
 
 export async function getReservationsByBranch(

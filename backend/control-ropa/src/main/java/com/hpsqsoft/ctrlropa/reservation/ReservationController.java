@@ -8,6 +8,8 @@ import java.util.List;
 @RequestMapping("/api/reservations")
 public class ReservationController {
 
+    private static final String IDEMPOTENCY_KEY_HEADER = "X-Idempotency-Key";
+
     private final ReservationService service;
 
     public ReservationController(ReservationService service) {
@@ -35,8 +37,11 @@ public class ReservationController {
     }
 
     @PostMapping
-    public ReservationResponse create(@RequestBody ReservationService.CreateReservationRequest request) {
-        return service.create(request);
+    public ReservationResponse create(
+            @RequestBody ReservationService.CreateReservationRequest request,
+            @RequestHeader(value = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey
+    ) {
+        return service.create(request, idempotencyKey);
     }
 
     @PatchMapping("/{reservationId}/box/{boxId}")

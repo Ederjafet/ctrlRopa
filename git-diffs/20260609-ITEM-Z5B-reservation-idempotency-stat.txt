@@ -1,0 +1,14 @@
+﻿ .../reservation/ReservationController.java         |   9 +-
+ .../reservation/ReservationIdempotencyRecord.java  | 169 ++++++++++++
+ .../ReservationIdempotencyRepository.java          |  16 ++
+ .../reservation/ReservationIdempotencyStatus.java  |   7 +
+ .../ctrlropa/reservation/ReservationService.java   | 199 ++++++++++++++-
+ .../V52__reservation_idempotency_keys.sql          |  32 +++
+ ...servationServiceLiveOperationalStatusTests.java |   4 +-
+ .../reservation/ReservationServiceTests.java       | 284 ++++++++++++++++++++-
+ docs/ERP_BITACORA_CAMBIOS.md                       |  29 +++
+ docs/ERP_RIESGOS_OPERATIVOS.md                     |   1 +
+ docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md          |  19 ++
+ docs/ITEM_Z5B_RESERVATION_IDEMPOTENCY.md           | 221 ++++++++++++++++
+ services/reservationService.ts                     |  24 +-
+ 13 files changed, 999 insertions(+), 15 deletions(-)

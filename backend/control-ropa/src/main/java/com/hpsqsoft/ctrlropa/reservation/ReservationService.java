@@ -23,17 +23,25 @@ import com.hpsqsoft.ctrlropa.security.access.ChannelCode;
 import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
 import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
 import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
+import com.hpsqsoft.ctrlropa.web.error.ConflictException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
 @Transactional
 public class ReservationService {
+
+    private static final String RESERVATION_CREATE_OPERATION = "RESERVATION_CREATE";
+    private static final int IDEMPOTENCY_KEY_MAX_LENGTH = 120;
 
     private final ReservationRepository repository;
     private final ItemRepository itemRepository;
@@ -48,6 +56,7 @@ public class ReservationService {
     private final JdbcTemplate jdbcTemplate;
     private final TenantAccessGuard tenantAccessGuard;
     private final LiveEventService liveEventService;
+    private final ReservationIdempotencyRepository idempotencyRepository;
 
     public ReservationService(ReservationRepository repository,
                               ItemRepository itemRepository,
@@ -61,7 +70,8 @@ public class ReservationService {
                               CustomerOrderService customerOrderService,
                               JdbcTemplate jdbcTemplate,
                               TenantAccessGuard tenantAccessGuard,
-                              LiveEventService liveEventService) {
+                              LiveEventService liveEventService,
+                              ReservationIdempotencyRepository idempotencyRepository) {
         this.repository = repository;
         this.itemRepository = itemRepository;
         this.customerRepository = customerRepository;
@@ -75,6 +85,7 @@ public class ReservationService {
         this.jdbcTemplate = jdbcTemplate;
         this.tenantAccessGuard = tenantAccessGuard;
         this.liveEventService = liveEventService;
+        this.idempotencyRepository = idempotencyRepository;
     }
 
     @Transactional(readOnly = true)
@@ -112,6 +123,10 @@ public class ReservationService {
     }
 
     public ReservationResponse create(CreateReservationRequest request) {
+        return create(request, null);
+    }
+
+    public ReservationResponse create(CreateReservationRequest request, String idempotencyKey) {
         Long userId = currentUser.getUserId();
         tenantAccessGuard.requireBranch(request.getBranchId(), "La sucursal de la reserva no pertenece al tenant activo");
 
@@ -119,23 +134,31 @@ public class ReservationService {
                 .orElseThrow(() -> new IllegalArgumentException("Item no encontrado"));
         tenantAccessGuard.requireBranch(item.getBranch().getId(), "El item no pertenece a la sucursal activa");
 
-        if (item.getStatus() != ItemStatus.AVAILABLE) {
-            throw new IllegalArgumentException("El item no está disponible");
+        Branch branch = branchRepository.findById(request.getBranchId())
+                .orElseThrow(() -> new IllegalArgumentException("Sucursal no encontrada"));
+
+        if (!item.getBranch().getId().equals(branch.getId())) {
+            throw new IllegalArgumentException("El item no pertenece a la sucursal indicada");
+        }
+
+        ReservationIdempotencyRecord existingIdempotency = findExistingIdempotency(
+                item.getCompany().getId(),
+                branch.getId(),
+                userId,
+                idempotencyKey,
+                request
+        );
+
+        if (existingIdempotency == null && item.getStatus() != ItemStatus.AVAILABLE) {
+            throw new IllegalArgumentException("El item no esta disponible");
         }
 
         Customer customer = customerRepository.findById(request.getCustomerId())
                 .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado"));
         tenantAccessGuard.requireBranch(customer.getBranch().getId(), "El cliente no pertenece a la sucursal activa");
 
-        Branch branch = branchRepository.findById(request.getBranchId())
-                .orElseThrow(() -> new IllegalArgumentException("Sucursal no encontrada"));
-
         SalesChannel salesChannel = salesChannelRepository.findById(request.getSalesChannelId())
                 .orElseThrow(() -> new IllegalArgumentException("Canal de venta no encontrado"));
-
-        if (!item.getBranch().getId().equals(branch.getId())) {
-            throw new IllegalArgumentException("El item no pertenece a la sucursal indicada");
-        }
 
         if (!customer.getBranch().getId().equals(branch.getId())) {
             throw new IllegalArgumentException("El cliente no pertenece a la sucursal indicada");
@@ -165,6 +188,18 @@ public class ReservationService {
         if (request.getLiveId() == null && ChannelCode.LIVE.equals(salesChannel.getCode())) {
             throw new IllegalArgumentException("Las reservas LIVE requieren liveId");
         }
+
+        if (existingIdempotency != null) {
+            return resolveExistingIdempotency(existingIdempotency);
+        }
+
+        ReservationIdempotencyRecord idempotencyRecord = createIdempotencyRecord(
+                item.getCompany().getId(),
+                branch.getId(),
+                userId,
+                idempotencyKey,
+                request
+        );
 
         Reservation activeReservation = repository.findByItemIdAndStatus(item.getId(), ReservationStatus.ACTIVE)
                 .orElse(null);
@@ -236,7 +271,151 @@ public class ReservationService {
             );
         }
 
+        markIdempotencyCompleted(idempotencyRecord, saved.getId());
+
         return toResponse(saved);
+    }
+
+    private ReservationIdempotencyRecord findExistingIdempotency(Long companyId,
+                                                                 Long branchId,
+                                                                 Long userId,
+                                                                 String idempotencyKey,
+                                                                 CreateReservationRequest request) {
+        String normalizedKey = normalizeIdempotencyKey(idempotencyKey);
+        if (normalizedKey == null) {
+            return null;
+        }
+
+        String requestHash = hashReservationRequest(request);
+        ReservationIdempotencyRecord existing = idempotencyRepository
+                .findByCompanyIdAndBranchIdAndUserIdAndOperationAndIdempotencyKey(
+                        companyId,
+                        branchId,
+                        userId,
+                        RESERVATION_CREATE_OPERATION,
+                        normalizedKey
+                )
+                .orElse(null);
+
+        if (existing != null && !requestHash.equals(existing.getRequestHash())) {
+            throw new ConflictException("La llave de idempotencia ya fue usada con datos distintos");
+        }
+
+        return existing;
+    }
+
+    private ReservationIdempotencyRecord createIdempotencyRecord(Long companyId,
+                                                                 Long branchId,
+                                                                 Long userId,
+                                                                 String idempotencyKey,
+                                                                 CreateReservationRequest request) {
+        String normalizedKey = normalizeIdempotencyKey(idempotencyKey);
+        if (normalizedKey == null) {
+            return null;
+        }
+
+        ReservationIdempotencyRecord record = new ReservationIdempotencyRecord();
+        record.setCompanyId(companyId);
+        record.setBranchId(branchId);
+        record.setUserId(userId);
+        record.setOperation(RESERVATION_CREATE_OPERATION);
+        record.setIdempotencyKey(normalizedKey);
+        record.setRequestHash(hashReservationRequest(request));
+        record.setStatus(ReservationIdempotencyStatus.IN_PROGRESS);
+        record.setExpiresAt(LocalDateTime.now().plusHours(24));
+
+        try {
+            return idempotencyRepository.saveAndFlush(record);
+        } catch (DataIntegrityViolationException ex) {
+            throw new ConflictException(
+                    "La solicitud de reserva con esta llave ya esta en proceso. Intenta de nuevo en unos segundos."
+            );
+        }
+    }
+
+    private ReservationResponse resolveExistingIdempotency(ReservationIdempotencyRecord record) {
+        if (record.getStatus() == ReservationIdempotencyStatus.COMPLETED
+                && record.getReservationId() != null) {
+            return toResponse(findEntityById(record.getReservationId()));
+        }
+
+        if (record.getStatus() == ReservationIdempotencyStatus.IN_PROGRESS) {
+            throw new ConflictException(
+                    "La solicitud de reserva con esta llave sigue en proceso. Intenta de nuevo en unos segundos."
+            );
+        }
+
+        throw new ConflictException(
+                "La solicitud de reserva con esta llave quedo en estado ambiguo. Genera un nuevo intento."
+        );
+    }
+
+    private void markIdempotencyCompleted(ReservationIdempotencyRecord record, Long reservationId) {
+        if (record == null) {
+            return;
+        }
+
+        record.setReservationId(reservationId);
+        record.setStatus(ReservationIdempotencyStatus.COMPLETED);
+        record.setErrorMessage(null);
+        idempotencyRepository.save(record);
+    }
+
+    private String normalizeIdempotencyKey(String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            return null;
+        }
+
+        String normalized = idempotencyKey.trim();
+        if (normalized.length() > IDEMPOTENCY_KEY_MAX_LENGTH) {
+            throw new IllegalArgumentException("La llave de idempotencia excede 120 caracteres");
+        }
+
+        return normalized;
+    }
+
+    private String hashReservationRequest(CreateReservationRequest request) {
+        return sha256(
+                "itemId=" + valuePart(request.getItemId()) + "\n"
+                        + "customerId=" + valuePart(request.getCustomerId()) + "\n"
+                        + "branchId=" + valuePart(request.getBranchId()) + "\n"
+                        + "liveId=" + valuePart(request.getLiveId()) + "\n"
+                        + "salesChannelId=" + valuePart(request.getSalesChannelId()) + "\n"
+                        + "sellerUserId=" + valuePart(request.getSellerUserId()) + "\n"
+                        + "price=" + amountPart(request.getPrice()) + "\n"
+                        + "notes=" + valuePart(request.getNotes())
+        );
+    }
+
+    private String valuePart(Object value) {
+        if (value == null) {
+            return "";
+        }
+
+        return value.toString().trim();
+    }
+
+    private String amountPart(BigDecimal value) {
+        if (value == null) {
+            return "";
+        }
+
+        return value.stripTrailingZeros().toPlainString();
+    }
+
+    private String sha256(String value) {
+        try {
+            byte[] hash = MessageDigest
+                    .getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder();
+            for (byte item : hash) {
+                builder.append(String.format("%02x", item));
+            }
+            return builder.toString();
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("No se pudo calcular hash de idempotencia", ex);
+        }
     }
 
     public ReservationResponse assignBox(Long reservationId, Long boxId) {
