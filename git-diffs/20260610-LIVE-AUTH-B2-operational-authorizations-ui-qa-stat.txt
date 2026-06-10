@@ -1,0 +1,10 @@
+﻿ app/operational-authorizations.tsx                 | 724 +++++++++++++++++++++
+ components/layout/appNavigation.ts                 |  14 +
+ docs/ERP_BITACORA_CAMBIOS.md                       |  25 +
+ docs/ERP_RIESGOS_OPERATIVOS.md                     |   2 +
+ docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md          |  19 +
+ ...IVE_AUTH_B2_OPERATIONAL_AUTHORIZATIONS_UI_QA.md |  81 +++
+ locales/en/common.json                             |  61 +-
+ locales/es/common.json                             |  61 +-
+ services/operationalAuthorizationService.ts        | 135 ++++
+ 9 files changed, 1120 insertions(+), 2 deletions(-)

@@ -9,6 +9,25 @@ Tipo: backlog documental, sin implementacion
 
 Convertir el analisis de Fase 2A/2B en un backlog tecnico ordenado para implementar multi-compania con bajo riesgo, evitando fuga de datos entre clientes y manteniendo trazabilidad HPSQ-SOFT.
 
+## Actualizacion LIVE-AUTH-B2 - UI autorizaciones operativas LIVE
+
+Fecha: 2026-06-10
+Estado: implementado tecnico condicionado.
+
+Alcance ejecutado:
+
+- Pantalla `/operational-authorizations` para autorizaciones operativas LIVE.
+- Servicio frontend contra endpoints B1.
+- Navegacion protegida por permisos de autorizacion LIVE.
+- Acciones de solicitar, aprobar, rechazar y aplicar segun permisos.
+- Apply real limitado a `UNDO_LIVE_OPERATIONAL_SALE`; otras operaciones muestran pendiente funcional.
+
+Pendiente:
+
+- QA visual real por rol.
+- Smoke API mutante con dataset desechable.
+- Integracion contextual desde LIVE/reservas.
+
 ## Actualizacion ITEM-Z8 - Consistencia final LIVE, inventario y reservas
 
 Fecha: 2026-06-10

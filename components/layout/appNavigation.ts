@@ -19,6 +19,10 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
   const doorReservationAllowed = canAccess(session, 'DOOR_RESERVATION', 'DO_DOOR_RESERVATION');
   const customersAllowed = canAccessByPermission(session, 'VIEW_CUSTOMERS');
   const reservationsAllowed = doorReservationAllowed || liveAllowed;
+  const operationalAuthorizationsAllowed = hasAnyPermission(session, [
+    'VIEW_LIVE_OPERATION_AUTHORIZATIONS',
+    'REQUEST_LIVE_OPERATION_AUTHORIZATION',
+  ]);
   const inventoryAllowed = hasAnyPermission(session, ['VIEW_INVENTORY', 'MANAGE_INVENTORY']);
   const inventoryManageAllowed = canAccessByPermission(session, 'MANAGE_INVENTORY');
   const usersAllowed = canAccessByPermission(session, 'MANAGE_USERS') || isAdmin(session);
@@ -55,6 +59,16 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
       : null,
     reservationsAllowed
       ? { key: 'reservations', label: 'Apartados', labelKey: 'navigation.items.holds', route: '/reservations', activeFor: ['reservations', '/reservations', 'reservation-detail', '/reservation-detail'], icon: 'bookmark' as const }
+      : null,
+    operationalAuthorizationsAllowed
+      ? {
+          key: 'operational-authorizations',
+          label: 'Autorizaciones LIVE',
+          labelKey: 'navigation.items.operationalAuthorizations',
+          route: '/operational-authorizations',
+          activeFor: ['operational-authorizations', '/operational-authorizations'],
+          icon: 'approval' as const,
+        }
       : null,
     customersAllowed
       ? { key: 'customers', label: 'Clientes', labelKey: 'navigation.items.customers', route: '/customers', activeFor: ['customers', '/customers', 'customers-create', '/customers-create'], icon: 'groups' as const }
