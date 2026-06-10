@@ -858,6 +858,10 @@ public class ReservationService {
         }
 
         LiveReservationOperationalStatus previousStatus = existing.getLiveOperationalStatus();
+        if (nextStatus == LiveReservationOperationalStatus.OPERATIONAL_SOLD) {
+            validateOperationalSoldCandidate(existing, previousStatus);
+        }
+
         existing.setLiveOperationalStatus(nextStatus);
         existing.setLiveOperationalStatusUpdatedAt(LocalDateTime.now());
         existing.setLiveOperationalStatusUpdatedByUserId(userId);
@@ -866,6 +870,30 @@ public class ReservationService {
         Reservation saved = repository.save(existing);
         recordLiveReservationStatusChange(saved, userId, previousStatus, nextStatus);
         return toResponse(saved);
+    }
+
+    private void validateOperationalSoldCandidate(Reservation reservation,
+                                                  LiveReservationOperationalStatus currentOperationalStatus) {
+        if (reservation.getStatus() == ReservationStatus.CANCELLED) {
+            throw new IllegalArgumentException("No se puede cerrar como vendido operativo una reserva cancelada");
+        }
+
+        if (reservation.getStatus() == ReservationStatus.CONVERTED_TO_SALE) {
+            throw new IllegalArgumentException("No se puede cerrar como vendido operativo una reserva convertida a venta");
+        }
+
+        if (reservation.getStatus() != ReservationStatus.ACTIVE) {
+            throw new IllegalArgumentException("Solo una reserva activa puede cerrarse como vendido operativo");
+        }
+
+        if (currentOperationalStatus == LiveReservationOperationalStatus.CANCELLED) {
+            throw new IllegalArgumentException("No se puede cerrar como vendido operativo un apartado LIVE cancelado");
+        }
+
+        Item item = reservation.getItem();
+        if (item == null || item.getStatus() != ItemStatus.RESERVED) {
+            throw new IllegalArgumentException("La prenda debe seguir reservada para cerrar como vendido operativo LIVE");
+        }
     }
 
     private void recordLiveReservationStatusChange(Reservation reservation,
