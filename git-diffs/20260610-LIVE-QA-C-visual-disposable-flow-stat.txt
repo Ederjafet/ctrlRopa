@@ -1,0 +1,3 @@
+﻿ docs/LIVE_QA_C_VISUAL_DISPOSABLE_FLOW.md           | 173 +++++++++++++++++++++
+ ...isual-disposable-flow-report-20260610-104030.md | 152 ++++++++++++++++++
+ 2 files changed, 325 insertions(+)

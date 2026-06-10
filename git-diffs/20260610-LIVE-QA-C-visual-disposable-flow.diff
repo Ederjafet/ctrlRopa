@@ -1,0 +1,337 @@
+﻿diff --git a/docs/LIVE_QA_C_VISUAL_DISPOSABLE_FLOW.md b/docs/LIVE_QA_C_VISUAL_DISPOSABLE_FLOW.md
+new file mode 100644
+index 0000000..d6ca92d
+--- /dev/null
++++ b/docs/LIVE_QA_C_VISUAL_DISPOSABLE_FLOW.md
+@@ -0,0 +1,173 @@
++# LIVE-QA-C - QA live con dataset desechable
++
++Fecha: 2026-06-10 10:40:30 -06:00
++Rama: `feature/live-qa-c-visual-disposable-flow`
++Resultado: `NO_GO`
++
++## Ambiente
++
++| Componente | URL | Resultado |
++|---|---|---|
++| Backend | `http://localhost:8090` | UP |
++| Frontend Expo Web | `http://localhost:8081` | UP |
++| Frontend Expo Web LAN | `http://192.168.0.128:8081` | UP |
++
++Checks:
++
++- `GET /api/health`: `200`.
++- `GET /api/me` sin token: `401`, esperado.
++- Frontend local y LAN: `200`.
++
++## Usuarios
++
++La password QA se obtuvo desde documentacion local y no se imprimio.
++
++| Usuario | Resultado | Rol | Permisos LIVE observados |
++|---|---|---|---|
++| `qa.admin@local.test` | Login OK, `/api/me` OK | `ADMIN` | `CHANGE_LIVE_ACTIVE_ITEM`, `DO_LIVE_RESERVATION`, `OPERATE_LIVE`, `PREPARE_LIVE_ITEM`, `REMOVE_LIVE_ACTIVE_ITEM`, `VIEW_LIVE` |
++| `qa.supervisor.centro@local.test` | Login OK, `/api/me` OK | `SUPERVISOR` | `CHANGE_LIVE_ACTIVE_ITEM`, `DO_LIVE_RESERVATION`, `OPERATE_LIVE`, `PREPARE_LIVE_ITEM`, `REMOVE_LIVE_ACTIVE_ITEM`, `VIEW_LIVE` |
++| `qa.vendedor.centro@local.test` | Login OK, `/api/me` OK | `SELLER` | `CHANGE_LIVE_ACTIVE_ITEM`, `DO_LIVE_RESERVATION`, `OPERATE_LIVE`, `PREPARE_LIVE_ITEM`, `VIEW_LIVE` |
++| `qa.sinpermisos@local.test` | `403` esperado | No aplica | ninguno |
++
++## Dataset
++
++No existia dataset `QA_LIVE_DISPOSABLE` previo. Se creo dataset desechable por API con prefijo:
++
++`QA_LIVE_DISPOSABLE_20260610104008`
++
++IDs creados:
++
++| Entidad | ID | Identificador |
++|---|---:|---|
++| Cliente | 32 | `QA_LIVE_DISPOSABLE_20260610104008 Cliente` |
++| Item A | 105 | `QA_LIVE_DISPOSABLE_20260610104008-ITEM-A` |
++| Item B | 106 | `QA_LIVE_DISPOSABLE_20260610104008-ITEM-B` |
++| LIVE | 15 | `QA_LIVE_DISPOSABLE_20260610104008 live disposable` |
++| Reserva A | 44 | reserva cancelada |
++| Reserva B | 45 | reserva `OPERATIONAL_SOLD` |
++
++Catalogos usados:
++
++- branch `QA_CTR`, id `4`;
++- usuario admin id `5`;
++- canal LIVE id `1`;
++- product type id `4`;
++- brand id `4`;
++- size id `1`;
++- storage location id `5`.
++
++## Pasos API
++
++Ejecutados con `qa.admin@local.test`, salvo pruebas de rol.
++
++| Paso | Resultado |
++|---|---|
++| Crear cliente desechable | OK, id `32` |
++| Crear item A `AVAILABLE` | OK, id `105` |
++| Crear item B `AVAILABLE` | OK, id `106` |
++| Crear LIVE desechable | OK, id `15`, status `OPEN` |
++| Activar LIVE | OK, status `ACTIVE` |
++| Poner item A al aire | OK, active item `105` |
++| Verificar status item A despues de poner al aire | OK, sigue `AVAILABLE` |
++| Vendedor intenta retirar prenda al aire | `200`, inesperado |
++| Reservar item A con `X-Idempotency-Key` | OK, reserva `44`, status `ACTIVE`, `RESERVED` |
++| Reintentar misma key y mismo payload | OK, devuelve misma reserva `44` |
++| Reintentar misma key y payload distinto | `409`, esperado |
++| Intentar reservar item ya tomado | `400`, esperado |
++| Cancelar reserva A activa sin pago | OK, reserva `44` queda `CANCELLED`, item A vuelve a `AVAILABLE` |
++| Poner item B al aire | OK, active item `106` |
++| Reservar item B | OK, reserva `45` |
++| Marcar `OPERATIONAL_SOLD` en reserva B | OK |
++| Verificar item B tras `OPERATIONAL_SOLD` | OK, queda `RESERVED` |
++| Verificar evento `LIVE_OPERATIONAL_SOLD` | OK, 1 evento |
++| Verificar pagos de reserva B | OK, 0 pagos |
++| Verificar ventas de items desechables | OK, 0 ventas |
++| Supervisor lee LIVE | OK |
++| Usuario sin permisos | `403`, esperado |
++
++## Pasos visuales
++
++No se ejecuto QA visual real.
++
++Motivo:
++
++- El plugin Browser Use estaba disponible, pero no expuso `node_repl/js` en esta sesion.
++- El repo no tiene Playwright/Puppeteer ni scripts e2e instalados.
++- No se generaron screenshots.
++
++Estado visual: `PENDING_QA_VISUAL`.
++
++## Evidencia
++
++Evidencia API principal:
++
++- dataset prefijado `QA_LIVE_DISPOSABLE_20260610104008`;
++- `LIVE 15`;
++- `item 105` permanece `AVAILABLE` al ponerse al aire;
++- reserva `44` prueba idempotencia y cancelacion;
++- reserva `45` prueba `OPERATIONAL_SOLD`;
++- evento `LIVE_OPERATIONAL_SOLD` encontrado para reserva `45`;
++- pagos para reserva `45`: `0`;
++- ventas para items `105` y `106`: `0`.
++
++Evidencia de bloqueo fallido:
++
++- `qa.vendedor.centro@local.test` no tiene `REMOVE_LIVE_ACTIVE_ITEM`;
++- `PATCH /api/lives/15/active-item` con `itemId: null` respondio `200`, inesperado.
++
++## Resultados por rol
++
++| Rol | Resultado |
++|---|---|
++| Admin | Puede operar flujo desechable. |
++| Supervisor | Puede autenticarse y leer LIVE creado. |
++| Vendedor | `NO_GO`: pudo retirar prenda al aire por API sin `REMOVE_LIVE_ACTIVE_ITEM`. |
++| Sin permisos | Login bloqueado con `403`. |
++
++## Mutaciones ejecutadas
++
++Se crearon datos desechables y se ejecutaron mutaciones solo sobre ese dataset:
++
++- crear cliente;
++- crear dos items;
++- crear y activar LIVE;
++- cambiar active item;
++- crear reservas LIVE;
++- reintentos idempotentes;
++- cancelar una reserva;
++- marcar una reserva como `OPERATIONAL_SOLD`.
++
++No se ejecutaron pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC, permisos, endpoints, migraciones ni venta financiera.
++
++## Rollback o cleanup manual
++
++No se borro nada y no se ejecuto cleanup automatico.
++
++Opciones manuales recomendadas para data owner/QA:
++
++1. Cerrar el LIVE desechable `15` si no debe quedar activo.
++2. Mantener el dataset como evidencia de QA con prefijo `QA_LIVE_DISPOSABLE_20260610104008`.
++3. Si se requiere limpieza completa, hacerla solo con respaldo y aprobacion explicita, filtrando por el prefijo `QA_LIVE_DISPOSABLE_20260610104008` y por los IDs documentados.
++
++## Fixes aplicados
++
++No se aplicaron fixes.
++
++El hallazgo de vendedor requiere revisar backend/permisos/capabilities y queda fuera del alcance permitido de LIVE-QA-C, porque la fase prohibe modificar RBAC, permisos y backend funcional complejo.
++
++## Criterios QA_PASS / GO / NO-GO
++
++| Criterio | Resultado |
++|---|---|
++| Dataset desechable seguro | GO |
++| Flujo API admin base | GO parcial |
++| Idempotencia | GO |
++| Cancelacion sin pago | GO |
++| `OPERATIONAL_SOLD` sin venta/pago/caja | GO |
++| Usuario sin permisos bloqueado | GO |
++| Vendedor no retira prenda al aire | NO-GO |
++| Visual con screenshots | Pendiente |
++
++Resultado final: `NO_GO`.
++
++No se marca `QA_PASS`.
+diff --git a/qa-reports/LIVE-QA-C-visual-disposable-flow-report-20260610-104030.md b/qa-reports/LIVE-QA-C-visual-disposable-flow-report-20260610-104030.md
+new file mode 100644
+index 0000000..5146719
+--- /dev/null
++++ b/qa-reports/LIVE-QA-C-visual-disposable-flow-report-20260610-104030.md
+@@ -0,0 +1,152 @@
++# LIVE-QA-C - Reporte QA live con dataset desechable
++
++Fecha: 2026-06-10 10:40:30 -06:00
++Rama: `feature/live-qa-c-visual-disposable-flow`
++Resultado: `NO_GO`
++
++## Resumen
++
++LIVE-QA-C creo un dataset desechable real con prefijo `QA_LIVE_DISPOSABLE_20260610104008` y ejecuto smoke API mutante sobre flujo LIVE base. Varias reglas criticas pasaron: active item no cambia status del item, idempotencia funciona, doble reserva se rechaza, cancelacion libera item, `OPERATIONAL_SOLD` no crea pagos ni ventas y genera evento LIVE.
++
++La fase queda en `NO_GO` porque el usuario vendedor pudo retirar la prenda al aire por API aunque no tiene `REMOVE_LIVE_ACTIVE_ITEM`.
++
++No se aplicaron fixes y no se marca `QA_PASS`.
++
++## Comandos ejecutados
++
++Preflight:
++
++- `git branch --show-current`
++- `git status`
++- `git log --oneline -100`
++
++Historial:
++
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-QA-B"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-QA-A"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z8"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z7"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z6B"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z5D"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-PERM-A1"`
++
++Auditoria:
++
++- `git grep -n "qa.admin@local.test\|qa.supervisor.centro\|qa.vendedor.centro\|qa.sinpermisos" -- docs backend app services qa-reports ...`
++- `git grep -n "QA_LIVE_DISPOSABLE\|disposable\|desechable\|seed\|demo\|QA_CTR\|local.test" -- docs backend app services qa-reports backend/control-ropa/src/main/resources ...`
++- `git grep -n "create.*item\|ItemController\|LiveController\|ReservationController\|setActiveItem\|updateLiveOperationalStatus\|X-Idempotency-Key" -- backend/control-ropa/src/main/java backend/control-ropa/src/test app services docs ...`
++- `git grep -n "VIEW_LIVE\|OPERATE_LIVE\|PREPARE_LIVE_ITEM\|CHANGE_LIVE_ACTIVE_ITEM\|REMOVE_LIVE_ACTIVE_ITEM\|DO_LIVE_RESERVATION" -- backend/control-ropa/src/main/java backend/control-ropa/src/main/resources app services docs qa-reports ...`
++
++Ambiente/API:
++
++- `GET /api/health`
++- `GET /api/me` sin token
++- `GET http://localhost:8081`
++- `GET http://192.168.0.128:8081`
++- login/logout por rol sin imprimir secretos
++- `GET /api/catalogs/bootstrap?branchId=4`
++- `GET /api/items/branch/4`
++- `GET /api/customers/branch/4`
++- `GET /api/lives/branch/4`
++- mutaciones controladas sobre dataset `QA_LIVE_DISPOSABLE_20260610104008`
++
++## Backend/frontend detectados
++
++| Check | Resultado |
++|---|---|
++| Backend health | `200` |
++| `/api/me` sin token | `401` |
++| Frontend localhost | `200` |
++| Frontend LAN | `200` |
++
++## Usuarios QA usados
++
++| Usuario | Resultado |
++|---|---|
++| `qa.admin@local.test` | login OK, `/api/me` OK |
++| `qa.supervisor.centro@local.test` | login OK, `/api/me` OK |
++| `qa.vendedor.centro@local.test` | login OK, `/api/me` OK |
++| `qa.sinpermisos@local.test` | `403` esperado |
++
++## Dataset encontrado o creado
++
++No existian datos `QA_LIVE_DISPOSABLE` antes de la corrida.
++
++Creado:
++
++- cliente `32`;
++- item A `105`;
++- item B `106`;
++- LIVE `15`;
++- reserva A `44`;
++- reserva B `45`.
++
++Prefijo: `QA_LIVE_DISPOSABLE_20260610104008`.
++
++## API smoke real
++
++| Caso | Resultado |
++|---|---|
++| Poner item A al aire | PASS |
++| Item A conserva `AVAILABLE` al ponerse al aire | PASS |
++| Vendedor intenta retirar item al aire | FAIL, respondio `200` |
++| Reserva con idempotency key | PASS |
++| Reintento misma key/mismo payload | PASS, misma reserva |
++| Reintento misma key/payload distinto | PASS, `409` |
++| Reservar item ya tomado | PASS, `400` |
++| Cancelar reserva activa sin pago | PASS |
++| Item A vuelve a `AVAILABLE` tras cancelar | PASS |
++| `OPERATIONAL_SOLD` sobre reserva LIVE valida | PASS |
++| Item B queda `RESERVED` tras `OPERATIONAL_SOLD` | PASS |
++| Evento `LIVE_OPERATIONAL_SOLD` | PASS |
++| Pagos para reserva B | PASS, 0 |
++| Ventas para items desechables | PASS, 0 |
++| Usuario sin permisos | PASS, `403` |
++
++## Visual smoke real
++
++Pendiente.
++
++No hubo screenshots porque Browser Use no expuso `node_repl/js` y el repo no incluye Playwright/Puppeteer ni scripts e2e.
++
++Resultado visual: `PENDING_QA_VISUAL`.
++
++## Screenshots/evidencia
++
++No existen screenshots.
++
++Evidencia API:
++
++- `DATASET_IDS liveId=15 customerId=32 itemA=105 itemB=106 reservationA=44 reservationB=45`
++- `SELLER_REMOVE_ACTIVE_ITEM status=200 UNEXPECTED`
++- `OPERATIONAL_SOLD ... itemStatusAfter=RESERVED opSoldEvents=1 paymentsForReservation=0 salesForDisposableItems=0`
++
++## Mutaciones ejecutadas
++
++Todas las mutaciones se limitaron al prefijo `QA_LIVE_DISPOSABLE_20260610104008`.
++
++No se borraron datos existentes. No se hizo cleanup automatico.
++
++## Fixes
++
++No se aplicaron fixes.
++
++Motivo: el hallazgo principal esta en autorizacion efectiva de backend/permisos para retirar prenda al aire; corregirlo implicaria tocar backend funcional/RBAC/permisos, fuera del alcance permitido.
++
++## Validaciones tecnicas
++
++- `./mvnw.cmd test`: `PASS` cargando `.env` en memoria sin imprimir secretos y quitando comillas envolventes de valores. Logback reporto acceso denegado al archivo externo `C:/HPSQ-SOFT/control-ropa/logs/backend/control-ropa.log`, pero el comando termino con exit code `0`.
++- `npm.cmd run lint`: `PASS` con 53 warnings preexistentes y 0 errores.
++- `npx.cmd tsc --noEmit`: `PASS`.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: `PASS`.
++- `git --no-pager diff --check`: `PASS`.
++- `git --no-pager diff --cached --check`: `PASS`.
++- `git status`: limpio despues del commit esperado.
++
++## Resultado
++
++`NO_GO`
++
++Motivo: vendedor sin `REMOVE_LIVE_ACTIVE_ITEM` pudo retirar la prenda al aire por API.
++
++No se marca `QA_PASS`.
