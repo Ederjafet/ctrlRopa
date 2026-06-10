@@ -233,11 +233,7 @@ public class LiveService {
     }
 
     private void assertCanRemoveLiveActiveItem(Long branchId) {
-        assertCanAnyLivePermission(
-                branchId,
-                PermissionCode.REMOVE_LIVE_ACTIVE_ITEM,
-                PermissionCode.DO_LIVE_RESERVATION
-        );
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.REMOVE_LIVE_ACTIVE_ITEM, ChannelCode.LIVE, branchId);
     }
 
     private void assertCanAnyLivePermission(Long branchId, String primaryPermission, String... fallbackPermissions) {

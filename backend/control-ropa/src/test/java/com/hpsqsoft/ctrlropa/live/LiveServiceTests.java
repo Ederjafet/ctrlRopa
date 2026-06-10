@@ -9,7 +9,9 @@ import com.hpsqsoft.ctrlropa.item.Item;
 import com.hpsqsoft.ctrlropa.item.ItemRepository;
 import com.hpsqsoft.ctrlropa.item.ItemStatus;
 import com.hpsqsoft.ctrlropa.security.access.AccessService;
+import com.hpsqsoft.ctrlropa.security.access.ChannelCode;
 import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
+import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
 import com.hpsqsoft.ctrlropa.tenant.CurrentTenantContext;
 import com.hpsqsoft.ctrlropa.tenant.TenantResolver;
 import org.junit.jupiter.api.Test;
@@ -25,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -65,6 +68,7 @@ class LiveServiceTests {
         request.setItemId(8L);
 
         when(currentUser.getUserId()).thenReturn(10L);
+        when(accessService.can(10L, PermissionCode.CHANGE_LIVE_ACTIVE_ITEM)).thenReturn(true);
         when(tenantResolver.resolveCurrent()).thenReturn(tenant());
         when(liveRepository.findById(4L)).thenReturn(Optional.of(live));
         when(itemRepository.findByCompanyIdAndId(2L, 8L)).thenReturn(Optional.of(item));
@@ -76,6 +80,7 @@ class LiveServiceTests {
         assertEquals("QA-CTR-005", response.getActiveItemCode());
         assertEquals("Blusa Verde", response.getActiveItemProductTypeName());
         assertEquals(ItemStatus.AVAILABLE, item.getStatus());
+        verify(accessService).assertCan(10L, PermissionCode.CHANGE_LIVE_ACTIVE_ITEM, ChannelCode.LIVE, 6L);
         verify(tenantResolver).assertBranchBelongsToCompany(6L, 2L);
         verify(liveEventService).record(
                 live,
@@ -139,7 +144,37 @@ class LiveServiceTests {
 
         assertEquals(null, response.getActiveItemId());
         assertEquals(ItemStatus.RESERVED, item.getStatus());
+        verify(accessService).assertCan(10L, PermissionCode.REMOVE_LIVE_ACTIVE_ITEM, ChannelCode.LIVE, 6L);
         verify(liveEventService).record(
+                live,
+                LiveEventType.ACTIVE_ITEM_CHANGED,
+                10L,
+                "ITEM",
+                null,
+                "{\"previousItemId\":8,\"activeItemId\":null}"
+        );
+    }
+
+    @Test
+    void clearActiveItemRejectsLiveReservationPermissionWithoutRemovePermission() {
+        Live live = live(4L, branch(6L, company(2L)));
+        Item item = item(8L, live.getBranch());
+        live.setActiveItem(item);
+
+        when(currentUser.getUserId()).thenReturn(10L);
+        when(accessService.can(10L, PermissionCode.DO_LIVE_RESERVATION)).thenReturn(true);
+        doThrow(new AccessDeniedException("Permiso requerido: REMOVE_LIVE_ACTIVE_ITEM"))
+                .when(accessService)
+                .assertCan(10L, PermissionCode.REMOVE_LIVE_ACTIVE_ITEM, ChannelCode.LIVE, 6L);
+        when(liveRepository.findById(4L)).thenReturn(Optional.of(live));
+
+        AccessDeniedException exception =
+                assertThrows(AccessDeniedException.class, () -> service.setActiveItem(4L, null));
+
+        assertEquals("Permiso requerido: REMOVE_LIVE_ACTIVE_ITEM", exception.getMessage());
+        assertEquals(8L, live.getActiveItem().getId());
+        verify(liveRepository, never()).save(live);
+        verify(liveEventService, never()).record(
                 live,
                 LiveEventType.ACTIVE_ITEM_CHANGED,
                 10L,

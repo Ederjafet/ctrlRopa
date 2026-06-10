@@ -1,0 +1,7 @@
+ .../com/hpsqsoft/ctrlropa/live/LiveService.java    |   6 +-
+ .../hpsqsoft/ctrlropa/live/LiveServiceTests.java   |  35 ++++++
+ docs/ERP_BITACORA_CAMBIOS.md                       |  25 ++++
+ docs/ERP_RIESGOS_OPERATIVOS.md                     |   1 +
+ ...E_PERM_FIX_A1_REMOVE_ACTIVE_ITEM_ENFORCEMENT.md | 130 +++++++++++++++++++++
+ ...tive-item-enforcement-report-20260610-113033.md | 105 +++++++++++++++++
+ 6 files changed, 297 insertions(+), 5 deletions(-)

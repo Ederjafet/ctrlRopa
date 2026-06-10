@@ -1,0 +1,393 @@
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveService.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveService.java
+index fdd13c2..e965f1b 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveService.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveService.java
+@@ -233,11 +233,7 @@ public class LiveService {
+     }
+
+     private void assertCanRemoveLiveActiveItem(Long branchId) {
+-        assertCanAnyLivePermission(
+-                branchId,
+-                PermissionCode.REMOVE_LIVE_ACTIVE_ITEM,
+-                PermissionCode.DO_LIVE_RESERVATION
+-        );
++        accessService.assertCan(currentUser.getUserId(), PermissionCode.REMOVE_LIVE_ACTIVE_ITEM, ChannelCode.LIVE, branchId);
+     }
+
+     private void assertCanAnyLivePermission(Long branchId, String primaryPermission, String... fallbackPermissions) {
+diff --git a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/live/LiveServiceTests.java b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/live/LiveServiceTests.java
+index 744ce3f..07302b4 100644
+--- a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/live/LiveServiceTests.java
++++ b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/live/LiveServiceTests.java
+@@ -9,7 +9,9 @@ import com.hpsqsoft.ctrlropa.item.Item;
+ import com.hpsqsoft.ctrlropa.item.ItemRepository;
+ import com.hpsqsoft.ctrlropa.item.ItemStatus;
+ import com.hpsqsoft.ctrlropa.security.access.AccessService;
++import com.hpsqsoft.ctrlropa.security.access.ChannelCode;
+ import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
++import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
+ import com.hpsqsoft.ctrlropa.tenant.CurrentTenantContext;
+ import com.hpsqsoft.ctrlropa.tenant.TenantResolver;
+ import org.junit.jupiter.api.Test;
+@@ -25,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
+ import static org.junit.jupiter.api.Assertions.assertThrows;
+ import static org.mockito.Mockito.mock;
+ import static org.mockito.Mockito.never;
++import static org.mockito.Mockito.doThrow;
+ import static org.mockito.Mockito.verify;
+ import static org.mockito.Mockito.when;
+
+@@ -65,6 +68,7 @@ class LiveServiceTests {
+         request.setItemId(8L);
+
+         when(currentUser.getUserId()).thenReturn(10L);
++        when(accessService.can(10L, PermissionCode.CHANGE_LIVE_ACTIVE_ITEM)).thenReturn(true);
+         when(tenantResolver.resolveCurrent()).thenReturn(tenant());
+         when(liveRepository.findById(4L)).thenReturn(Optional.of(live));
+         when(itemRepository.findByCompanyIdAndId(2L, 8L)).thenReturn(Optional.of(item));
+@@ -76,6 +80,7 @@ class LiveServiceTests {
+         assertEquals("QA-CTR-005", response.getActiveItemCode());
+         assertEquals("Blusa Verde", response.getActiveItemProductTypeName());
+         assertEquals(ItemStatus.AVAILABLE, item.getStatus());
++        verify(accessService).assertCan(10L, PermissionCode.CHANGE_LIVE_ACTIVE_ITEM, ChannelCode.LIVE, 6L);
+         verify(tenantResolver).assertBranchBelongsToCompany(6L, 2L);
+         verify(liveEventService).record(
+                 live,
+@@ -139,6 +144,7 @@ class LiveServiceTests {
+
+         assertEquals(null, response.getActiveItemId());
+         assertEquals(ItemStatus.RESERVED, item.getStatus());
++        verify(accessService).assertCan(10L, PermissionCode.REMOVE_LIVE_ACTIVE_ITEM, ChannelCode.LIVE, 6L);
+         verify(liveEventService).record(
+                 live,
+                 LiveEventType.ACTIVE_ITEM_CHANGED,
+@@ -149,6 +155,35 @@ class LiveServiceTests {
+         );
+     }
+
++    @Test
++    void clearActiveItemRejectsLiveReservationPermissionWithoutRemovePermission() {
++        Live live = live(4L, branch(6L, company(2L)));
++        Item item = item(8L, live.getBranch());
++        live.setActiveItem(item);
++
++        when(currentUser.getUserId()).thenReturn(10L);
++        when(accessService.can(10L, PermissionCode.DO_LIVE_RESERVATION)).thenReturn(true);
++        doThrow(new AccessDeniedException("Permiso requerido: REMOVE_LIVE_ACTIVE_ITEM"))
++                .when(accessService)
++                .assertCan(10L, PermissionCode.REMOVE_LIVE_ACTIVE_ITEM, ChannelCode.LIVE, 6L);
++        when(liveRepository.findById(4L)).thenReturn(Optional.of(live));
++
++        AccessDeniedException exception =
++                assertThrows(AccessDeniedException.class, () -> service.setActiveItem(4L, null));
++
++        assertEquals("Permiso requerido: REMOVE_LIVE_ACTIVE_ITEM", exception.getMessage());
++        assertEquals(8L, live.getActiveItem().getId());
++        verify(liveRepository, never()).save(live);
++        verify(liveEventService, never()).record(
++                live,
++                LiveEventType.ACTIVE_ITEM_CHANGED,
++                10L,
++                "ITEM",
++                null,
++                "{\"previousItemId\":8,\"activeItemId\":null}"
++        );
++    }
++
+     @Test
+     void closeClearsActiveItem() {
+         Live live = live(4L, branch(6L, company(2L)));
+diff --git a/docs/ERP_BITACORA_CAMBIOS.md b/docs/ERP_BITACORA_CAMBIOS.md
+index f10679a..b9adea8 100644
+--- a/docs/ERP_BITACORA_CAMBIOS.md
++++ b/docs/ERP_BITACORA_CAMBIOS.md
+@@ -1,5 +1,30 @@
+ # ERP - Bitacora de cambios
+
++## 2026-06-10 - LIVE-PERM-FIX-A1 enforcement retirar prenda al aire
++
++Tipo: backend autorizacion, LIVE permisos, pruebas, evidencia.
++
++Objetivo:
++
++- Corregir el NO_GO de LIVE-QA-C donde vendedor podia retirar la prenda al aire por API sin `REMOVE_LIVE_ACTIVE_ITEM`.
++
++Cambios realizados:
++
++- `LiveService.assertCanRemoveLiveActiveItem` exige estrictamente `REMOVE_LIVE_ACTIVE_ITEM`.
++- Se elimina `DO_LIVE_RESERVATION` como fallback solo para retirar prenda al aire.
++- Se agregan pruebas de permiso dedicado, rechazo con permiso de apartado y continuidad de cambio/puesta de prenda.
++
++Restricciones respetadas:
++
++- No se tocaron pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC, permisos, endpoints ni migraciones.
++- No se cambio venta financiera.
++- `DO_LIVE_RESERVATION` conserva su uso para apartados LIVE.
++
++Pendientes:
++
++- Smoke API autenticado con dataset desechable y vendedor real: esperar `403` al retirar active item.
++- QA visual si se requiere evidencia de UI.
++
+ ## 2026-06-10 - ITEM-Z8 consistencia final LIVE, inventario y reservas
+
+ Tipo: auditoria tecnica, consistencia operativa, documentacion, evidencia.
+diff --git a/docs/ERP_RIESGOS_OPERATIVOS.md b/docs/ERP_RIESGOS_OPERATIVOS.md
+index 9ae61b1..cb9c5f9 100644
+--- a/docs/ERP_RIESGOS_OPERATIVOS.md
++++ b/docs/ERP_RIESGOS_OPERATIVOS.md
+@@ -38,6 +38,7 @@ Probabilidad:
+ | Artefactos no rastreados en Git | MEDIO | ALTA | Release con archivos no controlados o ruido en diff. | Limpiar/ignorar antes de release; checklist Git. | No incluir artefactos; restaurar working tree limpio. |
+ | Auditoria insuficiente | ALTO | ALTA | No se puede explicar quien hizo una accion sensible. | Fase de auditoria, eventos de negocio, revision de logs. | No aplica rollback completo; se mitiga hacia adelante. |
+ | Consistencia LIVE/inventario/reservas sin smoke real | MEDIO | MEDIA despues de ITEM-Z8 | La auditoria tecnica confirma reglas, pero falta ejecutar flujo completo con dataset LIVE desechable. | ITEM-Z8 consolida matriz de consistencia y deja checklist API/visual; no avanzar a venta financiera sin QA real. | Mantener cierre operativo LIVE limitado y bloquear conversion financiera hasta completar smoke. |
++| Retiro de prenda al aire sin permiso dedicado | ALTO | BAJA despues de LIVE-PERM-FIX-A1 | Un usuario con permiso de apartado LIVE podia retirar `activeItem` por API directa aunque la UI ocultara la accion. | LIVE-PERM-FIX-A1 exige `REMOVE_LIVE_ACTIVE_ITEM` en backend y elimina fallback `DO_LIVE_RESERVATION` para retiro manual; queda pendiente smoke API real por rol. | Revertir A1 solo si bloquea operacion critica y deshabilitar temporalmente retiro manual hasta corregir permisos. |
+ | Vendido operativo LIVE sobre reserva no segura | CRITICO | BAJA despues de ITEM-Z7 | Un apartado cancelado, convertido a venta o con item no reservado podria cerrarse operativamente y confundir inventario/caja. | ITEM-Z7 valida `ACTIVE`, bloquea `CANCELLED`/`CONVERTED_TO_SALE`, exige item `RESERVED` y conserva solo `live_operational_status` + `live_events`. | Revertir ITEM-Z7 y bloquear temporalmente la accion de cierre operativo LIVE. |
+ | Cancelacion de apartado libera inventario indebidamente | CRITICO | BAJA despues de ITEM-Z6B | Una reserva con pago, convertida a venta o con item no reservado podria liberar prenda de forma incorrecta. | ITEM-Z6B bloquea reservas `CANCELLED`/`CONVERTED_TO_SALE`, pagos `ACTIVE` por allocation y libera solo con update condicional `RESERVED -> AVAILABLE`. | Revertir ITEM-Z6B y bloquear cancelacion normal hasta revisar datos; no ejecutar reversas financieras sin procedimiento. |
+ | Rechazos de reserva sin trazabilidad operativa | ALTO | BAJA despues de ITEM-Z5D | Soporte no podria explicar por que se rechazo un apartado en doble click, concurrencia o idempotencia. | ITEM-Z5D registra `reservation_rejection_events` con motivo, usuario, item, branch, hashes seguros y fecha; queda pendiente consola/consulta operativa. | Revertir instrumentacion si bloquea operacion; conservar tabla como diagnostico o retirarla con DBA. |
+diff --git a/docs/LIVE_PERM_FIX_A1_REMOVE_ACTIVE_ITEM_ENFORCEMENT.md b/docs/LIVE_PERM_FIX_A1_REMOVE_ACTIVE_ITEM_ENFORCEMENT.md
+new file mode 100644
+index 0000000..ddea59f
+--- /dev/null
++++ b/docs/LIVE_PERM_FIX_A1_REMOVE_ACTIVE_ITEM_ENFORCEMENT.md
+@@ -0,0 +1,130 @@
++# LIVE-PERM-FIX-A1 - Enforce backend REMOVE_LIVE_ACTIVE_ITEM
++
++Fecha: 2026-06-10
++
++## Resultado
++
++`GO_TECNICO`
++
++`PENDING_QA_API`
++
++`PENDING_QA_VISUAL`
++
++## Bug corregido
++
++LIVE-QA-C dejo `NO_GO` porque `qa.vendedor.centro@local.test` pudo retirar la prenda al aire por API aunque no tiene `REMOVE_LIVE_ACTIVE_ITEM`.
++
++Evidencia origen:
++
++- `612d82e LIVE-QA-C ejecuta QA live con dataset desechable`
++- `SELLER_REMOVE_ACTIVE_ITEM status=200 UNEXPECTED`
++- Endpoint: `PATCH /api/lives/{id}/active-item`
++- Payload de retiro: `itemId: null`
++
++## Causa confirmada
++
++`LiveService.setActiveItem(...)` detecta retiro cuando `request == null || request.getItemId() == null` y llama `assertCanRemoveLiveActiveItem(...)`.
++
++Antes de A1, ese metodo aceptaba:
++
++- `REMOVE_LIVE_ACTIVE_ITEM`
++- fallback `DO_LIVE_RESERVATION`
++
++Por esa compatibilidad legacy, un vendedor con permiso de apartado LIVE podia retirar la prenda al aire por API directa.
++
++## Implementacion
++
++Cambio focalizado en backend:
++
++- `assertCanRemoveLiveActiveItem(...)` ahora exige estrictamente `PermissionCode.REMOVE_LIVE_ACTIVE_ITEM`.
++- Se elimino `DO_LIVE_RESERVATION` como fallback para retirar prenda al aire.
++- No se cambio el endpoint.
++- No se cambio RBAC.
++- No se crearon permisos ni migraciones.
++
++Se mantiene:
++
++- `DO_LIVE_RESERVATION` para apartar en LIVE.
++- `CHANGE_LIVE_ACTIVE_ITEM` para poner/cambiar prenda al aire, con la compatibilidad existente que no fue parte de esta fase.
++- `VIEW_LIVE` / `OPERATE_LIVE` sin cambios.
++- `close(...)` limpia `activeItem` como parte del cierre de LIVE autorizado.
++
++## Comportamiento esperado por rol
++
++| Rol / permiso | Retirar prenda al aire |
++| --- | --- |
++| Admin con `REMOVE_LIVE_ACTIVE_ITEM` | Permitido |
++| Supervisor con `REMOVE_LIVE_ACTIVE_ITEM` | Permitido |
++| Vendedor sin `REMOVE_LIVE_ACTIVE_ITEM` | Rechazado por backend |
++| Usuario con `DO_LIVE_RESERVATION` solamente | Rechazado para retirar; conserva apartado LIVE |
++| Usuario con `OPERATE_LIVE` solamente | Rechazado para retirar |
++| Usuario con `CHANGE_LIVE_ACTIVE_ITEM` solamente | Rechazado para retirar; sirve para poner/cambiar segun reglas vigentes |
++
++## Tests agregados / ajustados
++
++Archivo:
++
++- `backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/live/LiveServiceTests.java`
++
++Cobertura:
++
++- `clearActiveItemDoesNotChangeInventoryStatus` ahora verifica que el backend exige `REMOVE_LIVE_ACTIVE_ITEM`.
++- `clearActiveItemRejectsLiveReservationPermissionWithoutRemovePermission` valida que un usuario con `DO_LIVE_RESERVATION` pero sin `REMOVE_LIVE_ACTIVE_ITEM` no puede limpiar `activeItem`.
++- `setActiveItemPersistsItemOnSameBranch` confirma que `CHANGE_LIVE_ACTIVE_ITEM` sigue permitiendo poner/cambiar prenda disponible.
++- Tests existentes de reservas LIVE siguen cubriendo que `DO_LIVE_RESERVATION` se mantiene para apartados.
++
++## Smoke API focalizado
++
++Ejecutado:
++
++- `GET http://localhost:8090/api/me` sin token: `401`, esperado.
++
++Pendiente:
++
++- `PATCH /api/lives/{id}/active-item` con usuario vendedor real.
++
++Motivo:
++
++- No hay credenciales QA documentadas disponibles en `.env` ni se deben inventar/imprimir secretos.
++- No se ejecuto mutacion autenticada sin dataset/credenciales seguros.
++
++Resultado: `PENDING_QA_API`.
++
++## Relacion con LIVE-QA-C
++
++Este cambio corrige el NO_GO especifico de LIVE-QA-C:
++
++- Antes: seller sin `REMOVE_LIVE_ACTIVE_ITEM` podia retirar prenda al aire.
++- Ahora: backend exige permiso dedicado y el test unitario cubre el rechazo.
++
++Debe repetirse smoke API real con dataset desechable para cerrar evidencia runtime.
++
++## Restricciones respetadas
++
++No se tocaron:
++
++- pagos;
++- caja;
++- precio LIVE;
++- devoluciones;
++- autorizaciones complejas;
++- RBAC;
++- permisos;
++- endpoints;
++- migraciones;
++- venta financiera;
++- frontend funcional.
++
++## Validaciones
++
++- `./mvnw.cmd -Dtest=LiveServiceTests test`: PASS.
++- `./mvnw.cmd test`: PASS tras cargar `.env` en memoria y quitar comillas envolventes de valores, sin imprimir secretos.
++- `npm.cmd run lint`: PASS, 0 errores, warnings preexistentes.
++- `npx.cmd tsc --noEmit`: PASS.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: PASS.
++
++## Pendientes
++
++- Smoke API autenticado por rol con `qa.vendedor.centro@local.test`: esperar `403` en retiro de active item.
++- Smoke positivo admin/supervisor con `REMOVE_LIVE_ACTIVE_ITEM`.
++- QA visual si se requiere evidencia de UI.
+diff --git a/qa-reports/LIVE-PERM-FIX-A1-remove-active-item-enforcement-report-20260610-113033.md b/qa-reports/LIVE-PERM-FIX-A1-remove-active-item-enforcement-report-20260610-113033.md
+new file mode 100644
+index 0000000..d8f81ea
+--- /dev/null
++++ b/qa-reports/LIVE-PERM-FIX-A1-remove-active-item-enforcement-report-20260610-113033.md
+@@ -0,0 +1,105 @@
++# LIVE-PERM-FIX-A1 - Reporte enforcement REMOVE_LIVE_ACTIVE_ITEM
++
++Fecha: 2026-06-10 11:30:33
++
++## Rama
++
++`feature/live-perm-fix-a1-remove-active-item-enforcement`
++
++## Comandos ejecutados
++
++- `git branch --show-current`
++- `git status`
++- `git log --oneline -80`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-QA-C"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-PERM-FIX-A0"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-PERM-A1"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z8"`
++- `git --no-pager log --oneline --all --decorate --grep="HOME-LIVE-A"`
++- Auditorias `git grep` solicitadas sobre permisos, active item y `AccessDenied`.
++- `./mvnw.cmd -Dtest=LiveServiceTests test`
++- `./mvnw.cmd test`
++- `npm.cmd run lint`
++- `npx.cmd tsc --noEmit`
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`
++- `GET http://localhost:8090/api/me` sin token
++
++## Historial validado
++
++- `612d82e LIVE-QA-C ejecuta QA live con dataset desechable`
++- `88e55ed LIVE-PERM-FIX-A0 documenta autorizacion retirar prenda live`
++- `5f5cf4d LIVE-PERM-A1 agrega permisos live minimos`
++- `9ad9e37 LIVE-PERM-A1 ajusta capacidades sensibles`
++- `4975138 LIVE-PERM-A1B corrige dependencias de permisos live`
++- `6c757c9 LIVE-PERM-A1 documenta cierre final`
++- `90ab2eb ITEM-Z8 valida consistencia live inventario reservas`
++- `dfe373e HOME-LIVE-A muestra live activo en inicio`
++
++## Archivos tocados
++
++- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveService.java`
++- `backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/live/LiveServiceTests.java`
++- `docs/LIVE_PERM_FIX_A1_REMOVE_ACTIVE_ITEM_ENFORCEMENT.md`
++- `docs/ERP_BITACORA_CAMBIOS.md`
++- `docs/ERP_RIESGOS_OPERATIVOS.md`
++- `qa-reports/LIVE-PERM-FIX-A1-remove-active-item-enforcement-report-20260610-113033.md`
++- `git-diffs/20260610-LIVE-PERM-FIX-A1-remove-active-item-enforcement.diff`
++- `git-diffs/20260610-LIVE-PERM-FIX-A1-remove-active-item-enforcement-stat.txt`
++
++## Implementacion
++
++`LiveService.assertCanRemoveLiveActiveItem(...)` ahora exige `REMOVE_LIVE_ACTIVE_ITEM` mediante `accessService.assertCan(...)`.
++
++Se elimino el fallback `DO_LIVE_RESERVATION` solo para retirar prenda al aire.
++
++No se modificaron endpoints, migraciones, RBAC, catalogo de permisos ni frontend funcional.
++
++## Tests agregados / ajustados
++
++- `clearActiveItemRejectsLiveReservationPermissionWithoutRemovePermission`: usuario con `DO_LIVE_RESERVATION` pero sin `REMOVE_LIVE_ACTIVE_ITEM` recibe `AccessDeniedException`.
++- `clearActiveItemDoesNotChangeInventoryStatus`: confirma permiso dedicado y que el inventario no cambia.
++- `setActiveItemPersistsItemOnSameBranch`: confirma que `CHANGE_LIVE_ACTIVE_ITEM` sigue permitiendo poner/cambiar una prenda `AVAILABLE`.
++
++## Validaciones
++
++| Validacion | Resultado |
++| --- | --- |
++| `./mvnw.cmd -Dtest=LiveServiceTests test` | PASS, 10 tests. |
++| `./mvnw.cmd test` | PASS tras cargar `.env` en memoria y quitar comillas envolventes; no se imprimieron secretos. |
++| `npm.cmd run lint` | PASS, 0 errores; 53 warnings preexistentes. |
++| `npx.cmd tsc --noEmit` | PASS. |
++| `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export` | PASS. |
++
++## Smoke API focalizado
++
++- `/api/me` sin token: `401`, esperado.
++- PATCH autenticado seller `itemId: null`: `PENDING_QA_API`.
++
++Motivo: no hay credenciales QA documentadas disponibles sin imprimir/inventar secretos. No se ejecuto mutacion autenticada.
++
++Resultado esperado pendiente:
++
++- seller sin `REMOVE_LIVE_ACTIVE_ITEM` => `403`.
++- admin/supervisor con `REMOVE_LIVE_ACTIVE_ITEM` => permitido.
++
++## QA visual
++
++No hubo navegador/screenshot real.
++
++Resultado: `PENDING_QA_VISUAL`.
++
++## Riesgos
++
++- El riesgo principal de API directa queda mitigado en test unitario/service.
++- Requiere smoke API real con dataset desechable para cerrar evidencia runtime.
++- La compatibilidad de `CHANGE_LIVE_ACTIVE_ITEM` y `DO_LIVE_RESERVATION` fuera del retiro no fue modificada.
++
++## Resultado
++
++`GO_TECNICO`
++
++`PENDING_QA_API`
++
++`PENDING_QA_VISUAL`
++
++No se marca `QA_PASS`.
