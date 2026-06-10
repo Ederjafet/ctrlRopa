@@ -1,0 +1,1656 @@
+﻿diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveEventType.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveEventType.java
+index a001446..c972f05 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveEventType.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveEventType.java
+@@ -7,5 +7,6 @@ public enum LiveEventType {
+     LIVE_RESERVATION_CREATED,
+     LIVE_RESERVATION_STATUS_CHANGED,
+     LIVE_OPERATIONAL_SOLD,
++    LIVE_OPERATIONAL_SOLD_UNDONE,
+     LIVE_RESERVATION_CANCELLED
+ }
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationController.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationController.java
+new file mode 100644
+index 0000000..b7127f5
+--- /dev/null
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationController.java
+@@ -0,0 +1,65 @@
++package com.hpsqsoft.ctrlropa.operationauth;
++
++import org.springframework.web.bind.annotation.*;
++
++import java.util.List;
++
++@RestController
++@RequestMapping("/api/operational-authorizations")
++public class OperationalAuthorizationController {
++
++    private final OperationalAuthorizationService service;
++
++    public OperationalAuthorizationController(OperationalAuthorizationService service) {
++        this.service = service;
++    }
++
++    @PostMapping
++    public OperationalAuthorizationResponse create(@RequestBody OperationalAuthorizationCreateRequest request) {
++        return service.create(request);
++    }
++
++    @GetMapping("/branch/{branchId}")
++    public List<OperationalAuthorizationResponse> findByBranch(@PathVariable Long branchId) {
++        return service.findByBranch(branchId);
++    }
++
++    @GetMapping("/pending/branch/{branchId}")
++    public List<OperationalAuthorizationResponse> findPending(@PathVariable Long branchId) {
++        return service.findPending(branchId);
++    }
++
++    @GetMapping("/mine/branch/{branchId}")
++    public List<OperationalAuthorizationResponse> findMine(@PathVariable Long branchId) {
++        return service.findMine(branchId);
++    }
++
++    @GetMapping("/{id}")
++    public OperationalAuthorizationResponse findById(@PathVariable Long id) {
++        return service.findById(id);
++    }
++
++    @PatchMapping("/{id}/approve")
++    public OperationalAuthorizationResponse approve(@PathVariable Long id,
++                                                    @RequestBody OperationalAuthorizationDecisionRequest request) {
++        return service.approve(id, request);
++    }
++
++    @PatchMapping("/{id}/reject")
++    public OperationalAuthorizationResponse reject(@PathVariable Long id,
++                                                   @RequestBody OperationalAuthorizationDecisionRequest request) {
++        return service.reject(id, request);
++    }
++
++    @PatchMapping("/{id}/cancel")
++    public OperationalAuthorizationResponse cancel(@PathVariable Long id,
++                                                   @RequestBody OperationalAuthorizationDecisionRequest request) {
++        return service.cancel(id, request);
++    }
++
++    @PostMapping("/{id}/apply")
++    public OperationalAuthorizationResponse apply(@PathVariable Long id,
++                                                  @RequestBody OperationalAuthorizationDecisionRequest request) {
++        return service.apply(id, request);
++    }
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationCreateRequest.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationCreateRequest.java
+new file mode 100644
+index 0000000..4ceba9a
+--- /dev/null
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationCreateRequest.java
+@@ -0,0 +1,38 @@
++package com.hpsqsoft.ctrlropa.operationauth;
++
++public class OperationalAuthorizationCreateRequest {
++    private OperationalAuthorizationType operationType;
++    private OperationalAuthorizationTargetType targetType;
++    private Long targetId;
++    private Long branchId;
++    private Long liveId;
++    private Long reservationId;
++    private Long itemId;
++    private Long paymentId;
++    private Long saleId;
++    private String reason;
++    private String payloadJson;
++
++    public OperationalAuthorizationType getOperationType() { return operationType; }
++    public void setOperationType(OperationalAuthorizationType operationType) { this.operationType = operationType; }
++    public OperationalAuthorizationTargetType getTargetType() { return targetType; }
++    public void setTargetType(OperationalAuthorizationTargetType targetType) { this.targetType = targetType; }
++    public Long getTargetId() { return targetId; }
++    public void setTargetId(Long targetId) { this.targetId = targetId; }
++    public Long getBranchId() { return branchId; }
++    public void setBranchId(Long branchId) { this.branchId = branchId; }
++    public Long getLiveId() { return liveId; }
++    public void setLiveId(Long liveId) { this.liveId = liveId; }
++    public Long getReservationId() { return reservationId; }
++    public void setReservationId(Long reservationId) { this.reservationId = reservationId; }
++    public Long getItemId() { return itemId; }
++    public void setItemId(Long itemId) { this.itemId = itemId; }
++    public Long getPaymentId() { return paymentId; }
++    public void setPaymentId(Long paymentId) { this.paymentId = paymentId; }
++    public Long getSaleId() { return saleId; }
++    public void setSaleId(Long saleId) { this.saleId = saleId; }
++    public String getReason() { return reason; }
++    public void setReason(String reason) { this.reason = reason; }
++    public String getPayloadJson() { return payloadJson; }
++    public void setPayloadJson(String payloadJson) { this.payloadJson = payloadJson; }
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationDecisionRequest.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationDecisionRequest.java
+new file mode 100644
+index 0000000..ef0934b
+--- /dev/null
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationDecisionRequest.java
+@@ -0,0 +1,8 @@
++package com.hpsqsoft.ctrlropa.operationauth;
++
++public class OperationalAuthorizationDecisionRequest {
++    private String reason;
++
++    public String getReason() { return reason; }
++    public void setReason(String reason) { this.reason = reason; }
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationRepository.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationRepository.java
+new file mode 100644
+index 0000000..b7ea4c4
+--- /dev/null
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationRepository.java
+@@ -0,0 +1,32 @@
++package com.hpsqsoft.ctrlropa.operationauth;
++
++import org.springframework.data.jpa.repository.JpaRepository;
++
++import java.util.List;
++import java.util.Optional;
++
++public interface OperationalAuthorizationRepository extends JpaRepository<OperationalAuthorizationRequest, Long> {
++
++    List<OperationalAuthorizationRequest> findByCompanyIdAndBranchIdOrderByCreatedAtDesc(Long companyId, Long branchId);
++
++    List<OperationalAuthorizationRequest> findByCompanyIdAndBranchIdAndStatusOrderByCreatedAtDesc(
++            Long companyId,
++            Long branchId,
++            OperationalAuthorizationStatus status
++    );
++
++    List<OperationalAuthorizationRequest> findByCompanyIdAndBranchIdAndRequestedByUserIdOrderByCreatedAtDesc(
++            Long companyId,
++            Long branchId,
++            Long requestedByUserId
++    );
++
++    Optional<OperationalAuthorizationRequest> findFirstByCompanyIdAndBranchIdAndOperationTypeAndTargetTypeAndTargetIdAndStatus(
++            Long companyId,
++            Long branchId,
++            OperationalAuthorizationType operationType,
++            OperationalAuthorizationTargetType targetType,
++            Long targetId,
++            OperationalAuthorizationStatus status
++    );
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationRequest.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationRequest.java
+new file mode 100644
+index 0000000..997e67b
+--- /dev/null
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationRequest.java
+@@ -0,0 +1,158 @@
++package com.hpsqsoft.ctrlropa.operationauth;
++
++import jakarta.persistence.*;
++
++import java.time.LocalDateTime;
++
++@Entity
++@Table(name = "operational_authorization_requests")
++public class OperationalAuthorizationRequest {
++
++    @Id
++    @GeneratedValue(strategy = GenerationType.IDENTITY)
++    private Long id;
++
++    @Enumerated(EnumType.STRING)
++    @Column(name = "operation_type", nullable = false, length = 80)
++    private OperationalAuthorizationType operationType;
++
++    @Enumerated(EnumType.STRING)
++    @Column(nullable = false, length = 30)
++    private OperationalAuthorizationStatus status = OperationalAuthorizationStatus.REQUESTED;
++
++    @Column(name = "company_id", nullable = false)
++    private Long companyId;
++
++    @Column(name = "branch_id", nullable = false)
++    private Long branchId;
++
++    @Column(name = "requested_by_user_id", nullable = false)
++    private Long requestedByUserId;
++
++    @Column(name = "requested_at", nullable = false)
++    private LocalDateTime requestedAt;
++
++    @Column(name = "decided_by_user_id")
++    private Long decidedByUserId;
++
++    @Column(name = "decided_at")
++    private LocalDateTime decidedAt;
++
++    @Column(name = "applied_by_user_id")
++    private Long appliedByUserId;
++
++    @Column(name = "applied_at")
++    private LocalDateTime appliedAt;
++
++    @Column(name = "expires_at", nullable = false)
++    private LocalDateTime expiresAt;
++
++    @Enumerated(EnumType.STRING)
++    @Column(name = "target_type", nullable = false, length = 40)
++    private OperationalAuthorizationTargetType targetType;
++
++    @Column(name = "target_id", nullable = false)
++    private Long targetId;
++
++    @Column(name = "live_id")
++    private Long liveId;
++
++    @Column(name = "reservation_id")
++    private Long reservationId;
++
++    @Column(name = "item_id")
++    private Long itemId;
++
++    @Column(name = "payment_id")
++    private Long paymentId;
++
++    @Column(name = "sale_id")
++    private Long saleId;
++
++    @Column(columnDefinition = "TEXT", nullable = false)
++    private String reason;
++
++    @Column(name = "decision_reason", columnDefinition = "TEXT")
++    private String decisionReason;
++
++    @Column(name = "current_state_hash", length = 64)
++    private String currentStateHash;
++
++    @Column(name = "snapshot_json", columnDefinition = "TEXT")
++    private String snapshotJson;
++
++    @Column(name = "payload_json", columnDefinition = "TEXT")
++    private String payloadJson;
++
++    @Column(name = "created_at", nullable = false)
++    private LocalDateTime createdAt;
++
++    @Column(name = "updated_at", nullable = false)
++    private LocalDateTime updatedAt;
++
++    @PrePersist
++    public void prePersist() {
++        LocalDateTime now = LocalDateTime.now();
++        if (requestedAt == null) requestedAt = now;
++        if (createdAt == null) createdAt = now;
++        if (updatedAt == null) updatedAt = now;
++        if (expiresAt == null) expiresAt = now.plusHours(8);
++    }
++
++    @PreUpdate
++    public void preUpdate() {
++        updatedAt = LocalDateTime.now();
++    }
++
++    public Long getId() { return id; }
++    public OperationalAuthorizationType getOperationType() { return operationType; }
++    public void setOperationType(OperationalAuthorizationType operationType) { this.operationType = operationType; }
++    public OperationalAuthorizationStatus getStatus() { return status; }
++    public void setStatus(OperationalAuthorizationStatus status) { this.status = status; }
++    public Long getCompanyId() { return companyId; }
++    public void setCompanyId(Long companyId) { this.companyId = companyId; }
++    public Long getBranchId() { return branchId; }
++    public void setBranchId(Long branchId) { this.branchId = branchId; }
++    public Long getRequestedByUserId() { return requestedByUserId; }
++    public void setRequestedByUserId(Long requestedByUserId) { this.requestedByUserId = requestedByUserId; }
++    public LocalDateTime getRequestedAt() { return requestedAt; }
++    public void setRequestedAt(LocalDateTime requestedAt) { this.requestedAt = requestedAt; }
++    public Long getDecidedByUserId() { return decidedByUserId; }
++    public void setDecidedByUserId(Long decidedByUserId) { this.decidedByUserId = decidedByUserId; }
++    public LocalDateTime getDecidedAt() { return decidedAt; }
++    public void setDecidedAt(LocalDateTime decidedAt) { this.decidedAt = decidedAt; }
++    public Long getAppliedByUserId() { return appliedByUserId; }
++    public void setAppliedByUserId(Long appliedByUserId) { this.appliedByUserId = appliedByUserId; }
++    public LocalDateTime getAppliedAt() { return appliedAt; }
++    public void setAppliedAt(LocalDateTime appliedAt) { this.appliedAt = appliedAt; }
++    public LocalDateTime getExpiresAt() { return expiresAt; }
++    public void setExpiresAt(LocalDateTime expiresAt) { this.expiresAt = expiresAt; }
++    public OperationalAuthorizationTargetType getTargetType() { return targetType; }
++    public void setTargetType(OperationalAuthorizationTargetType targetType) { this.targetType = targetType; }
++    public Long getTargetId() { return targetId; }
++    public void setTargetId(Long targetId) { this.targetId = targetId; }
++    public Long getLiveId() { return liveId; }
++    public void setLiveId(Long liveId) { this.liveId = liveId; }
++    public Long getReservationId() { return reservationId; }
++    public void setReservationId(Long reservationId) { this.reservationId = reservationId; }
++    public Long getItemId() { return itemId; }
++    public void setItemId(Long itemId) { this.itemId = itemId; }
++    public Long getPaymentId() { return paymentId; }
++    public void setPaymentId(Long paymentId) { this.paymentId = paymentId; }
++    public Long getSaleId() { return saleId; }
++    public void setSaleId(Long saleId) { this.saleId = saleId; }
++    public String getReason() { return reason; }
++    public void setReason(String reason) { this.reason = reason; }
++    public String getDecisionReason() { return decisionReason; }
++    public void setDecisionReason(String decisionReason) { this.decisionReason = decisionReason; }
++    public String getCurrentStateHash() { return currentStateHash; }
++    public void setCurrentStateHash(String currentStateHash) { this.currentStateHash = currentStateHash; }
++    public String getSnapshotJson() { return snapshotJson; }
++    public void setSnapshotJson(String snapshotJson) { this.snapshotJson = snapshotJson; }
++    public String getPayloadJson() { return payloadJson; }
++    public void setPayloadJson(String payloadJson) { this.payloadJson = payloadJson; }
++    public LocalDateTime getCreatedAt() { return createdAt; }
++    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
++    public LocalDateTime getUpdatedAt() { return updatedAt; }
++    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationResponse.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationResponse.java
+new file mode 100644
+index 0000000..9c2d3d9
+--- /dev/null
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationResponse.java
+@@ -0,0 +1,88 @@
++package com.hpsqsoft.ctrlropa.operationauth;
++
++import java.time.LocalDateTime;
++
++public class OperationalAuthorizationResponse {
++    private final Long id;
++    private final String operationType;
++    private final String status;
++    private final Long companyId;
++    private final Long branchId;
++    private final Long requestedByUserId;
++    private final LocalDateTime requestedAt;
++    private final Long decidedByUserId;
++    private final LocalDateTime decidedAt;
++    private final Long appliedByUserId;
++    private final LocalDateTime appliedAt;
++    private final LocalDateTime expiresAt;
++    private final String targetType;
++    private final Long targetId;
++    private final Long liveId;
++    private final Long reservationId;
++    private final Long itemId;
++    private final Long paymentId;
++    private final Long saleId;
++    private final String reason;
++    private final String decisionReason;
++    private final String currentStateHash;
++    private final String snapshotJson;
++    private final String payloadJson;
++    private final LocalDateTime createdAt;
++    private final LocalDateTime updatedAt;
++
++    public OperationalAuthorizationResponse(OperationalAuthorizationRequest request) {
++        this.id = request.getId();
++        this.operationType = request.getOperationType().name();
++        this.status = request.getStatus().name();
++        this.companyId = request.getCompanyId();
++        this.branchId = request.getBranchId();
++        this.requestedByUserId = request.getRequestedByUserId();
++        this.requestedAt = request.getRequestedAt();
++        this.decidedByUserId = request.getDecidedByUserId();
++        this.decidedAt = request.getDecidedAt();
++        this.appliedByUserId = request.getAppliedByUserId();
++        this.appliedAt = request.getAppliedAt();
++        this.expiresAt = request.getExpiresAt();
++        this.targetType = request.getTargetType().name();
++        this.targetId = request.getTargetId();
++        this.liveId = request.getLiveId();
++        this.reservationId = request.getReservationId();
++        this.itemId = request.getItemId();
++        this.paymentId = request.getPaymentId();
++        this.saleId = request.getSaleId();
++        this.reason = request.getReason();
++        this.decisionReason = request.getDecisionReason();
++        this.currentStateHash = request.getCurrentStateHash();
++        this.snapshotJson = request.getSnapshotJson();
++        this.payloadJson = request.getPayloadJson();
++        this.createdAt = request.getCreatedAt();
++        this.updatedAt = request.getUpdatedAt();
++    }
++
++    public Long getId() { return id; }
++    public String getOperationType() { return operationType; }
++    public String getStatus() { return status; }
++    public Long getCompanyId() { return companyId; }
++    public Long getBranchId() { return branchId; }
++    public Long getRequestedByUserId() { return requestedByUserId; }
++    public LocalDateTime getRequestedAt() { return requestedAt; }
++    public Long getDecidedByUserId() { return decidedByUserId; }
++    public LocalDateTime getDecidedAt() { return decidedAt; }
++    public Long getAppliedByUserId() { return appliedByUserId; }
++    public LocalDateTime getAppliedAt() { return appliedAt; }
++    public LocalDateTime getExpiresAt() { return expiresAt; }
++    public String getTargetType() { return targetType; }
++    public Long getTargetId() { return targetId; }
++    public Long getLiveId() { return liveId; }
++    public Long getReservationId() { return reservationId; }
++    public Long getItemId() { return itemId; }
++    public Long getPaymentId() { return paymentId; }
++    public Long getSaleId() { return saleId; }
++    public String getReason() { return reason; }
++    public String getDecisionReason() { return decisionReason; }
++    public String getCurrentStateHash() { return currentStateHash; }
++    public String getSnapshotJson() { return snapshotJson; }
++    public String getPayloadJson() { return payloadJson; }
++    public LocalDateTime getCreatedAt() { return createdAt; }
++    public LocalDateTime getUpdatedAt() { return updatedAt; }
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationService.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationService.java
+new file mode 100644
+index 0000000..3f603e0
+--- /dev/null
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationService.java
+@@ -0,0 +1,475 @@
++package com.hpsqsoft.ctrlropa.operationauth;
++
++import com.hpsqsoft.ctrlropa.item.Item;
++import com.hpsqsoft.ctrlropa.item.ItemRepository;
++import com.hpsqsoft.ctrlropa.item.ItemStatus;
++import com.hpsqsoft.ctrlropa.live.LiveEventService;
++import com.hpsqsoft.ctrlropa.live.LiveEventType;
++import com.hpsqsoft.ctrlropa.payment.Payment;
++import com.hpsqsoft.ctrlropa.payment.PaymentAllocation;
++import com.hpsqsoft.ctrlropa.payment.PaymentAllocationRepository;
++import com.hpsqsoft.ctrlropa.payment.PaymentRepository;
++import com.hpsqsoft.ctrlropa.payment.PaymentStatus;
++import com.hpsqsoft.ctrlropa.reservation.LiveReservationOperationalStatus;
++import com.hpsqsoft.ctrlropa.reservation.Reservation;
++import com.hpsqsoft.ctrlropa.reservation.ReservationRepository;
++import com.hpsqsoft.ctrlropa.reservation.ReservationStatus;
++import com.hpsqsoft.ctrlropa.security.access.AccessService;
++import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
++import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
++import com.hpsqsoft.ctrlropa.tenant.CurrentTenantContext;
++import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
++import com.hpsqsoft.ctrlropa.web.error.ConflictException;
++import org.springframework.security.access.AccessDeniedException;
++import org.springframework.stereotype.Service;
++import org.springframework.transaction.annotation.Transactional;
++
++import java.math.BigDecimal;
++import java.nio.charset.StandardCharsets;
++import java.security.MessageDigest;
++import java.security.NoSuchAlgorithmException;
++import java.time.LocalDateTime;
++import java.util.List;
++
++@Service
++@Transactional
++public class OperationalAuthorizationService {
++
++    private static final int DEFAULT_TTL_HOURS = 8;
++
++    private final OperationalAuthorizationRepository repository;
++    private final ReservationRepository reservationRepository;
++    private final ItemRepository itemRepository;
++    private final PaymentAllocationRepository paymentAllocationRepository;
++    private final PaymentRepository paymentRepository;
++    private final AccessService accessService;
++    private final CurrentUser currentUser;
++    private final TenantAccessGuard tenantAccessGuard;
++    private final LiveEventService liveEventService;
++
++    public OperationalAuthorizationService(OperationalAuthorizationRepository repository,
++                                           ReservationRepository reservationRepository,
++                                           ItemRepository itemRepository,
++                                           PaymentAllocationRepository paymentAllocationRepository,
++                                           PaymentRepository paymentRepository,
++                                           AccessService accessService,
++                                           CurrentUser currentUser,
++                                           TenantAccessGuard tenantAccessGuard,
++                                           LiveEventService liveEventService) {
++        this.repository = repository;
++        this.reservationRepository = reservationRepository;
++        this.itemRepository = itemRepository;
++        this.paymentAllocationRepository = paymentAllocationRepository;
++        this.paymentRepository = paymentRepository;
++        this.accessService = accessService;
++        this.currentUser = currentUser;
++        this.tenantAccessGuard = tenantAccessGuard;
++        this.liveEventService = liveEventService;
++    }
++
++    public OperationalAuthorizationResponse create(OperationalAuthorizationCreateRequest request) {
++        Long userId = currentUser.getUserId();
++        accessService.assertCan(userId, PermissionCode.REQUEST_LIVE_OPERATION_AUTHORIZATION);
++        assertCanRequestOperation(userId, request != null ? request.getOperationType() : null);
++        validateCreateRequest(request);
++
++        TargetSnapshot target = resolveTarget(request);
++        CurrentTenantContext tenant = tenantAccessGuard.requireBranch(target.branchId(), "El target de autorizacion no pertenece a la sucursal activa");
++
++        repository.findFirstByCompanyIdAndBranchIdAndOperationTypeAndTargetTypeAndTargetIdAndStatus(
++                tenant.getCompanyId(),
++                target.branchId(),
++                request.getOperationType(),
++                request.getTargetType(),
++                request.getTargetId(),
++                OperationalAuthorizationStatus.REQUESTED
++        ).ifPresent(existing -> {
++            throw new ConflictException("Ya existe una solicitud pendiente para esta accion y target");
++        });
++
++        OperationalAuthorizationRequest entity = new OperationalAuthorizationRequest();
++        entity.setOperationType(request.getOperationType());
++        entity.setStatus(OperationalAuthorizationStatus.REQUESTED);
++        entity.setCompanyId(tenant.getCompanyId());
++        entity.setBranchId(target.branchId());
++        entity.setRequestedByUserId(userId);
++        entity.setRequestedAt(LocalDateTime.now());
++        entity.setExpiresAt(LocalDateTime.now().plusHours(DEFAULT_TTL_HOURS));
++        entity.setTargetType(request.getTargetType());
++        entity.setTargetId(request.getTargetId());
++        entity.setLiveId(target.liveId());
++        entity.setReservationId(target.reservationId());
++        entity.setItemId(target.itemId());
++        entity.setPaymentId(request.getPaymentId());
++        entity.setSaleId(request.getSaleId());
++        entity.setReason(cleanReason(request.getReason()));
++        entity.setPayloadJson(cleanOptionalJson(request.getPayloadJson()));
++        entity.setSnapshotJson(target.snapshotJson());
++        entity.setCurrentStateHash(sha256(target.snapshotJson()));
++
++        return toResponse(repository.save(entity));
++    }
++
++    @Transactional(readOnly = true)
++    public List<OperationalAuthorizationResponse> findByBranch(Long branchId) {
++        Long userId = currentUser.getUserId();
++        accessService.assertCan(userId, PermissionCode.VIEW_LIVE_OPERATION_AUTHORIZATIONS);
++        CurrentTenantContext tenant = tenantAccessGuard.requireBranch(branchId, "La sucursal de autorizaciones no pertenece a la sesion activa");
++        return repository.findByCompanyIdAndBranchIdOrderByCreatedAtDesc(tenant.getCompanyId(), branchId)
++                .stream()
++                .map(this::toResponse)
++                .toList();
++    }
++
++    @Transactional(readOnly = true)
++    public List<OperationalAuthorizationResponse> findPending(Long branchId) {
++        Long userId = currentUser.getUserId();
++        accessService.assertCan(userId, PermissionCode.VIEW_LIVE_OPERATION_AUTHORIZATIONS);
++        CurrentTenantContext tenant = tenantAccessGuard.requireBranch(branchId, "La sucursal de autorizaciones no pertenece a la sesion activa");
++        return repository.findByCompanyIdAndBranchIdAndStatusOrderByCreatedAtDesc(
++                        tenant.getCompanyId(),
++                        branchId,
++                        OperationalAuthorizationStatus.REQUESTED
++                )
++                .stream()
++                .map(this::toResponse)
++                .toList();
++    }
++
++    @Transactional(readOnly = true)
++    public List<OperationalAuthorizationResponse> findMine(Long branchId) {
++        Long userId = currentUser.getUserId();
++        accessService.assertCan(userId, PermissionCode.REQUEST_LIVE_OPERATION_AUTHORIZATION);
++        CurrentTenantContext tenant = tenantAccessGuard.requireBranch(branchId, "La sucursal de autorizaciones no pertenece a la sesion activa");
++        return repository.findByCompanyIdAndBranchIdAndRequestedByUserIdOrderByCreatedAtDesc(
++                        tenant.getCompanyId(),
++                        branchId,
++                        userId
++                )
++                .stream()
++                .map(this::toResponse)
++                .toList();
++    }
++
++    @Transactional(readOnly = true)
++    public OperationalAuthorizationResponse findById(Long id) {
++        Long userId = currentUser.getUserId();
++        accessService.assertCan(userId, PermissionCode.VIEW_LIVE_OPERATION_AUTHORIZATIONS);
++        OperationalAuthorizationRequest entity = findScoped(id);
++        return toResponse(entity);
++    }
++
++    public OperationalAuthorizationResponse approve(Long id, OperationalAuthorizationDecisionRequest request) {
++        Long userId = currentUser.getUserId();
++        accessService.assertCan(userId, PermissionCode.APPROVE_LIVE_OPERATION_AUTHORIZATION);
++        OperationalAuthorizationRequest entity = findScoped(id);
++        ensureRequested(entity);
++        ensureNotExpired(entity);
++        if (userId.equals(entity.getRequestedByUserId())) {
++            throw new AccessDeniedException("El solicitante no puede aprobar su propia autorizacion");
++        }
++        entity.setStatus(OperationalAuthorizationStatus.APPROVED);
++        entity.setDecidedByUserId(userId);
++        entity.setDecidedAt(LocalDateTime.now());
++        entity.setDecisionReason(cleanReason(request != null ? request.getReason() : null));
++        return toResponse(repository.save(entity));
++    }
++
++    public OperationalAuthorizationResponse reject(Long id, OperationalAuthorizationDecisionRequest request) {
++        Long userId = currentUser.getUserId();
++        accessService.assertCan(userId, PermissionCode.APPROVE_LIVE_OPERATION_AUTHORIZATION);
++        OperationalAuthorizationRequest entity = findScoped(id);
++        ensureRequested(entity);
++        entity.setStatus(OperationalAuthorizationStatus.REJECTED);
++        entity.setDecidedByUserId(userId);
++        entity.setDecidedAt(LocalDateTime.now());
++        entity.setDecisionReason(cleanReason(request != null ? request.getReason() : null));
++        return toResponse(repository.save(entity));
++    }
++
++    public OperationalAuthorizationResponse cancel(Long id, OperationalAuthorizationDecisionRequest request) {
++        Long userId = currentUser.getUserId();
++        accessService.assertCan(userId, PermissionCode.REQUEST_LIVE_OPERATION_AUTHORIZATION);
++        OperationalAuthorizationRequest entity = findScoped(id);
++        ensureRequested(entity);
++        if (!userId.equals(entity.getRequestedByUserId())) {
++            throw new AccessDeniedException("Solo el solicitante puede cancelar la solicitud pendiente");
++        }
++        entity.setStatus(OperationalAuthorizationStatus.CANCELLED);
++        entity.setDecisionReason(cleanReason(request != null ? request.getReason() : "Cancelada por solicitante"));
++        entity.setDecidedByUserId(userId);
++        entity.setDecidedAt(LocalDateTime.now());
++        return toResponse(repository.save(entity));
++    }
++
++    public OperationalAuthorizationResponse apply(Long id, OperationalAuthorizationDecisionRequest request) {
++        Long userId = currentUser.getUserId();
++        accessService.assertCan(userId, PermissionCode.APPLY_LIVE_OPERATION_AUTHORIZATION);
++        OperationalAuthorizationRequest entity = findScoped(id);
++
++        if (entity.getStatus() == OperationalAuthorizationStatus.REJECTED) {
++            throw new IllegalArgumentException("No se puede aplicar una autorizacion rechazada");
++        }
++        if (entity.getStatus() != OperationalAuthorizationStatus.APPROVED) {
++            throw new IllegalArgumentException("Solo se puede aplicar una autorizacion aprobada");
++        }
++        ensureNotExpired(entity);
++
++        if (entity.getOperationType() != OperationalAuthorizationType.UNDO_LIVE_OPERATIONAL_SALE) {
++            throw new IllegalArgumentException("La aplicacion de esta accion queda pendiente de contrato funcional");
++        }
++
++        applyUndoLiveOperationalSale(entity, userId, request != null ? request.getReason() : null);
++        entity.setStatus(OperationalAuthorizationStatus.APPLIED);
++        entity.setAppliedByUserId(userId);
++        entity.setAppliedAt(LocalDateTime.now());
++        return toResponse(repository.save(entity));
++    }
++
++    private void applyUndoLiveOperationalSale(OperationalAuthorizationRequest entity, Long userId, String reason) {
++        accessService.assertCan(userId, PermissionCode.UNDO_LIVE_OPERATIONAL_SALE);
++        Reservation reservation = reservationRepository.findById(entity.getReservationId())
++                .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada"));
++        tenantAccessGuard.requireBranch(reservation.getBranch().getId(), "La reserva no pertenece a la sucursal activa");
++
++        if (reservation.getStatus() != ReservationStatus.ACTIVE) {
++            throw new IllegalArgumentException("Solo una reserva activa puede deshacer vendido operativo");
++        }
++        if (reservation.getLive() == null) {
++            throw new IllegalArgumentException("La reserva no pertenece a LIVE");
++        }
++        if (reservation.getLiveOperationalStatus() != LiveReservationOperationalStatus.OPERATIONAL_SOLD) {
++            throw new IllegalArgumentException("La reserva no esta en vendido operativo");
++        }
++        if (reservation.getItem() == null || reservation.getItem().getStatus() != ItemStatus.RESERVED) {
++            throw new IllegalArgumentException("La prenda debe seguir reservada para deshacer vendido operativo");
++        }
++        if (calculateActiveAppliedToReservation(reservation.getId()).compareTo(BigDecimal.ZERO) > 0) {
++            throw new IllegalArgumentException("No se puede aplicar desde LIVE si la reserva tiene pago activo");
++        }
++
++        String currentSnapshot = reservationSnapshot(reservation);
++        if (!sha256(currentSnapshot).equals(entity.getCurrentStateHash())) {
++            throw new ConflictException("El estado de la reserva cambio desde la aprobacion");
++        }
++
++        LiveReservationOperationalStatus previousStatus = reservation.getLiveOperationalStatus();
++        reservation.setLiveOperationalStatus(LiveReservationOperationalStatus.RESERVED);
++        reservation.setLiveOperationalStatusUpdatedAt(LocalDateTime.now());
++        reservation.setLiveOperationalStatusUpdatedByUserId(userId);
++        reservation.setLiveOperationalStatusReason(cleanOptionalText(reason));
++        Reservation saved = reservationRepository.save(reservation);
++
++        String payload = "{\"reservationId\":" + saved.getId()
++                + ",\"previousStatus\":\"" + previousStatus.name()
++                + "\",\"newStatus\":\"" + saved.getLiveOperationalStatus().name()
++                + "\",\"authorizationId\":" + entity.getId() + "}";
++        liveEventService.record(
++                saved.getLive(),
++                LiveEventType.LIVE_RESERVATION_STATUS_CHANGED,
++                userId,
++                "RESERVATION",
++                saved.getId(),
++                payload
++        );
++        liveEventService.record(
++                saved.getLive(),
++                LiveEventType.LIVE_OPERATIONAL_SOLD_UNDONE,
++                userId,
++                "RESERVATION",
++                saved.getId(),
++                payload
++        );
++    }
++
++    private TargetSnapshot resolveTarget(OperationalAuthorizationCreateRequest request) {
++        if (request.getTargetType() == OperationalAuthorizationTargetType.RESERVATION || request.getReservationId() != null) {
++            Long reservationId = request.getReservationId() != null ? request.getReservationId() : request.getTargetId();
++            Reservation reservation = reservationRepository.findById(reservationId)
++                    .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada"));
++            Long branchId = reservation.getBranch().getId();
++            if (request.getBranchId() != null && !request.getBranchId().equals(branchId)) {
++                throw new AccessDeniedException("La reserva no pertenece a la sucursal solicitada");
++            }
++            validateReservationOperation(request.getOperationType(), reservation);
++            return new TargetSnapshot(
++                    branchId,
++                    reservation.getLive() != null ? reservation.getLive().getId() : request.getLiveId(),
++                    reservation.getId(),
++                    reservation.getItem() != null ? reservation.getItem().getId() : request.getItemId(),
++                    reservationSnapshot(reservation)
++            );
++        }
++
++        if (request.getTargetType() == OperationalAuthorizationTargetType.ITEM || request.getItemId() != null) {
++            Long itemId = request.getItemId() != null ? request.getItemId() : request.getTargetId();
++            Item item = itemRepository.findById(itemId)
++                    .orElseThrow(() -> new IllegalArgumentException("Item no encontrado"));
++            Long branchId = item.getBranch().getId();
++            if (request.getBranchId() != null && !request.getBranchId().equals(branchId)) {
++                throw new AccessDeniedException("El item no pertenece a la sucursal solicitada");
++            }
++            return new TargetSnapshot(branchId, request.getLiveId(), request.getReservationId(), item.getId(), itemSnapshot(item));
++        }
++
++        if (request.getBranchId() == null) {
++            throw new IllegalArgumentException("branchId es obligatorio para este target");
++        }
++        return new TargetSnapshot(
++                request.getBranchId(),
++                request.getLiveId(),
++                request.getReservationId(),
++                request.getItemId(),
++                "{\"targetType\":\"" + request.getTargetType().name() + "\",\"targetId\":" + request.getTargetId() + "}"
++        );
++    }
++
++    private void validateReservationOperation(OperationalAuthorizationType operationType, Reservation reservation) {
++        if (operationType == OperationalAuthorizationType.UNDO_LIVE_OPERATIONAL_SALE
++                && reservation.getLiveOperationalStatus() != LiveReservationOperationalStatus.OPERATIONAL_SOLD) {
++            throw new IllegalArgumentException("Solo se puede solicitar deshacer vendido operativo sobre OPERATIONAL_SOLD");
++        }
++        if (operationType == OperationalAuthorizationType.CANCEL_RESERVATION_WITH_PAYMENT
++                && calculateActiveAppliedToReservation(reservation.getId()).compareTo(BigDecimal.ZERO) <= 0) {
++            throw new IllegalArgumentException("La reserva no tiene pago activo aplicado");
++        }
++    }
++
++    private BigDecimal calculateActiveAppliedToReservation(Long reservationId) {
++        return paymentAllocationRepository.findByReservationIdOrderByCreatedAtAsc(reservationId)
++                .stream()
++                .map(this::activeAllocationAmount)
++                .reduce(BigDecimal.ZERO, BigDecimal::add);
++    }
++
++    private BigDecimal activeAllocationAmount(PaymentAllocation allocation) {
++        Payment payment = paymentRepository.findById(allocation.getPaymentId())
++                .orElseThrow(() -> new IllegalArgumentException("Pago no encontrado"));
++        return payment.getStatus() == PaymentStatus.ACTIVE ? allocation.getAmount() : BigDecimal.ZERO;
++    }
++
++    private OperationalAuthorizationRequest findScoped(Long id) {
++        OperationalAuthorizationRequest entity = repository.findById(id)
++                .orElseThrow(() -> new IllegalArgumentException("Solicitud de autorizacion no encontrada"));
++        CurrentTenantContext tenant = tenantAccessGuard.requireBranch(entity.getBranchId(), "La autorizacion no pertenece a la sucursal activa");
++        if (!tenant.getCompanyId().equals(entity.getCompanyId())) {
++            throw new AccessDeniedException("La autorizacion no pertenece a la company activa");
++        }
++        return entity;
++    }
++
++    private void validateCreateRequest(OperationalAuthorizationCreateRequest request) {
++        if (request == null) {
++            throw new IllegalArgumentException("Solicitud requerida");
++        }
++        if (request.getOperationType() == null) {
++            throw new IllegalArgumentException("operationType es obligatorio");
++        }
++        if (request.getTargetType() == null) {
++            throw new IllegalArgumentException("targetType es obligatorio");
++        }
++        if (request.getTargetId() == null) {
++            throw new IllegalArgumentException("targetId es obligatorio");
++        }
++        cleanReason(request.getReason());
++    }
++
++    private void assertCanRequestOperation(Long userId, OperationalAuthorizationType operationType) {
++        if (operationType == null) {
++            return;
++        }
++        switch (operationType) {
++            case CANCEL_RESERVATION_WITH_PAYMENT ->
++                    accessService.assertCan(userId, PermissionCode.CANCEL_RESERVATION_WITH_PAYMENT);
++            case RELEASE_RESERVED_ITEM -> accessService.assertCan(userId, PermissionCode.RELEASE_RESERVED_ITEM);
++            case UNDO_LIVE_OPERATIONAL_SALE -> accessService.assertCan(userId, PermissionCode.UNDO_LIVE_OPERATIONAL_SALE);
++            case REASSIGN_RESERVATION -> accessService.assertCan(userId, PermissionCode.REASSIGN_RESERVATION);
++            case EDIT_LOCKED_ITEM -> accessService.assertCan(userId, PermissionCode.EDIT_LOCKED_ITEM);
++        }
++    }
++
++    private void ensureRequested(OperationalAuthorizationRequest entity) {
++        if (entity.getStatus() != OperationalAuthorizationStatus.REQUESTED) {
++            throw new IllegalArgumentException("Solo se puede decidir una solicitud pendiente");
++        }
++    }
++
++    private void ensureNotExpired(OperationalAuthorizationRequest entity) {
++        if (entity.getExpiresAt() != null && entity.getExpiresAt().isBefore(LocalDateTime.now())) {
++            entity.setStatus(OperationalAuthorizationStatus.EXPIRED);
++            repository.save(entity);
++            throw new IllegalArgumentException("La autorizacion expiro");
++        }
++    }
++
++    private OperationalAuthorizationResponse toResponse(OperationalAuthorizationRequest entity) {
++        return new OperationalAuthorizationResponse(entity);
++    }
++
++    private String cleanReason(String value) {
++        String cleaned = cleanOptionalText(value);
++        if (cleaned == null) {
++            throw new IllegalArgumentException("reason es obligatorio");
++        }
++        return cleaned;
++    }
++
++    private String cleanOptionalText(String value) {
++        if (value == null || value.trim().isEmpty()) {
++            return null;
++        }
++        String cleaned = value.trim();
++        return cleaned.length() > 2000 ? cleaned.substring(0, 2000) : cleaned;
++    }
++
++    private String cleanOptionalJson(String value) {
++        String cleaned = cleanOptionalText(value);
++        if (cleaned == null) {
++            return null;
++        }
++        return cleaned.length() > 4000 ? cleaned.substring(0, 4000) : cleaned;
++    }
++
++    private String reservationSnapshot(Reservation reservation) {
++        return "{\"reservationId\":" + reservation.getId()
++                + ",\"status\":\"" + reservation.getStatus().name()
++                + "\",\"liveOperationalStatus\":\"" + statusName(reservation.getLiveOperationalStatus())
++                + "\",\"branchId\":" + reservation.getBranch().getId()
++                + ",\"liveId\":" + nullableNumber(reservation.getLive() != null ? reservation.getLive().getId() : null)
++                + ",\"itemId\":" + nullableNumber(reservation.getItem() != null ? reservation.getItem().getId() : null)
++                + ",\"itemStatus\":\"" + (reservation.getItem() != null ? reservation.getItem().getStatus().name() : "null")
++                + "\"}";
++    }
++
++    private String itemSnapshot(Item item) {
++        return "{\"itemId\":" + item.getId()
++                + ",\"branchId\":" + item.getBranch().getId()
++                + ",\"status\":\"" + item.getStatus().name() + "\"}";
++    }
++
++    private String statusName(LiveReservationOperationalStatus status) {
++        return status == null ? "null" : status.name();
++    }
++
++    private String nullableNumber(Long value) {
++        return value == null ? "null" : value.toString();
++    }
++
++    private String sha256(String value) {
++        try {
++            byte[] hash = MessageDigest
++                    .getInstance("SHA-256")
++                    .digest(value.getBytes(StandardCharsets.UTF_8));
++            StringBuilder builder = new StringBuilder();
++            for (byte item : hash) {
++                builder.append(String.format("%02x", item));
++            }
++            return builder.toString();
++        } catch (NoSuchAlgorithmException ex) {
++            throw new IllegalStateException("No se pudo calcular hash de autorizacion", ex);
++        }
++    }
++
++    private record TargetSnapshot(Long branchId, Long liveId, Long reservationId, Long itemId, String snapshotJson) {
++    }
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationStatus.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationStatus.java
+new file mode 100644
+index 0000000..9663e89
+--- /dev/null
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationStatus.java
+@@ -0,0 +1,10 @@
++package com.hpsqsoft.ctrlropa.operationauth;
++
++public enum OperationalAuthorizationStatus {
++    REQUESTED,
++    APPROVED,
++    REJECTED,
++    APPLIED,
++    EXPIRED,
++    CANCELLED
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationTargetType.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationTargetType.java
+new file mode 100644
+index 0000000..98f577a
+--- /dev/null
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationTargetType.java
+@@ -0,0 +1,10 @@
++package com.hpsqsoft.ctrlropa.operationauth;
++
++public enum OperationalAuthorizationTargetType {
++    LIVE,
++    RESERVATION,
++    ITEM,
++    PAYMENT,
++    SALE,
++    SUPPORT
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationType.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationType.java
+new file mode 100644
+index 0000000..9f8625d
+--- /dev/null
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationType.java
+@@ -0,0 +1,9 @@
++package com.hpsqsoft.ctrlropa.operationauth;
++
++public enum OperationalAuthorizationType {
++    CANCEL_RESERVATION_WITH_PAYMENT,
++    RELEASE_RESERVED_ITEM,
++    UNDO_LIVE_OPERATIONAL_SALE,
++    REASSIGN_RESERVATION,
++    EDIT_LOCKED_ITEM
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/security/access/PermissionCode.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/security/access/PermissionCode.java
+index d32602a..b4e29ea 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/security/access/PermissionCode.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/security/access/PermissionCode.java
+@@ -26,6 +26,15 @@ public final class PermissionCode {
+     public static final String CHANGE_LIVE_ACTIVE_ITEM = "CHANGE_LIVE_ACTIVE_ITEM";
+     public static final String REMOVE_LIVE_ACTIVE_ITEM = "REMOVE_LIVE_ACTIVE_ITEM";
+     public static final String DO_LIVE_RESERVATION = "DO_LIVE_RESERVATION";
++    public static final String REQUEST_LIVE_OPERATION_AUTHORIZATION = "REQUEST_LIVE_OPERATION_AUTHORIZATION";
++    public static final String APPROVE_LIVE_OPERATION_AUTHORIZATION = "APPROVE_LIVE_OPERATION_AUTHORIZATION";
++    public static final String VIEW_LIVE_OPERATION_AUTHORIZATIONS = "VIEW_LIVE_OPERATION_AUTHORIZATIONS";
++    public static final String APPLY_LIVE_OPERATION_AUTHORIZATION = "APPLY_LIVE_OPERATION_AUTHORIZATION";
++    public static final String CANCEL_RESERVATION_WITH_PAYMENT = "CANCEL_RESERVATION_WITH_PAYMENT";
++    public static final String RELEASE_RESERVED_ITEM = "RELEASE_RESERVED_ITEM";
++    public static final String UNDO_LIVE_OPERATIONAL_SALE = "UNDO_LIVE_OPERATIONAL_SALE";
++    public static final String REASSIGN_RESERVATION = "REASSIGN_RESERVATION";
++    public static final String EDIT_LOCKED_ITEM = "EDIT_LOCKED_ITEM";
+     public static final String DO_DOOR_SALE = "DO_DOOR_SALE";
+     public static final String DO_DOOR_RESERVATION = "DO_DOOR_RESERVATION";
+
+diff --git a/backend/control-ropa/src/main/resources/db/migration/V55__live_operational_authorizations_mvp.sql b/backend/control-ropa/src/main/resources/db/migration/V55__live_operational_authorizations_mvp.sql
+new file mode 100644
+index 0000000..0e87e2d
+--- /dev/null
++++ b/backend/control-ropa/src/main/resources/db/migration/V55__live_operational_authorizations_mvp.sql
+@@ -0,0 +1,83 @@
++-- LIVE-AUTH-B1: MVP de autorizaciones operativas LIVE.
++-- Aditiva: crea permisos, tabla de solicitudes y asignacion minima por rol.
++-- No toca pagos, caja, precio LIVE, devoluciones ni venta financiera.
++
++SET NAMES utf8mb4;
++START TRANSACTION;
++
++INSERT IGNORE INTO permissions (code, name) VALUES
++  ('REQUEST_LIVE_OPERATION_AUTHORIZATION', 'Solicitar autorizacion operativa LIVE'),
++  ('APPROVE_LIVE_OPERATION_AUTHORIZATION', 'Aprobar autorizacion operativa LIVE'),
++  ('VIEW_LIVE_OPERATION_AUTHORIZATIONS', 'Ver autorizaciones operativas LIVE'),
++  ('APPLY_LIVE_OPERATION_AUTHORIZATION', 'Aplicar autorizacion operativa LIVE'),
++  ('CANCEL_RESERVATION_WITH_PAYMENT', 'Cancelar apartado con pago'),
++  ('RELEASE_RESERVED_ITEM', 'Liberar prenda apartada'),
++  ('UNDO_LIVE_OPERATIONAL_SALE', 'Deshacer vendido operativo LIVE'),
++  ('REASSIGN_RESERVATION', 'Reasignar apartado'),
++  ('EDIT_LOCKED_ITEM', 'Editar prenda bloqueada');
++
++CREATE TABLE IF NOT EXISTS operational_authorization_requests (
++  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
++  operation_type VARCHAR(80) NOT NULL,
++  status VARCHAR(30) NOT NULL DEFAULT 'REQUESTED',
++  company_id BIGINT UNSIGNED NOT NULL,
++  branch_id BIGINT UNSIGNED NOT NULL,
++  requested_by_user_id BIGINT UNSIGNED NOT NULL,
++  requested_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++  decided_by_user_id BIGINT UNSIGNED NULL,
++  decided_at DATETIME NULL,
++  applied_by_user_id BIGINT UNSIGNED NULL,
++  applied_at DATETIME NULL,
++  expires_at DATETIME NOT NULL,
++  target_type VARCHAR(40) NOT NULL,
++  target_id BIGINT UNSIGNED NOT NULL,
++  live_id BIGINT UNSIGNED NULL,
++  reservation_id BIGINT UNSIGNED NULL,
++  item_id BIGINT UNSIGNED NULL,
++  payment_id BIGINT UNSIGNED NULL,
++  sale_id BIGINT UNSIGNED NULL,
++  reason TEXT NOT NULL,
++  decision_reason TEXT NULL,
++  current_state_hash VARCHAR(64) NULL,
++  snapshot_json TEXT NULL,
++  payload_json TEXT NULL,
++  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
++  PRIMARY KEY (id),
++  KEY idx_op_auth_company_branch_created (company_id, branch_id, created_at),
++  KEY idx_op_auth_branch_status_created (branch_id, status, created_at),
++  KEY idx_op_auth_requester_created (requested_by_user_id, created_at),
++  KEY idx_op_auth_target_status (company_id, branch_id, operation_type, target_type, target_id, status),
++  KEY idx_op_auth_reservation_created (reservation_id, created_at),
++  KEY idx_op_auth_item_created (item_id, created_at),
++  KEY idx_op_auth_live_created (live_id, created_at)
++);
++
++-- ADMIN y SUPERVISOR pueden solicitar, ver, aprobar y aplicar el MVP.
++INSERT IGNORE INTO role_permissions (role_id, permission_id)
++SELECT r.id, p.id
++FROM roles r
++JOIN permissions p ON p.code IN (
++  'REQUEST_LIVE_OPERATION_AUTHORIZATION',
++  'APPROVE_LIVE_OPERATION_AUTHORIZATION',
++  'VIEW_LIVE_OPERATION_AUTHORIZATIONS',
++  'APPLY_LIVE_OPERATION_AUTHORIZATION',
++  'CANCEL_RESERVATION_WITH_PAYMENT',
++  'RELEASE_RESERVED_ITEM',
++  'UNDO_LIVE_OPERATIONAL_SALE',
++  'REASSIGN_RESERVATION',
++  'EDIT_LOCKED_ITEM'
++)
++WHERE r.code IN ('ADMIN', 'SUPERVISOR');
++
++-- SELLER puede solicitar deshacer vendido operativo; no puede ver cola completa, aprobar ni aplicar.
++INSERT IGNORE INTO role_permissions (role_id, permission_id)
++SELECT r.id, p.id
++FROM roles r
++JOIN permissions p ON p.code IN (
++  'REQUEST_LIVE_OPERATION_AUTHORIZATION',
++  'UNDO_LIVE_OPERATIONAL_SALE'
++)
++WHERE r.code = 'SELLER';
++
++COMMIT;
+diff --git a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationServiceTests.java b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationServiceTests.java
+new file mode 100644
+index 0000000..9f563d7
+--- /dev/null
++++ b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationServiceTests.java
+@@ -0,0 +1,256 @@
++package com.hpsqsoft.ctrlropa.operationauth;
++
++import com.hpsqsoft.ctrlropa.branch.Branch;
++import com.hpsqsoft.ctrlropa.catalog.SalesChannel;
++import com.hpsqsoft.ctrlropa.item.Item;
++import com.hpsqsoft.ctrlropa.item.ItemRepository;
++import com.hpsqsoft.ctrlropa.item.ItemStatus;
++import com.hpsqsoft.ctrlropa.live.Live;
++import com.hpsqsoft.ctrlropa.live.LiveEventService;
++import com.hpsqsoft.ctrlropa.live.LiveEventType;
++import com.hpsqsoft.ctrlropa.payment.PaymentAllocationRepository;
++import com.hpsqsoft.ctrlropa.payment.PaymentRepository;
++import com.hpsqsoft.ctrlropa.reservation.LiveReservationOperationalStatus;
++import com.hpsqsoft.ctrlropa.reservation.Reservation;
++import com.hpsqsoft.ctrlropa.reservation.ReservationRepository;
++import com.hpsqsoft.ctrlropa.reservation.ReservationStatus;
++import com.hpsqsoft.ctrlropa.security.access.AccessService;
++import com.hpsqsoft.ctrlropa.security.access.ChannelCode;
++import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
++import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
++import com.hpsqsoft.ctrlropa.tenant.CurrentTenantContext;
++import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
++import org.junit.jupiter.api.Test;
++import org.springframework.security.access.AccessDeniedException;
++import org.springframework.test.util.ReflectionTestUtils;
++
++import java.math.BigDecimal;
++import java.time.LocalDateTime;
++import java.util.List;
++import java.util.Optional;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertThrows;
++import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.Mockito.mock;
++import static org.mockito.Mockito.verify;
++import static org.mockito.Mockito.when;
++
++class OperationalAuthorizationServiceTests {
++
++    private final OperationalAuthorizationRepository repository = mock(OperationalAuthorizationRepository.class);
++    private final ReservationRepository reservationRepository = mock(ReservationRepository.class);
++    private final ItemRepository itemRepository = mock(ItemRepository.class);
++    private final PaymentAllocationRepository paymentAllocationRepository = mock(PaymentAllocationRepository.class);
++    private final PaymentRepository paymentRepository = mock(PaymentRepository.class);
++    private final AccessService accessService = mock(AccessService.class);
++    private final CurrentUser currentUser = mock(CurrentUser.class);
++    private final TenantAccessGuard tenantAccessGuard = mock(TenantAccessGuard.class);
++    private final LiveEventService liveEventService = mock(LiveEventService.class);
++
++    private final OperationalAuthorizationService service = new OperationalAuthorizationService(
++            repository,
++            reservationRepository,
++            itemRepository,
++            paymentAllocationRepository,
++            paymentRepository,
++            accessService,
++            currentUser,
++            tenantAccessGuard,
++            liveEventService
++    );
++
++    @Test
++    void createRequiresRequestPermissionAndPersistsSnapshot() {
++        Reservation reservation = liveReservation(10L, 6L);
++        when(currentUser.getUserId()).thenReturn(99L);
++        when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
++        when(paymentAllocationRepository.findByReservationIdOrderByCreatedAtAsc(10L)).thenReturn(List.of());
++        when(tenantAccessGuard.requireBranch(6L, "El target de autorizacion no pertenece a la sucursal activa"))
++                .thenReturn(tenant());
++        when(repository.save(any(OperationalAuthorizationRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
++
++        OperationalAuthorizationResponse response = service.create(undoRequest());
++
++        assertEquals("UNDO_LIVE_OPERATIONAL_SALE", response.getOperationType());
++        assertEquals("REQUESTED", response.getStatus());
++        assertEquals(10L, response.getReservationId());
++        verify(accessService).assertCan(99L, PermissionCode.REQUEST_LIVE_OPERATION_AUTHORIZATION);
++        verify(accessService).assertCan(99L, PermissionCode.UNDO_LIVE_OPERATIONAL_SALE);
++    }
++
++    @Test
++    void approveRejectsSelfApproval() {
++        OperationalAuthorizationRequest request = requestedAuthorization(50L, 99L);
++        when(currentUser.getUserId()).thenReturn(99L);
++        when(repository.findById(50L)).thenReturn(Optional.of(request));
++        when(tenantAccessGuard.requireBranch(6L, "La autorizacion no pertenece a la sucursal activa"))
++                .thenReturn(tenant());
++
++        assertThrows(
++                AccessDeniedException.class,
++                () -> service.approve(50L, decision("OK"))
++        );
++
++        verify(accessService).assertCan(99L, PermissionCode.APPROVE_LIVE_OPERATION_AUTHORIZATION);
++    }
++
++    @Test
++    void sellerCannotApproveWhenAccessServiceDenies() {
++        when(currentUser.getUserId()).thenReturn(44L);
++        org.mockito.Mockito.doThrow(new AccessDeniedException("denied"))
++                .when(accessService)
++                .assertCan(44L, PermissionCode.APPROVE_LIVE_OPERATION_AUTHORIZATION);
++
++        assertThrows(
++                AccessDeniedException.class,
++                () -> service.approve(50L, decision("OK"))
++        );
++    }
++
++    @Test
++    void rejectedAuthorizationCannotBeApplied() {
++        OperationalAuthorizationRequest request = requestedAuthorization(50L, 99L);
++        request.setStatus(OperationalAuthorizationStatus.REJECTED);
++        when(currentUser.getUserId()).thenReturn(100L);
++        when(repository.findById(50L)).thenReturn(Optional.of(request));
++        when(tenantAccessGuard.requireBranch(6L, "La autorizacion no pertenece a la sucursal activa"))
++                .thenReturn(tenant());
++
++        assertThrows(
++                IllegalArgumentException.class,
++                () -> service.apply(50L, decision("Aplicar"))
++        );
++
++        verify(accessService).assertCan(100L, PermissionCode.APPLY_LIVE_OPERATION_AUTHORIZATION);
++    }
++
++    @Test
++    void applyUndoOperationalSoldRestoresReservedOperationalStatusWithoutPayments() {
++        Reservation reservation = liveReservation(10L, 6L);
++        OperationalAuthorizationCreateRequest createRequest = undoRequest();
++        when(currentUser.getUserId()).thenReturn(99L, 100L, 100L);
++        when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
++        when(paymentAllocationRepository.findByReservationIdOrderByCreatedAtAsc(10L)).thenReturn(List.of());
++        when(tenantAccessGuard.requireBranch(6L, "El target de autorizacion no pertenece a la sucursal activa"))
++                .thenReturn(tenant());
++        when(tenantAccessGuard.requireBranch(6L, "La autorizacion no pertenece a la sucursal activa"))
++                .thenReturn(tenant());
++        when(tenantAccessGuard.requireBranch(6L, "La reserva no pertenece a la sucursal activa"))
++                .thenReturn(tenant());
++        when(repository.save(any(OperationalAuthorizationRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
++        when(reservationRepository.save(any(Reservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
++
++        OperationalAuthorizationResponse created = service.create(createRequest);
++        OperationalAuthorizationRequest entity = captureCreatedEntity();
++        ReflectionTestUtils.setField(entity, "id", 50L);
++        entity.setStatus(OperationalAuthorizationStatus.APPROVED);
++        entity.setDecidedByUserId(100L);
++        entity.setDecidedAt(LocalDateTime.now());
++        when(repository.findById(50L)).thenReturn(Optional.of(entity));
++
++        OperationalAuthorizationResponse applied = service.apply(50L, decision("Reabrir operativo"));
++
++        assertEquals("APPLIED", applied.getStatus());
++        assertEquals(LiveReservationOperationalStatus.RESERVED, reservation.getLiveOperationalStatus());
++        assertEquals(ItemStatus.RESERVED, reservation.getItem().getStatus());
++        verify(accessService).assertCan(100L, PermissionCode.APPLY_LIVE_OPERATION_AUTHORIZATION);
++        verify(accessService).assertCan(100L, PermissionCode.UNDO_LIVE_OPERATIONAL_SALE);
++        verify(liveEventService).record(
++                reservation.getLive(),
++                LiveEventType.LIVE_OPERATIONAL_SOLD_UNDONE,
++                100L,
++                "RESERVATION",
++                10L,
++                "{\"reservationId\":10,\"previousStatus\":\"OPERATIONAL_SOLD\",\"newStatus\":\"RESERVED\",\"authorizationId\":50}"
++        );
++    }
++
++    private OperationalAuthorizationRequest captureCreatedEntity() {
++        org.mockito.ArgumentCaptor<OperationalAuthorizationRequest> captor =
++                org.mockito.ArgumentCaptor.forClass(OperationalAuthorizationRequest.class);
++        verify(repository).save(captor.capture());
++        return captor.getValue();
++    }
++
++    private static OperationalAuthorizationCreateRequest undoRequest() {
++        OperationalAuthorizationCreateRequest request = new OperationalAuthorizationCreateRequest();
++        request.setOperationType(OperationalAuthorizationType.UNDO_LIVE_OPERATIONAL_SALE);
++        request.setTargetType(OperationalAuthorizationTargetType.RESERVATION);
++        request.setTargetId(10L);
++        request.setReservationId(10L);
++        request.setReason("Cliente pidio reabrir seguimiento operativo");
++        return request;
++    }
++
++    private static OperationalAuthorizationDecisionRequest decision(String reason) {
++        OperationalAuthorizationDecisionRequest request = new OperationalAuthorizationDecisionRequest();
++        request.setReason(reason);
++        return request;
++    }
++
++    private static OperationalAuthorizationRequest requestedAuthorization(Long id, Long requestedByUserId) {
++        OperationalAuthorizationRequest request = new OperationalAuthorizationRequest();
++        ReflectionTestUtils.setField(request, "id", id);
++        request.setOperationType(OperationalAuthorizationType.UNDO_LIVE_OPERATIONAL_SALE);
++        request.setStatus(OperationalAuthorizationStatus.REQUESTED);
++        request.setCompanyId(1L);
++        request.setBranchId(6L);
++        request.setRequestedByUserId(requestedByUserId);
++        request.setRequestedAt(LocalDateTime.now());
++        request.setExpiresAt(LocalDateTime.now().plusHours(8));
++        request.setTargetType(OperationalAuthorizationTargetType.RESERVATION);
++        request.setTargetId(10L);
++        request.setReservationId(10L);
++        request.setReason("Motivo");
++        return request;
++    }
++
++    private static CurrentTenantContext tenant() {
++        return new CurrentTenantContext(1L, "DEFAULT", "Default", 6L, "QA_CTR", "QA Centro", 100L);
++    }
++
++    private static Reservation liveReservation(Long id, Long branchId) {
++        Branch branch = new Branch();
++        branch.setId(branchId);
++        branch.setCode("QA_CTR");
++
++        Item item = new Item();
++        ReflectionTestUtils.setField(item, "id", 8L);
++        item.setCode("QA-CTR-005");
++        item.setPrice(BigDecimal.valueOf(300));
++        item.setBranch(branch);
++        item.setStatus(ItemStatus.RESERVED);
++
++        Live live = new Live();
++        ReflectionTestUtils.setField(live, "id", 4L);
++        live.setBranch(branch);
++
++        SalesChannel liveChannel = new SalesChannel();
++        liveChannel.setId(3L);
++        liveChannel.setCode(ChannelCode.LIVE);
++
++        Reservation reservation = new Reservation();
++        ReflectionTestUtils.setField(reservation, "id", id);
++        reservation.setBranch(branch);
++        reservation.setItem(item);
++        reservation.setCustomer(customer());
++        reservation.setLive(live);
++        reservation.setSalesChannel(liveChannel);
++        reservation.setPrice(BigDecimal.valueOf(300));
++        reservation.setStatus(ReservationStatus.ACTIVE);
++        reservation.setLiveOperationalStatus(LiveReservationOperationalStatus.OPERATIONAL_SOLD);
++        reservation.setLiveOperationalStatusUpdatedAt(LocalDateTime.now());
++        reservation.setLiveOperationalStatusUpdatedByUserId(99L);
++        ReflectionTestUtils.setField(reservation, "createdAt", LocalDateTime.now());
++        return reservation;
++    }
++
++    private static com.hpsqsoft.ctrlropa.customer.Customer customer() {
++        com.hpsqsoft.ctrlropa.customer.Customer customer =
++                new com.hpsqsoft.ctrlropa.customer.Customer();
++        ReflectionTestUtils.setField(customer, "id", 27L);
++        customer.setName("Damaris");
++        return customer;
++    }
++}
+diff --git a/docs/AUTH_F_RBAC_PERMISSION_MATRIX.md b/docs/AUTH_F_RBAC_PERMISSION_MATRIX.md
+index 91fb946..b9e1e90 100644
+--- a/docs/AUTH_F_RBAC_PERMISSION_MATRIX.md
++++ b/docs/AUTH_F_RBAC_PERMISSION_MATRIX.md
+@@ -292,3 +292,26 @@ No se recomienda implementar enforcement fuerte hasta que negocio apruebe:
+ - Dependencias obligatorias vs advertencias.
+ - Estrategia de asignacion inicial para roles existentes.
+
++## Actualizacion 2026-06-10 - LIVE-AUTH-B1
++
++Permisos LIVE operativos agregados por `V55__live_operational_authorizations_mvp.sql`:
++
++| Permiso | Estado | Uso |
++|---|---|---|
++| `REQUEST_LIVE_OPERATION_AUTHORIZATION` | Existe desde B1 | Crear y consultar solicitudes propias |
++| `VIEW_LIVE_OPERATION_AUTHORIZATIONS` | Existe desde B1 | Ver cola/listado por sucursal |
++| `APPROVE_LIVE_OPERATION_AUTHORIZATION` | Existe desde B1 | Aprobar/rechazar solicitudes |
++| `APPLY_LIVE_OPERATION_AUTHORIZATION` | Existe desde B1 | Aplicar autorizacion aprobada |
++| `UNDO_LIVE_OPERATIONAL_SALE` | Existe desde B1 | Solicitar/aplicar deshacer vendido operativo sin pago activo |
++| `CANCEL_RESERVATION_WITH_PAYMENT` | Existe desde B1 | Solicitud/aprobacion; aplicacion pendiente de contrato financiero |
++| `RELEASE_RESERVED_ITEM` | Existe desde B1 | Solicitud/aprobacion; aplicacion pendiente |
++| `REASSIGN_RESERVATION` | Existe desde B1 | Solicitud/aprobacion; aplicacion pendiente |
++| `EDIT_LOCKED_ITEM` | Existe desde B1 | Solicitud/aprobacion; aplicacion pendiente |
++
++Asignacion inicial:
++
++- `ADMIN` y `SUPERVISOR`: solicitud, vista, aprobacion, aplicacion y permisos finos.
++- `SELLER`: solicitud y `UNDO_LIVE_OPERATIONAL_SALE`; sin aprobacion ni aplicacion.
++
++Nota: B1 no toca pagos/caja/precio/devoluciones ni venta financiera.
++
+diff --git a/docs/ERP_BITACORA_CAMBIOS.md b/docs/ERP_BITACORA_CAMBIOS.md
+index f5dbfec..0264792 100644
+--- a/docs/ERP_BITACORA_CAMBIOS.md
++++ b/docs/ERP_BITACORA_CAMBIOS.md
+@@ -3538,3 +3538,27 @@ Decision:
+
+ - `GO tecnico` si frontend pasa validaciones.
+ - `PENDING_QA_VISUAL` hasta validar en `/live` con navegador/capturas reales.
++## 2026-06-10 - LIVE-AUTH-B1 autorizaciones operativas LIVE MVP
++
++Tipo: backend MVP de autorizaciones operativas LIVE, con migracion aditiva y sin pagos/caja/precio/devoluciones/venta financiera.
++
++Objetivo:
++
++- Crear solicitudes persistentes de autorizacion operativa LIVE.
++- Permitir solicitud, listado, aprobacion, rechazo, cancelacion y aplicacion controlada.
++- Aplicar solo `UNDO_LIVE_OPERATIONAL_SALE` cuando no hay pago activo y el snapshot sigue consistente.
++
++Cambios realizados:
++
++- `V55__live_operational_authorizations_mvp.sql`: crea permisos y tabla `operational_authorization_requests`.
++- `PermissionCode.java`: agrega permisos de autorizacion operativa y acciones sensibles.
++- Nuevo paquete backend `operationauth`: entidad, repositorio, service, controller y DTOs.
++- `LiveEventType`: agrega `LIVE_OPERATIONAL_SOLD_UNDONE`.
++- `OperationalAuthorizationServiceTests`: cubre permisos, self-approval, rechazo y aplicacion segura.
++- `docs/LIVE_AUTH_B1_OPERATIONAL_AUTHORIZATIONS_MVP.md`: documenta alcance, endpoints, permisos, rollback y QA.
++
++Decision:
++
++- `GO_TECNICO` si backend/frontend pasan validaciones.
++- `PARTIAL_GO_BACKEND` porque la UI de cola/solicitud queda para fase posterior.
++- `PENDING_QA_VISUAL` hasta validar con navegador/screenshots reales.
+diff --git a/docs/ERP_RIESGOS_OPERATIVOS.md b/docs/ERP_RIESGOS_OPERATIVOS.md
+index cb9c5f9..720c1de 100644
+--- a/docs/ERP_RIESGOS_OPERATIVOS.md
++++ b/docs/ERP_RIESGOS_OPERATIVOS.md
+@@ -220,6 +220,9 @@ Probabilidad:
+ - ITEM-Z4 aclara en UI cuando una prenda `AVAILABLE` ya esta al aire; no cambia inventario, por lo que QA debe confirmar que el selector no la muestra solo como `Libre` ni permite prepararla como reemplazo de si misma.
+ - ITEM-Z5B agrega idempotencia backend para creacion de reservas con `X-Idempotency-Key`; siguen pendientes constraint de reserva activa por item, limpieza TTL, trazabilidad de intentos rechazados y QA API/visual real.
+ - ITEM-Z5C agrega constraint estructural de una reserva `ACTIVE` por item usando columna generada compatible con MySQL 5.7; ambientes con duplicados activos legacy deben resolverse antes de aplicar la migracion.
++- LIVE-AUTH-B1 crea autorizaciones operativas persistentes y permite aplicar solo `UNDO_LIVE_OPERATIONAL_SALE` sin pago activo; cancelaciones con pago, reasignacion, liberacion sensible y edicion de prendas bloqueadas siguen sin aplicacion real hasta contrato financiero/funcional y QA.
++- LIVE-AUTH-B1 agrega permisos operativos nuevos; roles productivos deben revisar asignaciones antes de operar, especialmente porque `SELLER` solo puede solicitar y no debe aprobar ni aplicar.
++- LIVE-AUTH-B1 no agrega UI; cualquier operacion desde frontend queda pendiente de fase B2 y QA visual real.
+ - PRODUCT-ERR-A agrega mapper frontend de errores accionables; modulos fuera de las rutas criticas aun deben migrarse por dominio para evitar que `err.message` exponga mensajes genericos o tecnicos.
+ - Pagos/ventas sin regresion automatizada suficiente.
+ - Auditoria de negocio todavia parcial.
+diff --git a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+index a2e9d21..2f47bc7 100644
+--- a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
++++ b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+@@ -928,3 +928,26 @@ Pendiente backlog:
+ | ITEM-Z3B reserva atomica disponibilidad | P0 | CRITICO | ITEM-Z3A | `ReservationService.create` usa update atomico `AVAILABLE -> RESERVED` por company/branch/item |
+ | ITEM-Z4 consistencia visual active item | P0 | MEDIO | ITEM-Z2/ITEM-Z3B | Selector LIVE distingue prenda actualmente al aire sin cambiar inventario |
+ | ITEM-Z5 auditoria e idempotencia de reservas | P0 | ALTO | ITEM-Z3B | Doble submit exacto, auditoria y constraint de reserva activa definidos/aprobados |
++
++## Avance LIVE-AUTH-B1
++
++Epic: autorizaciones operativas LIVE reales.
++
++Completado:
++
++- Crear migracion `V55__live_operational_authorizations_mvp.sql`.
++- Crear permisos de solicitud, visualizacion, aprobacion, aplicacion y acciones sensibles LIVE.
++- Crear backend `/api/operational-authorizations`.
++- Persistir solicitudes con company/branch, target, snapshot y hash.
++- Bloquear self-approval y solicitudes duplicadas pendientes.
++- Aplicar solo `UNDO_LIVE_OPERATIONAL_SALE` sin pago activo.
++- Documentar que cancelacion con pago, caja, precio LIVE, devoluciones, reasignacion y edicion bloqueada quedan pendientes.
++
++Pendiente backlog:
++
++| Tarea | Prioridad | Riesgo | Dependencia | Criterio de aceptacion |
++|---|---|---|---|---|
++| LIVE-AUTH-B2 UI autorizaciones | P0 | ALTO | B1 backend | Cola, solicitud y decisiones con i18n y QA visual |
++| LIVE-PAYMENT-GUARD-A reversa con pago | P0 | CRITICO | contrato financiero | Cancelacion con pago no descuadra saldos/caja |
++| LIVE-AUTH-B3 reasignacion autorizada | P1 | ALTO | reglas cliente/orden | Reasignar reserva con auditoria y sin pagos inconsistentes |
++| LIVE-AUTH-B4 edicion bloqueada autorizada | P1 | ALTO | reglas inventario | Edicion de prenda bloqueada limita campos y conserva trazabilidad |
+diff --git a/docs/LIVE_AUTH_B1_OPERATIONAL_AUTHORIZATIONS_MVP.md b/docs/LIVE_AUTH_B1_OPERATIONAL_AUTHORIZATIONS_MVP.md
+new file mode 100644
+index 0000000..744b632
+--- /dev/null
++++ b/docs/LIVE_AUTH_B1_OPERATIONAL_AUTHORIZATIONS_MVP.md
+@@ -0,0 +1,207 @@
++# LIVE-AUTH-B1 - MVP autorizaciones operativas LIVE
++
++Fecha: 2026-06-10
++Rama: feature/live-auth-b1-operational-authorizations-mvp
++
++## Resumen ejecutivo
++
++LIVE-AUTH-B1 implementa el MVP backend de autorizaciones operativas LIVE siguiendo el handoff `LIVE_AUTH_B0_OPERATIONAL_AUTHORIZATIONS_HANDOFF.md`.
++
++Resultado tecnico esperado: `GO_TECNICO` si las validaciones completas pasan.
++
++La implementacion queda deliberadamente acotada:
++
++- crea permisos reales para solicitar, ver, aprobar y aplicar autorizaciones operativas LIVE;
++- crea tabla persistente de solicitudes;
++- expone endpoints backend para crear, listar, aprobar, rechazar, cancelar y aplicar;
++- permite aplicar solo `UNDO_LIVE_OPERATIONAL_SALE` cuando no hay pago activo y el snapshot sigue consistente;
++- deja `CANCEL_RESERVATION_WITH_PAYMENT`, `RELEASE_RESERVED_ITEM`, `REASSIGN_RESERVATION` y `EDIT_LOCKED_ITEM` como solicitud/aprobacion documental, sin aplicacion real todavia.
++
++No se implementan pagos, caja, precio LIVE, devoluciones ni venta financiera.
++
++## Handoff aplicado
++
++B0 recomienda:
++
++- entidad generica `operational_authorization_requests`;
++- estados `REQUESTED`, `APPROVED`, `REJECTED`, `APPLIED`, `EXPIRED`, `CANCELLED`;
++- scope `company_id`, `branch_id`, usuario solicitante, target y snapshot;
++- permisos de solicitud, aprobacion, visualizacion y aplicacion;
++- primer caso aplicable seguro: `UNDO_LIVE_OPERATIONAL_SALE` sin pago activo.
++
++B1 implementa ese recorte y mantiene gate para cualquier accion que toque pago/caja/venta financiera o edicion funcional amplia.
++
++## Permisos creados
++
++Migracion: `V55__live_operational_authorizations_mvp.sql`.
++
++Permisos nuevos:
++
++- `REQUEST_LIVE_OPERATION_AUTHORIZATION`
++- `APPROVE_LIVE_OPERATION_AUTHORIZATION`
++- `VIEW_LIVE_OPERATION_AUTHORIZATIONS`
++- `APPLY_LIVE_OPERATION_AUTHORIZATION`
++- `CANCEL_RESERVATION_WITH_PAYMENT`
++- `RELEASE_RESERVED_ITEM`
++- `UNDO_LIVE_OPERATIONAL_SALE`
++- `REASSIGN_RESERVATION`
++- `EDIT_LOCKED_ITEM`
++
++Asignacion inicial:
++
++| Rol | Permisos |
++| --- | --- |
++| ADMIN | Solicitar, ver, aprobar, aplicar y permisos finos de acciones objetivo |
++| SUPERVISOR | Solicitar, ver, aprobar, aplicar y permisos finos de acciones objetivo |
++| SELLER | Solicitar y `UNDO_LIVE_OPERATIONAL_SALE`; no ve cola completa, no aprueba y no aplica |
++| Sin permisos | Sin acceso a endpoints de autorizacion |
++
++## Modelo persistente
++
++Tabla: `operational_authorization_requests`.
++
++Campos principales:
++
++- `operation_type`
++- `status`
++- `company_id`
++- `branch_id`
++- `requested_by_user_id`
++- `decided_by_user_id`
++- `applied_by_user_id`
++- `expires_at`
++- `target_type`
++- `target_id`
++- `live_id`
++- `reservation_id`
++- `item_id`
++- `payment_id`
++- `sale_id`
++- `reason`
++- `decision_reason`
++- `current_state_hash`
++- `snapshot_json`
++- `payload_json`
++
++Reglas:
++
++- no guarda secretos;
++- usa snapshot minimo y hash para detectar drift;
++- bloquea solicitud duplicada `REQUESTED` por accion + target + scope;
++- bloquea self-approval;
++- marca expiradas en validacion lazy;
++- revalida tenant/branch en lectura, decision y aplicacion.
++
++## Endpoints creados
++
++Base: `/api/operational-authorizations`.
++
++| Metodo | Ruta | Permiso |
++| --- | --- | --- |
++| `POST` | `/api/operational-authorizations` | `REQUEST_LIVE_OPERATION_AUTHORIZATION` + permiso fino de accion |
++| `GET` | `/api/operational-authorizations/branch/{branchId}` | `VIEW_LIVE_OPERATION_AUTHORIZATIONS` |
++| `GET` | `/api/operational-authorizations/pending/branch/{branchId}` | `VIEW_LIVE_OPERATION_AUTHORIZATIONS` |
++| `GET` | `/api/operational-authorizations/mine/branch/{branchId}` | `REQUEST_LIVE_OPERATION_AUTHORIZATION` |
++| `GET` | `/api/operational-authorizations/{id}` | `VIEW_LIVE_OPERATION_AUTHORIZATIONS` |
++| `PATCH` | `/api/operational-authorizations/{id}/approve` | `APPROVE_LIVE_OPERATION_AUTHORIZATION` |
++| `PATCH` | `/api/operational-authorizations/{id}/reject` | `APPROVE_LIVE_OPERATION_AUTHORIZATION` |
++| `PATCH` | `/api/operational-authorizations/{id}/cancel` | `REQUEST_LIVE_OPERATION_AUTHORIZATION` y solicitante original |
++| `POST` | `/api/operational-authorizations/{id}/apply` | `APPLY_LIVE_OPERATION_AUTHORIZATION` + permiso fino de aplicacion |
++
++## Aplicacion implementada
++
++Solo se implementa aplicacion para:
++
++`UNDO_LIVE_OPERATIONAL_SALE`
++
++Condiciones:
++
++- solicitud en estado `APPROVED`;
++- no expirada;
++- reserva sigue `ACTIVE`;
++- reserva pertenece a LIVE;
++- `liveOperationalStatus` sigue `OPERATIONAL_SOLD`;
++- item sigue `RESERVED`;
++- no hay `PaymentAllocation` con `PaymentStatus.ACTIVE`;
++- snapshot hash coincide;
++- aplicador tiene `APPLY_LIVE_OPERATION_AUTHORIZATION`;
++- aplicador tiene `UNDO_LIVE_OPERATIONAL_SALE`.
++
++Efecto:
++
++- cambia `liveOperationalStatus` a `RESERVED`;
++- conserva `ReservationStatus.ACTIVE`;
++- conserva item en `RESERVED`;
++- no crea venta;
++- no crea pago;
++- no toca caja;
++- registra eventos `LIVE_RESERVATION_STATUS_CHANGED` y `LIVE_OPERATIONAL_SOLD_UNDONE`.
++
++## Acciones pendientes
++
++Estas acciones pueden solicitarse/aprobarse si el usuario tiene permisos, pero no se aplican todavia:
++
++- `CANCEL_RESERVATION_WITH_PAYMENT`
++- `RELEASE_RESERVED_ITEM`
++- `REASSIGN_RESERVATION`
++- `EDIT_LOCKED_ITEM`
++
++Motivo: requieren contrato funcional/financiero especifico para no tocar pagos, caja, ventas, saldos o edicion de inventario de forma insegura.
++
++## Frontend
++
++No se agrego UI en B1.
++
++Motivo: el alcance seguro era cerrar backend, permisos, migracion y tests primero. La UI de cola/solicitud debe implementarse en una fase posterior con i18n y QA visual, usando estos endpoints reales.
++
++Pendiente recomendado:
++
++`LIVE-AUTH-B2 - UI cola y solicitud de autorizaciones operativas LIVE`
++
++## Tests
++
++Tests agregados:
++
++- `OperationalAuthorizationServiceTests`.
++
++Cobertura:
++
++- crear solicitud exige permiso de solicitud y permiso fino;
++- snapshot se persiste;
++- self-approval se bloquea;
++- seller/no aprobador no aprueba si `AccessService` deniega;
++- autorizacion rechazada no aplica;
++- `UNDO_LIVE_OPERATIONAL_SALE` aprobado se aplica sin pago activo y registra evento.
++
++## Rollback
++
++Si B1 se integra y requiere rollback:
++
++1. Revertir el merge/commit de B1.
++2. No borrar filas de `operational_authorization_requests` sin plan DBA.
++3. Si V55 ya fue aplicada en ambiente con datos, tratarla como migracion con datos operativos y no hacer DROP directo.
++4. Mantener permisos creados sin asignacion o retirar con migracion nueva controlada si negocio lo aprueba.
++
++## QA
++
++Checklist API:
++
++- usuario sin permiso no crea solicitud;
++- seller crea solicitud autorizable pero no aprueba ni aplica;
++- admin/supervisor aprueba;
++- solicitante no aprueba su propia solicitud;
++- solicitud rechazada no aplica;
++- solicitud aprobada no aplica dos veces;
++- `UNDO_LIVE_OPERATIONAL_SALE` sin pago activo revierte a `RESERVED`;
++- `UNDO_LIVE_OPERATIONAL_SALE` con pago activo queda bloqueado;
++- acciones con pago/caja no aplican en B1.
++
++Checklist visual:
++
++- `PENDING_QA_VISUAL` hasta existir UI y screenshots.
++
++## Resultado
++
++- `GO_TECNICO` si validaciones pasan.
++- `PARTIAL_GO_BACKEND` porque frontend queda pendiente documentado.
++- `PENDING_QA_VISUAL` porque no hubo navegador/screenshots.

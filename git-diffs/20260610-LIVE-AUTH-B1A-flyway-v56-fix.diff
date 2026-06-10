@@ -1,0 +1,130 @@
+﻿diff --git a/backend/control-ropa/src/main/resources/db/migration/V56__live_operational_authorizations_rbac_backfill.sql b/backend/control-ropa/src/main/resources/db/migration/V56__live_operational_authorizations_rbac_backfill.sql
+new file mode 100644
+index 0000000..c37a6a6
+--- /dev/null
++++ b/backend/control-ropa/src/main/resources/db/migration/V56__live_operational_authorizations_rbac_backfill.sql
+@@ -0,0 +1,14 @@
++-- LIVE-AUTH-B1A: backfill RBAC aditivo para autorizaciones operativas LIVE.
++-- Corrige bases DEV donde V55 se aplico antes de la version canonica commiteada.
++-- No toca pagos, caja, precio LIVE, devoluciones ni venta financiera.
++
++SET NAMES utf8mb4;
++START TRANSACTION;
++
++INSERT IGNORE INTO role_permissions (role_id, permission_id)
++SELECT r.id, p.id
++FROM roles r
++JOIN permissions p ON p.code = 'UNDO_LIVE_OPERATIONAL_SALE'
++WHERE r.code = 'SELLER';
++
++COMMIT;
+diff --git a/docs/LIVE_AUTH_B1A_FLYWAY_V56_FIX.md b/docs/LIVE_AUTH_B1A_FLYWAY_V56_FIX.md
+new file mode 100644
+index 0000000..9434ae6
+--- /dev/null
++++ b/docs/LIVE_AUTH_B1A_FLYWAY_V56_FIX.md
+@@ -0,0 +1,104 @@
++# LIVE-AUTH-B1A / Fix Flyway V55 con V56 aditiva
++
++Fecha: 2026-06-10
++Rama: `feature/live-auth-b1a-flyway-v56-fix`
++
++## Resumen ejecutivo
++
++LIVE-AUTH-B1 genero la migracion `V55__live_operational_authorizations_mvp.sql`.
++Durante la validacion local, la base DEV aplico una version anterior de V55 y despues el archivo quedo commiteado con contenido canonico distinto.
++
++Flyway detecto:
++
++- Applied to database: `-57051771`
++- Resolved locally: `1317462819`
++
++La correccion segura de codigo es no modificar V55 y agregar una migracion posterior aditiva:
++
++- `V56__live_operational_authorizations_rbac_backfill.sql`
++
++## Causa del mismatch
++
++El diagnostico previo confirmo:
++
++- existe una sola V55;
++- V55 esta commiteada en `290369c LIVE-AUTH-B1 implementa autorizaciones operativas`;
++- V55 no tiene cambios pendientes;
++- la DB local ya tenia V55 aplicada con checksum anterior;
++- la tabla `operational_authorization_requests` existe;
++- los indices existen;
++- los 9 permisos existen;
++- `ADMIN` y `SUPERVISOR` tienen los 9 permisos B1;
++- `SELLER` solo tenia `REQUEST_LIVE_OPERATION_AUTHORIZATION`;
++- la V55 canonica tambien asigna `UNDO_LIVE_OPERATIONAL_SALE` a `SELLER`.
++
++Por eso no era seguro hacer `flyway repair` directo antes de cubrir la diferencia real de datos.
++
++## Por que no se modifico V55
++
++V55 ya esta commiteada y puede estar aplicada en bases locales o compartidas. Modificar una migracion versionada aplicada aumenta el riesgo de nuevos checksum mismatch.
++
++La regla aplicada es:
++
++- migracion versionada aplicada no se reescribe;
++- ajuste nuevo se hace en una version posterior;
++- el repair, si se usa, queda limitado a DB local DEV y solo despues del backfill.
++
++## Que hace V56
++
++V56 ejecuta un backfill idempotente:
++
++- inserta en `role_permissions` la asignacion de `UNDO_LIVE_OPERATIONAL_SALE` para el rol `SELLER`;
++- solo lo hace si existen el rol y el permiso;
++- usa `INSERT IGNORE`, asi que no duplica si la DB limpia ya recibio la asignacion desde V55 canonica.
++
++V56 no borra datos, no toca pagos, caja, precio LIVE, devoluciones ni venta financiera.
++
++## Seguridad en escenarios
++
++DB limpia:
++
++- V55 canonica asigna `UNDO_LIVE_OPERATIONAL_SALE` a `SELLER`;
++- V56 no duplica por `INSERT IGNORE`;
++- resultado estable.
++
++DB local desalineada:
++
++- V55 anterior ya creo tabla/permisos pero no asigno `UNDO_LIVE_OPERATIONAL_SALE` a `SELLER`;
++- V56 completa la asignacion faltante;
++- si Flyway queda bloqueado por checksum de V55, se requiere `repair` local DEV para poder avanzar.
++
++## Cuándo ejecutar Flyway repair
++
++Permitido solo si se confirma todo lo siguiente:
++
++- la DB es local/DEV;
++- no es produccion ni QA compartido;
++- V55 actual esta commiteada y es canonica;
++- V56 ya cubre la diferencia detectada;
++- no se busca ocultar una estructura aplicada distinta.
++
++No ejecutar repair si:
++
++- la DB es compartida o productiva;
++- no se puede confirmar el origen local;
++- la estructura aplicada no coincide con la version canonica;
++- faltan tablas, indices o permisos que deberian existir.
++
++## Rollback
++
++Para rollback de codigo:
++
++- revertir el commit B1A antes de aplicar en ambientes nuevos.
++
++Para DB local DEV:
++
++- no borrar datos sin plan;
++- si se ejecuto `repair`, registrar que solo actualizo metadatos de Flyway;
++- si se aplico V56 y se requiere revertir la asignacion RBAC, hacerlo solo con una migracion posterior aprobada, no editando V56.
++
++## Riesgos
++
++- `flyway repair` actualiza metadatos de Flyway y debe tratarse como accion local controlada.
++- Si otra DB aplico una V55 diferente con datos distintos, V56 puede no ser suficiente y se requiere diagnostico especifico.
++- El MVP B1 sigue siendo backend-only; UI y QA visual quedan fuera de esta fase.

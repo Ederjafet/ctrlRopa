@@ -928,3 +928,26 @@ Pendiente backlog:
 | ITEM-Z3B reserva atomica disponibilidad | P0 | CRITICO | ITEM-Z3A | `ReservationService.create` usa update atomico `AVAILABLE -> RESERVED` por company/branch/item |
 | ITEM-Z4 consistencia visual active item | P0 | MEDIO | ITEM-Z2/ITEM-Z3B | Selector LIVE distingue prenda actualmente al aire sin cambiar inventario |
 | ITEM-Z5 auditoria e idempotencia de reservas | P0 | ALTO | ITEM-Z3B | Doble submit exacto, auditoria y constraint de reserva activa definidos/aprobados |
+
+## Avance LIVE-AUTH-B1
+
+Epic: autorizaciones operativas LIVE reales.
+
+Completado:
+
+- Crear migracion `V55__live_operational_authorizations_mvp.sql`.
+- Crear permisos de solicitud, visualizacion, aprobacion, aplicacion y acciones sensibles LIVE.
+- Crear backend `/api/operational-authorizations`.
+- Persistir solicitudes con company/branch, target, snapshot y hash.
+- Bloquear self-approval y solicitudes duplicadas pendientes.
+- Aplicar solo `UNDO_LIVE_OPERATIONAL_SALE` sin pago activo.
+- Documentar que cancelacion con pago, caja, precio LIVE, devoluciones, reasignacion y edicion bloqueada quedan pendientes.
+
+Pendiente backlog:
+
+| Tarea | Prioridad | Riesgo | Dependencia | Criterio de aceptacion |
+|---|---|---|---|---|
+| LIVE-AUTH-B2 UI autorizaciones | P0 | ALTO | B1 backend | Cola, solicitud y decisiones con i18n y QA visual |
+| LIVE-PAYMENT-GUARD-A reversa con pago | P0 | CRITICO | contrato financiero | Cancelacion con pago no descuadra saldos/caja |
+| LIVE-AUTH-B3 reasignacion autorizada | P1 | ALTO | reglas cliente/orden | Reasignar reserva con auditoria y sin pagos inconsistentes |
+| LIVE-AUTH-B4 edicion bloqueada autorizada | P1 | ALTO | reglas inventario | Edicion de prenda bloqueada limita campos y conserva trazabilidad |

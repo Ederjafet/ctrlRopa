@@ -220,6 +220,9 @@ Probabilidad:
 - ITEM-Z4 aclara en UI cuando una prenda `AVAILABLE` ya esta al aire; no cambia inventario, por lo que QA debe confirmar que el selector no la muestra solo como `Libre` ni permite prepararla como reemplazo de si misma.
 - ITEM-Z5B agrega idempotencia backend para creacion de reservas con `X-Idempotency-Key`; siguen pendientes constraint de reserva activa por item, limpieza TTL, trazabilidad de intentos rechazados y QA API/visual real.
 - ITEM-Z5C agrega constraint estructural de una reserva `ACTIVE` por item usando columna generada compatible con MySQL 5.7; ambientes con duplicados activos legacy deben resolverse antes de aplicar la migracion.
+- LIVE-AUTH-B1 crea autorizaciones operativas persistentes y permite aplicar solo `UNDO_LIVE_OPERATIONAL_SALE` sin pago activo; cancelaciones con pago, reasignacion, liberacion sensible y edicion de prendas bloqueadas siguen sin aplicacion real hasta contrato financiero/funcional y QA.
+- LIVE-AUTH-B1 agrega permisos operativos nuevos; roles productivos deben revisar asignaciones antes de operar, especialmente porque `SELLER` solo puede solicitar y no debe aprobar ni aplicar.
+- LIVE-AUTH-B1 no agrega UI; cualquier operacion desde frontend queda pendiente de fase B2 y QA visual real.
 - PRODUCT-ERR-A agrega mapper frontend de errores accionables; modulos fuera de las rutas criticas aun deben migrarse por dominio para evitar que `err.message` exponga mensajes genericos o tecnicos.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.

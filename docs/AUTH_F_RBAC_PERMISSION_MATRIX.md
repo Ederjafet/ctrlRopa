@@ -292,3 +292,26 @@ No se recomienda implementar enforcement fuerte hasta que negocio apruebe:
 - Dependencias obligatorias vs advertencias.
 - Estrategia de asignacion inicial para roles existentes.
 
+## Actualizacion 2026-06-10 - LIVE-AUTH-B1
+
+Permisos LIVE operativos agregados por `V55__live_operational_authorizations_mvp.sql`:
+
+| Permiso | Estado | Uso |
+|---|---|---|
+| `REQUEST_LIVE_OPERATION_AUTHORIZATION` | Existe desde B1 | Crear y consultar solicitudes propias |
+| `VIEW_LIVE_OPERATION_AUTHORIZATIONS` | Existe desde B1 | Ver cola/listado por sucursal |
+| `APPROVE_LIVE_OPERATION_AUTHORIZATION` | Existe desde B1 | Aprobar/rechazar solicitudes |
+| `APPLY_LIVE_OPERATION_AUTHORIZATION` | Existe desde B1 | Aplicar autorizacion aprobada |
+| `UNDO_LIVE_OPERATIONAL_SALE` | Existe desde B1 | Solicitar/aplicar deshacer vendido operativo sin pago activo |
+| `CANCEL_RESERVATION_WITH_PAYMENT` | Existe desde B1 | Solicitud/aprobacion; aplicacion pendiente de contrato financiero |
+| `RELEASE_RESERVED_ITEM` | Existe desde B1 | Solicitud/aprobacion; aplicacion pendiente |
+| `REASSIGN_RESERVATION` | Existe desde B1 | Solicitud/aprobacion; aplicacion pendiente |
+| `EDIT_LOCKED_ITEM` | Existe desde B1 | Solicitud/aprobacion; aplicacion pendiente |
+
+Asignacion inicial:
+
+- `ADMIN` y `SUPERVISOR`: solicitud, vista, aprobacion, aplicacion y permisos finos.
+- `SELLER`: solicitud y `UNDO_LIVE_OPERATIONAL_SALE`; sin aprobacion ni aplicacion.
+
+Nota: B1 no toca pagos/caja/precio/devoluciones ni venta financiera.
+

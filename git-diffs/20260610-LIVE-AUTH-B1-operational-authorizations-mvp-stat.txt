@@ -1,0 +1,20 @@
+﻿ .../com/hpsqsoft/ctrlropa/live/LiveEventType.java  |   1 +
+ .../OperationalAuthorizationController.java        |  65 +++
+ .../OperationalAuthorizationCreateRequest.java     |  38 ++
+ .../OperationalAuthorizationDecisionRequest.java   |   8 +
+ .../OperationalAuthorizationRepository.java        |  32 ++
+ .../OperationalAuthorizationRequest.java           | 158 +++++++
+ .../OperationalAuthorizationResponse.java          |  88 ++++
+ .../OperationalAuthorizationService.java           | 475 +++++++++++++++++++++
+ .../OperationalAuthorizationStatus.java            |  10 +
+ .../OperationalAuthorizationTargetType.java        |  10 +
+ .../OperationalAuthorizationType.java              |   9 +
+ .../ctrlropa/security/access/PermissionCode.java   |   9 +
+ .../V55__live_operational_authorizations_mvp.sql   |  83 ++++
+ .../OperationalAuthorizationServiceTests.java      | 256 +++++++++++
+ docs/AUTH_F_RBAC_PERMISSION_MATRIX.md              |  23 +
+ docs/ERP_BITACORA_CAMBIOS.md                       |  24 ++
+ docs/ERP_RIESGOS_OPERATIVOS.md                     |   3 +
+ docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md          |  23 +
+ .../LIVE_AUTH_B1_OPERATIONAL_AUTHORIZATIONS_MVP.md | 207 +++++++++
+ 19 files changed, 1522 insertions(+)
