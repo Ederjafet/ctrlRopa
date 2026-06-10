@@ -1,5 +1,30 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-10 - LIVE-PERM-FIX-A1 enforcement retirar prenda al aire
+
+Tipo: backend autorizacion, LIVE permisos, pruebas, evidencia.
+
+Objetivo:
+
+- Corregir el NO_GO de LIVE-QA-C donde vendedor podia retirar la prenda al aire por API sin `REMOVE_LIVE_ACTIVE_ITEM`.
+
+Cambios realizados:
+
+- `LiveService.assertCanRemoveLiveActiveItem` exige estrictamente `REMOVE_LIVE_ACTIVE_ITEM`.
+- Se elimina `DO_LIVE_RESERVATION` como fallback solo para retirar prenda al aire.
+- Se agregan pruebas de permiso dedicado, rechazo con permiso de apartado y continuidad de cambio/puesta de prenda.
+
+Restricciones respetadas:
+
+- No se tocaron pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC, permisos, endpoints ni migraciones.
+- No se cambio venta financiera.
+- `DO_LIVE_RESERVATION` conserva su uso para apartados LIVE.
+
+Pendientes:
+
+- Smoke API autenticado con dataset desechable y vendedor real: esperar `403` al retirar active item.
+- QA visual si se requiere evidencia de UI.
+
 ## 2026-06-10 - ITEM-Z8 consistencia final LIVE, inventario y reservas
 
 Tipo: auditoria tecnica, consistencia operativa, documentacion, evidencia.
