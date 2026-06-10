@@ -52,6 +52,7 @@ class ReservationServiceLiveOperationalStatusTests {
     private final TenantAccessGuard tenantAccessGuard = mock(TenantAccessGuard.class);
     private final LiveEventService liveEventService = mock(LiveEventService.class);
     private final ReservationIdempotencyRepository idempotencyRepository = mock(ReservationIdempotencyRepository.class);
+    private final ReservationRejectionTraceService rejectionTraceService = mock(ReservationRejectionTraceService.class);
 
     private final ReservationService service = new ReservationService(
             repository,
@@ -67,7 +68,8 @@ class ReservationServiceLiveOperationalStatusTests {
             jdbcTemplate,
             tenantAccessGuard,
             liveEventService,
-            idempotencyRepository
+            idempotencyRepository,
+            rejectionTraceService
     );
 
     @Test

@@ -1,5 +1,35 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-09 - ITEM-Z5D trazabilidad de reservas rechazadas
+
+Tipo: backend defensivo, migracion aditiva, retencion operativa, pruebas, evidencia.
+
+Objetivo:
+
+- Registrar intentos de reserva rechazados para diagnostico operativo sin guardar payload completo ni secretos.
+- Limpiar llaves de idempotencia expiradas para evitar crecimiento indefinido.
+
+Cambios realizados:
+
+- Se creo `V54__reservation_rejection_events.sql`.
+- Se agrego tabla `reservation_rejection_events` separada de auditoria de seguridad y de `live_events`.
+- `ReservationService.create` registra rechazos por item no disponible, reserva activa, mismatch de idempotencia, llave en progreso y validaciones de negocio relevantes.
+- La llave `X-Idempotency-Key` se registra solo como hash SHA-256.
+- Se agrego limpieza programada configurable para `reservation_idempotency_keys` vencidas.
+
+Restricciones respetadas:
+
+- No se tocaron pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC ni permisos.
+- No se crearon endpoints nuevos.
+- No se cambio venta financiera.
+- No se guarda payload completo.
+
+Pendientes:
+
+- QA API/visual real con usuarios operativos.
+- Consola o reporte operativo futuro para consultar rechazos si soporte lo requiere.
+- Definir retencion historica de `reservation_rejection_events` si el volumen crece.
+
 ## 2026-06-09 - ITEM-Z5C constraint de reserva activa por item
 
 Tipo: migracion de consistencia, backend defensivo, pruebas, evidencia operativa.

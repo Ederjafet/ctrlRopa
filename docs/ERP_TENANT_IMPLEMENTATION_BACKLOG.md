@@ -9,6 +9,25 @@ Tipo: backlog documental, sin implementacion
 
 Convertir el analisis de Fase 2A/2B en un backlog tecnico ordenado para implementar multi-compania con bajo riesgo, evitando fuga de datos entre clientes y manteniendo trazabilidad HPSQ-SOFT.
 
+## Actualizacion ITEM-Z5D - Trazabilidad de rechazos de reserva
+
+Fecha: 2026-06-09
+Estado: implementado tecnico condicionado.
+
+Alcance ejecutado:
+
+- Migracion `V54__reservation_rejection_events.sql`.
+- Tabla `reservation_rejection_events` para rechazos operativos de reserva.
+- Motivos trazados: `ITEM_NOT_AVAILABLE`, `ACTIVE_RESERVATION_EXISTS`, `IDEMPOTENCY_PAYLOAD_MISMATCH`, `IDEMPOTENCY_CONFLICT_OR_IN_PROGRESS` y `VALIDATION_REJECTED`.
+- Hash de `X-Idempotency-Key` y hash de request relevante; no payload completo.
+- Limpieza programada de llaves vencidas en `reservation_idempotency_keys`.
+
+Pendiente:
+
+- QA API/visual real con usuarios operativos.
+- Definir consola o reporte tecnico para consultar rechazos.
+- Evaluar retencion historica para `reservation_rejection_events` si crece volumen.
+
 ## Actualizacion ITEM-Z5C - Constraint de reserva activa por item
 
 Fecha: 2026-06-09

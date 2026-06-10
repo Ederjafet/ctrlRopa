@@ -1,0 +1,21 @@
+ ...ReservationIdempotencyCleanupConfiguration.java |   9 +
+ .../ReservationIdempotencyCleanupJob.java          |  19 ++
+ .../ReservationIdempotencyCleanupService.java      |  40 ++++
+ .../ReservationIdempotencyRepository.java          |   3 +
+ .../ReservationIdempotencyRetentionProperties.java |  34 +++
+ .../reservation/ReservationRejectionEvent.java     | 146 +++++++++++++
+ .../ReservationRejectionEventRepository.java       |   6 +
+ .../reservation/ReservationRejectionReason.java    |   9 +
+ .../ReservationRejectionTraceService.java          |  52 +++++
+ .../ctrlropa/reservation/ReservationService.java   | 235 ++++++++++++++++++++-
+ .../src/main/resources/application.properties      |   6 +
+ .../V54__reservation_rejection_events.sql          |  24 +++
+ .../ReservationIdempotencyCleanupServiceTests.java |  49 +++++
+ ...servationServiceLiveOperationalStatusTests.java |   4 +-
+ .../reservation/ReservationServiceTests.java       | 132 +++++++++++-
+ docs/ERP_BITACORA_CAMBIOS.md                       |  30 +++
+ docs/ERP_RIESGOS_OPERATIVOS.md                     |   1 +
+ docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md          |  19 ++
+ docs/ITEM_Z5D_RESERVATION_REJECTION_TRACE.md       | 146 +++++++++++++
+ ...ation-rejection-trace-report-20260609-200405.md | 175 +++++++++++++++
+ 20 files changed, 1132 insertions(+), 7 deletions(-)

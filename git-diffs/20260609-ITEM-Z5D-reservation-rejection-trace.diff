@@ -1,0 +1,1495 @@
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyCleanupConfiguration.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyCleanupConfiguration.java
+new file mode 100644
+index 0000000..892aca4
+--- /dev/null
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyCleanupConfiguration.java
+@@ -0,0 +1,9 @@
++package com.hpsqsoft.ctrlropa.reservation;
++
++import org.springframework.boot.context.properties.EnableConfigurationProperties;
++import org.springframework.context.annotation.Configuration;
++
++@Configuration
++@EnableConfigurationProperties(ReservationIdempotencyRetentionProperties.class)
++public class ReservationIdempotencyCleanupConfiguration {
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyCleanupJob.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyCleanupJob.java
+new file mode 100644
+index 0000000..1292c90
+--- /dev/null
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyCleanupJob.java
+@@ -0,0 +1,19 @@
++package com.hpsqsoft.ctrlropa.reservation;
++
++import org.springframework.scheduling.annotation.Scheduled;
++import org.springframework.stereotype.Component;
++
++@Component
++public class ReservationIdempotencyCleanupJob {
++
++    private final ReservationIdempotencyCleanupService cleanupService;
++
++    public ReservationIdempotencyCleanupJob(ReservationIdempotencyCleanupService cleanupService) {
++        this.cleanupService = cleanupService;
++    }
++
++    @Scheduled(cron = "${reservation.idempotency.cleanup-cron:0 30 3 * * *}")
++    public void runScheduledCleanup() {
++        cleanupService.cleanupExpiredKeys();
++    }
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyCleanupService.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyCleanupService.java
+new file mode 100644
+index 0000000..fbd7bc9
+--- /dev/null
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyCleanupService.java
+@@ -0,0 +1,40 @@
++package com.hpsqsoft.ctrlropa.reservation;
++
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++import org.springframework.stereotype.Service;
++import org.springframework.transaction.annotation.Transactional;
++
++import java.time.Clock;
++import java.time.LocalDateTime;
++
++@Service
++public class ReservationIdempotencyCleanupService {
++
++    private static final Logger log = LoggerFactory.getLogger(ReservationIdempotencyCleanupService.class);
++
++    private final ReservationIdempotencyRepository repository;
++    private final ReservationIdempotencyRetentionProperties properties;
++    private final Clock clock;
++
++    public ReservationIdempotencyCleanupService(ReservationIdempotencyRepository repository,
++                                                ReservationIdempotencyRetentionProperties properties,
++                                                Clock clock) {
++        this.repository = repository;
++        this.properties = properties;
++        this.clock = clock;
++    }
++
++    @Transactional
++    public long cleanupExpiredKeys() {
++        if (!properties.getCleanup().isEnabled()) {
++            log.debug("Reservation idempotency cleanup skipped because it is disabled");
++            return 0L;
++        }
++
++        LocalDateTime cutoff = LocalDateTime.now(clock);
++        long deleted = repository.deleteByExpiresAtBefore(cutoff);
++        log.info("Reservation idempotency cleanup deleted {} keys expired before {}", deleted, cutoff);
++        return deleted;
++    }
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyRepository.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyRepository.java
+index 28871c6..b00e438 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyRepository.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyRepository.java
+@@ -2,6 +2,7 @@ package com.hpsqsoft.ctrlropa.reservation;
+
+ import org.springframework.data.jpa.repository.JpaRepository;
+
++import java.time.LocalDateTime;
+ import java.util.Optional;
+
+ public interface ReservationIdempotencyRepository extends JpaRepository<ReservationIdempotencyRecord, Long> {
+@@ -13,4 +14,6 @@ public interface ReservationIdempotencyRepository extends JpaRepository<Reservat
+             String operation,
+             String idempotencyKey
+     );
++
++    long deleteByExpiresAtBefore(LocalDateTime cutoff);
+ }
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyRetentionProperties.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyRetentionProperties.java
+new file mode 100644
+index 0000000..bad2660
+--- /dev/null
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyRetentionProperties.java
+@@ -0,0 +1,34 @@
++package com.hpsqsoft.ctrlropa.reservation;
++
++import org.springframework.boot.context.properties.ConfigurationProperties;
++
++@ConfigurationProperties(prefix = "reservation.idempotency")
++public class ReservationIdempotencyRetentionProperties {
++
++    private String cleanupCron = "0 30 3 * * *";
++    private final Cleanup cleanup = new Cleanup();
++
++    public String getCleanupCron() {
++        return cleanupCron;
++    }
++
++    public void setCleanupCron(String cleanupCron) {
++        this.cleanupCron = cleanupCron;
++    }
++
++    public Cleanup getCleanup() {
++        return cleanup;
++    }
++
++    public static class Cleanup {
++        private boolean enabled = true;
++
++        public boolean isEnabled() {
++            return enabled;
++        }
++
++        public void setEnabled(boolean enabled) {
++            this.enabled = enabled;
++        }
++    }
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationRejectionEvent.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationRejectionEvent.java
+new file mode 100644
+index 0000000..cfe2ff3
+--- /dev/null
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationRejectionEvent.java
+@@ -0,0 +1,146 @@
++package com.hpsqsoft.ctrlropa.reservation;
++
++import jakarta.persistence.*;
++
++import java.time.LocalDateTime;
++
++@Entity
++@Table(name = "reservation_rejection_events")
++public class ReservationRejectionEvent {
++
++    @Id
++    @GeneratedValue(strategy = GenerationType.IDENTITY)
++    private Long id;
++
++    @Column(name = "company_id")
++    private Long companyId;
++
++    @Column(name = "branch_id")
++    private Long branchId;
++
++    @Column(name = "user_id")
++    private Long userId;
++
++    @Column(name = "item_id")
++    private Long itemId;
++
++    @Column(name = "live_id")
++    private Long liveId;
++
++    @Column(name = "reservation_id")
++    private Long reservationId;
++
++    @Enumerated(EnumType.STRING)
++    @Column(name = "reason_code", nullable = false, length = 60)
++    private ReservationRejectionReason reasonCode;
++
++    @Column(nullable = false, length = 255)
++    private String message;
++
++    @Column(name = "idempotency_key_hash", length = 64)
++    private String idempotencyKeyHash;
++
++    @Column(name = "request_hash", length = 64)
++    private String requestHash;
++
++    @Column(name = "created_at", nullable = false)
++    private LocalDateTime createdAt;
++
++    public ReservationRejectionEvent() {
++    }
++
++    @PrePersist
++    public void prePersist() {
++        if (this.createdAt == null) {
++            this.createdAt = LocalDateTime.now();
++        }
++    }
++
++    public Long getId() {
++        return id;
++    }
++
++    public Long getCompanyId() {
++        return companyId;
++    }
++
++    public void setCompanyId(Long companyId) {
++        this.companyId = companyId;
++    }
++
++    public Long getBranchId() {
++        return branchId;
++    }
++
++    public void setBranchId(Long branchId) {
++        this.branchId = branchId;
++    }
++
++    public Long getUserId() {
++        return userId;
++    }
++
++    public void setUserId(Long userId) {
++        this.userId = userId;
++    }
++
++    public Long getItemId() {
++        return itemId;
++    }
++
++    public void setItemId(Long itemId) {
++        this.itemId = itemId;
++    }
++
++    public Long getLiveId() {
++        return liveId;
++    }
++
++    public void setLiveId(Long liveId) {
++        this.liveId = liveId;
++    }
++
++    public Long getReservationId() {
++        return reservationId;
++    }
++
++    public void setReservationId(Long reservationId) {
++        this.reservationId = reservationId;
++    }
++
++    public ReservationRejectionReason getReasonCode() {
++        return reasonCode;
++    }
++
++    public void setReasonCode(ReservationRejectionReason reasonCode) {
++        this.reasonCode = reasonCode;
++    }
++
++    public String getMessage() {
++        return message;
++    }
++
++    public void setMessage(String message) {
++        this.message = message;
++    }
++
++    public String getIdempotencyKeyHash() {
++        return idempotencyKeyHash;
++    }
++
++    public void setIdempotencyKeyHash(String idempotencyKeyHash) {
++        this.idempotencyKeyHash = idempotencyKeyHash;
++    }
++
++    public String getRequestHash() {
++        return requestHash;
++    }
++
++    public void setRequestHash(String requestHash) {
++        this.requestHash = requestHash;
++    }
++
++    public LocalDateTime getCreatedAt() {
++        return createdAt;
++    }
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationRejectionEventRepository.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationRejectionEventRepository.java
+new file mode 100644
+index 0000000..e6ddd6a
+--- /dev/null
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationRejectionEventRepository.java
+@@ -0,0 +1,6 @@
++package com.hpsqsoft.ctrlropa.reservation;
++
++import org.springframework.data.jpa.repository.JpaRepository;
++
++public interface ReservationRejectionEventRepository extends JpaRepository<ReservationRejectionEvent, Long> {
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationRejectionReason.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationRejectionReason.java
+new file mode 100644
+index 0000000..3be574a
+--- /dev/null
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationRejectionReason.java
+@@ -0,0 +1,9 @@
++package com.hpsqsoft.ctrlropa.reservation;
++
++public enum ReservationRejectionReason {
++    ITEM_NOT_AVAILABLE,
++    ACTIVE_RESERVATION_EXISTS,
++    IDEMPOTENCY_PAYLOAD_MISMATCH,
++    IDEMPOTENCY_CONFLICT_OR_IN_PROGRESS,
++    VALIDATION_REJECTED
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationRejectionTraceService.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationRejectionTraceService.java
+new file mode 100644
+index 0000000..bdf3230
+--- /dev/null
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationRejectionTraceService.java
+@@ -0,0 +1,52 @@
++package com.hpsqsoft.ctrlropa.reservation;
++
++import org.springframework.stereotype.Service;
++import org.springframework.transaction.annotation.Propagation;
++import org.springframework.transaction.annotation.Transactional;
++
++@Service
++public class ReservationRejectionTraceService {
++
++    private final ReservationRejectionEventRepository repository;
++
++    public ReservationRejectionTraceService(ReservationRejectionEventRepository repository) {
++        this.repository = repository;
++    }
++
++    @Transactional(propagation = Propagation.REQUIRES_NEW)
++    public void record(Long companyId,
++                       Long branchId,
++                       Long userId,
++                       Long itemId,
++                       Long liveId,
++                       Long reservationId,
++                       ReservationRejectionReason reason,
++                       String message,
++                       String idempotencyKeyHash,
++                       String requestHash) {
++        if (reason == null || message == null || message.isBlank()) {
++            return;
++        }
++
++        ReservationRejectionEvent event = new ReservationRejectionEvent();
++        event.setCompanyId(companyId);
++        event.setBranchId(branchId);
++        event.setUserId(userId);
++        event.setItemId(itemId);
++        event.setLiveId(liveId);
++        event.setReservationId(reservationId);
++        event.setReasonCode(reason);
++        event.setMessage(truncate(message, 255));
++        event.setIdempotencyKeyHash(idempotencyKeyHash);
++        event.setRequestHash(requestHash);
++        repository.save(event);
++    }
++
++    private String truncate(String value, int maxLength) {
++        if (value.length() <= maxLength) {
++            return value;
++        }
++
++        return value.substring(0, maxLength);
++    }
++}
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
+index 79d7d8d..19670a0 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
+@@ -24,6 +24,8 @@ import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
+ import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
+ import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
+ import com.hpsqsoft.ctrlropa.web.error.ConflictException;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
+ import org.springframework.dao.DataIntegrityViolationException;
+ import org.springframework.jdbc.core.JdbcTemplate;
+ import org.springframework.stereotype.Service;
+@@ -40,6 +42,7 @@ import java.util.List;
+ @Transactional
+ public class ReservationService {
+
++    private static final Logger log = LoggerFactory.getLogger(ReservationService.class);
+     private static final String RESERVATION_CREATE_OPERATION = "RESERVATION_CREATE";
+     private static final int IDEMPOTENCY_KEY_MAX_LENGTH = 120;
+
+@@ -57,6 +60,7 @@ public class ReservationService {
+     private final TenantAccessGuard tenantAccessGuard;
+     private final LiveEventService liveEventService;
+     private final ReservationIdempotencyRepository idempotencyRepository;
++    private final ReservationRejectionTraceService rejectionTraceService;
+
+     public ReservationService(ReservationRepository repository,
+                               ItemRepository itemRepository,
+@@ -71,7 +75,8 @@ public class ReservationService {
+                               JdbcTemplate jdbcTemplate,
+                               TenantAccessGuard tenantAccessGuard,
+                               LiveEventService liveEventService,
+-                              ReservationIdempotencyRepository idempotencyRepository) {
++                              ReservationIdempotencyRepository idempotencyRepository,
++                              ReservationRejectionTraceService rejectionTraceService) {
+         this.repository = repository;
+         this.itemRepository = itemRepository;
+         this.customerRepository = customerRepository;
+@@ -86,6 +91,7 @@ public class ReservationService {
+         this.tenantAccessGuard = tenantAccessGuard;
+         this.liveEventService = liveEventService;
+         this.idempotencyRepository = idempotencyRepository;
++        this.rejectionTraceService = rejectionTraceService;
+     }
+
+     @Transactional(readOnly = true)
+@@ -150,6 +156,18 @@ public class ReservationService {
+         );
+
+         if (existingIdempotency == null && item.getStatus() != ItemStatus.AVAILABLE) {
++            traceReservationRejection(
++                    item.getCompany().getId(),
++                    branch.getId(),
++                    userId,
++                    item.getId(),
++                    request.getLiveId(),
++                    null,
++                    ReservationRejectionReason.ITEM_NOT_AVAILABLE,
++                    "El item no esta disponible",
++                    idempotencyKey,
++                    request
++            );
+             throw new IllegalArgumentException("El item no esta disponible");
+         }
+
+@@ -173,24 +191,72 @@ public class ReservationService {
+             tenantAccessGuard.requireBranch(live.getBranch().getId(), "La transmision no pertenece a la sucursal activa");
+
+             if (live.getStatus() != LiveStatus.OPEN && live.getStatus() != LiveStatus.ACTIVE) {
++                traceReservationRejection(
++                        item.getCompany().getId(),
++                        branch.getId(),
++                        userId,
++                        item.getId(),
++                        live.getId(),
++                        null,
++                        ReservationRejectionReason.VALIDATION_REJECTED,
++                        "El live no esta disponible para reservar",
++                        idempotencyKey,
++                        request
++                );
+                 throw new IllegalArgumentException("El live no está disponible para reservar");
+             }
+
+             if (!ChannelCode.LIVE.equals(salesChannel.getCode())) {
++                traceReservationRejection(
++                        item.getCompany().getId(),
++                        branch.getId(),
++                        userId,
++                        item.getId(),
++                        live.getId(),
++                        null,
++                        ReservationRejectionReason.VALIDATION_REJECTED,
++                        "Si la reserva viene de live, el canal debe ser LIVE",
++                        idempotencyKey,
++                        request
++                );
+                 throw new IllegalArgumentException("Si la reserva viene de live, el canal debe ser LIVE");
+             }
+
+             if (!live.getBranch().getId().equals(branch.getId())) {
++                traceReservationRejection(
++                        item.getCompany().getId(),
++                        branch.getId(),
++                        userId,
++                        item.getId(),
++                        live.getId(),
++                        null,
++                        ReservationRejectionReason.VALIDATION_REJECTED,
++                        "El live no pertenece a la sucursal indicada",
++                        idempotencyKey,
++                        request
++                );
+                 throw new IllegalArgumentException("El live no pertenece a la sucursal indicada");
+             }
+         }
+
+         if (request.getLiveId() == null && ChannelCode.LIVE.equals(salesChannel.getCode())) {
++            traceReservationRejection(
++                    item.getCompany().getId(),
++                    branch.getId(),
++                    userId,
++                    item.getId(),
++                    null,
++                    null,
++                    ReservationRejectionReason.VALIDATION_REJECTED,
++                    "Las reservas LIVE requieren liveId",
++                    idempotencyKey,
++                    request
++            );
+             throw new IllegalArgumentException("Las reservas LIVE requieren liveId");
+         }
+
+         if (existingIdempotency != null) {
+-            return resolveExistingIdempotency(existingIdempotency);
++            return resolveExistingIdempotency(existingIdempotency, request);
+         }
+
+         ReservationIdempotencyRecord idempotencyRecord = createIdempotencyRecord(
+@@ -205,6 +271,18 @@ public class ReservationService {
+                 .orElse(null);
+
+         if (activeReservation != null) {
++            traceReservationRejection(
++                    item.getCompany().getId(),
++                    branch.getId(),
++                    userId,
++                    item.getId(),
++                    request.getLiveId(),
++                    activeReservation.getId(),
++                    ReservationRejectionReason.ACTIVE_RESERVATION_EXISTS,
++                    "El item ya tiene una reserva activa",
++                    idempotencyKey,
++                    request
++            );
+             throw new IllegalArgumentException("El item ya tiene una reserva activa");
+         }
+
+@@ -217,6 +295,18 @@ public class ReservationService {
+         );
+
+         if (reservedRows != 1) {
++            traceReservationRejection(
++                    item.getCompany().getId(),
++                    branch.getId(),
++                    userId,
++                    item.getId(),
++                    request.getLiveId(),
++                    null,
++                    ReservationRejectionReason.ITEM_NOT_AVAILABLE,
++                    "La prenda ya no esta disponible para apartar",
++                    idempotencyKey,
++                    request
++            );
+             throw new IllegalArgumentException("La prenda ya no esta disponible para apartar");
+         }
+
+@@ -227,6 +317,18 @@ public class ReservationService {
+         }
+
+         if (effectivePrice == null || effectivePrice.signum() <= 0) {
++            traceReservationRejection(
++                    item.getCompany().getId(),
++                    branch.getId(),
++                    userId,
++                    item.getId(),
++                    request.getLiveId(),
++                    null,
++                    ReservationRejectionReason.VALIDATION_REJECTED,
++                    "El item no tiene precio asignado",
++                    idempotencyKey,
++                    request
++            );
+             throw new IllegalArgumentException("El item no tiene precio asignado");
+         }
+
+@@ -252,7 +354,7 @@ public class ReservationService {
+             entity.setLiveOperationalStatusUpdatedByUserId(userId);
+         }
+
+-        Reservation saved = saveCreatedReservation(entity);
++        Reservation saved = saveCreatedReservation(entity, idempotencyKey, request);
+
+         CustomerOrder order = customerOrderService.addReservationToOpenOrder(saved);
+         customerOrderService.refreshStatus(order.getId());
+@@ -298,6 +400,18 @@ public class ReservationService {
+                 .orElse(null);
+
+         if (existing != null && !requestHash.equals(existing.getRequestHash())) {
++            traceReservationRejection(
++                    companyId,
++                    branchId,
++                    userId,
++                    request.getItemId(),
++                    request.getLiveId(),
++                    existing.getReservationId(),
++                    ReservationRejectionReason.IDEMPOTENCY_PAYLOAD_MISMATCH,
++                    "La llave de idempotencia ya fue usada con datos distintos",
++                    normalizedKey,
++                    requestHash
++            );
+             throw new ConflictException("La llave de idempotencia ya fue usada con datos distintos");
+         }
+
+@@ -327,24 +441,61 @@ public class ReservationService {
+         try {
+             return idempotencyRepository.saveAndFlush(record);
+         } catch (DataIntegrityViolationException ex) {
++            traceReservationRejection(
++                    companyId,
++                    branchId,
++                    userId,
++                    request.getItemId(),
++                    request.getLiveId(),
++                    null,
++                    ReservationRejectionReason.IDEMPOTENCY_CONFLICT_OR_IN_PROGRESS,
++                    "La solicitud de reserva con esta llave ya esta en proceso",
++                    normalizedKey,
++                    record.getRequestHash()
++            );
+             throw new ConflictException(
+                     "La solicitud de reserva con esta llave ya esta en proceso. Intenta de nuevo en unos segundos."
+             );
+         }
+     }
+
+-    private ReservationResponse resolveExistingIdempotency(ReservationIdempotencyRecord record) {
++    private ReservationResponse resolveExistingIdempotency(ReservationIdempotencyRecord record,
++                                                           CreateReservationRequest request) {
+         if (record.getStatus() == ReservationIdempotencyStatus.COMPLETED
+                 && record.getReservationId() != null) {
+             return toResponse(findEntityById(record.getReservationId()));
+         }
+
+         if (record.getStatus() == ReservationIdempotencyStatus.IN_PROGRESS) {
++            traceReservationRejection(
++                    record.getCompanyId(),
++                    record.getBranchId(),
++                    record.getUserId(),
++                    request.getItemId(),
++                    request.getLiveId(),
++                    record.getReservationId(),
++                    ReservationRejectionReason.IDEMPOTENCY_CONFLICT_OR_IN_PROGRESS,
++                    "La solicitud de reserva con esta llave sigue en proceso",
++                    record.getIdempotencyKey(),
++                    record.getRequestHash()
++            );
+             throw new ConflictException(
+                     "La solicitud de reserva con esta llave sigue en proceso. Intenta de nuevo en unos segundos."
+             );
+         }
+
++        traceReservationRejection(
++                record.getCompanyId(),
++                record.getBranchId(),
++                record.getUserId(),
++                request.getItemId(),
++                request.getLiveId(),
++                record.getReservationId(),
++                ReservationRejectionReason.IDEMPOTENCY_CONFLICT_OR_IN_PROGRESS,
++                "La solicitud de reserva con esta llave quedo en estado ambiguo",
++                record.getIdempotencyKey(),
++                record.getRequestHash()
++        );
+         throw new ConflictException(
+                 "La solicitud de reserva con esta llave quedo en estado ambiguo. Genera un nuevo intento."
+         );
+@@ -361,11 +512,25 @@ public class ReservationService {
+         idempotencyRepository.save(record);
+     }
+
+-    private Reservation saveCreatedReservation(Reservation entity) {
++    private Reservation saveCreatedReservation(Reservation entity,
++                                               String idempotencyKey,
++                                               CreateReservationRequest request) {
+         try {
+             return repository.saveAndFlush(entity);
+         } catch (DataIntegrityViolationException ex) {
+             if (isActiveReservationConstraintViolation(ex)) {
++                traceReservationRejection(
++                        entity.getItem().getCompany().getId(),
++                        entity.getBranch().getId(),
++                        currentUser.getUserId(),
++                        entity.getItem().getId(),
++                        entity.getLive() != null ? entity.getLive().getId() : null,
++                        null,
++                        ReservationRejectionReason.ACTIVE_RESERVATION_EXISTS,
++                        "El item ya tiene una reserva activa",
++                        idempotencyKey,
++                        request
++                );
+                 throw new ConflictException("El item ya tiene una reserva activa");
+             }
+             throw ex;
+@@ -384,6 +549,66 @@ public class ReservationService {
+         return false;
+     }
+
++    private void traceReservationRejection(Long companyId,
++                                           Long branchId,
++                                           Long userId,
++                                           Long itemId,
++                                           Long liveId,
++                                           Long reservationId,
++                                           ReservationRejectionReason reason,
++                                           String message,
++                                           String idempotencyKey,
++                                           CreateReservationRequest request) {
++        traceReservationRejection(
++                companyId,
++                branchId,
++                userId,
++                itemId,
++                liveId,
++                reservationId,
++                reason,
++                message,
++                idempotencyKey,
++                request != null ? hashReservationRequest(request) : null
++        );
++    }
++
++    private void traceReservationRejection(Long companyId,
++                                           Long branchId,
++                                           Long userId,
++                                           Long itemId,
++                                           Long liveId,
++                                           Long reservationId,
++                                           ReservationRejectionReason reason,
++                                           String message,
++                                           String idempotencyKey,
++                                           String requestHash) {
++        try {
++            rejectionTraceService.record(
++                    companyId,
++                    branchId,
++                    userId,
++                    itemId,
++                    liveId,
++                    reservationId,
++                    reason,
++                    message,
++                    hashIdempotencyKeyForTrace(idempotencyKey),
++                    requestHash
++            );
++        } catch (RuntimeException ex) {
++            log.warn("No se pudo registrar rechazo de reserva: {}", message, ex);
++        }
++    }
++
++    private String hashIdempotencyKeyForTrace(String idempotencyKey) {
++        if (idempotencyKey == null || idempotencyKey.isBlank()) {
++            return null;
++        }
++
++        return sha256(idempotencyKey.trim());
++    }
++
+     private String normalizeIdempotencyKey(String idempotencyKey) {
+         if (idempotencyKey == null || idempotencyKey.isBlank()) {
+             return null;
+diff --git a/backend/control-ropa/src/main/resources/application.properties b/backend/control-ropa/src/main/resources/application.properties
+index cf422b1..810ffae 100644
+--- a/backend/control-ropa/src/main/resources/application.properties
++++ b/backend/control-ropa/src/main/resources/application.properties
+@@ -27,6 +27,12 @@ security.audit.retention-days=${SECURITY_AUDIT_RETENTION_DAYS:180}
+ security.audit.cleanup.enabled=${SECURITY_AUDIT_CLEANUP_ENABLED:true}
+ security.audit.cleanup-cron=${SECURITY_AUDIT_CLEANUP_CRON:0 0 3 * * *}
+
++# ===============================
++# RESERVATION IDEMPOTENCY CLEANUP
++# ===============================
++reservation.idempotency.cleanup.enabled=${RESERVATION_IDEMPOTENCY_CLEANUP_ENABLED:true}
++reservation.idempotency.cleanup-cron=${RESERVATION_IDEMPOTENCY_CLEANUP_CRON:0 30 3 * * *}
++
+ # ===============================
+ # LOGGING
+ # ===============================
+diff --git a/backend/control-ropa/src/main/resources/db/migration/V54__reservation_rejection_events.sql b/backend/control-ropa/src/main/resources/db/migration/V54__reservation_rejection_events.sql
+new file mode 100644
+index 0000000..a3d45ec
+--- /dev/null
++++ b/backend/control-ropa/src/main/resources/db/migration/V54__reservation_rejection_events.sql
+@@ -0,0 +1,24 @@
++-- ITEM-Z5D: trazabilidad operativa de intentos de reserva rechazados.
++-- No toca pagos, caja, precio LIVE, devoluciones, autorizaciones, permisos ni RBAC.
++-- No guarda payload completo ni secretos; la llave de idempotencia se registra solo como hash.
++
++CREATE TABLE IF NOT EXISTS reservation_rejection_events (
++  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
++  company_id BIGINT UNSIGNED NULL,
++  branch_id BIGINT UNSIGNED NULL,
++  user_id BIGINT UNSIGNED NULL,
++  item_id BIGINT UNSIGNED NULL,
++  live_id BIGINT UNSIGNED NULL,
++  reservation_id BIGINT UNSIGNED NULL,
++  reason_code VARCHAR(60) NOT NULL,
++  message VARCHAR(255) NOT NULL,
++  idempotency_key_hash VARCHAR(64) NULL,
++  request_hash VARCHAR(64) NULL,
++  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++  PRIMARY KEY (id),
++  KEY idx_reservation_rejection_branch_created (branch_id, created_at),
++  KEY idx_reservation_rejection_item_created (item_id, created_at),
++  KEY idx_reservation_rejection_live_created (live_id, created_at),
++  KEY idx_reservation_rejection_user_created (user_id, created_at),
++  KEY idx_reservation_rejection_reason_created (reason_code, created_at)
++);
+diff --git a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyCleanupServiceTests.java b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyCleanupServiceTests.java
+new file mode 100644
+index 0000000..3bd6f6e
+--- /dev/null
++++ b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationIdempotencyCleanupServiceTests.java
+@@ -0,0 +1,49 @@
++package com.hpsqsoft.ctrlropa.reservation;
++
++import org.junit.jupiter.api.Test;
++
++import java.time.Clock;
++import java.time.Instant;
++import java.time.LocalDateTime;
++import java.time.ZoneId;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.Mockito.mock;
++import static org.mockito.Mockito.never;
++import static org.mockito.Mockito.verify;
++import static org.mockito.Mockito.when;
++
++class ReservationIdempotencyCleanupServiceTests {
++
++    private final ReservationIdempotencyRepository repository = mock(ReservationIdempotencyRepository.class);
++    private final ReservationIdempotencyRetentionProperties properties =
++            new ReservationIdempotencyRetentionProperties();
++    private final Clock clock = Clock.fixed(
++            Instant.parse("2026-06-09T09:00:00Z"),
++            ZoneId.of("America/Mexico_City")
++    );
++    private final ReservationIdempotencyCleanupService service =
++            new ReservationIdempotencyCleanupService(repository, properties, clock);
++
++    @Test
++    void deletesOnlyExpiredKeysUsingCurrentTimeCutoff() {
++        LocalDateTime cutoff = LocalDateTime.now(clock);
++        when(repository.deleteByExpiresAtBefore(cutoff)).thenReturn(4L);
++
++        long deleted = service.cleanupExpiredKeys();
++
++        assertEquals(4L, deleted);
++        verify(repository).deleteByExpiresAtBefore(cutoff);
++    }
++
++    @Test
++    void cleanupDisabledDoesNotDeleteAnything() {
++        properties.getCleanup().setEnabled(false);
++
++        long deleted = service.cleanupExpiredKeys();
++
++        assertEquals(0L, deleted);
++        verify(repository, never()).deleteByExpiresAtBefore(any());
++    }
++}
+diff --git a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java
+index 194c151..35d02ca 100644
+--- a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java
++++ b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java
+@@ -52,6 +52,7 @@ class ReservationServiceLiveOperationalStatusTests {
+     private final TenantAccessGuard tenantAccessGuard = mock(TenantAccessGuard.class);
+     private final LiveEventService liveEventService = mock(LiveEventService.class);
+     private final ReservationIdempotencyRepository idempotencyRepository = mock(ReservationIdempotencyRepository.class);
++    private final ReservationRejectionTraceService rejectionTraceService = mock(ReservationRejectionTraceService.class);
+
+     private final ReservationService service = new ReservationService(
+             repository,
+@@ -67,7 +68,8 @@ class ReservationServiceLiveOperationalStatusTests {
+             jdbcTemplate,
+             tenantAccessGuard,
+             liveEventService,
+-            idempotencyRepository
++            idempotencyRepository,
++            rejectionTraceService
+     );
+
+     @Test
+diff --git a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java
+index 9e620f8..4a8b395 100644
+--- a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java
++++ b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java
+@@ -66,6 +66,7 @@ class ReservationServiceTests {
+     private final JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+     private final TenantAccessGuard tenantAccessGuard = mock(TenantAccessGuard.class);
+     private final LiveEventService liveEventService = mock(LiveEventService.class);
++    private final ReservationRejectionTraceService rejectionTraceService = mock(ReservationRejectionTraceService.class);
+
+     private final ReservationService service = new ReservationService(
+             repository,
+@@ -81,7 +82,8 @@ class ReservationServiceTests {
+             jdbcTemplate,
+             tenantAccessGuard,
+             liveEventService,
+-            idempotencyRepository
++            idempotencyRepository,
++            rejectionTraceService
+     );
+
+     @Test
+@@ -116,6 +118,7 @@ class ReservationServiceTests {
+         verify(itemRepository, never()).save(any(Item.class));
+         verify(repository).saveAndFlush(any(Reservation.class));
+         verify(customerOrderService).refreshStatus(55L);
++        verify(rejectionTraceService, never()).record(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+         verify(accessService).assertCan(
+                 99L,
+                 PermissionCode.DO_DOOR_RESERVATION,
+@@ -150,6 +153,18 @@ class ReservationServiceTests {
+                 any()
+         );
+         verify(repository, never()).saveAndFlush(any(Reservation.class));
++        verify(rejectionTraceService).record(
++                eq(2L),
++                eq(6L),
++                eq(99L),
++                eq(8L),
++                any(),
++                any(),
++                eq(ReservationRejectionReason.ITEM_NOT_AVAILABLE),
++                eq("El item no esta disponible"),
++                any(),
++                any()
++        );
+     }
+
+     @Test
+@@ -174,6 +189,53 @@ class ReservationServiceTests {
+         verify(repository, never()).saveAndFlush(any(Reservation.class));
+         verify(customerOrderService, never()).addReservationToOpenOrder(any(Reservation.class));
+         verify(itemRepository, never()).save(any(Item.class));
++        verify(rejectionTraceService).record(
++                eq(2L),
++                eq(6L),
++                eq(99L),
++                eq(8L),
++                any(),
++                any(),
++                eq(ReservationRejectionReason.ITEM_NOT_AVAILABLE),
++                eq("La prenda ya no esta disponible para apartar"),
++                any(),
++                any()
++        );
++    }
++
++    @Test
++    void createRejectsWhenActiveReservationAlreadyExists() {
++        Branch branch = branch();
++        Item item = item(ItemStatus.AVAILABLE, branch);
++        Customer customer = customer(branch);
++        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
++        ReservationService.CreateReservationRequest request = request(channel.getId(), null);
++        Reservation activeReservation = reservation(44L, item, customer, branch, channel);
++
++        stubCommonCreateFlow(branch, item, customer, channel);
++        when(repository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE))
++                .thenReturn(Optional.of(activeReservation));
++
++        IllegalArgumentException exception = assertThrows(
++                IllegalArgumentException.class,
++                () -> service.create(request)
++        );
++
++        assertTrue(exception.getMessage().contains("reserva activa"));
++        verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
++        verify(repository, never()).saveAndFlush(any(Reservation.class));
++        verify(rejectionTraceService).record(
++                eq(2L),
++                eq(6L),
++                eq(99L),
++                eq(8L),
++                any(),
++                eq(44L),
++                eq(ReservationRejectionReason.ACTIVE_RESERVATION_EXISTS),
++                eq("El item ya tiene una reserva activa"),
++                any(),
++                any()
++        );
+     }
+
+     @Test
+@@ -241,6 +303,18 @@ class ReservationServiceTests {
+         assertTrue(exception.getMessage().contains("reserva activa"));
+         verify(itemRepository).reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED);
+         verify(customerOrderService, never()).addReservationToOpenOrder(any(Reservation.class));
++        verify(rejectionTraceService).record(
++                eq(2L),
++                eq(6L),
++                eq(99L),
++                eq(8L),
++                any(),
++                any(),
++                eq(ReservationRejectionReason.ACTIVE_RESERVATION_EXISTS),
++                eq("El item ya tiene una reserva activa"),
++                any(),
++                any()
++        );
+     }
+
+     @Test
+@@ -310,6 +384,18 @@ class ReservationServiceTests {
+         assertTrue(exception.getMessage().contains("datos distintos"));
+         verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
+         verify(repository, never()).saveAndFlush(any(Reservation.class));
++        verify(rejectionTraceService).record(
++                eq(2L),
++                eq(6L),
++                eq(99L),
++                eq(8L),
++                any(),
++                any(),
++                eq(ReservationRejectionReason.IDEMPOTENCY_PAYLOAD_MISMATCH),
++                eq("La llave de idempotencia ya fue usada con datos distintos"),
++                any(),
++                any()
++        );
+     }
+
+     @Test
+@@ -342,6 +428,50 @@ class ReservationServiceTests {
+         assertTrue(exception.getMessage().contains("sigue en proceso"));
+         verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
+         verify(repository, never()).saveAndFlush(any(Reservation.class));
++        verify(rejectionTraceService).record(
++                eq(2L),
++                eq(6L),
++                eq(99L),
++                eq(8L),
++                any(),
++                any(),
++                eq(ReservationRejectionReason.IDEMPOTENCY_CONFLICT_OR_IN_PROGRESS),
++                eq("La solicitud de reserva con esta llave sigue en proceso"),
++                any(),
++                any()
++        );
++    }
++
++    @Test
++    void createRejectsLiveChannelWithoutLiveIdAndTracesValidation() {
++        Branch branch = branch();
++        Item item = item(ItemStatus.AVAILABLE, branch);
++        Customer customer = customer(branch);
++        SalesChannel channel = channel(3L, ChannelCode.LIVE);
++        ReservationService.CreateReservationRequest request = request(channel.getId(), null);
++
++        stubCommonCreateFlow(branch, item, customer, channel);
++
++        IllegalArgumentException exception = assertThrows(
++                IllegalArgumentException.class,
++                () -> service.create(request)
++        );
++
++        assertTrue(exception.getMessage().contains("liveId"));
++        verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
++        verify(repository, never()).saveAndFlush(any(Reservation.class));
++        verify(rejectionTraceService).record(
++                eq(2L),
++                eq(6L),
++                eq(99L),
++                eq(8L),
++                any(),
++                any(),
++                eq(ReservationRejectionReason.VALIDATION_REJECTED),
++                eq("Las reservas LIVE requieren liveId"),
++                any(),
++                any()
++        );
+     }
+
+     @Test
+diff --git a/docs/ERP_BITACORA_CAMBIOS.md b/docs/ERP_BITACORA_CAMBIOS.md
+index cfb1695..a14237f 100644
+--- a/docs/ERP_BITACORA_CAMBIOS.md
++++ b/docs/ERP_BITACORA_CAMBIOS.md
+@@ -1,5 +1,35 @@
+ # ERP - Bitacora de cambios
+
++## 2026-06-09 - ITEM-Z5D trazabilidad de reservas rechazadas
++
++Tipo: backend defensivo, migracion aditiva, retencion operativa, pruebas, evidencia.
++
++Objetivo:
++
++- Registrar intentos de reserva rechazados para diagnostico operativo sin guardar payload completo ni secretos.
++- Limpiar llaves de idempotencia expiradas para evitar crecimiento indefinido.
++
++Cambios realizados:
++
++- Se creo `V54__reservation_rejection_events.sql`.
++- Se agrego tabla `reservation_rejection_events` separada de auditoria de seguridad y de `live_events`.
++- `ReservationService.create` registra rechazos por item no disponible, reserva activa, mismatch de idempotencia, llave en progreso y validaciones de negocio relevantes.
++- La llave `X-Idempotency-Key` se registra solo como hash SHA-256.
++- Se agrego limpieza programada configurable para `reservation_idempotency_keys` vencidas.
++
++Restricciones respetadas:
++
++- No se tocaron pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC ni permisos.
++- No se crearon endpoints nuevos.
++- No se cambio venta financiera.
++- No se guarda payload completo.
++
++Pendientes:
++
++- QA API/visual real con usuarios operativos.
++- Consola o reporte operativo futuro para consultar rechazos si soporte lo requiere.
++- Definir retencion historica de `reservation_rejection_events` si el volumen crece.
++
+ ## 2026-06-09 - ITEM-Z5C constraint de reserva activa por item
+
+ Tipo: migracion de consistencia, backend defensivo, pruebas, evidencia operativa.
+diff --git a/docs/ERP_RIESGOS_OPERATIVOS.md b/docs/ERP_RIESGOS_OPERATIVOS.md
+index 957b7a4..394b5dd 100644
+--- a/docs/ERP_RIESGOS_OPERATIVOS.md
++++ b/docs/ERP_RIESGOS_OPERATIVOS.md
+@@ -37,6 +37,7 @@ Probabilidad:
+ | Codificacion rota en textos | MEDIO | MEDIA | Mala experiencia, mensajes poco confiables. | Barridos de mojibake, usar UTF-8, QA visual. | Revertir archivo o corregir texto. |
+ | Artefactos no rastreados en Git | MEDIO | ALTA | Release con archivos no controlados o ruido en diff. | Limpiar/ignorar antes de release; checklist Git. | No incluir artefactos; restaurar working tree limpio. |
+ | Auditoria insuficiente | ALTO | ALTA | No se puede explicar quien hizo una accion sensible. | Fase de auditoria, eventos de negocio, revision de logs. | No aplica rollback completo; se mitiga hacia adelante. |
++| Rechazos de reserva sin trazabilidad operativa | ALTO | BAJA despues de ITEM-Z5D | Soporte no podria explicar por que se rechazo un apartado en doble click, concurrencia o idempotencia. | ITEM-Z5D registra `reservation_rejection_events` con motivo, usuario, item, branch, hashes seguros y fecha; queda pendiente consola/consulta operativa. | Revertir instrumentacion si bloquea operacion; conservar tabla como diagnostico o retirarla con DBA. |
+ | Auditoria de seguridad sin consola de consulta | MEDIO | MEDIA despues de AUTH-G | Los eventos quedan persistidos, pero soporte aun necesita SQL o herramienta tecnica para revisarlos. | AUTH-G crea `security_audit_events`; AUTH-G2 debe exponer consulta protegida con filtros. | Consultar tabla por SQL en soporte controlado hasta crear consola. |
+ | Consulta de auditoria sin permiso dedicado | MEDIO | BAJA despues de AUTH-I2 | `MANAGE_SECURITY_SETTINGS` permitia consultar auditoria y era demasiado amplio para soporte de solo lectura. | AUTH-I2 crea `VIEW_SECURITY_AUDIT` y cambia backend/frontend para exigirlo en auditoria. | Retirar el tile o revocar `VIEW_SECURITY_AUDIT` si se detecta asignacion indebida. |
+ | Asignacion indebida de `VIEW_SECURITY_AUDIT` | ALTO | MEDIA despues de AUTH-I2 | Un usuario operativo podria consultar eventos de seguridad si el permiso se asigna sin criterio. | Script QA lo asigna solo a soporte y lo retira de `QA_TENANT_ADMIN`; definir matriz productiva antes de asignarlo fuera de QA. | Revocar permiso directo/rol y auditar accesos a `/api/security/audit-events`. |
+diff --git a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+index 3afe833..40e68fe 100644
+--- a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
++++ b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+@@ -9,6 +9,25 @@ Tipo: backlog documental, sin implementacion
+
+ Convertir el analisis de Fase 2A/2B en un backlog tecnico ordenado para implementar multi-compania con bajo riesgo, evitando fuga de datos entre clientes y manteniendo trazabilidad HPSQ-SOFT.
+
++## Actualizacion ITEM-Z5D - Trazabilidad de rechazos de reserva
++
++Fecha: 2026-06-09
++Estado: implementado tecnico condicionado.
++
++Alcance ejecutado:
++
++- Migracion `V54__reservation_rejection_events.sql`.
++- Tabla `reservation_rejection_events` para rechazos operativos de reserva.
++- Motivos trazados: `ITEM_NOT_AVAILABLE`, `ACTIVE_RESERVATION_EXISTS`, `IDEMPOTENCY_PAYLOAD_MISMATCH`, `IDEMPOTENCY_CONFLICT_OR_IN_PROGRESS` y `VALIDATION_REJECTED`.
++- Hash de `X-Idempotency-Key` y hash de request relevante; no payload completo.
++- Limpieza programada de llaves vencidas en `reservation_idempotency_keys`.
++
++Pendiente:
++
++- QA API/visual real con usuarios operativos.
++- Definir consola o reporte tecnico para consultar rechazos.
++- Evaluar retencion historica para `reservation_rejection_events` si crece volumen.
++
+ ## Actualizacion ITEM-Z5C - Constraint de reserva activa por item
+
+ Fecha: 2026-06-09
+diff --git a/docs/ITEM_Z5D_RESERVATION_REJECTION_TRACE.md b/docs/ITEM_Z5D_RESERVATION_REJECTION_TRACE.md
+new file mode 100644
+index 0000000..c622f45
+--- /dev/null
++++ b/docs/ITEM_Z5D_RESERVATION_REJECTION_TRACE.md
+@@ -0,0 +1,146 @@
++# ITEM-Z5D - Trazabilidad de reservas rechazadas
++
++Fecha: 2026-06-09
++
++Rama: `feature/item-z5d-reservation-rejection-trace`
++
++## Resumen ejecutivo
++
++ITEM-Z5D agrega trazabilidad operativa minima para intentos de reserva rechazados y limpieza programada de llaves de idempotencia expiradas. La fase mantiene intactos pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC, permisos y endpoints.
++
++La trazabilidad queda separada de auditoria de seguridad y de `live_events` porque aplica tanto a reservas normales como a reservas LIVE.
++
++## Estado previo
++
++- ITEM-Z3B protege la transicion `AVAILABLE -> RESERVED` con `ItemRepository.reserveIfAvailable(...)`.
++- ITEM-Z5B agrega idempotencia opcional con header `X-Idempotency-Key`.
++- ITEM-Z5C agrega constraint estructural para una sola reserva `ACTIVE` por item.
++- Antes de ITEM-Z5D, los rechazos no quedaban trazados en una tabla operativa especifica.
++- `reservation_idempotency_keys.expires_at` existia, pero no habia limpieza automatica de llaves expiradas.
++
++## Patron de auditoria/evento elegido
++
++Se eligio una tabla operativa nueva:
++
++`reservation_rejection_events`
++
++Motivos:
++
++- `security_audit_events` esta orientada a seguridad/autenticacion/autorizacion.
++- `live_events` requiere `live_id` y no cubre reservas normales.
++- Los rechazos de reserva deben sobrevivir aunque la transaccion principal falle.
++- La tabla no guarda payload completo ni secretos.
++
++## Eventos instrumentados
++
++| Motivo | Cuándo se registra |
++|---|---|
++| `ITEM_NOT_AVAILABLE` | El item no esta `AVAILABLE` o `reserveIfAvailable(...)` afecta `0` filas. |
++| `ACTIVE_RESERVATION_EXISTS` | Ya existe reserva activa o la base dispara `uq_reservations_active_item`. |
++| `IDEMPOTENCY_PAYLOAD_MISMATCH` | Misma llave de idempotencia con payload distinto. |
++| `IDEMPOTENCY_CONFLICT_OR_IN_PROGRESS` | Llave en proceso, duplicada en carrera o estado ambiguo. |
++| `VALIDATION_REJECTED` | Validaciones de negocio relevantes de reserva, como LIVE no disponible, canal incompatible, falta de `liveId` o item sin precio. |
++
++## Datos guardados
++
++Campos principales:
++
++- `company_id`
++- `branch_id`
++- `user_id`
++- `item_id`
++- `live_id`
++- `reservation_id`
++- `reason_code`
++- `message`
++- `idempotency_key_hash`
++- `request_hash`
++- `created_at`
++
++La llave de idempotencia se guarda como SHA-256. El payload completo no se persiste; solo se conserva el hash del request relevante.
++
++## Migracion
++
++Se agrega:
++
++`backend/control-ropa/src/main/resources/db/migration/V54__reservation_rejection_events.sql`
++
++La migracion:
++
++- crea `reservation_rejection_events` si no existe;
++- agrega indices minimos por branch, item, live, user, motivo y fecha;
++- no modifica `reservations`;
++- no modifica `items`;
++- no modifica `reservation_idempotency_keys`;
++- no borra datos;
++- no crea endpoints.
++
++No se agregan foreign keys a la tabla de eventos. Es una decision intencional para evitar que un evento diagnostico falle por referencias operativas removidas o datos legacy.
++
++## Retencion de idempotencia
++
++ITEM-Z5D agrega limpieza programada de llaves expiradas en `reservation_idempotency_keys`.
++
++Configuracion:
++
++- `reservation.idempotency.cleanup.enabled=${RESERVATION_IDEMPOTENCY_CLEANUP_ENABLED:true}`
++- `reservation.idempotency.cleanup-cron=${RESERVATION_IDEMPOTENCY_CLEANUP_CRON:0 30 3 * * *}`
++
++La limpieza elimina solo llaves con `expires_at` anterior a la hora actual. No elimina registros sin `expires_at`, no borra reservas y no crea endpoint manual de purge.
++
++## Que no se cambio
++
++- No se tocaron pagos.
++- No se toco caja.
++- No se toco precio LIVE.
++- No se tocaron devoluciones.
++- No se tocaron autorizaciones.
++- No se crearon permisos.
++- No se modifico RBAC.
++- No se crearon endpoints.
++- No se cambio venta financiera.
++- No se guarda payload completo.
++
++## Pruebas agregadas/ajustadas
++
++- `ReservationServiceTests` valida trazabilidad para:
++  - item no disponible;
++  - update atomico con `0` filas;
++  - reserva activa detectada por consulta;
++  - constraint `uq_reservations_active_item`;
++  - idempotency payload mismatch;
++  - llave en progreso;
++  - canal LIVE sin `liveId`.
++- `ReservationIdempotencyCleanupServiceTests` valida:
++  - limpieza de llaves expiradas con fecha de corte actual;
++  - limpieza deshabilitada sin borrar nada.
++
++## Riesgos pendientes
++
++- No hay consola operativa para consultar `reservation_rejection_events`; la consulta inicial queda por SQL o herramienta tecnica.
++- No se implementa retencion de eventos de rechazo; solo limpieza de llaves de idempotencia expiradas.
++- QA visual/API real con usuarios operativos queda pendiente si no hay ambiente/navegador disponible.
++
++## Rollback
++
++Rollback tecnico:
++
++1. Revertir cambios de `ReservationService`.
++2. Revertir servicio/repositorio/entidad de eventos de rechazo.
++3. Revertir limpieza de idempotencia.
++4. Si la migracion ya fue aplicada, decidir con DBA si conservar `reservation_rejection_events` como tabla inerte o removerla con script controlado.
++
++No se requiere rollback de pagos, caja, precio ni permisos porque no se tocaron.
++
++## GO/NO-GO
++
++GO tecnico si:
++
++- backend tests pasan;
++- frontend lint, typecheck y export pasan;
++- `git diff --check` no reporta whitespace;
++- no se detectan cambios fuera de reservas/idempotencia/documentacion/evidencia.
++
++Resultado funcional:
++
++- `GO_TECNICO` con `PENDING_QA_VISUAL` si no hay navegador/smoke API real.
+diff --git a/qa-reports/ITEM-Z5D-reservation-rejection-trace-report-20260609-200405.md b/qa-reports/ITEM-Z5D-reservation-rejection-trace-report-20260609-200405.md
+new file mode 100644
+index 0000000..514f5c6
+--- /dev/null
++++ b/qa-reports/ITEM-Z5D-reservation-rejection-trace-report-20260609-200405.md
+@@ -0,0 +1,175 @@
++# ITEM-Z5D - Reservation rejection trace report
++
++Fecha: 2026-06-09 20:04:05
++
++Rama: `feature/item-z5d-reservation-rejection-trace`
++
++## Resumen
++
++ITEM-Z5D implemento trazabilidad minima para intentos de reserva rechazados y limpieza programada de llaves de idempotencia expiradas.
++
++Resultado: `GO_TECNICO` / `PENDING_QA_VISUAL`.
++
++## Historial validado
++
++Commits confirmados en historial:
++
++- `78065c3 ITEM-Z5 documenta handoff idempotencia reservas`
++- `6f1ee15 ITEM-Z5B agrega idempotencia de reservas`
++- `ef8d255 ITEM-Z5C protege reserva activa por item`
++- `92e937a ITEM-Z3B protege reserva atomica`
++- `ce0e2b5 ITEM-Z4 distingue prenda al aire en selector live`
++
++## Comandos ejecutados
++
++Iniciales:
++
++- `git branch --show-current`
++- `git status`
++- `git log --oneline -45`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z5"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z5B"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z5C"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z3B"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z4"`
++
++Auditoria:
++
++- `git grep -n -E "ReservationService|ReservationController|ReservationRepository|ReservationIdempotency|reservation_idempotency_keys|X-Idempotency-Key|reserveIfAvailable|active_reservation_item_id|uq_reservations_active_item" -- ...`
++- `git grep -n -E "Audit|audit|Event|event|live_events|SecurityAudit|OperationalEvent|History|bitacora|bitácora|trace|trazabilidad" -- ...`
++- `git grep -n -E "Scheduled|scheduler|cron|cleanup|retention|expires_at|expired|delete.*idempotency|purge" -- ...`
++
++Validaciones:
++
++- `./mvnw.cmd test`
++- `npm.cmd run lint`
++- `npx.cmd tsc --noEmit`
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`
++
++Nota: el primer intento de Maven fallo por no cargar password desde `.env`. El segundo intento detecto que `CONTROL_ROPA_DB_URL` estaba entre comillas simples; se repitio cargando `.env` sin imprimir secretos y quitando comillas simples/dobles. Resultado final: PASS.
++
++## Patron elegido
++
++Se creo una tabla operativa separada:
++
++- `reservation_rejection_events`
++
++No se reutilizo `security_audit_events` porque es auditoria de seguridad.
++No se reutilizo `live_events` porque los rechazos aplican tambien a reservas normales sin `live_id`.
++
++## Migracion creada
++
++- `backend/control-ropa/src/main/resources/db/migration/V54__reservation_rejection_events.sql`
++
++La migracion:
++
++- crea `reservation_rejection_events`;
++- agrega indices minimos;
++- no agrega foreign keys para no bloquear trazabilidad por datos legacy;
++- no toca `reservations`;
++- no toca `items`;
++- no toca pagos, caja, precio LIVE, devoluciones, autorizaciones, permisos ni RBAC.
++
++## Implementacion realizada
++
++Archivos backend:
++
++- `ReservationRejectionReason.java`
++- `ReservationRejectionEvent.java`
++- `ReservationRejectionEventRepository.java`
++- `ReservationRejectionTraceService.java`
++- `ReservationIdempotencyRetentionProperties.java`
++- `ReservationIdempotencyCleanupConfiguration.java`
++- `ReservationIdempotencyCleanupService.java`
++- `ReservationIdempotencyCleanupJob.java`
++- `ReservationIdempotencyRepository.java`
++- `ReservationService.java`
++- `application.properties`
++
++Documentacion:
++
++- `docs/ITEM_Z5D_RESERVATION_REJECTION_TRACE.md`
++- `docs/ERP_BITACORA_CAMBIOS.md`
++- `docs/ERP_RIESGOS_OPERATIVOS.md`
++- `docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md`
++
++## Motivos trazados
++
++- `ITEM_NOT_AVAILABLE`
++- `ACTIVE_RESERVATION_EXISTS`
++- `IDEMPOTENCY_PAYLOAD_MISMATCH`
++- `IDEMPOTENCY_CONFLICT_OR_IN_PROGRESS`
++- `VALIDATION_REJECTED`
++
++## Seguridad de datos
++
++- No se guarda payload completo.
++- `X-Idempotency-Key` se registra solo como hash SHA-256.
++- Se guarda `request_hash`, no el cuerpo de la solicitud.
++- No se imprimen passwords ni tokens.
++
++## Retencion / limpieza
++
++Se implemento limpieza programada de llaves expiradas:
++
++- `reservation.idempotency.cleanup.enabled`
++- `reservation.idempotency.cleanup-cron`
++
++La limpieza elimina solo registros con `expires_at` anterior al momento de ejecucion.
++
++No se implemento retencion de `reservation_rejection_events`; queda como decision futura segun volumen real.
++
++## Tests agregados / ajustados
++
++- `ReservationServiceTests`
++  - item no disponible;
++  - update atomico con `0` filas;
++  - reserva activa existente por consulta;
++  - constraint `uq_reservations_active_item`;
++  - idempotency payload mismatch;
++  - llave en progreso;
++  - canal LIVE sin `liveId`;
++  - flujo exitoso sin evento de rechazo.
++- `ReservationIdempotencyCleanupServiceTests`
++  - limpia llaves vencidas;
++  - limpieza deshabilitada no borra.
++- `ReservationServiceLiveOperationalStatusTests`
++  - actualizado por nueva dependencia de constructor.
++
++## Validaciones
++
++| Validacion | Resultado | Nota |
++|---|---|---|
++| `./mvnw.cmd test` | PASS | Ejecutado con `.env` cargado sin imprimir secretos. |
++| `npm.cmd run lint` | PASS con warnings | Warnings historicos existentes; 0 errores. |
++| `npx.cmd tsc --noEmit` | PASS | Sin salida de error. |
++| `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export` | PASS | Exportado en `C:/tmp/control-ropa-web-export`. |
++
++## Riesgos
++
++- La tabla nueva no tiene consola de consulta; soporte inicial requiere SQL o herramienta tecnica.
++- No hay QA visual/API real ejecutada con usuarios operativos en esta fase.
++- El volumen futuro de `reservation_rejection_events` podria requerir retencion propia.
++
++## Confirmacion de no alcance
++
++No se tocaron:
++
++- pagos;
++- caja;
++- precio LIVE;
++- devoluciones;
++- autorizaciones;
++- permisos;
++- RBAC;
++- endpoints nuevos;
++- venta financiera.
++
++## Resultado
++
++- `GO_TECNICO`
++- `PENDING_QA_VISUAL`
++
++Siguiente fase recomendada:
++
++- ITEM-Z5E o QA API/visual de reserva normal y LIVE con doble submit, item ya tomado, misma idempotency key y mismatch de payload.
