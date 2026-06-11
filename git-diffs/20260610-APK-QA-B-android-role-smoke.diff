@@ -1,0 +1,248 @@
+﻿diff --git a/docs/APK_QA_B_ANDROID_ROLE_SMOKE.md b/docs/APK_QA_B_ANDROID_ROLE_SMOKE.md
+new file mode 100644
+index 0000000..393ecb7
+--- /dev/null
++++ b/docs/APK_QA_B_ANDROID_ROLE_SMOKE.md
+@@ -0,0 +1,116 @@
++# APK-QA-B / Smoke Android real con screenshots y roles desde APK instalado
++
++## Resumen ejecutivo
++
++APK-QA-B documenta el intento de cierre de smoke Android por roles desde el APK instalado.
++
++Resultado:
++
++- `APK_ANDROID_BASIC_OK`
++- `PENDING_QA_VISUAL`
++- `PENDING_ROLE_SMOKE`
++
++No se encontraron screenshots en `qa-evidence/APK-QA-B/android/` ni evidencia visual nueva para validar pantallas/roles adicionales. Se conserva como evidencia confirmada lo ya declarado por el usuario en APK-QA-A: APK descargado, instalado, app abre, usuario puede entrar y ya no depende de Expo Go ni Metro.
++
++## APK probado
++
++- APK: `https://expo.dev/artifacts/eas/l_IlEZtHvOu4wJ2gIlOKMhJaP9AGzrfJs6LXKwse4sw.apk`
++- Build EAS: `f9e59a44-6fa7-4c13-bd8f-9d1dafc7318b`
++- Perfil EAS: `preview-apk`
++- Fase origen: `APK-RC1`
++- Commit APK-RC1: `97e13d1 APK-RC1 prepara build android apk`
++- Commit APK-QA-A: `58e2131 APK-QA-A documenta smoke android`
++
++## Backend LAN
++
++Validado desde PC durante APK-QA-B:
++
++| Endpoint | Resultado |
++| --- | --- |
++| `http://localhost:8090/api/health` | `HTTP 200` |
++| `http://192.168.0.128:8090/api/health` | `HTTP 200` |
++
++## Evidencia visual disponible
++
++Auditoria local:
++
++- `qa-evidence/APK-QA-B/android/`: no existe o no contiene archivos.
++- `qa-evidence/`: solo se encontro evidencia previa de `PRODUCT-D4`.
++- No se recibieron screenshots nuevos en esta fase.
++
++Resultado visual: `PENDING_QA_VISUAL`.
++
++## Checklist
++
++| Punto | Resultado | Fuente |
++| --- | --- | --- |
++| APK instalado | OK | Confirmado previamente por usuario en APK-QA-A |
++| App abre | OK | Confirmado previamente por usuario en APK-QA-A |
++| Login/entrada | OK | Confirmado previamente por usuario en APK-QA-A |
++| Login admin | Pendiente | Sin screenshot/evidencia nueva |
++| Home admin | Pendiente | Sin screenshot/evidencia nueva |
++| Menu principal | Pendiente | Sin screenshot/evidencia nueva |
++| LIVE admin | Pendiente | Sin screenshot/evidencia nueva |
++| Autorizaciones operativas admin | Pendiente | Sin screenshot/evidencia nueva |
++| Reserva/pago desde APK | Pendiente | Sin screenshot/evidencia nueva |
++| Cierre de sesion | Pendiente | Sin screenshot/evidencia nueva |
++| Login vendedor | Pendiente | Sin screenshot/evidencia nueva |
++| LIVE vendedor | Pendiente | Sin screenshot/evidencia nueva |
++| Restriccion de permisos vendedor | Pendiente | Sin screenshot/evidencia nueva |
++| Usuario sin permisos | Pendiente | Sin screenshot/evidencia nueva |
++| Error de conexion | No observado | Backend LAN responde 200; sin evidencia de error |
++
++## Roles
++
++No se puede marcar smoke por roles como aprobado porque no hay evidencia visual o manual nueva para:
++
++- Admin.
++- Vendedor.
++- Usuario sin permisos.
++
++Resultado por roles: `PENDING_ROLE_SMOKE`.
++
++## Configuracion movil/API auditada
++
++La auditoria confirma que la base ya contiene configuracion movil/LAN documentada:
++
++- `EXPO_PUBLIC_API_HOST`.
++- `EXPO_PUBLIC_API_PORT`.
++- `EXPO_PUBLIC_API_BASE_URL`.
++- Perfil EAS `preview-apk`.
++- `android.buildType: apk`.
++
++No se cambio configuracion Android/EAS en esta fase.
++
++## Alcance no tocado
++
++No se modifico:
++
++- Backend funcional.
++- LIVE funcional.
++- Pagos.
++- Caja.
++- Precio LIVE.
++- Devoluciones.
++- Autorizaciones.
++- RBAC.
++- Permisos.
++- Migraciones.
++- Configuracion Android/EAS.
++
++## Riesgos y pendientes
++
++- Falta evidencia visual real de Android instalado.
++- Falta smoke por roles desde APK instalado.
++- Falta captura de Home, menu principal, LIVE, autorizaciones operativas y pago/reserva.
++- No se puede declarar `APK_ANDROID_ROLE_SMOKE_OK` sin screenshots o evidencia manual especifica por rol.
++
++## Resultado
++
++`APK_ANDROID_BASIC_OK`
++
++`PENDING_QA_VISUAL`
++
++`PENDING_ROLE_SMOKE`
++
++Siguiente fase recomendada: repetir APK-QA-B cuando existan screenshots en `qa-evidence/APK-QA-B/android/` o una confirmacion manual detallada por pantalla y rol.
+diff --git a/qa-reports/APK-QA-B-android-role-smoke-report-20260610-195432.md b/qa-reports/APK-QA-B-android-role-smoke-report-20260610-195432.md
+new file mode 100644
+index 0000000..bc6f144
+--- /dev/null
++++ b/qa-reports/APK-QA-B-android-role-smoke-report-20260610-195432.md
+@@ -0,0 +1,120 @@
++# APK-QA-B / Android role smoke report
++
++## Resumen
++
++- Rama: `feature/apk-qa-b-android-role-smoke`
++- Resultado: `APK_ANDROID_BASIC_OK`, `PENDING_QA_VISUAL`, `PENDING_ROLE_SMOKE`
++- APK probado: `https://expo.dev/artifacts/eas/l_IlEZtHvOu4wJ2gIlOKMhJaP9AGzrfJs6LXKwse4sw.apk`
++- Build EAS: `f9e59a44-6fa7-4c13-bd8f-9d1dafc7318b`
++
++## Comandos ejecutados
++
++```powershell
++git branch --show-current
++git status
++git log --oneline -140
++git --no-pager log --oneline --all --decorate --grep="APK-QA-A"
++git --no-pager log --oneline --all --decorate --grep="APK-RC1"
++git --no-pager log --oneline --all --decorate --grep="PAY-LIVE-B"
++git --no-pager log --oneline --all --decorate --grep="LIVE-PRICE-D"
++git --no-pager log --oneline --all --decorate --grep="LIVE-AUTH-B3"
++Get-ChildItem -Path qa-evidence -Recurse -File
++Get-ChildItem -Path qa-reports -File
++Get-ChildItem -Path docs -File
++git grep -n "EXPO_PUBLIC_API_HOST|EXPO_PUBLIC_API_PORT|API_BASE|baseURL|apiUrl|localhost|127.0.0.1|192.168.0.128|preview-apk|buildType|apk" -- app services components app.json app.config.* eas.json package.json docs qa-reports
++curl.exe -i http://localhost:8090/api/health
++curl.exe -i http://192.168.0.128:8090/api/health
++npm.cmd run lint
++npx.cmd tsc --noEmit
++npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export
++.\mvnw.cmd test
++git --no-pager diff --check
++git --no-pager diff --cached --check
++git status
++```
++
++## Historial confirmado
++
++- `58e2131 APK-QA-A documenta smoke android`
++- `97e13d1 APK-RC1 prepara build android apk`
++- `fcc4fd9 PAY-LIVE-B valida pago live visual`
++- `3676d2b LIVE-PRICE-D valida cambio precio live`
++- `9121fe2 LIVE-AUTH-B3 valida autorizaciones operativas`
++
++## Evidencia visual encontrada
++
++- No se encontraron archivos en `qa-evidence/APK-QA-B/android/`.
++- No se recibieron screenshots nuevos para esta fase.
++- Se encontro solo evidencia previa no relacionada directamente: `qa-evidence/PRODUCT-D4/README.md`.
++
++Resultado: `PENDING_QA_VISUAL`.
++
++## Backend LAN
++
++| Endpoint | Resultado |
++| --- | --- |
++| `http://localhost:8090/api/health` | `HTTP 200` |
++| `http://192.168.0.128:8090/api/health` | `HTTP 200` |
++
++## Resultado por pantalla
++
++| Pantalla/flujo | Resultado |
++| --- | --- |
++| Instalacion APK | OK, confirmado previamente |
++| Apertura app | OK, confirmado previamente |
++| Entrada/login | OK, confirmado previamente |
++| Home | Pendiente |
++| Menu principal | Pendiente |
++| LIVE | Pendiente |
++| Autorizaciones operativas | Pendiente |
++| Reserva/pago | Pendiente |
++| Cierre de sesion | Pendiente |
++
++## Resultado por rol
++
++| Rol | Resultado |
++| --- | --- |
++| Admin | Pendiente de screenshot/evidencia nueva |
++| Vendedor | Pendiente de screenshot/evidencia nueva |
++| Sin permisos | Pendiente de screenshot/evidencia nueva |
++
++Resultado: `PENDING_ROLE_SMOKE`.
++
++## Validaciones tecnicas
++
++| Validacion | Resultado |
++| --- | --- |
++| `npm.cmd run lint` | PASS con 53 warnings preexistentes y 0 errores |
++| `npx.cmd tsc --noEmit` | PASS |
++| `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export` | PASS |
++| `backend/control-ropa/.mvnw.cmd test` | PASS, 125 tests, 0 failures, 0 errors |
++| `git --no-pager diff --check` | PASS |
++| `git --no-pager diff --cached --check` | PASS |
++
++## Confirmacion de no cambios funcionales
++
++Esta fase solo agrega documentacion, QA report y evidencia git.
++
++No se tocaron:
++
++- Backend funcional.
++- LIVE funcional.
++- Pagos.
++- Caja.
++- Precio LIVE.
++- Devoluciones.
++- Autorizaciones.
++- RBAC.
++- Permisos.
++- Migraciones.
++- Configuracion Android/EAS.
++
++## GO/NO-GO
++
++`APK_ANDROID_BASIC_OK`
++
++`PENDING_QA_VISUAL`
++
++`PENDING_ROLE_SMOKE`
++
++No se marca `APK_ANDROID_ROLE_SMOKE_OK` porque falta evidencia real por screenshots o confirmacion manual detallada por rol.
