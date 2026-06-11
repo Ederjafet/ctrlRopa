@@ -1,0 +1,490 @@
+﻿diff --git a/docs/ERP_BITACORA_CAMBIOS.md b/docs/ERP_BITACORA_CAMBIOS.md
+index cf8c764..551b25a 100644
+--- a/docs/ERP_BITACORA_CAMBIOS.md
++++ b/docs/ERP_BITACORA_CAMBIOS.md
+@@ -3637,3 +3637,18 @@ Decision:
+
+ - `GO_TECNICO_API` si backend/frontend pasan validaciones completas.
+ - `PENDING_QA_VISUAL` hasta validar `/live` y `/payments` con capturas reales.
++
++## 2026-06-10 - RELEASE-LIVE-GO cierre formal con APK Android
++
++Tipo: cierre documental de release LIVE con APK Android, sin cambios funcionales, backend, frontend, pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC, permisos, migraciones ni configuracion Android/EAS.
++
++Objetivo:
++
++- Consolidar estado real del release LIVE con APK generado, instalado y probado de forma basica.
++- Documentar riesgos, pendientes, rollback, handoff e instalacion.
++
++Resultado:
++
++- `RELEASE_GO_CONDICIONADO`.
++- `PENDING_QA_VISUAL` por falta de screenshots.
++- `PENDING_ROLE_SMOKE` por falta de evidencia nueva por roles desde APK instalado.
+diff --git a/docs/ERP_RIESGOS_OPERATIVOS.md b/docs/ERP_RIESGOS_OPERATIVOS.md
+index 6530fa6..0f80100 100644
+--- a/docs/ERP_RIESGOS_OPERATIVOS.md
++++ b/docs/ERP_RIESGOS_OPERATIVOS.md
+@@ -227,6 +227,7 @@ Probabilidad:
+ - LIVE-AUTH-B1 agrega permisos operativos nuevos; roles productivos deben revisar asignaciones antes de operar, especialmente porque `SELLER` solo puede solicitar y no debe aprobar ni aplicar.
+ - LIVE-AUTH-B1 no agrega UI; cualquier operacion desde frontend queda pendiente de fase B2 y QA visual real.
+ - PAY-LIVE-A reutiliza pagos por reserva para apartados LIVE; antes de liberar productivo se requiere QA visual real y decision de negocio sobre sobrepagos, porque el modelo actual registra excedentes como saldo existente.
++- RELEASE-LIVE-GO queda como release interno condicionado: APK Android instala, abre y permite login, pero no debe declararse release final completo hasta contar con screenshots y smoke por roles desde APK instalado.
+ - PRODUCT-ERR-A agrega mapper frontend de errores accionables; modulos fuera de las rutas criticas aun deben migrarse por dominio para evitar que `err.message` exponga mensajes genericos o tecnicos.
+ - Pagos/ventas sin regresion automatizada suficiente.
+ - Auditoria de negocio todavia parcial.
+diff --git a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+index 27776e6..afefdcb 100644
+--- a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
++++ b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+@@ -1009,3 +1009,23 @@ Pendiente backlog:
+ | PAY-LIVE-B QA visual de pago desde LIVE | P0 | ALTO | backend/frontend levantados | Capturas reales de `/live` hacia `/payments` y retorno a LIVE |
+ | PAY-LIVE-C decision sobre sobrepago LIVE | P1 | MEDIO | regla negocio | Bloquear o documentar saldo excedente segun operacion real |
+ | PAY-LIVE-D conciliacion caja futura | P1 | CRITICO | contrato caja | Pago LIVE conciliable sin inventar cierre de caja |
++
++## Avance RELEASE-LIVE-GO
++
++Epic: cierre controlado de LIVE con APK Android.
++
++Completado:
++
++- APK Android generado por EAS con perfil `preview-apk`.
++- APK descargado, instalado y abierto en Android segun evidencia manual.
++- Login/entrada confirmado.
++- Backend LAN validado en `192.168.0.128:8090`.
++- Handoff de instalacion y QA manual documentado.
++
++Pendiente backlog:
++
++| Tarea | Prioridad | Riesgo | Dependencia | Criterio de aceptacion |
++|---|---|---|---|---|
++| RELEASE-LIVE-GO-QA-VISUAL screenshots Android | P0 | ALTO | APK instalado | Capturas de login, Home, menu, LIVE, autorizaciones y pago/reserva |
++| RELEASE-LIVE-GO-ROLE-SMOKE roles Android | P0 | ALTO | usuarios QA y screenshots | Admin/vendedor/sin permisos validados desde APK instalado |
++| RELEASE-LIVE-GO-CLIENTE validacion final | P1 | ALTO | dispositivo/red cliente | Cliente valida instalacion, conexion y flujo basico |
+diff --git a/docs/RELEASE_LIVE_GO.md b/docs/RELEASE_LIVE_GO.md
+new file mode 100644
+index 0000000..f91f9e1
+--- /dev/null
++++ b/docs/RELEASE_LIVE_GO.md
+@@ -0,0 +1,207 @@
++# RELEASE-LIVE-GO / Cierre formal de release LIVE con APK Android
++
++## 1. Resumen ejecutivo
++
++RELEASE-LIVE-GO consolida el estado real del release LIVE con APK Android generado, instalado y probado de forma basica.
++
++Resultado:
++
++- `RELEASE_GO_CONDICIONADO`
++- `PENDING_QA_VISUAL`
++- `PENDING_ROLE_SMOKE`
++
++El release queda tecnicamente listo para entrega controlada interna, con APK Android disponible y smoke basico confirmado. No se declara `QA_PASS` completo porque faltan screenshots, evidencia visual completa y smoke por roles desde APK instalado.
++
++## 2. Alcance del release
++
++Incluido:
++
++- LIVE base.
++- Permisos LIVE minimos.
++- Control de prenda al aire.
++- Inventario/reservas con atomicidad, idempotencia, constraint y trazabilidad.
++- Cancelacion segura de reservas.
++- Vendido operativo LIVE.
++- Autorizaciones operativas LIVE.
++- Cambio de precio LIVE autorizado.
++- Pago minimo para apartados LIVE.
++- Card de LIVE activo en home.
++- APK Android interno generado con EAS.
++- Smoke Android basico.
++
++Excluido:
++
++- QA visual completo con screenshots.
++- Smoke completo por roles desde APK instalado.
++- Validacion de usuario sin permisos desde APK.
++- Release en tienda.
++- Caja productiva completa.
++- Devoluciones productivas sobre pagos LIVE.
++- Venta financiera real desde LIVE.
++
++## 3. APK generado y build EAS
++
++- APK: `https://expo.dev/artifacts/eas/l_IlEZtHvOu4wJ2gIlOKMhJaP9AGzrfJs6LXKwse4sw.apk`
++- Build ID: `f9e59a44-6fa7-4c13-bd8f-9d1dafc7318b`
++- Perfil: `preview-apk`
++- Estado: `FINISHED`
++- Distribucion: `INTERNAL`
++- Commit APK-RC1: `97e13d1 APK-RC1 prepara build android apk`
++
++## 4. Instalacion Android
++
++Estado confirmado por evidencia manual del usuario:
++
++- APK descargado: OK.
++- APK instalado: OK.
++- App abre desde APK: OK.
++- Usuario puede entrar/login: OK.
++- No depende de Expo Go.
++- No depende de Metro.
++
++## 5. Estado de smoke APK
++
++| Fase | Resultado |
++| --- | --- |
++| APK-RC1 | `APK_BUILD_OK` |
++| APK-QA-A | `GO_TECNICO_ANDROID_SMOKE`, `APK_INSTALLED_OK`, `APK_CONNECTION_OK` |
++| APK-QA-B | `APK_ANDROID_BASIC_OK`, `PENDING_QA_VISUAL`, `PENDING_ROLE_SMOKE` |
++
++No se marca `APK_ANDROID_ROLE_SMOKE_OK` porque no hay evidencia nueva por roles.
++
++## 6. Funcionalidades cerradas
++
++### LIVE base
++
++La base LIVE queda consolidada por `RELEASE-LIVE-BASE-RC1` con resultado tecnico `GO_TECNICO_RC` y pendiente visual.
++
++### Permisos LIVE
++
++Se implementaron permisos minimos LIVE y correccion de enforcement para retirar prenda al aire, incluyendo validacion donde seller sin `REMOVE_LIVE_ACTIVE_ITEM` queda bloqueado por backend.
++
++### Reservas e inventario
++
++Incluye:
++
++- Solo prendas `AVAILABLE` pueden ponerse al aire.
++- Reserva atomica `AVAILABLE -> RESERVED`.
++- Idempotencia por `X-Idempotency-Key`.
++- Constraint de reserva activa por item.
++- Trazabilidad de rechazos.
++- Cancelacion/liberacion segura.
++
++### Autorizacion operativa
++
++Existe backend y UI minima para autorizaciones operativas. Apply real se mantiene controlado para `UNDO_LIVE_OPERATIONAL_SALE` segun alcance documentado.
++
++### Cambio de precio LIVE
++
++Existe cambio de precio LIVE autorizado sobre `reservations.price`, sin tocar `items.price`, `sales.price`, pagos, caja ni venta financiera.
++
++### Pago minimo LIVE
++
++Existe pago minimo de apartados LIVE usando pagos por reserva. El flujo no convierte la reserva a venta ni toca caja como cierre financiero completo.
++
++### APK Android
++
++APK generado por EAS con perfil `preview-apk`, instalado y abierto en Android con login/entrada confirmados.
++
++## 7. Evidencia disponible
++
++- `docs/APK_RC1_ANDROID_BUILD.md`
++- `docs/APK_QA_A_ANDROID_SMOKE.md`
++- `docs/APK_QA_B_ANDROID_ROLE_SMOKE.md`
++- `qa-reports/APK-RC1-android-build-report-20260610-190254.md`
++- `qa-reports/APK-QA-A-android-smoke-report-20260610-194242.md`
++- `qa-reports/APK-QA-B-android-role-smoke-report-20260610-195432.md`
++- `docs/PAY_LIVE_A_MINIMAL_LIVE_PAYMENT.md`
++- `docs/PAY_LIVE_B_VISUAL_PAYMENT_QA.md`
++- `docs/LIVE_PRICE_D_PRICE_QA.md`
++- `docs/LIVE_AUTH_B3_OPERATIONAL_AUTHORIZATIONS_QA.md`
++- `docs/RELEASE_LIVE_BASE_RC1.md`
++
++## 8. Pendientes reales
++
++- Screenshots reales desde APK instalado.
++- Smoke visual completo.
++- Smoke por roles desde APK instalado.
++- Validacion con vendedor.
++- Validacion con usuario sin permisos.
++- Validacion de Home, menu principal, LIVE, autorizaciones y pagos/reservas con capturas.
++- Validacion de cliente final en su red/dispositivo real.
++
++## 9. Riesgos aceptados
++
++- Entrega interna controlada con `PENDING_QA_VISUAL`.
++- Entrega interna controlada con `PENDING_ROLE_SMOKE`.
++- APK de distribucion interna, no firmado como release de tienda.
++- URL de artefacto EAS puede expirar.
++
++## 10. Riesgos no aceptados
++
++- No liberar como release productivo final sin screenshots y smoke por roles.
++- No declarar `QA_PASS` completo.
++- No declarar cobertura de usuario sin permisos desde APK.
++- No declarar pruebas de pagos/caja/devoluciones productivas completas.
++
++## 11. Rollback
++
++Si el APK instalado presenta fallo critico:
++
++1. Detener distribucion del APK interno.
++2. Conservar APK, build ID y logs EAS para diagnostico.
++3. Revertir el merge de la rama de release en develop si ya fue integrado y se confirma regresion documental/configuracional.
++4. Si la regresion es funcional, abrir fase de fix focalizado sobre el modulo afectado.
++5. No borrar datos ni migraciones sin plan explicito.
++
++El rollback de migraciones previas de LIVE/autorizaciones/precio/pagos debe tratarse como operacion de base de datos con plan especifico; no se recomienda rollback manual destructivo.
++
++## 12. Guia de instalacion APK
++
++1. Descargar el APK desde el artefacto EAS.
++2. Transferirlo al dispositivo Android o abrir la URL desde el dispositivo.
++3. Permitir instalacion desde fuente confiable si Android lo solicita.
++4. Instalar.
++5. Abrir la app desde el icono instalado.
++6. Confirmar que no se usa Expo Go ni Metro.
++7. Validar backend LAN con `http://192.168.0.128:8090/api/health`.
++8. Entrar con usuario QA definido sin compartir secretos en evidencia.
++
++## 13. Checklist QA manual
++
++- Captura de pantalla de app instalada.
++- Captura de login.
++- Captura de Home.
++- Captura de menu principal.
++- Captura de LIVE como admin.
++- Captura de autorizaciones operativas.
++- Captura de pago/reserva si el dataset es seguro.
++- Cierre de sesion.
++- Login vendedor.
++- LIVE vendedor.
++- Validacion de restricciones de vendedor.
++- Usuario sin permisos.
++- Evidencia de error o ausencia de error de conexion.
++
++## 14. Criterio GO/NO-GO
++
++GO condicionado:
++
++- APK generado e instalado.
++- App abre desde APK.
++- Login/entrada confirmado.
++- Backend LAN responde.
++- Validaciones tecnicas pasan.
++- Pendientes visuales y por rol quedan documentados.
++
++NO-GO:
++
++- APK no instala.
++- APK no abre.
++- Login falla por conexion o error funcional reproducible.
++- Backend LAN no responde.
++- Se detecta regresion critica en pagos/LIVE/autorizaciones.
++
++## 15. Siguiente paso recomendado
++
++Ejecutar `RELEASE-LIVE-GO-QA-VISUAL` o fase equivalente con screenshots reales desde Android instalado y smoke por roles admin/vendedor/sin permisos.
+diff --git a/docs/RELEASE_LIVE_GO_HANDOFF.md b/docs/RELEASE_LIVE_GO_HANDOFF.md
+new file mode 100644
+index 0000000..f995f67
+--- /dev/null
++++ b/docs/RELEASE_LIVE_GO_HANDOFF.md
+@@ -0,0 +1,109 @@
++# RELEASE-LIVE-GO / Handoff de entrega
++
++## Que entregar
++
++- APK Android interno.
++- Documentacion de release.
++- Checklist QA manual.
++- Evidencia de backend LAN.
++- Lista de pendientes reales.
++
++## APK
++
++- URL: `https://expo.dev/artifacts/eas/l_IlEZtHvOu4wJ2gIlOKMhJaP9AGzrfJs6LXKwse4sw.apk`
++- Build ID: `f9e59a44-6fa7-4c13-bd8f-9d1dafc7318b`
++- Perfil: `preview-apk`
++- Distribucion: `INTERNAL`
++
++## Usuarios QA sugeridos
++
++Usar usuarios QA documentados, sin imprimir passwords ni tokens:
++
++- `qa.admin@local.test`
++- `qa.supervisor.centro@local.test`
++- `qa.vendedor.centro@local.test`
++- `qa.sinpermisos@local.test`
++
++Si alguna credencial no esta disponible en el ambiente local, documentar bloqueo y no inventar password.
++
++## Instalacion
++
++1. Descargar el APK desde la URL de EAS.
++2. Instalar en Android.
++3. Confirmar que la app abre desde el icono instalado.
++4. Confirmar que no se usa Expo Go.
++5. Confirmar que no se usa Metro.
++
++## Smoke minimo
++
++1. Abrir app instalada.
++2. Login admin.
++3. Home.
++4. Menu principal.
++5. LIVE.
++6. Autorizaciones operativas.
++7. Reserva/pago si hay dataset seguro.
++8. Cierre de sesion.
++9. Login vendedor.
++10. Validar restricciones de vendedor.
++11. Login usuario sin permisos o validacion de bloqueo.
++
++## Validar backend
++
++Desde PC:
++
++```powershell
++curl.exe -i http://localhost:8090/api/health
++curl.exe -i http://192.168.0.128:8090/api/health
++```
++
++Resultado esperado: `HTTP 200`.
++
++Desde Android, si hay problema de conexion:
++
++- Confirmar que el telefono esta en la misma red LAN.
++- Confirmar que el backend escucha en `192.168.0.128:8090`.
++- Confirmar firewall Windows.
++- Confirmar que la app no esta apuntando a `localhost`.
++- Revisar `.env`/build usado si se genera un APK nuevo.
++
++## Evidencias a pedir
++
++- Screenshot de login.
++- Screenshot de Home.
++- Screenshot de menu principal.
++- Screenshot de LIVE admin.
++- Screenshot de autorizaciones operativas.
++- Screenshot de pago/reserva si aplica.
++- Screenshot de LIVE vendedor.
++- Screenshot de bloqueo o restriccion.
++- Screenshot de usuario sin permisos.
++- Nota del dispositivo usado.
++- Fecha/hora de prueba.
++
++## Criterios de aceptacion
++
++Aceptar como release interno condicionado si:
++
++- APK instala.
++- APK abre.
++- Login funciona.
++- Backend LAN responde.
++- No hay error critico reproducible.
++- Pendientes visuales/roles quedan documentados.
++
++Aceptar como release completo solo si:
++
++- Hay screenshots reales.
++- Hay smoke por roles.
++- Admin, vendedor y sin permisos quedan validados.
++- No hay regresion critica de LIVE, pagos, precio ni autorizaciones.
++
++Rechazar si:
++
++- APK no instala o no abre.
++- Login falla por conexion o error funcional.
++- Backend LAN no responde.
++- Vendedor accede a acciones no permitidas.
++- Usuario sin permisos opera LIVE/pagos/autorizaciones.
++- Pago/reserva descuadra datos.
+diff --git a/qa-reports/RELEASE-LIVE-GO-report-20260610-201902.md b/qa-reports/RELEASE-LIVE-GO-report-20260610-201902.md
+new file mode 100644
+index 0000000..3bae07c
+--- /dev/null
++++ b/qa-reports/RELEASE-LIVE-GO-report-20260610-201902.md
+@@ -0,0 +1,93 @@
++# RELEASE-LIVE-GO / QA report
++
++## Resumen
++
++- Rama: `feature/release-live-go`
++- Resultado: `RELEASE_GO_CONDICIONADO`
++- Pendientes: `PENDING_QA_VISUAL`, `PENDING_ROLE_SMOKE`
++- APK: `https://expo.dev/artifacts/eas/l_IlEZtHvOu4wJ2gIlOKMhJaP9AGzrfJs6LXKwse4sw.apk`
++- Build ID: `f9e59a44-6fa7-4c13-bd8f-9d1dafc7318b`
++
++## Historial confirmado
++
++- `fd92569 APK-QA-B valida smoke android por roles`
++- `58e2131 APK-QA-A documenta smoke android`
++- `97e13d1 APK-RC1 prepara build android apk`
++- `fcc4fd9 PAY-LIVE-B valida pago live visual`
++- `4b1435e PAY-LIVE-A implementa pago minimo live`
++- `3676d2b LIVE-PRICE-D valida cambio precio live`
++- `9121fe2 LIVE-AUTH-B3 valida autorizaciones operativas`
++- `7f77e80 RELEASE-LIVE-BASE-RC1 documenta release candidate live base`
++
++## Comandos ejecutados
++
++```powershell
++git branch --show-current
++git status
++git log --oneline -180
++git --no-pager log --oneline --all --decorate --grep="APK-QA-B"
++git --no-pager log --oneline --all --decorate --grep="APK-QA-A"
++git --no-pager log --oneline --all --decorate --grep="APK-RC1"
++git --no-pager log --oneline --all --decorate --grep="PAY-LIVE-B"
++git --no-pager log --oneline --all --decorate --grep="PAY-LIVE-A"
++git --no-pager log --oneline --all --decorate --grep="LIVE-PRICE-D"
++git --no-pager log --oneline --all --decorate --grep="LIVE-AUTH-B3"
++git --no-pager log --oneline --all --decorate --grep="RELEASE-LIVE-BASE-RC1"
++Get-ChildItem docs/qa-reports/git-diffs/qa-evidence
++git grep -n "preview-apk|buildType|apk|f9e59a44|l_IlEZtHvOu4wJ2gIlOKMhJaP9AGzrfJs6LXKwse4sw|EXPO_PUBLIC_API_HOST|EXPO_PUBLIC_API_PORT|192.168.0.128" -- app.json app.config.* eas.json package.json docs qa-reports
++curl.exe -i http://localhost:8090/api/health
++curl.exe -i http://192.168.0.128:8090/api/health
++npm.cmd run lint
++npx.cmd tsc --noEmit
++npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export
++.\mvnw.cmd test
++git --no-pager diff --check
++git --no-pager diff --cached --check
++git status
++```
++
++## Backend LAN
++
++| Endpoint | Resultado |
++| --- | --- |
++| `http://localhost:8090/api/health` | `HTTP 200` |
++| `http://192.168.0.128:8090/api/health` | `HTTP 200` |
++
++## Estado APK-QA-A
++
++- `GO_TECNICO_ANDROID_SMOKE`.
++- `APK_INSTALLED_OK`.
++- `APK_CONNECTION_OK`.
++- App abre y login/entrada funciona segun evidencia manual.
++
++## Estado APK-QA-B
++
++- `APK_ANDROID_BASIC_OK`.
++- `PENDING_QA_VISUAL`.
++- `PENDING_ROLE_SMOKE`.
++- No se encontraron screenshots para APK-QA-B.
++- No hay evidencia nueva por roles.
++
++## Pendientes
++
++- Screenshots reales desde Android instalado.
++- Smoke por roles admin/vendedor/sin permisos.
++- Validacion Home/menu/LIVE/autorizaciones/pago-reserva con capturas.
++- Validacion cliente final.
++
++## Validaciones tecnicas
++
++| Validacion | Resultado |
++| --- | --- |
++| `npm.cmd run lint` | PASS con 53 warnings preexistentes y 0 errores |
++| `npx.cmd tsc --noEmit` | PASS |
++| `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export` | PASS |
++| `backend/control-ropa/.mvnw.cmd test` | PASS, 125 tests, 0 failures, 0 errors |
++| `git --no-pager diff --check` | PASS |
++| `git --no-pager diff --cached --check` | PASS |
++
++## GO/NO-GO
++
++`RELEASE_GO_CONDICIONADO`
++
++No se marca `QA_PASS` completo ni `APK_ANDROID_ROLE_SMOKE_OK`.
