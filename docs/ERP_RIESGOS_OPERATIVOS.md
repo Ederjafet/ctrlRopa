@@ -227,6 +227,7 @@ Probabilidad:
 - LIVE-AUTH-B1 agrega permisos operativos nuevos; roles productivos deben revisar asignaciones antes de operar, especialmente porque `SELLER` solo puede solicitar y no debe aprobar ni aplicar.
 - LIVE-AUTH-B1 no agrega UI; cualquier operacion desde frontend queda pendiente de fase B2 y QA visual real.
 - PAY-LIVE-A reutiliza pagos por reserva para apartados LIVE; antes de liberar productivo se requiere QA visual real y decision de negocio sobre sobrepagos, porque el modelo actual registra excedentes como saldo existente.
+- RELEASE-LIVE-GO queda como release interno condicionado: APK Android instala, abre y permite login, pero no debe declararse release final completo hasta contar con screenshots y smoke por roles desde APK instalado.
 - PRODUCT-ERR-A agrega mapper frontend de errores accionables; modulos fuera de las rutas criticas aun deben migrarse por dominio para evitar que `err.message` exponga mensajes genericos o tecnicos.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.

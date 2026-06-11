@@ -1,0 +1,7 @@
+﻿ docs/ERP_BITACORA_CAMBIOS.md                       |  15 ++
+ docs/ERP_RIESGOS_OPERATIVOS.md                     |   1 +
+ docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md          |  20 ++
+ docs/RELEASE_LIVE_GO.md                            | 207 +++++++++++++++++++++
+ docs/RELEASE_LIVE_GO_HANDOFF.md                    | 109 +++++++++++
+ .../RELEASE-LIVE-GO-report-20260610-201902.md      |  93 +++++++++
+ 6 files changed, 445 insertions(+)

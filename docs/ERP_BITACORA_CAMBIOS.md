@@ -3637,3 +3637,18 @@ Decision:
 
 - `GO_TECNICO_API` si backend/frontend pasan validaciones completas.
 - `PENDING_QA_VISUAL` hasta validar `/live` y `/payments` con capturas reales.
+
+## 2026-06-10 - RELEASE-LIVE-GO cierre formal con APK Android
+
+Tipo: cierre documental de release LIVE con APK Android, sin cambios funcionales, backend, frontend, pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC, permisos, migraciones ni configuracion Android/EAS.
+
+Objetivo:
+
+- Consolidar estado real del release LIVE con APK generado, instalado y probado de forma basica.
+- Documentar riesgos, pendientes, rollback, handoff e instalacion.
+
+Resultado:
+
+- `RELEASE_GO_CONDICIONADO`.
+- `PENDING_QA_VISUAL` por falta de screenshots.
+- `PENDING_ROLE_SMOKE` por falta de evidencia nueva por roles desde APK instalado.

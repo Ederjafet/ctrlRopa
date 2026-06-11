@@ -1009,3 +1009,23 @@ Pendiente backlog:
 | PAY-LIVE-B QA visual de pago desde LIVE | P0 | ALTO | backend/frontend levantados | Capturas reales de `/live` hacia `/payments` y retorno a LIVE |
 | PAY-LIVE-C decision sobre sobrepago LIVE | P1 | MEDIO | regla negocio | Bloquear o documentar saldo excedente segun operacion real |
 | PAY-LIVE-D conciliacion caja futura | P1 | CRITICO | contrato caja | Pago LIVE conciliable sin inventar cierre de caja |
+
+## Avance RELEASE-LIVE-GO
+
+Epic: cierre controlado de LIVE con APK Android.
+
+Completado:
+
+- APK Android generado por EAS con perfil `preview-apk`.
+- APK descargado, instalado y abierto en Android segun evidencia manual.
+- Login/entrada confirmado.
+- Backend LAN validado en `192.168.0.128:8090`.
+- Handoff de instalacion y QA manual documentado.
+
+Pendiente backlog:
+
+| Tarea | Prioridad | Riesgo | Dependencia | Criterio de aceptacion |
+|---|---|---|---|---|
+| RELEASE-LIVE-GO-QA-VISUAL screenshots Android | P0 | ALTO | APK instalado | Capturas de login, Home, menu, LIVE, autorizaciones y pago/reserva |
+| RELEASE-LIVE-GO-ROLE-SMOKE roles Android | P0 | ALTO | usuarios QA y screenshots | Admin/vendedor/sin permisos validados desde APK instalado |
+| RELEASE-LIVE-GO-CLIENTE validacion final | P1 | ALTO | dispositivo/red cliente | Cliente valida instalacion, conexion y flujo basico |
