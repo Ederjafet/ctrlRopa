@@ -988,3 +988,24 @@ Pendiente backlog:
 | LIVE-PAYMENT-GUARD-A reversa con pago | P0 | CRITICO | contrato financiero | Cancelacion con pago no descuadra saldos/caja |
 | LIVE-AUTH-B3 reasignacion autorizada | P1 | ALTO | reglas cliente/orden | Reasignar reserva con auditoria y sin pagos inconsistentes |
 | LIVE-AUTH-B4 edicion bloqueada autorizada | P1 | ALTO | reglas inventario | Edicion de prenda bloqueada limita campos y conserva trazabilidad |
+
+## Avance PAY-LIVE-A
+
+Epic: pagos minimos para apartados LIVE.
+
+Completado:
+
+- Reutilizar `POST /api/payments` con `reservationId` para pagos de reserva LIVE activa.
+- Reutilizar `GET /api/payments/reservation/{reservationId}` para consultar pagos del apartado.
+- Confirmar que el flujo crea `PaymentAllocation` con `reservationId` y no `saleId`.
+- Agregar pruebas de regresion para reserva LIVE activa, cancelada y convertida.
+- Ejecutar smoke API controlado con dataset desechable.
+- Documentar que caja, devoluciones, venta financiera, precio LIVE y RBAC quedan fuera de alcance.
+
+Pendiente backlog:
+
+| Tarea | Prioridad | Riesgo | Dependencia | Criterio de aceptacion |
+|---|---|---|---|---|
+| PAY-LIVE-B QA visual de pago desde LIVE | P0 | ALTO | backend/frontend levantados | Capturas reales de `/live` hacia `/payments` y retorno a LIVE |
+| PAY-LIVE-C decision sobre sobrepago LIVE | P1 | MEDIO | regla negocio | Bloquear o documentar saldo excedente segun operacion real |
+| PAY-LIVE-D conciliacion caja futura | P1 | CRITICO | contrato caja | Pago LIVE conciliable sin inventar cierre de caja |

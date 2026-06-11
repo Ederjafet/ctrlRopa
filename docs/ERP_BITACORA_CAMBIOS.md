@@ -3615,3 +3615,25 @@ Decision:
 - `GO_TECNICO` si backend/frontend pasan validaciones.
 - `PARTIAL_GO_BACKEND` porque la UI de cola/solicitud queda para fase posterior.
 - `PENDING_QA_VISUAL` hasta validar con navegador/screenshots reales.
+
+## 2026-06-10 - PAY-LIVE-A pago minimo de apartado LIVE
+
+Tipo: formalizacion tecnica y QA API de pago minimo para reservas LIVE, sin endpoints nuevos, migraciones, permisos, RBAC, caja, devoluciones, precio LIVE ni venta financiera.
+
+Objetivo:
+
+- Registrar pagos parciales o totales contra una reserva LIVE activa usando el endpoint existente de pagos.
+- Mantener la reserva como reserva; no convertirla a venta.
+- Confirmar que el pago queda asociado por `payment_allocations.reservation_id`.
+- Confirmar que el flujo no toca caja ni crea venta financiera.
+
+Cambios realizados:
+
+- `PaymentServiceAccessTests`: agrega cobertura para pago de reserva LIVE activa, rechazo de reserva cancelada y rechazo de reserva convertida a venta.
+- `docs/PAY_LIVE_A_MINIMAL_LIVE_PAYMENT.md`: documenta alcance, contrato API, UI existente, smoke API, riesgos y rollback.
+- `qa-reports/PAY-LIVE-A-minimal-live-payment-report-20260610-173428.md`: registra evidencia tecnica y smoke API.
+
+Decision:
+
+- `GO_TECNICO_API` si backend/frontend pasan validaciones completas.
+- `PENDING_QA_VISUAL` hasta validar `/live` y `/payments` con capturas reales.
