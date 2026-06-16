@@ -107,3 +107,9 @@ Rechazar si:
 - Vendedor accede a acciones no permitidas.
 - Usuario sin permisos opera LIVE/pagos/autorizaciones.
 - Pago/reserva descuadra datos.
+
+## Actualizacion 2026-06-16 - APK-QA-C
+
+Se intento cerrar el pendiente visual revisando `qa-evidence/APK-QA-C/android/`, pero no se encontraron screenshots.
+
+El handoff mantiene como requisito pedir evidencia visual real antes de aceptar el release como completo.

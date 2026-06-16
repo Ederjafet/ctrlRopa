@@ -205,3 +205,13 @@ NO-GO:
 ## 15. Siguiente paso recomendado
 
 Ejecutar `RELEASE-LIVE-GO-QA-VISUAL` o fase equivalente con screenshots reales desde Android instalado y smoke por roles admin/vendedor/sin permisos.
+
+## Actualizacion 2026-06-16 - APK-QA-C
+
+APK-QA-C audito `qa-evidence/APK-QA-C/android/` y no encontro screenshots ni evidencia visual nueva por roles.
+
+Estado actualizado:
+
+- `PENDING_QA_VISUAL`.
+- `PENDING_ROLE_SMOKE`.
+- Sin `NO_GO_APK` porque no se detecto error critico reproducible.

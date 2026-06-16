@@ -1,0 +1,8 @@
+﻿ docs/APK_QA_C_FINAL_VISUAL_ROLE_SMOKE.md           | 96 +++++++++++++++++++++
+ docs/ERP_BITACORA_CAMBIOS.md                       | 11 +++
+ docs/ERP_RIESGOS_OPERATIVOS.md                     |  1 +
+ docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md          |  2 +
+ docs/RELEASE_LIVE_GO.md                            | 10 +++
+ docs/RELEASE_LIVE_GO_HANDOFF.md                    |  6 ++
+ ...nal-visual-role-smoke-report-20260616-115526.md | 98 ++++++++++++++++++++++
+ 7 files changed, 224 insertions(+)

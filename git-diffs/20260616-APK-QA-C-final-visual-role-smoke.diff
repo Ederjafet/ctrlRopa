@@ -1,0 +1,279 @@
+﻿diff --git a/docs/APK_QA_C_FINAL_VISUAL_ROLE_SMOKE.md b/docs/APK_QA_C_FINAL_VISUAL_ROLE_SMOKE.md
+new file mode 100644
+index 0000000..b2cba59
+--- /dev/null
++++ b/docs/APK_QA_C_FINAL_VISUAL_ROLE_SMOKE.md
+@@ -0,0 +1,96 @@
++# APK-QA-C / QA visual final desde APK instalado con roles
++
++## Resumen ejecutivo
++
++APK-QA-C audito la evidencia visual esperada para cerrar el pendiente del release LIVE con APK Android instalado.
++
++Resultado:
++
++- `PENDING_QA_VISUAL`
++- `PENDING_ROLE_SMOKE`
++
++No se encontraron screenshots en `qa-evidence/APK-QA-C/android/` ni evidencia visual nueva de roles. Por lo tanto, no se marca `APK_VISUAL_ROLE_SMOKE_OK`, no se marca `APK_VISUAL_BASIC_OK` y no se inventa `QA_PASS`.
++
++## 1. APK probado
++
++- APK: `https://expo.dev/artifacts/eas/l_IlEZtHvOu4wJ2gIlOKMhJaP9AGzrfJs6LXKwse4sw.apk`
++- Origen: `APK-RC1`
++- Estado previo confirmado: APK descargado, instalado, app abre y login/entrada funciona segun APK-QA-A.
++
++## 2. Build ID
++
++- Build EAS: `f9e59a44-6fa7-4c13-bd8f-9d1dafc7318b`
++- Perfil: `preview-apk`
++- Distribucion: `INTERNAL`
++
++## 3. Backend LAN
++
++Validado desde PC durante APK-QA-C:
++
++| Endpoint | Resultado |
++| --- | --- |
++| `http://localhost:8090/api/health` | `HTTP 200` |
++| `http://192.168.0.128:8090/api/health` | `HTTP 200` |
++
++## 4. Screenshots encontrados
++
++Auditoria local:
++
++| Ruta | Resultado |
++| --- | --- |
++| `qa-evidence/` | Solo contiene `qa-evidence/PRODUCT-D4/README.md` |
++| `qa-evidence/APK-QA-C/android/` | No existe o no contiene archivos |
++
++No hay screenshots disponibles para APK-QA-C.
++
++## 5. Pantallas validadas
++
++No se validaron pantallas nuevas por evidencia visual en esta fase.
++
++Se conserva evidencia previa de APK-QA-A:
++
++- APK instalado.
++- App abre.
++- Usuario puede entrar/login.
++
++Pendiente por falta de screenshots:
++
++- Home.
++- Menu principal.
++- LIVE.
++- Autorizaciones operativas.
++- Reserva/pago.
++- Restricciones por permisos.
++
++## 6. Roles validados
++
++No se validaron roles nuevos por evidencia visual en esta fase.
++
++## 7. Roles pendientes
++
++- Admin.
++- Vendedor.
++- Usuario sin permisos.
++- Restricciones por permisos.
++
++Resultado: `PENDING_ROLE_SMOKE`.
++
++## 8. Hallazgos
++
++- No hay evidencia visual local para APK-QA-C.
++- Backend LAN sigue disponible.
++- No se detecto error critico reproducible de APK durante esta auditoria documental.
++
++## 9. Riesgos
++
++- El release LIVE sigue condicionado por falta de screenshots.
++- No se puede afirmar validacion visual de Home, LIVE, autorizaciones ni pago/reserva.
++- No se puede afirmar validacion por roles desde APK instalado.
++
++## 10. Resultado GO/NO-GO
++
++Resultado: `PENDING_QA_VISUAL` y `PENDING_ROLE_SMOKE`.
++
++No hay `NO_GO_APK` porque no se detecto error critico reproducible, pero tampoco hay evidencia suficiente para cerrar visual/roles.
++
++Siguiente paso recomendado: recopilar screenshots reales en `qa-evidence/APK-QA-C/android/` y repetir esta fase.
+diff --git a/docs/ERP_BITACORA_CAMBIOS.md b/docs/ERP_BITACORA_CAMBIOS.md
+index 551b25a..dbd53ad 100644
+--- a/docs/ERP_BITACORA_CAMBIOS.md
++++ b/docs/ERP_BITACORA_CAMBIOS.md
+@@ -3652,3 +3652,14 @@ Resultado:
+ - `RELEASE_GO_CONDICIONADO`.
+ - `PENDING_QA_VISUAL` por falta de screenshots.
+ - `PENDING_ROLE_SMOKE` por falta de evidencia nueva por roles desde APK instalado.
++
++## 2026-06-16 - APK-QA-C auditoria visual final Android
++
++Tipo: auditoria documental de evidencia visual desde APK instalado, sin cambios funcionales ni configuracion Android/EAS.
++
++Resultado:
++
++- No se encontraron screenshots en `qa-evidence/APK-QA-C/android/`.
++- Backend LAN respondio `200`.
++- Se mantiene `PENDING_QA_VISUAL`.
++- Se mantiene `PENDING_ROLE_SMOKE`.
+diff --git a/docs/ERP_RIESGOS_OPERATIVOS.md b/docs/ERP_RIESGOS_OPERATIVOS.md
+index 0f80100..33df115 100644
+--- a/docs/ERP_RIESGOS_OPERATIVOS.md
++++ b/docs/ERP_RIESGOS_OPERATIVOS.md
+@@ -228,6 +228,7 @@ Probabilidad:
+ - LIVE-AUTH-B1 no agrega UI; cualquier operacion desde frontend queda pendiente de fase B2 y QA visual real.
+ - PAY-LIVE-A reutiliza pagos por reserva para apartados LIVE; antes de liberar productivo se requiere QA visual real y decision de negocio sobre sobrepagos, porque el modelo actual registra excedentes como saldo existente.
+ - RELEASE-LIVE-GO queda como release interno condicionado: APK Android instala, abre y permite login, pero no debe declararse release final completo hasta contar con screenshots y smoke por roles desde APK instalado.
++- APK-QA-C no encontro screenshots ni evidencia visual por roles; el release LIVE no debe promocionarse a QA visual completo hasta repetir la fase con evidencias reales en `qa-evidence/APK-QA-C/android/`.
+ - PRODUCT-ERR-A agrega mapper frontend de errores accionables; modulos fuera de las rutas criticas aun deben migrarse por dominio para evitar que `err.message` exponga mensajes genericos o tecnicos.
+ - Pagos/ventas sin regresion automatizada suficiente.
+ - Auditoria de negocio todavia parcial.
+diff --git a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+index afefdcb..d837e9e 100644
+--- a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
++++ b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+@@ -1029,3 +1029,5 @@ Pendiente backlog:
+ | RELEASE-LIVE-GO-QA-VISUAL screenshots Android | P0 | ALTO | APK instalado | Capturas de login, Home, menu, LIVE, autorizaciones y pago/reserva |
+ | RELEASE-LIVE-GO-ROLE-SMOKE roles Android | P0 | ALTO | usuarios QA y screenshots | Admin/vendedor/sin permisos validados desde APK instalado |
+ | RELEASE-LIVE-GO-CLIENTE validacion final | P1 | ALTO | dispositivo/red cliente | Cliente valida instalacion, conexion y flujo basico |
++
++Nota 2026-06-16: APK-QA-C reviso `qa-evidence/APK-QA-C/android/` sin encontrar screenshots; las tareas visuales y por roles siguen pendientes.
+diff --git a/docs/RELEASE_LIVE_GO.md b/docs/RELEASE_LIVE_GO.md
+index f91f9e1..ca1ba5d 100644
+--- a/docs/RELEASE_LIVE_GO.md
++++ b/docs/RELEASE_LIVE_GO.md
+@@ -205,3 +205,13 @@ NO-GO:
+ ## 15. Siguiente paso recomendado
+
+ Ejecutar `RELEASE-LIVE-GO-QA-VISUAL` o fase equivalente con screenshots reales desde Android instalado y smoke por roles admin/vendedor/sin permisos.
++
++## Actualizacion 2026-06-16 - APK-QA-C
++
++APK-QA-C audito `qa-evidence/APK-QA-C/android/` y no encontro screenshots ni evidencia visual nueva por roles.
++
++Estado actualizado:
++
++- `PENDING_QA_VISUAL`.
++- `PENDING_ROLE_SMOKE`.
++- Sin `NO_GO_APK` porque no se detecto error critico reproducible.
+diff --git a/docs/RELEASE_LIVE_GO_HANDOFF.md b/docs/RELEASE_LIVE_GO_HANDOFF.md
+index f995f67..ee68704 100644
+--- a/docs/RELEASE_LIVE_GO_HANDOFF.md
++++ b/docs/RELEASE_LIVE_GO_HANDOFF.md
+@@ -107,3 +107,9 @@ Rechazar si:
+ - Vendedor accede a acciones no permitidas.
+ - Usuario sin permisos opera LIVE/pagos/autorizaciones.
+ - Pago/reserva descuadra datos.
++
++## Actualizacion 2026-06-16 - APK-QA-C
++
++Se intento cerrar el pendiente visual revisando `qa-evidence/APK-QA-C/android/`, pero no se encontraron screenshots.
++
++El handoff mantiene como requisito pedir evidencia visual real antes de aceptar el release como completo.
+diff --git a/qa-reports/APK-QA-C-final-visual-role-smoke-report-20260616-115526.md b/qa-reports/APK-QA-C-final-visual-role-smoke-report-20260616-115526.md
+new file mode 100644
+index 0000000..e5fb783
+--- /dev/null
++++ b/qa-reports/APK-QA-C-final-visual-role-smoke-report-20260616-115526.md
+@@ -0,0 +1,98 @@
++# APK-QA-C / Final visual role smoke report
++
++## Resumen
++
++- Rama: `feature/apk-qa-c-final-visual-role-smoke`
++- Resultado: `PENDING_QA_VISUAL`, `PENDING_ROLE_SMOKE`
++- APK: `https://expo.dev/artifacts/eas/l_IlEZtHvOu4wJ2gIlOKMhJaP9AGzrfJs6LXKwse4sw.apk`
++- Build ID: `f9e59a44-6fa7-4c13-bd8f-9d1dafc7318b`
++
++## Comandos ejecutados
++
++```powershell
++git branch --show-current
++git status
++git log --oneline -180
++git --no-pager log --oneline --all --decorate --grep="RELEASE-LIVE-GO"
++git --no-pager log --oneline --all --decorate --grep="APK-QA-B"
++git --no-pager log --oneline --all --decorate --grep="APK-QA-A"
++git --no-pager log --oneline --all --decorate --grep="APK-RC1"
++git --no-pager log --oneline --all --decorate --grep="PAY-LIVE-B"
++git --no-pager log --oneline --all --decorate --grep="LIVE-PRICE-D"
++Get-ChildItem -Path qa-evidence -Recurse -File
++Get-ChildItem -Path qa-evidence\APK-QA-C\android -Recurse -File
++Get-ChildItem -Path docs -File
++Get-ChildItem -Path qa-reports -File
++curl.exe -i http://localhost:8090/api/health
++curl.exe -i http://192.168.0.128:8090/api/health
++npm.cmd run lint
++npx.cmd tsc --noEmit
++npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export
++.\mvnw.cmd test
++git --no-pager diff --check
++git --no-pager diff --cached --check
++git status
++```
++
++## Historial confirmado
++
++- `8d6c331 RELEASE-LIVE-GO documenta cierre apk live`
++- `fd92569 APK-QA-B valida smoke android por roles`
++- `58e2131 APK-QA-A documenta smoke android`
++- `97e13d1 APK-RC1 prepara build android apk`
++- `fcc4fd9 PAY-LIVE-B valida pago live visual`
++- `3676d2b LIVE-PRICE-D valida cambio precio live`
++
++## Evidencia visual encontrada
++
++| Ruta | Resultado |
++| --- | --- |
++| `qa-evidence/` | Solo `qa-evidence/PRODUCT-D4/README.md` |
++| `qa-evidence/APK-QA-C/android/` | Sin archivos encontrados |
++
++No hay screenshots APK-QA-C disponibles.
++
++## Screenshots por pantalla
++
++| Pantalla | Evidencia |
++| --- | --- |
++| Home | Pendiente |
++| Menu principal | Pendiente |
++| LIVE | Pendiente |
++| Autorizaciones operativas | Pendiente |
++| Reserva/pago | Pendiente |
++| Restricciones por permisos | Pendiente |
++
++## Usuarios/roles probados
++
++| Rol | Resultado |
++| --- | --- |
++| Admin | Pendiente de evidencia visual |
++| Vendedor | Pendiente de evidencia visual |
++| Usuario sin permisos | Pendiente de evidencia visual |
++
++## Backend LAN
++
++| Endpoint | Resultado |
++| --- | --- |
++| `http://localhost:8090/api/health` | `HTTP 200` |
++| `http://192.168.0.128:8090/api/health` | `HTTP 200` |
++
++## Validaciones
++
++| Validacion | Resultado |
++| --- | --- |
++| `npm.cmd run lint` | PASS con 53 warnings preexistentes y 0 errores |
++| `npx.cmd tsc --noEmit` | PASS |
++| `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export` | PASS |
++| `backend/control-ropa/.mvnw.cmd test` | PASS, 125 tests, 0 failures, 0 errors |
++| `git --no-pager diff --check` | PASS |
++| `git --no-pager diff --cached --check` | PASS |
++
++## Resultado
++
++`PENDING_QA_VISUAL`
++
++`PENDING_ROLE_SMOKE`
++
++No se marca `APK_VISUAL_ROLE_SMOKE_OK` ni `APK_VISUAL_BASIC_OK`.

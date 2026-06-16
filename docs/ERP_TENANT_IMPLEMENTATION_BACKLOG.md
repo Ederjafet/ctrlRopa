@@ -1029,3 +1029,5 @@ Pendiente backlog:
 | RELEASE-LIVE-GO-QA-VISUAL screenshots Android | P0 | ALTO | APK instalado | Capturas de login, Home, menu, LIVE, autorizaciones y pago/reserva |
 | RELEASE-LIVE-GO-ROLE-SMOKE roles Android | P0 | ALTO | usuarios QA y screenshots | Admin/vendedor/sin permisos validados desde APK instalado |
 | RELEASE-LIVE-GO-CLIENTE validacion final | P1 | ALTO | dispositivo/red cliente | Cliente valida instalacion, conexion y flujo basico |
+
+Nota 2026-06-16: APK-QA-C reviso `qa-evidence/APK-QA-C/android/` sin encontrar screenshots; las tareas visuales y por roles siguen pendientes.

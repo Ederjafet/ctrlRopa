@@ -3652,3 +3652,14 @@ Resultado:
 - `RELEASE_GO_CONDICIONADO`.
 - `PENDING_QA_VISUAL` por falta de screenshots.
 - `PENDING_ROLE_SMOKE` por falta de evidencia nueva por roles desde APK instalado.
+
+## 2026-06-16 - APK-QA-C auditoria visual final Android
+
+Tipo: auditoria documental de evidencia visual desde APK instalado, sin cambios funcionales ni configuracion Android/EAS.
+
+Resultado:
+
+- No se encontraron screenshots en `qa-evidence/APK-QA-C/android/`.
+- Backend LAN respondio `200`.
+- Se mantiene `PENDING_QA_VISUAL`.
+- Se mantiene `PENDING_ROLE_SMOKE`.
