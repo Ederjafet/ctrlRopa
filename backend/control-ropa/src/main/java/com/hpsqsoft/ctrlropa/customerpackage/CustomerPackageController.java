@@ -26,6 +26,12 @@ public class CustomerPackageController {
         return service.prepareFromOrder(orderId, request);
     }
 
+    @PostMapping("/from-reservation/{reservationId}")
+    public CustomerPackageDetailResponse prepareFromReservation(@PathVariable Long reservationId,
+                                                                @Valid @RequestBody PrepareCustomerPackageFromReservationRequest request) {
+        return service.prepareFromReservation(reservationId, request);
+    }
+
     @GetMapping("/customer/{customerId}")
     public List<CustomerPackageResponse> findByCustomer(@PathVariable Long customerId) {
         return service.findByCustomer(customerId);

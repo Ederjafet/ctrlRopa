@@ -131,6 +131,41 @@ public class CustomerPackageService {
         return findDetail(customerPackage.getId());
     }
 
+    public CustomerPackageDetailResponse prepareFromReservation(Long reservationId,
+                                                                PrepareCustomerPackageFromReservationRequest request) {
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada"));
+        tenantAccessGuard.requireBranch(reservation.getBranch().getId(), "La reserva no pertenece a la sucursal activa");
+
+        if (reservation.getStatus() != ReservationStatus.ACTIVE) {
+            throw new IllegalArgumentException("Solo se puede crear paquete desde apartados activos");
+        }
+
+        if (reservation.getBox() == null) {
+            throw new IllegalArgumentException("Primero asigna una caja o ubicacion fisica al apartado");
+        }
+
+        if (itemRepository.existsByReservationId(reservation.getId())) {
+            throw new IllegalArgumentException("La reserva ya esta en otro paquete");
+        }
+
+        CustomerPackage customerPackage = new CustomerPackage();
+        customerPackage.setFolio(generateUniqueFolio());
+        customerPackage.setCustomer(reservation.getCustomer());
+        customerPackage.setBranch(reservation.getBranch());
+        customerPackage.setStatus(CustomerPackageStatus.OPEN);
+        customerPackage.setNotes("Creado desde apartado #" + reservation.getId());
+        customerPackage.setCreatedByUserId(request.getCreatedByUserId());
+
+        CustomerPackage saved = repository.save(customerPackage);
+
+        AddCustomerPackageItemRequest addItemRequest = new AddCustomerPackageItemRequest();
+        addItemRequest.setItemId(reservation.getItem().getId());
+        addItemRequest.setReservationId(reservation.getId());
+
+        return addItem(saved.getId(), addItemRequest);
+    }
+
     @Transactional(readOnly = true)
     public List<CustomerPackageResponse> findByCustomer(Long customerId) {
         validateCustomerInActiveTenant(customerId);

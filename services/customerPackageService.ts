@@ -82,6 +82,10 @@ export type PrepareCustomerPackageFromOrderRequest = {
   createdByUserId: number;
 };
 
+export type PrepareCustomerPackageFromReservationRequest = {
+  createdByUserId: number;
+};
+
 export async function createCustomerPackage(
   payload: CreateCustomerPackageRequest
 ): Promise<CustomerPackage> {
@@ -114,6 +118,16 @@ export async function prepareCustomerPackageFromOrder(
   payload: PrepareCustomerPackageFromOrderRequest
 ): Promise<CustomerPackageDetail> {
   return apiRequest<CustomerPackageDetail>(`/api/customer-packages/from-order/${orderId}`, {
+    method: 'POST',
+    body: payload,
+  });
+}
+
+export async function prepareCustomerPackageFromReservation(
+  reservationId: number,
+  payload: PrepareCustomerPackageFromReservationRequest
+): Promise<CustomerPackageDetail> {
+  return apiRequest<CustomerPackageDetail>(`/api/customer-packages/from-reservation/${reservationId}`, {
     method: 'POST',
     body: payload,
   });
