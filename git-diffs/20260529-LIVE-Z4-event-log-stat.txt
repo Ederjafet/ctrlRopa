@@ -1,0 +1,34 @@
+ app/live.tsx                                       | 130 +++++++++++++++------
+ .../com/hpsqsoft/ctrlropa/live/LiveController.java |   5 +
+ .../com/hpsqsoft/ctrlropa/live/LiveService.java    |  58 ++++++++-
+ .../ctrlropa/reservation/ReservationService.java   |  84 ++++++++++++-
+ .../hpsqsoft/ctrlropa/live/LiveServiceTests.java   |  20 +++-
+ ...servationServiceLiveOperationalStatusTests.java |  22 +++-
+ locales/en/common.json                             |  10 ++
+ locales/es/common.json                             |  10 ++
+ services/liveService.ts                            |  17 +++
+ 9 files changed, 311 insertions(+), 45 deletions(-)
+app/live.tsx
+backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveController.java
+backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveService.java
+backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
+backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/live/LiveServiceTests.java
+backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java
+locales/en/common.json
+locales/es/common.json
+services/liveService.ts
+
+Untracked files not included by plain git diff:
+backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveEvent.java
+backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveEventRepository.java
+backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveEventResponse.java
+backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveEventService.java
+backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveEventType.java
+backend/control-ropa/src/main/resources/db/migration/V49__live_operational_events.sql
+docs/ERP_LIVE_Z4_EVENT_LOG.md
+
+Ignored generated evidence files:
+qa-reports/LIVE-Z4-event-log-report-20260529-135444.md
+qa-reports/LIVE-Z4-event-log-smoke-20260529-135444.csv
+git-diffs/20260529-LIVE-Z4-event-log.diff
+git-diffs/20260529-LIVE-Z4-event-log-stat.txt

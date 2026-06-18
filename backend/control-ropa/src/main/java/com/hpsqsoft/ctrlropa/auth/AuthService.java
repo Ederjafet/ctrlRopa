@@ -3,6 +3,8 @@ package com.hpsqsoft.ctrlropa.auth;
 import com.hpsqsoft.ctrlropa.security.settings.SecuritySettingsResponse;
 import com.hpsqsoft.ctrlropa.security.settings.SecuritySettingsService;
 import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
+import com.hpsqsoft.ctrlropa.security.audit.SecurityAuditEventType;
+import com.hpsqsoft.ctrlropa.security.audit.SecurityAuditService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
@@ -28,16 +30,19 @@ public class AuthService {
     private final SecuritySettingsService securitySettingsService;
     private final CurrentUser currentUser;
     private final HttpServletRequest httpRequest;
+    private final SecurityAuditService securityAuditService;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public AuthService(JdbcTemplate jdbcTemplate,
                        SecuritySettingsService securitySettingsService,
                        CurrentUser currentUser,
-                       HttpServletRequest httpRequest) {
+                       HttpServletRequest httpRequest,
+                       SecurityAuditService securityAuditService) {
         this.jdbcTemplate = jdbcTemplate;
         this.securitySettingsService = securitySettingsService;
         this.currentUser = currentUser;
         this.httpRequest = httpRequest;
+        this.securityAuditService = securityAuditService;
         this.passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
     }
 
@@ -61,13 +66,18 @@ public class AuthService {
             throw new AccessDeniedException("Usuario inactivo");
         }
 
+        List<LoginResponse.RoleInfo> roles = findRoles(user.id());
+        List<LoginResponse.PermissionInfo> effectivePermissions = findEffectivePermissions(user.id());
+        assertAuthorizedForLogin(user, roles, effectivePermissions);
+        DefaultTenantRow tenant = findDefaultTenantForUser(user.id());
+
         boolean passwordExpired = isPasswordExpired(user.passwordUpdatedAt(), securitySettings);
         if (passwordExpired) {
             markPasswordChangeRequired(user.id());
         }
 
         registerSuccessfulLogin(user.id());
-        String sessionToken = createApiSession(user.id(), securitySettings);
+        String sessionToken = createApiSession(user.id(), securitySettings, tenant);
         auditSecurityEvent("AUTH_LOGIN_SUCCESS", "/api/auth/login", 200, user.id(), user.branchId(), user.name(), "Login exitoso");
 
         return new LoginResponse(
@@ -79,9 +89,10 @@ public class AuthService {
                 sessionToken,
                 securitySettings.getSessionTimeoutMinutes(),
                 Boolean.TRUE.equals(user.passwordChangeRequired()) || passwordExpired,
-                findBranch(user.branchId()),
-                findRoles(user.id()),
-                findEffectivePermissions(user.id()),
+                findCompany(tenant.companyId()),
+                findBranch(tenant.branchId()),
+                roles,
+                effectivePermissions,
                 findChannels(user.branchId())
         );
     }
@@ -157,16 +168,33 @@ public class AuthService {
         }
     }
 
-    private String createApiSession(Long userId, SecuritySettingsResponse settings) {
+    private String createApiSession(Long userId, SecuritySettingsResponse settings, DefaultTenantRow tenant) {
         byte[] randomBytes = new byte[32];
         secureRandom.nextBytes(randomBytes);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
         Integer absoluteHours = settings.getAbsoluteSessionTimeoutHours();
+        int revokedSessions = revokeActiveSessionsForUser(userId);
+        if (revokedSessions > 0) {
+            securityAuditService.record(
+                    SecurityAuditEventType.SESSION_REVOKED,
+                    userId,
+                    null,
+                    tenant.companyId(),
+                    tenant.branchId(),
+                    200,
+                    "Sesiones activas anteriores revocadas por nuevo login",
+                    "USER_API_SESSION",
+                    userId.toString(),
+                    "{\"revokedSessions\":" + revokedSessions + "}"
+            );
+        }
 
         jdbcTemplate.update(
                 """
                 INSERT INTO user_api_sessions (
                   user_id,
+                  active_company_id,
+                  active_branch_id,
                   token_hash,
                   expires_at,
                   absolute_expires_at,
@@ -174,6 +202,8 @@ public class AuthService {
                   ip_address,
                   user_agent
                 ) VALUES (
+                  ?,
+                  ?,
                   ?,
                   ?,
                   DATE_ADD(CURRENT_TIMESTAMP, INTERVAL ? MINUTE),
@@ -184,6 +214,8 @@ public class AuthService {
                 )
                 """,
                 userId,
+                tenant.companyId(),
+                tenant.branchId(),
                 sha256(token),
                 settings.getSessionTimeoutMinutes(),
                 absoluteHours,
@@ -193,6 +225,93 @@ public class AuthService {
         );
 
         return token;
+    }
+
+    private int revokeActiveSessionsForUser(Long userId) {
+        return jdbcTemplate.update(
+                """
+                UPDATE user_api_sessions
+                SET revoked_at = CURRENT_TIMESTAMP
+                WHERE user_id = ?
+                  AND revoked_at IS NULL
+                """,
+                userId
+        );
+    }
+
+    private void assertAuthorizedForLogin(AuthUserRow user,
+                                          List<LoginResponse.RoleInfo> roles,
+                                          List<LoginResponse.PermissionInfo> effectivePermissions) {
+        boolean hasNoAccessRole = roles.stream().anyMatch(role -> "NO_ACCESS".equals(role.getCode()));
+
+        if (hasNoAccessRole) {
+            securityAuditService.record(
+                    SecurityAuditEventType.LOGIN_BLOCKED_NO_ACCESS,
+                    user.id(),
+                    user.email(),
+                    null,
+                    user.branchId(),
+                    403,
+                    "Usuario con rol NO_ACCESS"
+            );
+            auditSecurityEvent("AUTH_LOGIN_DENIED", "/api/auth/login", 403, user.id(), user.branchId(), user.name(), "Usuario con rol NO_ACCESS");
+            throw new AccessDeniedException("No tienes permisos asignados para acceder al sistema");
+        }
+
+        if (effectivePermissions.isEmpty()) {
+            securityAuditService.record(
+                    SecurityAuditEventType.LOGIN_BLOCKED_NO_EFFECTIVE_PERMISSIONS,
+                    user.id(),
+                    user.email(),
+                    null,
+                    user.branchId(),
+                    403,
+                    "Usuario sin permisos efectivos"
+            );
+            auditSecurityEvent("AUTH_LOGIN_DENIED", "/api/auth/login", 403, user.id(), user.branchId(), user.name(), "Usuario sin permisos efectivos");
+            throw new AccessDeniedException("No tienes permisos asignados para acceder al sistema");
+        }
+    }
+
+    private DefaultTenantRow findDefaultTenantForUser(Long userId) {
+        return jdbcTemplate.query(
+                """
+                SELECT
+                  c.id AS company_id,
+                  b.id AS branch_id
+                FROM users u
+                JOIN branches b ON b.id = u.branch_id
+                JOIN companies c ON c.id = b.company_id
+                JOIN user_companies uc ON uc.user_id = u.id
+                                    AND uc.company_id = c.id
+                                    AND uc.status = 'ACTIVE'
+                JOIN user_branches ub ON ub.user_id = u.id
+                                    AND ub.branch_id = b.id
+                WHERE u.id = ?
+                  AND u.status = 'ACTIVE'
+                  AND b.status = 'ACTIVE'
+                  AND c.status = 'ACTIVE'
+                """,
+                rs -> {
+                    if (!rs.next()) {
+                        securityAuditService.record(
+                                SecurityAuditEventType.COMPANY_DENIED,
+                                userId,
+                                null,
+                                null,
+                                null,
+                                403,
+                                "No se pudo resolver company activa para la sesion"
+                        );
+                        throw new AccessDeniedException("No se pudo resolver company activa para la sesion");
+                    }
+                    return new DefaultTenantRow(
+                            rs.getLong("company_id"),
+                            rs.getLong("branch_id")
+                    );
+                },
+                userId
+        );
     }
 
     private String sha256(String value) {
@@ -519,6 +638,22 @@ public class AuthService {
         );
     }
 
+    private LoginResponse.CompanyInfo findCompany(Long companyId) {
+        return jdbcTemplate.queryForObject(
+                """
+                SELECT id, code, name
+                FROM companies
+                WHERE id = ?
+                """,
+                (rs, rowNum) -> new LoginResponse.CompanyInfo(
+                        rs.getLong("id"),
+                        rs.getString("code"),
+                        rs.getString("name")
+                ),
+                companyId
+        );
+    }
+
     private List<LoginResponse.RoleInfo> findRoles(Long userId) {
         return jdbcTemplate.query(
                 """
@@ -632,6 +767,12 @@ public class AuthService {
             Long id,
             Long branchId,
             String name
+    ) {
+    }
+
+    private record DefaultTenantRow(
+            Long companyId,
+            Long branchId
     ) {
     }
 }

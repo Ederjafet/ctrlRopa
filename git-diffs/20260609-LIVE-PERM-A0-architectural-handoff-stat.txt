@@ -1,0 +1,3 @@
+﻿ docs/LIVE_PERM_A0_ARCHITECTURAL_HANDOFF.md         | 293 +++++++++++++++++++++
+ ...architectural-handoff-report-20260609-004510.md | 143 ++++++++++
+ 2 files changed, 436 insertions(+)

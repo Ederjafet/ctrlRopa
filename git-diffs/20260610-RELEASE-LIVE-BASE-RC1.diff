@@ -1,0 +1,425 @@
+diff --git a/docs/RELEASE_LIVE_BASE_RC1.md b/docs/RELEASE_LIVE_BASE_RC1.md
+new file mode 100644
+index 0000000..c72a1ce
+--- /dev/null
++++ b/docs/RELEASE_LIVE_BASE_RC1.md
+@@ -0,0 +1,310 @@
++# RELEASE LIVE BASE RC1
++
++Fecha: 2026-06-10
++Rama: feature/live-base-rc1-release-candidate
++
++## 1. Resumen ejecutivo
++
++La base LIVE queda consolidada como release candidate tecnico `RC1` para merge manual posterior.
++
++Estado:
++
++- Release candidate tecnico: `GO_TECNICO_RC`
++- Evidencia visual: `PENDING_QA_VISUAL`
++- QA_PASS: no aplica; no se marca sin screenshots/evidencia visual real.
++
++Quedo listo:
++
++- permisos LIVE minimos y capacidades frontend;
++- separacion de permiso para retirar prenda al aire;
++- control de prenda al aire;
++- reserva atomica y segura sobre inventario;
++- idempotencia de reservas con `X-Idempotency-Key`;
++- constraint de reserva activa por item;
++- trazabilidad de rechazos de reserva;
++- cancelacion/liberacion segura;
++- vendido operativo LIVE sin venta financiera;
++- card de LIVE activo en home;
++- smoke API por roles con seller bloqueado para retirar prenda.
++
++No quedo listo:
++
++- QA visual completo con screenshots por rol;
++- pagos/caja/precio LIVE/devoluciones;
++- autorizaciones operativas reales;
++- venta financiera desde LIVE;
++- limpieza automatica del dataset QA desechable.
++
++## 2. Alcance incluido
++
++### Permisos LIVE minimos
++
++Incluye:
++
++- `VIEW_LIVE`
++- `OPERATE_LIVE`
++- `PREPARE_LIVE_ITEM`
++- `CHANGE_LIVE_ACTIVE_ITEM`
++- `REMOVE_LIVE_ACTIVE_ITEM`
++- compatibilidad de `DO_LIVE_RESERVATION` para apartados LIVE.
++
++Evidencia:
++
++- `LIVE-PERM-A1`
++- `LIVE-PERM-A2`
++- `LIVE-PERM-A3`
++- `LIVE-PERM-FIX-A1`
++- `LIVE-QA-C2`
++
++### Control de prenda al aire
++
++Incluye:
++
++- solo item elegible/disponible puede ponerse al aire;
++- selector distingue la prenda `Actualmente al aire`;
++- retirar prenda al aire exige `REMOVE_LIVE_ACTIVE_ITEM` en backend.
++
++Evidencia:
++
++- `ITEM-Z2`
++- `ITEM-Z4`
++- `LIVE-PERM-FIX-A1`
++- `LIVE-QA-C2`
++
++### Reserva atomica
++
++Incluye:
++
++- `ItemRepository.reserveIfAvailable(...)`;
++- transicion atomica `AVAILABLE -> RESERVED`;
++- rechazo si el item ya no esta disponible.
++
++Evidencia:
++
++- `ITEM-Z3B`
++- `ITEM-Z8`
++
++### Idempotencia
++
++Incluye:
++
++- soporte de `X-Idempotency-Key` en creacion de reservas;
++- reintentos exactos protegidos;
++- hashes seguros para trazabilidad.
++
++Evidencia:
++
++- `ITEM-Z5B`
++- `ITEM-Z5D`
++
++### Constraint de reserva activa
++
++Incluye:
++
++- columna generada `active_reservation_item_id`;
++- indice unico `uq_reservations_active_item`;
++- una sola reserva `ACTIVE` por item/sucursal.
++
++Evidencia:
++
++- `ITEM-Z5C`
++- migracion `V53__active_reservation_item_constraint.sql`
++
++### Trazabilidad de rechazo
++
++Incluye:
++
++- tabla `reservation_rejection_events`;
++- registro tecnico de rechazos por disponibilidad, idempotencia y validacion;
++- sin exponer payload completo ni secretos.
++
++Evidencia:
++
++- `ITEM-Z5D`
++- migracion `V54__reservation_rejection_events.sql`
++
++### Cancelacion segura
++
++Incluye:
++
++- `ItemRepository.releaseIfReserved(...)`;
++- liberacion condicional `RESERVED -> AVAILABLE`;
++- cancelacion bloqueada si no corresponde liberar con seguridad.
++
++Evidencia:
++
++- `ITEM-Z6B`
++- `ITEM-Z8`
++
++### Vendido operativo seguro
++
++Incluye:
++
++- `OPERATIONAL_SOLD` como cierre operativo LIVE;
++- evento `LIVE_OPERATIONAL_SOLD`;
++- no crea venta financiera;
++- no crea pago;
++- no toca caja.
++
++Evidencia:
++
++- `ITEM-Z7`
++- `ITEM-Z8`
++- `LIVE-QA-C`
++
++### Card LIVE en home
++
++Incluye:
++
++- card superior de LIVE activo en `app/index.tsx`;
++- visibilidad por `canViewLive(session)`;
++- boton `Ir a LIVE`;
++- contenido previo del home permanece debajo.
++
++Evidencia:
++
++- `HOME-LIVE-A`
++- `LIVE-QA-D`
++- `LIVE-QA-E`
++
++### Smoke API por roles
++
++Incluye:
++
++- admin/supervisor con `REMOVE_LIVE_ACTIVE_ITEM`;
++- vendedor con LIVE operativo pero sin `REMOVE_LIVE_ACTIVE_ITEM`;
++- seller recibe 403 al intentar retirar active item por API;
++- usuario sin permisos bloqueado.
++
++Evidencia:
++
++- `LIVE-QA-A`
++- `LIVE-QA-B`
++- `LIVE-QA-C`
++- `LIVE-QA-C2`
++- `LIVE-QA-D`
++
++## 3. Alcance excluido
++
++No se incluye en RC1:
++
++- pagos;
++- caja;
++- precio LIVE;
++- devoluciones;
++- autorizaciones operativas reales;
++- autorizaciones de precio;
++- venta financiera;
++- dashboards financieros;
++- QA visual completo si no hay screenshots/evidencia real;
++- limpieza automatica de dataset QA desechable.
++
++## 4. Matriz de permisos LIVE
++
++| Rol | Ver LIVE | Operar LIVE | Preparar prenda | Cambiar prenda al aire | Retirar prenda al aire | Apartar en LIVE | Estado RC1 |
++| --- | --- | --- | --- | --- | --- | --- | --- |
++| Admin | Si | Si | Si | Si | Si, con `REMOVE_LIVE_ACTIVE_ITEM` | Si | GO tecnico/API |
++| Supervisor | Si | Si | Si | Si | Si, con `REMOVE_LIVE_ACTIVE_ITEM` | Si | GO tecnico/API |
++| Vendedor | Si | Si, flujo acotado | Si, segun permisos actuales | Si, segun permisos actuales | No | Si, con `DO_LIVE_RESERVATION` | GO tecnico/API: retiro bloqueado |
++| Sin permisos | No | No | No | No | No | No | Bloqueado |
++
++Nota: la confirmacion visual por rol sigue `PENDING_QA_VISUAL`.
++
++## 5. Flujo LIVE base validado
++
++| Flujo | Estado | Evidencia |
++| --- | --- | --- |
++| Ver LIVE | GO tecnico/API | LIVE-QA-A/B/D |
++| Preparar prenda | GO tecnico/API/documental | LIVE-QA-A/B, HOME/LIVE docs |
++| Poner/cambiar prenda al aire | GO tecnico/API | ITEM-Z2, ITEM-Z4, LIVE-QA-C |
++| Retirar prenda por permiso | GO tecnico/API | LIVE-PERM-FIX-A1, LIVE-QA-C2 |
++| Reservar con idempotencia | GO tecnico/API | ITEM-Z5B, LIVE-QA-C |
++| Cancelar reserva segura | GO tecnico/API | ITEM-Z6B, LIVE-QA-C, ITEM-Z8 |
++| Vendido operativo sin venta financiera | GO tecnico/API | ITEM-Z7, LIVE-QA-C, ITEM-Z8 |
++| Home card LIVE | GO tecnico/documental/API indirecta | HOME-LIVE-A, LIVE-QA-D/E |
++
++## 6. Riesgos conocidos
++
++| Riesgo | Severidad | Estado | Mitigacion |
++| --- | --- | --- | --- |
++| Falta QA visual real | Media | `PENDING_QA_VISUAL` | Ejecutar QA manual con screenshots por rol antes de QA_PASS |
++| Dataset QA desechable no limpiado automaticamente | Baja/Media | Conocido | No borrar sin plan; limpiar con DBA/QA owner |
++| No hay pagos/caja en LIVE base | Alta si se confunde alcance | Excluido | Mantener microcopy y docs: operativo no financiero |
++| No hay autorizaciones operativas reales | Media | Excluido | Fase futura separada |
++| No hay precio LIVE real | Media | Excluido | Fase futura separada |
++| Screenshots pendientes | Media | Pendiente | LIVE-QA-E define nombres/rutas esperadas |
++| Rollback de migraciones con datos | Alta | Requiere plan | No revertir V52/V53/V54 sin DBA |
++
++## 7. Rollback
++
++Rollback recomendado si RC1 se mergea y aparece incidencia critica:
++
++1. Identificar commit de merge de `feature/live-base-rc1-release-candidate` en `develop`.
++2. Crear rama de hotfix/rollback desde `develop`.
++3. Usar `git revert -m 1 <merge_commit>` para revertir el merge completo si aplica.
++4. Ejecutar suite backend/frontend completa.
++5. Revisar migraciones ya aplicadas antes de desplegar rollback a ambientes con datos.
++
++Migraciones relevantes:
++
++- `V50__live_minimal_permissions.sql`
++- `V51__live_permission_view_dependency_backfill.sql`
++- `V52__reservation_idempotency_keys.sql`
++- `V53__active_reservation_item_constraint.sql`
++- `V54__reservation_rejection_events.sql`
++
++Riesgos de rollback:
++
++- `V52` puede contener llaves de idempotencia ya usadas.
++- `V53` agrega constraint/columna generada; retirarlo sin revisar reservas activas puede permitir duplicidad de reserva por item.
++- `V54` puede contener trazabilidad util de rechazos; no borrar sin retencion/export.
++
++Regla: no borrar datos QA o productivos sin plan explicito, respaldo y dueño de datos.
++
++## 8. Checklist QA final
++
++### API
++
++- Confirmar `/api/me` por rol.
++- Confirmar permisos LIVE por rol.
++- Confirmar seller sin `REMOVE_LIVE_ACTIVE_ITEM` recibe 403 al retirar active item.
++- Confirmar admin/supervisor puede retirar si hay active item.
++- Confirmar reserva con `X-Idempotency-Key`.
++- Confirmar doble reserva rechazada.
++- Confirmar cancelacion libera item si corresponde.
++- Confirmar `OPERATIONAL_SOLD` no crea venta/pago/caja.
++
++### Visual
++
++- Admin: home card + `/live` + acciones permitidas.
++- Supervisor: home card + `/live` + acciones permitidas.
++- Vendedor: home card + `/live` + retiro ausente/bloqueado.
++- Sin permisos: sin card, sin acceso operativo, `/live` bloqueado.
++- Confirmar contenido anterior del home debajo del card.
++- Confirmar estado sin prenda al aire no rompe UI.
++
++### Dataset
++
++- Usar dataset desechable identificado.
++- No borrar dataset sin aprobacion.
++- No mutar datos reales.
++- Registrar IDs usados en reporte.
++
++### Evidencia requerida
++
++- Screenshots home/LIVE por rol.
++- Resultado API por rol.
++- Registro de dataset.
++- Logs o reportes de validacion tecnica.
++
++## 9. Recomendacion
++
++Recomendacion actual:
++
++- `GO_TECNICO_RC` para release candidate tecnico.
++- `PENDING_QA_VISUAL` para evidencia visual real.
++- No marcar `QA_PASS`.
++
++No se detecta hallazgo critico vigente que obligue a `NO_GO_RELEASE_CANDIDATE`.
++
++La siguiente fase recomendada es QA visual real con screenshots por rol, o merge manual del RC1 si el criterio del equipo permite avanzar con GO tecnico y visual pendiente declarado.
+diff --git a/qa-reports/RELEASE-LIVE-BASE-RC1-report-20260610-125230.md b/qa-reports/RELEASE-LIVE-BASE-RC1-report-20260610-125230.md
+new file mode 100644
+index 0000000..c11703a
+--- /dev/null
++++ b/qa-reports/RELEASE-LIVE-BASE-RC1-report-20260610-125230.md
+@@ -0,0 +1,103 @@
++# RELEASE LIVE BASE RC1 report
++
++Fecha: 2026-06-10 12:52:30
++Rama: feature/live-base-rc1-release-candidate
++
++## Resultado ejecutivo
++
++`GO_TECNICO_RC` con `PENDING_QA_VISUAL`.
++
++Se consolido el release candidate tecnico de la base LIVE. No se implemento funcionalidad nueva ni se tocaron archivos funcionales. La evidencia API y documental es suficiente para RC tecnico; no hay screenshots/evidencia visual real suficiente para `QA_PASS`.
++
++## Commits confirmados
++
++- `af8fa3d LIVE-QA-E documenta evidencia visual live`
++- `5a2771f LIVE-QA-D valida home live por rol`
++- `00101a4 LIVE-QA-C2 valida permiso retirar prenda live`
++- `020a265 LIVE-PERM-FIX-A1 exige permiso retirar prenda live`
++- `dfe373e HOME-LIVE-A muestra live activo en inicio`
++- `90ab2eb ITEM-Z8 valida consistencia live inventario reservas`
++- `a5541e4 ITEM-Z7 asegura vendido operativo live`
++- `7490809 ITEM-Z6B libera reservas de forma segura`
++- `3826a43 ITEM-Z5D registra rechazos de reserva`
++- `ef8d255 ITEM-Z5C protege reserva activa por item`
++- `6f1ee15 ITEM-Z5B agrega idempotencia de reservas`
++- `6c757c9 LIVE-PERM-A1 documenta cierre final`
++- `4975138 LIVE-PERM-A1B corrige dependencias de permisos live`
++- `9ad9e37 LIVE-PERM-A1 ajusta capacidades sensibles`
++- `5f5cf4d LIVE-PERM-A1 agrega permisos live minimos`
++
++## Comandos ejecutados
++
++- `git branch --show-current`
++- `git status`
++- `git log --oneline -120`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-QA-E"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-QA-D"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-QA-C2"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-PERM-FIX-A1"`
++- `git --no-pager log --oneline --all --decorate --grep="HOME-LIVE-A"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z8"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z7"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z6B"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z5D"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z5C"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z5B"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-PERM-A1"`
++- `git grep -n "QA_PASS|PENDING_QA_VISUAL|PENDING_QA_API|NO_GO|GO_TECNICO" -- docs qa-reports`
++- `git grep -n "VIEW_LIVE|OPERATE_LIVE|PREPARE_LIVE_ITEM|CHANGE_LIVE_ACTIVE_ITEM|REMOVE_LIVE_ACTIVE_ITEM|DO_LIVE_RESERVATION" -- backend/control-ropa/src/main/java backend/control-ropa/src/main/resources app services docs qa-reports`
++- `git grep -n "OPERATIONAL_SOLD|LIVE_OPERATIONAL_SOLD|X-Idempotency-Key|reservation_rejection_events|active_reservation_item_id|releaseIfReserved|reserveIfAvailable" -- backend/control-ropa/src/main/java backend/control-ropa/src/main/resources backend/control-ropa/src/test docs qa-reports`
++- `git grep -n "HOME-LIVE-A|LIVE activo|Ir a LIVE|Actualmente al aire|canViewLive" -- app components services locales docs qa-reports`
++
++## Evidencias revisadas
++
++- Documentacion LIVE-PERM-A1/A2/A3.
++- Documentacion y reporte LIVE-PERM-FIX-A1.
++- Reportes LIVE-QA-A/B/C/C2/D/E.
++- Documentacion ITEM-Z2/Z3B/Z4/Z5B/Z5C/Z5D/Z6B/Z7/Z8.
++- Documentacion HOME-LIVE-A.
++- Migraciones `V50`, `V51`, `V52`, `V53`, `V54`.
++
++## Hallazgos
++
++- El `NO_GO` de LIVE-QA-C fue corregido y revalidado en LIVE-QA-C2.
++- Seller sin `REMOVE_LIVE_ACTIVE_ITEM` queda bloqueado por API para retirar active item.
++- `OPERATIONAL_SOLD` permanece operativo, no financiero.
++- Home card LIVE queda documentado y validado tecnicamente/API indirecta.
++- La evidencia visual real sigue pendiente; no se marca `QA_PASS`.
++
++## Resultado de validaciones
++
++- `backend/control-ropa/./mvnw.cmd test`: PASS.
++- `npm.cmd run lint`: PASS con advertencias preexistentes, 0 errores.
++- `npx.cmd tsc --noEmit`: PASS.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: PASS.
++- `git --no-pager diff --check`: PASS.
++- `git --no-pager diff --cached --check`: PASS.
++- `git status`: solo artefactos RC1 staged antes del commit.
++
++## GO/NO-GO
++
++- Release candidate tecnico: `GO_TECNICO_RC`
++- Evidencia visual: `PENDING_QA_VISUAL`
++- QA_PASS: no aplica
++- NO_GO_RELEASE_CANDIDATE: no aplica
++
++## Pendientes
++
++- QA visual real por rol con screenshots.
++- Definir limpieza o retencion del dataset QA desechable.
++- Planificar fases futuras de pagos/caja/precio LIVE/autorizaciones/devoluciones.
++- Mantener rollback con DBA si se tocan migraciones con datos.
++
++## Confirmacion de alcance
++
++- No se implemento funcionalidad nueva.
++- No se modifico backend funcional.
++- No se modifico frontend funcional.
++- No se tocaron pagos, caja, precio LIVE, devoluciones ni autorizaciones.
++- No se modifico RBAC.
++- No se crearon permisos.
++- No se crearon endpoints.
++- No se crearon migraciones.
++- No se cambio venta financiera.

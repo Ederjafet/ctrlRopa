@@ -1,0 +1,9 @@
+﻿ app/live.tsx               | 156 ++++++++++--
+ app/reservation-detail.tsx | 623 +++++++++++++++++++++++++--------------------
+ locales/en/common.json     |   7 +
+ locales/es/common.json     |   7 +
+ 4 files changed, 496 insertions(+), 297 deletions(-)
+ .../PRODUCT_B3_RESERVATION_DETAIL_TEMPLATE.md      | 124 +++++++++++++++++++++
+ 1 file changed, 124 insertions(+)
+ ...ation-detail-template-report-20260603-140748.md | 100 +++++++++++++++++++++
+ 1 file changed, 100 insertions(+)

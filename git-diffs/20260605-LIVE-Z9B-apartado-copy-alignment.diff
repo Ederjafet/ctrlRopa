@@ -1,0 +1,1071 @@
+﻿diff --git a/app/live.tsx b/app/live.tsx
+index 3794415..7e9e6b8 100644
+--- a/app/live.tsx
++++ b/app/live.tsx
+@@ -2279,12 +2279,15 @@ export default function LiveScreen() {
+         const withoutDuplicate = current.filter((entry) => entry.id !== reservation.id);
+         return [reservation, ...withoutDuplicate];
+       });
++      const reservedItemId = activeItem.id;
+       setActiveItemForReservation({
+         ...activeItem,
+         status: 'RESERVED',
+       });
+
+-      setSelectedItem(null);
++      setSelectedItem((current) =>
++        current?.id === reservedItemId ? null : current
++      );
+       setSelectedCustomer(null);
+       setScanInput('');
+
+@@ -2659,9 +2662,12 @@ export default function LiveScreen() {
+                       ? t('live.liveOperatePermissionError')
+                       : !operatorFlowEnabled
+                         ? t('live.selectOpenLiveReason')
+-                        : undefined
++                      : undefined
+                   }
+                 />
++                <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
++                  {t('live.clearProductOnAirHelp')}
++                </AppText>
+               </View>
+               <View style={styles.buttonFill}>
+                 <AppButton
+@@ -2671,6 +2677,9 @@ export default function LiveScreen() {
+                   disabled={!maySelectItem}
+                   disabledReason={t('live.itemPermissionError')}
+                 />
++                <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
++                  {t('live.changeItemOnAirHelp')}
++                </AppText>
+               </View>
+             </View>
+           ) : null}
+@@ -4108,6 +4117,9 @@ export default function LiveScreen() {
+                                     loading={isUpdatingOperationalStatus}
+                                     onPress={() => handleConfirmOperationalSold(reservation.id)}
+                                   />
++                                  <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
++                                    {t('live.markOperationalSoldHelp')}
++                                  </AppText>
+                                 </View>
+                               ) : null}
+                               {operationalStatus === 'RESERVED' && mayMarkLivePending ? (
+@@ -4123,6 +4135,9 @@ export default function LiveScreen() {
+                                       )
+                                     }
+                                   />
++                                  <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
++                                    {t('live.markPendingHelp')}
++                                  </AppText>
+                                 </View>
+                               ) : null}
+                               {(operationalStatus === 'PENDING' || operationalSold) &&
+@@ -4149,6 +4164,9 @@ export default function LiveScreen() {
+                                     loading={isUpdatingOperationalStatus}
+                                     onPress={() => handleCancelLiveReservation(reservation.id)}
+                                   />
++                                  <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
++                                    {t('live.cancelOperationalHelp')}
++                                  </AppText>
+                                 </View>
+                               ) : !operationalCancelled && !mayCancelLiveReservation ? (
+                                 <AuthorizationRequestPanel
+@@ -4202,6 +4220,9 @@ export default function LiveScreen() {
+                   disabled={isSavingLive || !selectedLiveIsOperable || !mayCloseLive}
+                   disabledReason={operatorFinishDisabledReason}
+                 />
++                <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
++                  {t('live.closeLiveHelp')}
++                </AppText>
+                 {selectedLiveIsOperable && !mayCloseLive ? (
+                   <AuthorizationRequestPanel
+                     actionLabel={t('live.authorizationActionCloseLive')}
+@@ -5177,29 +5198,35 @@ export default function LiveScreen() {
+                     </View>
+                     {!settled && !operationalSold && !operationalCancelled && mayMarkLiveOperationalSold ? (
+                       <View style={styles.buttonFill}>
+-                        <AppButton
+-                          title={t('live.markOperationalSold')}
+-                          variant="primary"
+-                          loading={isUpdatingOperationalStatus}
+-                          onPress={() => handleConfirmOperationalSold(reservation.id)}
+-                        />
+-                      </View>
+-                    ) : null}
++                      <AppButton
++                        title={t('live.markOperationalSold')}
++                        variant="primary"
++                        loading={isUpdatingOperationalStatus}
++                        onPress={() => handleConfirmOperationalSold(reservation.id)}
++                      />
++                      <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
++                        {t('live.markOperationalSoldHelp')}
++                      </AppText>
++                    </View>
++                  ) : null}
+                     {operationalStatus === 'RESERVED' && mayMarkLivePending ? (
+                       <View style={styles.buttonFill}>
+-                        <AppButton
+-                          title={t('live.markPending')}
+-                          variant="neutral"
+-                          loading={isUpdatingOperationalStatus}
++                      <AppButton
++                        title={t('live.markPending')}
++                        variant="neutral"
++                        loading={isUpdatingOperationalStatus}
+                           onPress={() =>
+                             handleUpdateReservationOperationalStatus(
+                               reservation.id,
+                               'PENDING'
+-                            )
+-                          }
+-                        />
+-                      </View>
+-                    ) : null}
++                          )
++                        }
++                      />
++                      <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
++                        {t('live.markPendingHelp')}
++                      </AppText>
++                    </View>
++                  ) : null}
+                     {operationalStatus === 'PENDING' && mayChangeLiveReservationStatus ? (
+                       <View style={styles.buttonFill}>
+                         <AppButton
+@@ -5232,14 +5259,17 @@ export default function LiveScreen() {
+                     ) : null}
+                     {!operationalCancelled && mayCancelLiveReservation ? (
+                       <View style={styles.buttonFill}>
+-                        <AppButton
+-                          title={t('live.cancelOperational')}
+-                          variant="danger"
+-                          loading={isUpdatingOperationalStatus}
+-                          onPress={() => handleCancelLiveReservation(reservation.id)}
+-                        />
+-                      </View>
+-                    ) : null}
++                      <AppButton
++                        title={t('live.cancelOperational')}
++                        variant="danger"
++                        loading={isUpdatingOperationalStatus}
++                        onPress={() => handleCancelLiveReservation(reservation.id)}
++                      />
++                      <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
++                        {t('live.cancelOperationalHelp')}
++                      </AppText>
++                    </View>
++                  ) : null}
+                     {operationalCancelled && mayChangeLiveReservationStatus ? (
+                       <View style={styles.buttonFill}>
+                         <AppButton
+@@ -5670,6 +5700,9 @@ const styles = StyleSheet.create({
+     flexBasis: '100%',
+     marginTop: 4,
+   },
++  actionHelperText: {
++    marginTop: 4,
++  },
+   buttonRow: {
+     flexDirection: 'row',
+     flexWrap: 'wrap',
+diff --git a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+index b7fa007..b18e0ca 100644
+--- a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
++++ b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+@@ -446,3 +446,10 @@ Fecha: 2026-06-04
+
+ - No se tocaron backend, AUTH/RBAC, pagos, caja, reportes, billing ni IA.
+ - No se cambiaron capacidades LIVE ni reglas operativas Z6/Z7/Z8.
++# Nota LIVE-Z9B - Lenguaje de apartados
++
++LIVE-Z9B alinea el copy visible de `/live` para usar `Apartado` como termino operativo principal. `Reserva` queda como termino tecnico interno cuando aplique.
++
++Tambien corrige que, despues de apartar la prenda al aire, la prenda preparada para cambio permanezca visible y pueda usarse con `Cambiar por prenda preparada`.
++
++No se cambiaron backend, permisos, capacidades ni contratos de API.
+diff --git a/docs/LIVE_Z9B_APARTADO_COPY_ALIGNMENT.md b/docs/LIVE_Z9B_APARTADO_COPY_ALIGNMENT.md
+new file mode 100644
+index 0000000..8c9abf0
+--- /dev/null
++++ b/docs/LIVE_Z9B_APARTADO_COPY_ALIGNMENT.md
+@@ -0,0 +1,85 @@
++# LIVE-Z9B - Unificacion de terminos: Apartado, venta LIVE y cambio de prenda
++
++## Objetivo
++
++LIVE-Z9B alinea el lenguaje visible de `/live` para usar `Apartado` como termino operativo principal. `Reserva` queda como termino tecnico interno cuando esta ligado a entidades, servicios o rutas existentes.
++
++La fase tambien corrige un estado frontend: apartar la prenda al aire ya no limpia la prenda preparada para cambio.
++
++## Decision de lenguaje
++
++- Apartado: prenda separada para un cliente/interesado durante el LIVE.
++- Reserva: termino tecnico interno del sistema.
++- Venta LIVE: cierre operativo del apartado dentro del LIVE.
++- Pago/caja: flujo separado; no se confirma desde LIVE.
++
++## Cambios visibles
++
++| Antes | Ahora |
++| --- | --- |
++| Reservas recientes | Apartados recientes |
++| Ultima reserva | Ultimo apartado |
++| Reservar ahora | Apartar ahora |
++| Precio confirmado para reserva | Precio confirmado para apartado |
++| Esta prenda ya tiene una reserva activa | Esta prenda ya tiene un apartado activo |
++| Marcar vendido operativo / Confirmar venta LIVE | Cerrar como venta LIVE |
++| Marcar pendiente | Mantener apartado |
++| Sacar del aire | Retirar prenda del aire |
++| Cambiar prenda | Cambiar por prenda preparada |
++
++## Ayudas operativas
++
++- `Cerrar como venta LIVE`: cierra el apartado como venta dentro del LIVE; no registra pago ni caja.
++- `Mantener apartado`: deja el apartado activo para seguimiento; no confirma venta, pago ni caja.
++- `Cancelar apartado`: cancela el apartado operativo de la prenda; no registra pago ni caja.
++- `Retirar prenda del aire`: quita la prenda actual del LIVE; el en vivo sigue activo y queda sin prenda al aire.
++- `Cambiar por prenda preparada`: reemplaza la prenda actual por la prenda preparada.
++- `Finalizar en vivo`: cierra la sesion completa del LIVE.
++
++## Correccion de flujo
++
++Escenario corregido:
++
++1. Hay una prenda al aire.
++2. Hay una prenda preparada para cambio.
++3. El operador aparta la prenda al aire.
++
++Resultado esperado:
++
++- la prenda al aire queda apartada/reservada;
++- `Apartar ahora` queda bloqueado para esa prenda;
++- la prenda preparada sigue visible;
++- el operador puede usar `Cambiar por prenda preparada`.
++
++Implementacion frontend:
++
++- antes se limpiaba `selectedItem` despues de crear el apartado;
++- ahora solo se limpia si `selectedItem` era la misma prenda apartada;
++- si `selectedItem` representa la prenda preparada, se conserva.
++
++## Sin cambios funcionales backend
++
++No se modifico:
++
++- backend;
++- endpoints;
++- contratos de API;
++- AUTH/RBAC;
++- permisos/capacidades;
++- pagos/caja/reportes/billing/IA;
++- reglas operativas de reserva/apartado;
++- persistencia.
++
++## Validacion manual esperada
++
++1. Entrar con `qa.admin@local.test`.
++2. Abrir `/live`.
++3. Confirmar que el flujo usa `Apartado` de forma consistente.
++4. Preparar una prenda para cambio.
++5. Poner otra prenda al aire.
++6. Apartar la prenda al aire.
++7. Confirmar que la prenda al aire queda apartada/reservada.
++8. Confirmar que la prenda preparada sigue visible.
++9. Usar `Cambiar por prenda preparada`.
++10. Confirmar que la prenda preparada pasa al aire.
++11. Validar vendedor/supervisor y light/dark.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index 028bdd5..ec77ad0 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -98,3 +98,14 @@ Falta evidencia para los 28 casos del smoke PRODUCT-D4, incluyendo:
+ ## Recomendacion
+
+ Ejecutar la corrida manual real y llenar el CSV PRODUCT-D4. Si aparecen S1/S2 confirmados, abrir PRODUCT-D5 para correcciones puntuales. Si solo quedan S3/S4 aceptables, se puede evaluar avanzar a PRODUCT-E con riesgo documentado.
++
++## Nota LIVE-Z9B
++
++La validacion manual posterior debe revisar tambien:
++
++- uso consistente de `Apartado` en la pantalla LIVE;
++- `Apartar ahora`;
++- `Cerrar como venta LIVE`;
++- `Mantener apartado`;
++- diferencia entre `Retirar prenda del aire`, `Cambiar por prenda preparada` y `Finalizar en vivo`;
++- que apartar la prenda al aire no oculte la prenda preparada para cambio.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index d47e1dd..48a8ab5 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -41,7 +41,7 @@
+     "liveOperationTitle": "LIVE operation",
+     "noActiveTransmission": "No active broadcast",
+     "actorOperatorLabel": "OPERATOR",
+-    "actorOperatorSubtitle": "Reservations and follow-up",
++    "actorOperatorSubtitle": "Holds and follow-up",
+     "actorSellerLabel": "LIVE SELLER",
+     "actorSellerSubtitle": "Sales support and on-air item",
+     "actorSupervisorLabel": "LIVE SUPERVISOR",
+@@ -49,8 +49,8 @@
+     "actorNoAccessLabel": "NO LIVE ACCESS",
+     "actorNoAccessSubtitle": "You do not have permission to operate Live",
+     "supportViewTitle": "Support view",
+-    "supportViewHelp": "This view shows what is needed to communicate the on-air item, without operating reservations or cash.",
+-    "operatorReservationTracking": "Reservations and follow-up",
++    "supportViewHelp": "Support view: shows the item on air and follow-up data. It does not operate holds like the operator view.",
++    "operatorReservationTracking": "Holds and follow-up",
+     "operatorStartLive": "START LIVE",
+     "operatorStartNewLive": "START NEW LIVE",
+     "operatorFinishLive": "FINISH LIVE",
+@@ -59,9 +59,9 @@
+     "operatorNoLiveActive": "NO ACTIVE LIVE",
+     "operatorNoLiveActiveShort": "NO LIVE",
+     "operatorLiveClosed": "LIVE CLOSED",
+-    "operatorLiveActiveHelp": "You can now register customers, items, and reservations.",
++    "operatorLiveActiveHelp": "You can now register customers, items, and holds.",
+     "operatorNoLiveStateHelp": "Start a live session to begin capturing items and reservations.",
+-    "operatorLiveClosedHelp": "This live session ended. You can review reservations and activity.",
++    "operatorLiveClosedHelp": "This live session ended. You can review holds and activity.",
+     "operatorNoLiveHelp": "Start a live session to begin capturing items and reservations.",
+     "operatorDefaultLiveNotes": "Operational live",
+     "operatorLiveAlreadyActive": "Live #{{id}} is already active.",
+@@ -85,8 +85,8 @@
+     "liveNotes": "Notes",
+     "shownItems": "Shown items",
+     "lastActivity": "Last activity",
+-    "viewReservations": "View reservations",
+-    "hideReservations": "Hide reservations",
++    "viewReservations": "View holds",
++    "hideReservations": "Hide holds",
+     "viewEvents": "View events",
+     "hideEvents": "Hide events",
+     "viewFullHistory": "View full history",
+@@ -95,9 +95,9 @@
+     "fullHistoryPending": "Full history is pending implementation.",
+     "noClosedLivesHistory": "No closed lives available.",
+     "selectedLiveChip": "Selected",
+-    "closedLiveReservationsTitle": "Live reservations",
++    "closedLiveReservationsTitle": "Live holds",
+     "closedLiveEventsTitle": "Live activity",
+-    "noClosedLiveReservations": "This live has no registered reservations.",
++    "noClosedLiveReservations": "This live has no registered holds.",
+     "noClosedLiveEvents": "This live has no registered events.",
+     "loadingEvents": "Loading events...",
+     "noShownItems": "No shown items",
+@@ -106,18 +106,18 @@
+     "unknownLiveEvent": "Operational event",
+     "eventLiveStarted": "Live started",
+     "eventLiveClosed": "Live closed",
+-    "eventActiveItemChanged": "Item on air changed",
+-    "eventReservationCreated": "Reservation created",
+-    "eventReservationStatusChanged": "Reservation status updated",
+-    "eventOperationalSold": "Operational sold",
+-    "eventReservationCancelled": "Reservation cancelled",
+-    "summaryReservations": "Reservations",
++    "eventActiveItemChanged": "Product on air updated: #{{id}}",
++    "eventReservationCreated": "Live reservation created: #{{id}}",
++    "eventReservationStatusChanged": "Reservation status updated: #{{id}}",
++    "eventOperationalSold": "Operational sold recorded: #{{id}}",
++    "eventReservationCancelled": "Reservation operationally cancelled: #{{id}}",
++    "summaryReservations": "Holds",
+     "summaryOperationalSold": "Operational sold",
+     "summaryCancelled": "Cancelled",
+     "summaryEvents": "Events",
+     "recentLivesTitle": "Recent lives",
+     "supervisorMonitoringTitle": "Monitoring and control",
+-    "supervisorMonitoringHelp": "Supervisor view for the live session, reservations, and operational activity.",
++    "supervisorMonitoringHelp": "Supervisor view: monitors activity, holds, and live status.",
+     "supervisorIndicatorsTitle": "Live indicators",
+     "supervisorNoDemoMetricsHelp": "Viewers, active buyers, and live sales stay pending unless real data exists.",
+     "supervisorRecentEventsTitle": "Recent events",
+@@ -125,16 +125,16 @@
+     "operatorStepProduct": "PREPARE NEXT ITEM",
+     "operatorStepActiveItem": "ITEM ON AIR NOW",
+     "operatorStepPrice": "PRICE",
+-    "operatorStepReservation": "RESERVATION",
++    "operatorStepReservation": "HOLD",
+     "operatorStepCustomerEmpty": "Select customer",
+     "operatorStepProductEmpty": "Select item",
+     "operatorStepPriceEmpty": "Confirm price",
+     "operatorProductOnAir": "Item shown now",
+     "operatorSelectProductHelp": "Select an item and mark it as product on air.",
+     "operatorChangeProduct": "Change product",
+-    "operatorReserveNow": "RESERVE NOW",
++    "operatorReserveNow": "HOLD NOW",
+     "operatorQuickCustomer": "Quick customer",
+-    "operatorQuickProduct": "Quick product",
++    "operatorQuickProduct": "Change product",
+     "operatorQuickChangeProduct": "Change product",
+     "operatorNextStepLabel": "Next step:",
+     "operatorNextStart": "start Live.",
+@@ -142,11 +142,11 @@
+     "operatorNextCustomer": "select customer/interested person.",
+     "operatorNextProduct": "prepare item.",
+     "operatorNextPrice": "confirm price.",
+-    "operatorNextReserve": "reserve now.",
+-    "operatorNextChangeReservedItem": "Change or take the item off air to continue.",
+-    "operatorReadyToReserve": "Ready to reserve.",
+-    "operatorLatestReservation": "Latest reservation: #{{id}}",
+-    "liveReservationBadge": "LIVE reservation",
++    "operatorNextReserve": "hold now.",
++    "operatorNextChangeReservedItem": "Switch or remove the item from live to continue.",
++    "operatorReadyToReserve": "Ready to create hold.",
++    "operatorLatestReservation": "Last hold: #{{id}}",
++    "liveReservationBadge": "LIVE hold",
+     "noReservationLive": "No linked live",
+     "noReservationDate": "No date",
+     "reservationDate": "Reservation date",
+@@ -163,13 +163,13 @@
+     "noItemOnAirTitle": "No item on air",
+     "noItemOnAirHelp": "Prepare an item and press 'Put this item on air'.",
+     "prepareNextItemHelp": "Search, scan, or create the item you will show in the live stream.",
+-    "activeItemSectionHelp": "This is the item being shown and reserved.",
+-    "productOnAirHelp": "Product on air is the item currently shown in the live stream.",
+-    "activeItemReservationHelp": "This is the item being shown and reserved.",
+-    "activeItemReservedHelp": "This item has already been reserved. Change it or take it off air to continue.",
+-    "activeItemReservedNextStepHelp": "This item has already been reserved. Change it or take it off air to continue.",
++    "activeItemSectionHelp": "The live item is the only item that can be held right now.",
++    "productOnAirHelp": "Product on air is the item currently shown in the live stream and the only item that can be held right now.",
++    "activeItemReservationHelp": "The live item is the only item that can be held right now.",
++    "activeItemReservedHelp": "This item already has a hold. Switch it or remove it from live to continue.",
++    "activeItemReservedNextStepHelp": "This item already has a hold. Switch it or remove it from live to continue.",
+     "activeItemAlreadyReservedTitle": "Item already reserved",
+-    "activeItemAlreadyReservedReason": "This item already has an active reservation. Change or take the item off air to register another reservation.",
++    "activeItemAlreadyReservedReason": "This item already has an active hold. Switch or remove the item from live to create another hold.",
+     "activeItemReservedStatus": "Reserved / Held",
+     "activeItemReservedChip": "Reserved",
+     "activeItemPresenterHelp": "This is the item currently being shown in the stream.",
+@@ -187,11 +187,11 @@
+     "itemStatus": "Status",
+     "customerNeedsActiveItem": "Put an item on air first.",
+     "customerNeedsPrice": "Confirm the price of the item on air first.",
+-    "reserveActiveItemHelp": "Confirm the price and register the reservation for the item on air.",
+-    "reserveNeedsActiveItem": "Put an item on air before registering a reservation.",
++    "reserveActiveItemHelp": "Confirm the price and create the hold for the item on air.",
++    "reserveNeedsActiveItem": "Put an item on air before creating a hold.",
+     "reserveMissingActiveItem": "Put an item on air first.",
+-    "priceUsesActiveItemHelp": "This price belongs to the item on air and will be used for the reservation. If adjusted, it applies only to the current live/reservation and does not change the item base price.",
+-    "livePriceReadOnlyHelp": "Price of the item on air. You do not have permission to change the LIVE price.",
++    "priceUsesActiveItemHelp": "This price applies only to the hold for the current live item. If adjusted, it does not change the item base price.",
++    "livePriceReadOnlyHelp": "This price applies only to the hold for the current live item. You do not have permission to change the LIVE price.",
+     "livePriceAuthorizationHelp": "Request supervisor authorization if you need to change the LIVE price.",
+     "requestAuthorization": "Request authorization",
+     "authorizationRequestTitle": "Request authorization",
+@@ -202,7 +202,7 @@
+     "authorizationActionReleaseItem": "Release item",
+     "authorizationActionCancelHold": "Cancel hold",
+     "authorizationActionCloseLive": "Close live",
+-    "authorizationActionOperationalSold": "Mark operational sold",
++    "authorizationActionOperationalSold": "Close as LIVE sale",
+     "authorizationActionStartLive": "Start live",
+     "authorizationBackendRequired": "Authorization requests still require backend integration.",
+     "authorizationCancelHelp": "Request authorization to cancel this hold.",
+@@ -220,11 +220,11 @@
+     "authorizationRequestPendingMessage": "Authorization request is pending implementation. Reason: {{reason}}.",
+     "authorizationRequestNotPersistedHelp": "Internal messaging pending for LIVE-Z8.",
+     "livePriceChangeConfirmTitle": "Confirm LIVE price",
+-    "livePriceChangeConfirmMessage": "The LIVE price {{livePrice}} differs from the suggested price {{basePrice}}. This change applies only to the current live/reservation and does not change the item base price.",
++    "livePriceChangeConfirmMessage": "The LIVE price {{livePrice}} differs from the suggested price {{basePrice}}. This change applies only to the current hold and does not change the item base price.",
+     "confirmLivePriceChange": "Confirm LIVE price",
+     "activeItemPriceLabel": "Price of the item on air",
+     "suggestedPriceFromItem": "Suggested item price: {{price}}",
+-    "priceConfirmedForReservation": "Confirmed reservation price: {{price}}",
++    "priceConfirmedForReservation": "Confirmed hold price: {{price}}",
+     "itemNotAvailableForReservation": "The item is not available for reservation.",
+     "itemFree": "Free",
+     "itemReservedWithoutPayment": "Reserved without payment",
+@@ -235,8 +235,10 @@
+     "itemCannotGoOnAirPaidOrSold": "This item cannot be put on air because it already has payment applied or is sold.",
+     "itemAvailabilityUnknown": "Availability not confirmed",
+     "itemAvailabilityUnknownReason": "The item cannot be confirmed as free to put on air.",
+-    "clearProductOnAir": "TAKE OFF AIR",
+-    "changeItemOnAir": "CHANGE ITEM",
++    "clearProductOnAir": "REMOVE ITEM FROM LIVE",
++    "clearProductOnAirHelp": "Removing the item keeps the live session active and leaves no current live item.",
++    "changeItemOnAir": "SWITCH TO PREPARED ITEM",
++    "changeItemOnAirHelp": "Replaces the current item with the prepared item.",
+     "activeProductClearedTitle": "Item taken off air",
+     "activeProductClearedMessage": "The item is no longer marked as product on air.",
+     "minimalModeTitle": "Minimal operational mode",
+@@ -362,13 +364,6 @@
+     "activityNow": "Now",
+     "activityMinutesAgo": "{{count}} min ago",
+     "noLiveEvents": "No operational events have been recorded yet.",
+-    "eventLiveStarted": "Live started",
+-    "eventLiveClosed": "Live closed",
+-    "eventActiveItemChanged": "Product on air updated: #{{id}}",
+-    "eventReservationCreated": "Live reservation created: #{{id}}",
+-    "eventReservationStatusChanged": "Reservation status updated: #{{id}}",
+-    "eventOperationalSold": "Operational sold recorded: #{{id}}",
+-    "eventReservationCancelled": "Reservation operationally cancelled: #{{id}}",
+     "presenterRoleTitle": "Presenter",
+     "presenterRoleValue": "Show and connect",
+     "presenterRoleHelp": "Product and key signals.",
+@@ -399,13 +394,12 @@
+     "streamReservations": "Reservations",
+     "streamComments": "Comments",
+     "streamReactions": "Reactions",
+-    "operatorQuickReservation": "Quick reservation",
+-    "operatorQuickProduct": "Change product",
++    "operatorQuickReservation": "Quick hold",
+     "operatorQuickCharge": "Follow-up",
+-    "quickReservationHint": "Fast reservation: customer + item + price.",
++    "quickReservationHint": "Quick hold: customer + item + price.",
+     "reservationRiskTitle": "Quick verification",
+-    "reservationRiskHelp": "Confirm phone or name before reserving. If unsure, register as interested.",
+-    "capturingHelp": "Reservations will be registered here.",
++    "reservationRiskHelp": "Confirm phone or name before creating the hold. If unsure, register as interested.",
++    "capturingHelp": "Holds will be registered here.",
+     "activateLive": "Activate live",
+     "activateLiveModalTitle": "Activate live",
+     "activateLiveModalBody": "Confirm that this live is ready to start operations. After activation, the team can capture reservations in this session.",
+@@ -434,7 +428,7 @@
+     "closeConfirmNotice": "Confirm if you want to close Live #{{id}}.",
+     "liveClosed": "Live #{{id}} closed successfully.",
+     "liveCloseError": "The live could not be closed.",
+-    "captureReservationTitle": "Capture reservation",
++    "captureReservationTitle": "Capture hold",
+     "selectLiveToCapture": "Select or create an open live to capture reservations.",
+     "customer": "Customer",
+     "selectCustomerHelp": "Select a real or generic customer.",
+@@ -475,17 +469,17 @@
+     "itemPermissionError": "You do not have permission to load items.",
+     "quickItem": "Quick item creation",
+     "price": "Price",
+-    "addReservation": "Add reservation",
+-    "reserveNow": "Reserve now",
+-    "reservationCreatedTitle": "Reservation created",
+-    "reservationCreateErrorTitle": "Reservation could not be created",
++    "addReservation": "Add hold",
++    "reserveNow": "Hold now",
++    "reservationCreatedTitle": "Hold created",
++    "reservationCreateErrorTitle": "Hold could not be created",
+     "reservationBlockedTitle": "Could not complete",
+-    "reservationCreated": "Reservation #{{id}} created successfully.",
+-    "reservationCreateError": "The reservation could not be created.",
+-    "reservationBlockedMessage": "Reservation cannot be added: {{reason}}",
+-    "reservationIssueTitle": "Cannot add reservation",
+-    "reservationIssueBody": "Complete the missing information to add the reservation.",
+-    "reserveMissingLive": "Start a live session before registering reservations.",
++    "reservationCreated": "Hold #{{id}} created successfully.",
++    "reservationCreateError": "The hold could not be created.",
++    "reservationBlockedMessage": "Hold cannot be added: {{reason}}",
++    "reservationIssueTitle": "Cannot add hold",
++    "reservationIssueBody": "Complete the missing information to add the hold.",
++    "reserveMissingLive": "Start a live session before registering holds.",
+     "reserveMissingCustomer": "Select or create a customer/interested person before reserving.",
+     "reserveMissingItem": "Select an item before reserving.",
+     "reserveMissingPrice": "Confirm a valid price of the item on air before reserving.",
+@@ -498,34 +492,37 @@
+     "selectOrScanItem": "Select or scan an item.",
+     "validPrice": "Enter a valid price.",
+     "itemNotFound": "No available item was found with that code.",
+-    "recentReservations": "Recent reservations",
+-    "noRecentReservations": "There are no reservations captured in this session yet.",
+-    "noRecentReservationsShort": "No recent reservations",
+-    "moreRecentReservations": "+{{count}} more reservations in this session.",
++    "recentReservations": "Recent holds",
++    "noRecentReservations": "There are no holds captured in this session yet.",
++    "noRecentReservationsShort": "No recent holds",
++    "moreRecentReservations": "+{{count}} more holds in this session.",
+     "settled": "Settled",
+     "reservedBy": "Reserved by: {{seller}}",
+     "date": "Date: {{date}}",
+     "viewDetail": "View detail",
+     "charge": "Charge",
+-    "markOperationalSold": "Mark operational sold",
+-    "operationalSoldConfirmTitle": "Operational sold",
+-    "operationalSoldConfirmMessage": "Mark as operational sold? This status does not confirm payment. Final sale requires checkout/cashbox.",
+-    "confirmOperationalSold": "Confirm operational sold",
+-    "operationalSoldTitle": "Operational sold",
+-    "operationalSoldMessage": "The reservation was marked as sold for Live operations. No payment was processed.",
+-    "operationalSoldStatus": "Operational sold",
+-    "operationalSoldNoPaymentHelp": "Local operational mark; it does not register payment or cash movement.",
+-    "operationalSoldPersistedNoPaymentHelp": "Saved operational state; it does not register payment or cash movement.",
+-    "operationalStatusPending": "Pending",
++    "markOperationalSold": "Close as LIVE sale",
++    "markOperationalSoldHelp": "Closes this hold as a sale within LIVE. It does not record payment or cash register movement.",
++    "operationalSoldConfirmTitle": "Close as LIVE sale",
++    "operationalSoldConfirmMessage": "Close this hold as a LIVE sale? This does not record payment or cash register movement.",
++    "confirmOperationalSold": "Close as LIVE sale",
++    "operationalSoldTitle": "LIVE sale closed",
++    "operationalSoldMessage": "The hold was closed as a sale within LIVE. No payment was processed.",
++    "operationalSoldStatus": "LIVE sale",
++    "operationalSoldNoPaymentHelp": "LIVE operational close; it does not register payment or cash movement.",
++    "operationalSoldPersistedNoPaymentHelp": "Saved LIVE sale; it does not register payment or cash movement.",
++    "operationalStatusPending": "Hold in follow-up",
+     "operationalStatusReserved": "Reserved",
+     "operationalStatusCancelled": "Operational cancelled",
+     "operationalStatusUpdatedTitle": "Status updated",
+-    "operationalStatusUpdatedMessage": "The reservation operational status was saved.",
++    "operationalStatusUpdatedMessage": "The hold operational status was saved.",
+     "operationalStatusUpdateErrorTitle": "Could not update",
+-    "operationalStatusUpdateError": "Could not save the reservation operational status.",
++    "operationalStatusUpdateError": "Could not save the hold operational status.",
+     "returnToReserved": "Back to reserved",
+-    "markPending": "Mark pending",
++    "markPending": "Keep hold",
++    "markPendingHelp": "Keeps the hold active for follow-up. It does not confirm sale, payment, or cashbox.",
+     "cancelOperational": "Cancel hold",
++    "cancelOperationalHelp": "Cancels the operational hold for this item. It does not record payment or cash register movement.",
+     "cancelHoldTitle": "Cancel hold",
+     "cancelHoldReasonPrompt": "Select the cancellation reason. This does not process payments or cashbox movements.",
+     "cancelReasonCustomerDeclined": "Customer declined",
+@@ -536,12 +533,12 @@
+     "cancelReasonOtherPendingNote": "Free-text note pending for LIVE-Z7.",
+     "reactivateReserved": "Reactivate reserved",
+     "closeLiveTitle": "Live closing",
+-    "closeLiveHelp": "Close the session when you finish capturing reservations.",
++    "closeLiveHelp": "End live session closes the full LIVE session.",
+     "liveClosedButton": "Live closed",
+     "closeLive": "Close live",
+     "closeLiveModalTitle": "Close live",
+-    "closeLiveModalBody": "After closing the live, reservations can no longer be captured in this session.",
+-    "closeLiveModalWarning": "Before closing, validate that no reservations are missing.",
++    "closeLiveModalBody": "After closing the live, holds can no longer be captured in this session.",
++    "closeLiveModalWarning": "Before closing, validate that no holds are missing.",
+     "confirmClose": "Confirm close",
+     "selectCustomerModal": "Select customer",
+     "searchCustomer": "Search customer",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index 9e62e7d..ab9482d 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -41,7 +41,7 @@
+     "liveOperationTitle": "Operacion LIVE",
+     "noActiveTransmission": "Sin transmision activa",
+     "actorOperatorLabel": "OPERADOR",
+-    "actorOperatorSubtitle": "Reservas y seguimiento",
++    "actorOperatorSubtitle": "Apartados y seguimiento",
+     "actorSellerLabel": "VENDEDOR LIVE",
+     "actorSellerSubtitle": "Apoyo visual de venta y prenda al aire",
+     "actorSupervisorLabel": "SUPERVISOR LIVE",
+@@ -49,8 +49,8 @@
+     "actorNoAccessLabel": "SIN ACCESO LIVE",
+     "actorNoAccessSubtitle": "No tienes permisos para operar En vivo",
+     "supportViewTitle": "Vista de apoyo",
+-    "supportViewHelp": "Esta vista muestra lo necesario para comunicar la prenda al aire, sin operar reservas ni caja.",
+-    "operatorReservationTracking": "Reservas y seguimiento",
++    "supportViewHelp": "Vista de apoyo: muestra la prenda al aire y datos para seguimiento. No opera apartados como operador.",
++    "operatorReservationTracking": "Apartados y seguimiento",
+     "operatorStartLive": "INICIAR EN VIVO",
+     "operatorStartNewLive": "INICIAR NUEVO EN VIVO",
+     "operatorFinishLive": "FINALIZAR EN VIVO",
+@@ -59,9 +59,9 @@
+     "operatorNoLiveActive": "NO HAY EN VIVO ACTIVO",
+     "operatorNoLiveActiveShort": "SIN EN VIVO",
+     "operatorLiveClosed": "LIVE CERRADO",
+-    "operatorLiveActiveHelp": "Ya puedes registrar clientes, prendas y reservas.",
++    "operatorLiveActiveHelp": "Ya puedes registrar clientes, prendas y apartados.",
+     "operatorNoLiveStateHelp": "Inicia un en vivo para comenzar a registrar prendas y apartados.",
+-    "operatorLiveClosedHelp": "Este en vivo finalizo. Puedes revisar reservas y actividad.",
++    "operatorLiveClosedHelp": "Este en vivo finalizo. Puedes revisar apartados y actividad.",
+     "operatorNoLiveHelp": "Inicia un en vivo para comenzar a registrar prendas y apartados.",
+     "operatorDefaultLiveNotes": "En vivo operativo",
+     "operatorLiveAlreadyActive": "En vivo #{{id}} ya esta activo.",
+@@ -85,8 +85,8 @@
+     "liveNotes": "Notas",
+     "shownItems": "Prendas mostradas",
+     "lastActivity": "Ultima actividad",
+-    "viewReservations": "Ver reservas",
+-    "hideReservations": "Ocultar reservas",
++    "viewReservations": "Ver apartados",
++    "hideReservations": "Ocultar apartados",
+     "viewEvents": "Ver eventos",
+     "hideEvents": "Ocultar eventos",
+     "viewFullHistory": "Ver historial completo",
+@@ -95,29 +95,29 @@
+     "fullHistoryPending": "Historial completo pendiente de implementar.",
+     "noClosedLivesHistory": "No hay en vivos cerrados disponibles.",
+     "selectedLiveChip": "Seleccionado",
+-    "closedLiveReservationsTitle": "Reservas del en vivo",
++    "closedLiveReservationsTitle": "Apartados del en vivo",
+     "closedLiveEventsTitle": "Actividad del en vivo",
+-    "noClosedLiveReservations": "Este en vivo no tiene reservas registradas.",
++    "noClosedLiveReservations": "Este en vivo no tiene apartados registrados.",
+     "noClosedLiveEvents": "Este en vivo no tiene eventos registrados.",
+     "loadingEvents": "Cargando eventos...",
+     "noShownItems": "Sin prendas registradas",
+     "noEventsShort": "Sin eventos",
+     "noEntity": "Sin entidad",
+     "unknownLiveEvent": "Evento operativo",
+-    "eventLiveStarted": "En vivo iniciado",
+-    "eventLiveClosed": "En vivo cerrado",
+-    "eventActiveItemChanged": "Prenda al aire cambiada",
+-    "eventReservationCreated": "Reserva creada",
+-    "eventReservationStatusChanged": "Estado de reserva actualizado",
+-    "eventOperationalSold": "Vendido operativo",
+-    "eventReservationCancelled": "Reserva cancelada",
+-    "summaryReservations": "Reservas",
++    "eventLiveStarted": "Transmisión iniciada",
++    "eventLiveClosed": "Transmisión cerrada",
++    "eventActiveItemChanged": "Producto al aire actualizado: #{{id}}",
++    "eventReservationCreated": "Reserva En vivo creada: #{{id}}",
++    "eventReservationStatusChanged": "Estado de reserva actualizado: #{{id}}",
++    "eventOperationalSold": "Vendido operativo registrado: #{{id}}",
++    "eventReservationCancelled": "Reserva cancelada operativamente: #{{id}}",
++    "summaryReservations": "Apartados",
+     "summaryOperationalSold": "Vendidos operativos",
+     "summaryCancelled": "Canceladas",
+     "summaryEvents": "Eventos",
+     "recentLivesTitle": "En vivos recientes",
+     "supervisorMonitoringTitle": "Monitoreo y control",
+-    "supervisorMonitoringHelp": "Vista de supervision del en vivo, reservas y actividad operacional.",
++    "supervisorMonitoringHelp": "Vista de supervision: monitorea actividad, apartados y estado del en vivo.",
+     "supervisorIndicatorsTitle": "Indicadores del en vivo",
+     "supervisorNoDemoMetricsHelp": "Espectadores, compradores activos y ventas en vivo quedan como pendiente si no existen datos reales.",
+     "supervisorRecentEventsTitle": "Eventos recientes",
+@@ -125,16 +125,16 @@
+     "operatorStepProduct": "PREPARAR SIGUIENTE PRENDA",
+     "operatorStepActiveItem": "PRENDA AL AIRE AHORA",
+     "operatorStepPrice": "PRECIO",
+-    "operatorStepReservation": "RESERVA",
++    "operatorStepReservation": "APARTADO",
+     "operatorStepCustomerEmpty": "Selecciona cliente",
+     "operatorStepProductEmpty": "Selecciona prenda",
+     "operatorStepPriceEmpty": "Confirma precio",
+     "operatorProductOnAir": "Prenda mostrada ahora",
+     "operatorSelectProductHelp": "Selecciona una prenda y marcala como producto al aire.",
+     "operatorChangeProduct": "Cambiar producto",
+-    "operatorReserveNow": "RESERVAR AHORA",
++    "operatorReserveNow": "APARTAR AHORA",
+     "operatorQuickCustomer": "Cliente rapido",
+-    "operatorQuickProduct": "Producto rapido",
++    "operatorQuickProduct": "Cambiar producto",
+     "operatorQuickChangeProduct": "Cambiar producto",
+     "operatorNextStepLabel": "Siguiente paso:",
+     "operatorNextStart": "iniciar En vivo.",
+@@ -142,11 +142,11 @@
+     "operatorNextCustomer": "seleccionar cliente/interesado.",
+     "operatorNextProduct": "preparar prenda.",
+     "operatorNextPrice": "confirmar precio.",
+-    "operatorNextReserve": "reservar ahora.",
+-    "operatorNextChangeReservedItem": "Cambia o saca la prenda del aire para continuar.",
+-    "operatorReadyToReserve": "Listo para reservar.",
+-    "operatorLatestReservation": "Ultima reserva: #{{id}}",
+-    "liveReservationBadge": "Reserva LIVE",
++    "operatorNextReserve": "apartar ahora.",
++    "operatorNextChangeReservedItem": "Cambia o retira la prenda del aire para continuar.",
++    "operatorReadyToReserve": "Listo para apartar.",
++    "operatorLatestReservation": "Ultimo apartado: #{{id}}",
++    "liveReservationBadge": "Apartado LIVE",
+     "noReservationLive": "Sin live asociado",
+     "noReservationDate": "Sin fecha",
+     "reservationDate": "Fecha de apartado",
+@@ -163,13 +163,13 @@
+     "noItemOnAirTitle": "No hay prenda al aire",
+     "noItemOnAirHelp": "Prepara una prenda y presiona 'Poner esta prenda al aire'.",
+     "prepareNextItemHelp": "Busca, escanea o crea la prenda que vas a mostrar en el en vivo.",
+-    "activeItemSectionHelp": "Esta es la prenda que se esta mostrando y que se reservara.",
+-    "productOnAirHelp": "Producto al aire es la prenda que se esta mostrando en la transmision.",
+-    "activeItemReservationHelp": "Esta es la prenda que se esta mostrando y que se reservara.",
+-    "activeItemReservedHelp": "Esta prenda ya fue reservada. Cambia o saca la prenda del aire para continuar.",
+-    "activeItemReservedNextStepHelp": "Esta prenda ya fue reservada. Cambia o saca la prenda del aire para continuar.",
++    "activeItemSectionHelp": "La prenda al aire es la unica que se puede apartar en este momento.",
++    "productOnAirHelp": "Producto al aire es la prenda que se esta mostrando en la transmision y la unica que se puede apartar ahora.",
++    "activeItemReservationHelp": "La prenda al aire es la unica que se puede apartar en este momento.",
++    "activeItemReservedHelp": "Esta prenda ya fue apartada. Cambiala o retirala del aire para continuar.",
++    "activeItemReservedNextStepHelp": "Esta prenda ya fue apartada. Cambiala o retirala del aire para continuar.",
+     "activeItemAlreadyReservedTitle": "Prenda ya reservada",
+-    "activeItemAlreadyReservedReason": "Esta prenda ya tiene una reserva activa. Cambia o saca la prenda del aire para registrar otra reserva.",
++    "activeItemAlreadyReservedReason": "Esta prenda ya tiene un apartado activo. Cambia o retira la prenda del aire para registrar otro apartado.",
+     "activeItemReservedStatus": "Reservada / Apartada",
+     "activeItemReservedChip": "Reservada",
+     "activeItemPresenterHelp": "Esta es la prenda que se esta mostrando en la transmision.",
+@@ -188,10 +188,10 @@
+     "customerNeedsActiveItem": "Primero pon una prenda al aire.",
+     "customerNeedsPrice": "Primero confirma el precio de la prenda al aire.",
+     "reserveActiveItemHelp": "Confirma el precio y registra el apartado de la prenda al aire.",
+-    "reserveNeedsActiveItem": "Primero pon una prenda al aire para registrar una reserva.",
++    "reserveNeedsActiveItem": "Primero pon una prenda al aire para registrar un apartado.",
+     "reserveMissingActiveItem": "Primero pon una prenda al aire.",
+-    "priceUsesActiveItemHelp": "Este precio corresponde a la prenda que esta al aire y sera el que se usara para reservar. Si lo ajustas, aplica solo al en vivo/reserva actual y no modifica el precio base de la prenda.",
+-    "livePriceReadOnlyHelp": "Precio de la prenda al aire. No tienes permiso para cambiar el precio LIVE.",
++    "priceUsesActiveItemHelp": "Este precio aplica solo al apartado de la prenda al aire actual. Si lo ajustas, no modifica el precio base de la prenda.",
++    "livePriceReadOnlyHelp": "Este precio aplica solo al apartado de la prenda al aire actual. No tienes permiso para cambiar el precio LIVE.",
+     "livePriceAuthorizationHelp": "Solicita autorizacion a un supervisor si necesitas cambiar el precio LIVE.",
+     "requestAuthorization": "Solicitar autorizacion",
+     "authorizationRequestTitle": "Solicitar autorizacion",
+@@ -202,7 +202,7 @@
+     "authorizationActionReleaseItem": "Liberar prenda",
+     "authorizationActionCancelHold": "Cancelar apartado",
+     "authorizationActionCloseLive": "Finalizar en vivo",
+-    "authorizationActionOperationalSold": "Marcar vendido operativo",
++    "authorizationActionOperationalSold": "Cerrar como venta LIVE",
+     "authorizationActionStartLive": "Iniciar en vivo",
+     "authorizationBackendRequired": "La solicitud de autorizacion todavia requiere integracion backend.",
+     "authorizationCancelHelp": "Solicita autorizacion para cancelar este apartado.",
+@@ -220,11 +220,11 @@
+     "authorizationRequestPendingMessage": "Solicitud de autorizacion pendiente de implementar. Motivo: {{reason}}.",
+     "authorizationRequestNotPersistedHelp": "Mensajeria interna pendiente para LIVE-Z8.",
+     "livePriceChangeConfirmTitle": "Confirmar precio LIVE",
+-    "livePriceChangeConfirmMessage": "El precio LIVE {{livePrice}} es distinto al precio sugerido {{basePrice}}. Este cambio aplica solo al en vivo/reserva actual y no modifica el precio base de la prenda.",
++    "livePriceChangeConfirmMessage": "El precio LIVE {{livePrice}} es distinto al precio sugerido {{basePrice}}. Este cambio aplica solo al apartado actual y no modifica el precio base de la prenda.",
+     "confirmLivePriceChange": "Confirmar precio LIVE",
+     "activeItemPriceLabel": "Precio de la prenda al aire",
+     "suggestedPriceFromItem": "Precio sugerido de la prenda: {{price}}",
+-    "priceConfirmedForReservation": "Precio confirmado para reserva: {{price}}",
++    "priceConfirmedForReservation": "Precio confirmado para apartado: {{price}}",
+     "itemNotAvailableForReservation": "La prenda no esta disponible para reservar.",
+     "itemFree": "Libre",
+     "itemReservedWithoutPayment": "Reservada sin pago",
+@@ -235,8 +235,10 @@
+     "itemCannotGoOnAirPaidOrSold": "Esta prenda no puede ponerse al aire porque ya tiene pago aplicado o esta vendida.",
+     "itemAvailabilityUnknown": "Disponibilidad no confirmada",
+     "itemAvailabilityUnknownReason": "No se puede confirmar que la prenda este libre para ponerse al aire.",
+-    "clearProductOnAir": "SACAR DEL AIRE",
+-    "changeItemOnAir": "CAMBIAR PRENDA",
++    "clearProductOnAir": "RETIRAR PRENDA DEL AIRE",
++    "clearProductOnAirHelp": "Quita la prenda actual del LIVE. El en vivo sigue activo y queda sin prenda al aire.",
++    "changeItemOnAir": "CAMBIAR POR PRENDA PREPARADA",
++    "changeItemOnAirHelp": "Reemplaza la prenda actual por la prenda preparada.",
+     "activeProductClearedTitle": "Prenda fuera del aire",
+     "activeProductClearedMessage": "La prenda ya no esta marcada como producto al aire.",
+     "minimalModeTitle": "Modo operativo mínimo",
+@@ -250,17 +252,17 @@
+     "resourceLoadError": "No se pudo cargar un recurso.",
+     "accessDenied": "No tienes permisos para acceder a En vivo.",
+     "permissionDeniedTitle": "Permiso requerido",
+-    "liveOperatePermissionError": "No tienes permisos para operar esta transmisi\u00f3n.",
+-    "presenterReadOnlyHelp": "Vista de presentadora: puedes ver la transmisi\u00f3n, pero no modificarla.",
++    "liveOperatePermissionError": "No tienes permisos para operar esta transmisión.",
++    "presenterReadOnlyHelp": "Vista de presentadora: puedes ver la transmisión, pero no modificarla.",
+     "liveLoadError": "No fue posible cargar En vivo.",
+     "liveLoadIssueTitle": "No se pudo cargar En vivo",
+     "reservationLoadError": "No fue posible cargar reservaciones.",
+     "reservationLoadIssueTitle": "Reservaciones no disponibles",
+     "reservationPermissionError": "No tienes permisos para cargar reservaciones de En vivo.",
+     "openLivesTitle": "Transmisiones listas",
+-    "operationBlockTitle": "Operaci\u00f3n de transmisi\u00f3n",
+-    "operationBlockHelp": "Selecciona, activa o abre una transmisi\u00f3n sin salir del flujo.",
+-    "operationBlockActiveHelp": "Mant\u00e9n la operaci\u00f3n lista para registrar reservas.",
++    "operationBlockTitle": "Operación de transmisión",
++    "operationBlockHelp": "Selecciona, activa o abre una transmisión sin salir del flujo.",
++    "operationBlockActiveHelp": "Mantén la operación lista para registrar reservas.",
+     "openLivesHelp": "Elige dónde se registrarán las reservas.",
+     "selectedLive": "Transmisión seleccionada",
+     "liveNumber": "En vivo #{{id}}",
+@@ -362,13 +364,6 @@
+     "activityNow": "Ahora",
+     "activityMinutesAgo": "Hace {{count}} min",
+     "noLiveEvents": "Aún no hay eventos operativos registrados.",
+-    "eventLiveStarted": "Transmisión iniciada",
+-    "eventLiveClosed": "Transmisión cerrada",
+-    "eventActiveItemChanged": "Producto al aire actualizado: #{{id}}",
+-    "eventReservationCreated": "Reserva En vivo creada: #{{id}}",
+-    "eventReservationStatusChanged": "Estado de reserva actualizado: #{{id}}",
+-    "eventOperationalSold": "Vendido operativo registrado: #{{id}}",
+-    "eventReservationCancelled": "Reserva cancelada operativamente: #{{id}}",
+     "presenterRoleTitle": "Presentadora",
+     "presenterRoleValue": "Muestra y conecta",
+     "presenterRoleHelp": "Producto y señales clave.",
+@@ -399,13 +394,12 @@
+     "streamReservations": "Reservas",
+     "streamComments": "Comentarios",
+     "streamReactions": "Reacciones",
+-    "operatorQuickReservation": "Reserva rápida",
+-    "operatorQuickProduct": "Cambiar producto",
++    "operatorQuickReservation": "Apartado rapido",
+     "operatorQuickCharge": "Seguimiento",
+-    "quickReservationHint": "Reserva rápida: cliente + prenda + precio.",
++    "quickReservationHint": "Apartado rapido: cliente + prenda + precio.",
+     "reservationRiskTitle": "Verificación rápida",
+-    "reservationRiskHelp": "Confirma teléfono o nombre antes de reservar. Si hay duda, registra como interesado.",
+-    "capturingHelp": "Las reservas se registrarán aquí.",
++    "reservationRiskHelp": "Confirma telefono o nombre antes de apartar. Si hay duda, registra como interesado.",
++    "capturingHelp": "Los apartados se registraran aqui.",
+     "activateLive": "Activar transmisión",
+     "activateLiveModalTitle": "Activar transmisión",
+     "activateLiveModalBody": "Confirma que esta transmisión iniciará operación. Al activarla, el equipo podrá registrar reservas.",
+@@ -434,7 +428,7 @@
+     "closeConfirmNotice": "Confirma si deseas cerrar En vivo #{{id}}.",
+     "liveClosed": "En vivo #{{id}} cerrado correctamente.",
+     "liveCloseError": "No se pudo cerrar la transmisión.",
+-    "captureReservationTitle": "Registrar reserva",
++    "captureReservationTitle": "Registrar apartado",
+     "selectLiveToCapture": "Selecciona o crea una transmisión abierta para registrar reservas.",
+     "customer": "Cliente",
+     "selectCustomerHelp": "Selecciona cliente real o genérico.",
+@@ -455,15 +449,15 @@
+     "markProductOnAir": "Marcar producto al aire",
+     "productAlreadyOnAir": "Producto al aire",
+     "activeProductCurrent": "Producto al aire: {{item}}",
+-    "noOfficialActiveProduct": "A\u00fan no hay producto al aire oficial.",
++    "noOfficialActiveProduct": "Aún no hay producto al aire oficial.",
+     "activeProductMissingTitle": "Falta producto",
+-    "activeProductMissingMessage": "Selecciona una transmisi\u00f3n y una prenda antes de marcar producto al aire.",
+-    "activeProductLiveClosedMessage": "Selecciona una transmisi\u00f3n abierta o activa para cambiar el producto al aire.",
++    "activeProductMissingMessage": "Selecciona una transmisión y una prenda antes de marcar producto al aire.",
++    "activeProductLiveClosedMessage": "Selecciona una transmisión abierta o activa para cambiar el producto al aire.",
+     "activeProductUpdatedTitle": "Producto al aire actualizado",
+-    "activeProductUpdatedMessage": "{{item}} qued\u00f3 como producto al aire.",
++    "activeProductUpdatedMessage": "{{item}} quedó como producto al aire.",
+     "activeProductUpdateErrorTitle": "No se pudo actualizar",
+     "activeProductUpdateError": "No se pudo marcar el producto al aire.",
+-    "itemDoesNotExistQuestion": "\u00bfLa prenda no existe?",
++    "itemDoesNotExistQuestion": "¿La prenda no existe?",
+     "noCodeQuestion": "¿No tienes código?",
+     "addByCode": "Agregar por código",
+     "scanQr": "Escanear QR",
+@@ -475,17 +469,17 @@
+     "itemPermissionError": "No tienes permisos para cargar prendas.",
+     "quickItem": "Crear prenda rápida",
+     "price": "Precio",
+-    "addReservation": "Agregar reserva",
+-    "reserveNow": "Reservar ahora",
+-    "reservationCreatedTitle": "Reserva creada",
+-    "reservationCreateErrorTitle": "No se pudo crear la reserva",
++    "addReservation": "Agregar apartado",
++    "reserveNow": "Apartar ahora",
++    "reservationCreatedTitle": "Apartado creado",
++    "reservationCreateErrorTitle": "No se pudo crear el apartado",
+     "reservationBlockedTitle": "No se pudo completar",
+-    "reservationCreated": "Reserva #{{id}} creada correctamente.",
+-    "reservationCreateError": "No se pudo crear la reserva.",
+-    "reservationBlockedMessage": "No se puede agregar la reserva: {{reason}}",
+-    "reservationIssueTitle": "No se puede agregar reserva",
+-    "reservationIssueBody": "Falta completar información para poder agregar la reserva.",
+-    "reserveMissingLive": "Primero inicia un en vivo para registrar reservas.",
++    "reservationCreated": "Apartado #{{id}} creado correctamente.",
++    "reservationCreateError": "No se pudo crear el apartado.",
++    "reservationBlockedMessage": "No se puede agregar el apartado: {{reason}}",
++    "reservationIssueTitle": "No se puede agregar apartado",
++    "reservationIssueBody": "Falta completar informacion para poder agregar el apartado.",
++    "reserveMissingLive": "Inicia un en vivo antes de registrar apartados.",
+     "reserveMissingCustomer": "Selecciona o crea un cliente/interesado antes de reservar.",
+     "reserveMissingItem": "Selecciona una prenda antes de reservar.",
+     "reserveMissingPrice": "Confirma un precio valido de la prenda al aire antes de reservar.",
+@@ -498,33 +492,33 @@
+     "selectOrScanItem": "Selecciona o escanea una prenda.",
+     "validPrice": "Captura un precio válido.",
+     "itemNotFound": "No se encontró una prenda disponible con ese código.",
+-    "recentReservations": "Reservas recientes",
+-    "noRecentReservations": "Aún no hay reservas registradas en esta transmisión.",
+-    "noRecentReservationsShort": "Sin reservas recientes",
+-    "moreRecentReservations": "+{{count}} reservas más en esta transmisión.",
++    "recentReservations": "Apartados recientes",
++    "noRecentReservations": "Aun no hay apartados registrados en esta transmision.",
++    "noRecentReservationsShort": "Sin apartados recientes",
++    "moreRecentReservations": "+{{count}} apartados mas en esta transmision.",
+     "settled": "Liquidado",
+     "reservedBy": "Reservó: {{seller}}",
+     "date": "Fecha: {{date}}",
+     "viewDetail": "Ver detalle",
+     "charge": "Cobrar",
+-    "markOperationalSold": "Marcar vendido operativo",
+-    "operationalSoldConfirmTitle": "Vendido operativo",
+-    "operationalSoldConfirmMessage": "¿Marcar como vendido operativo? Este estado no confirma pago. La venta final requiere cobro/caja.",
+-    "confirmOperationalSold": "Confirmar vendido operativo",
+-    "operationalSoldTitle": "Vendido operativo",
+-    "operationalSoldMessage": "La reserva quedó marcada como vendida para la operación de En vivo. No se procesó ningún pago.",
+-    "operationalSoldStatus": "Vendido operativo",
+-    "operationalSoldNoPaymentHelp": "Marca operativa local; no registra cobro ni caja.",
+-    "operationalSoldPersistedNoPaymentHelp": "Estado operativo guardado; no registra cobro ni caja.",
+-    "operationalStatusPending": "Pendiente",
++    "markOperationalSold": "Cerrar como venta LIVE",
++    "operationalSoldConfirmTitle": "Cerrar como venta LIVE",
++    "operationalSoldConfirmMessage": "Cerrar este apartado como venta LIVE? Esto no registra pago ni caja.",
++    "confirmOperationalSold": "Cerrar como venta LIVE",
++    "operationalSoldTitle": "Venta LIVE cerrada",
++    "operationalSoldMessage": "El apartado quedo cerrado como venta dentro del LIVE. No se proceso ningun pago.",
++    "operationalSoldStatus": "Venta LIVE",
++    "operationalSoldNoPaymentHelp": "Cierre operativo del LIVE; no registra cobro ni caja.",
++    "operationalSoldPersistedNoPaymentHelp": "Venta LIVE guardada; no registra cobro ni caja.",
++    "operationalStatusPending": "Apartado en seguimiento",
+     "operationalStatusReserved": "Apartado",
+     "operationalStatusCancelled": "Cancelado operativo",
+     "operationalStatusUpdatedTitle": "Estado actualizado",
+-    "operationalStatusUpdatedMessage": "El estado operativo de la reserva quedó guardado.",
++    "operationalStatusUpdatedMessage": "El estado operativo del apartado quedo guardado.",
+     "operationalStatusUpdateErrorTitle": "No se pudo actualizar",
+-    "operationalStatusUpdateError": "No se pudo guardar el estado operativo de la reserva.",
++    "operationalStatusUpdateError": "No se pudo guardar el estado operativo del apartado.",
+     "returnToReserved": "Volver a apartado",
+-    "markPending": "Marcar pendiente",
++    "markPending": "Mantener apartado",
+     "cancelOperational": "Cancelar apartado",
+     "cancelHoldTitle": "Cancelar apartado",
+     "cancelHoldReasonPrompt": "Selecciona el motivo de cancelación. Esto no procesa pagos ni caja.",
+@@ -536,12 +530,12 @@
+     "cancelReasonOtherPendingNote": "Nota libre pendiente de integrar en LIVE-Z7.",
+     "reactivateReserved": "Reactivar apartado",
+     "closeLiveTitle": "Cierre de transmisión",
+-    "closeLiveHelp": "Cierra la transmisión cuando termines de registrar reservas.",
++    "closeLiveHelp": "Cierra la sesion completa del LIVE.",
+     "liveClosedButton": "Transmisión cerrada",
+     "closeLive": "Cerrar transmisión",
+     "closeLiveModalTitle": "Cerrar transmisión",
+-    "closeLiveModalBody": "Al cerrar la transmisión ya no se podrán registrar reservas.",
+-    "closeLiveModalWarning": "Antes de cerrar, valida que no falten reservas por registrar.",
++    "closeLiveModalBody": "Al cerrar la transmision ya no se podran registrar apartados.",
++    "closeLiveModalWarning": "Antes de cerrar, valida que no falten apartados por registrar.",
+     "confirmClose": "Confirmar cierre",
+     "selectCustomerModal": "Seleccionar cliente",
+     "searchCustomer": "Buscar cliente",
+@@ -555,7 +549,10 @@
+     "noBrand": "Sin marca",
+     "noSize": "Sin talla",
+     "suggestedPrice": "Precio sugerido:",
+-    "noPrice": "Sin precio"
++    "noPrice": "Sin precio",
++    "markOperationalSoldHelp": "Cierra este apartado como venta dentro del LIVE. No registra pago ni caja.",
++    "markPendingHelp": "Deja el apartado activo para seguimiento. No confirma venta, pago ni caja.",
++    "cancelOperationalHelp": "Cancela el apartado operativo de esta prenda. No registra pago ni caja."
+   },
+   "payments": {
+     "title": "Pagos / Cobros",
+diff --git a/qa-reports/LIVE-Z9B-apartado-copy-alignment-report-20260605-141709.md b/qa-reports/LIVE-Z9B-apartado-copy-alignment-report-20260605-141709.md
+new file mode 100644
+index 0000000..9f33279
+--- /dev/null
++++ b/qa-reports/LIVE-Z9B-apartado-copy-alignment-report-20260605-141709.md
+@@ -0,0 +1,45 @@
++# LIVE-Z9B - Reporte de alineacion de copy a Apartado
++
++## Objetivo
++
++Unificar el lenguaje visible de LIVE para usar `Apartado` como termino operativo principal y corregir el estado frontend que ocultaba la prenda preparada despues de apartar la prenda al aire.
++
++## Cambios implementados
++
++- `Reservas recientes` pasa a `Apartados recientes`.
++- `Reservar ahora` pasa a `Apartar ahora`.
++- `Ultima reserva` pasa a `Ultimo apartado`.
++- `Confirmar venta LIVE` / vendido operativo se alinea como `Cerrar como venta LIVE`.
++- `Marcar pendiente` pasa a `Mantener apartado`.
++- Se refuerza que pago/caja no se registra desde LIVE.
++- Se refuerza que retirar prenda, cambiar por preparada y finalizar en vivo son acciones distintas.
++- Se conserva la prenda preparada al crear el apartado de la prenda al aire.
++
++## Correccion frontend
++
++En `persistReservation`, la seleccion de prenda ya no se limpia siempre. Ahora se limpia solo si la seleccion corresponde a la misma prenda apartada. Esto evita perder la prenda preparada para cambio.
++
++## Validaciones tecnicas
++
++Ejecutadas el 2026-06-05:
++
++- OK - `npm.cmd run lint` (sin errores; 60 warnings preexistentes de lint).
++- OK - `npx.cmd tsc --noEmit`.
++- OK - `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export` (73 rutas exportadas).
++- OK - `cd backend/control-ropa; ./mvnw.cmd test` (73 tests, 0 fallas, 0 errores).
++- OK - `cd backend/control-ropa; ./mvnw.cmd -q -DskipTests package`.
++- Pendiente de cierre - `git diff --check` se ejecuta al generar evidencia final.
++
++Warnings observados:
++
++- Lint conserva 60 warnings ya existentes, no introducidos por esta fase.
++- Maven test muestra warnings de entorno conocidos: MySQL 5.7 fuera de soporte comunitario, Mockito dynamic agent y password generado por Spring Security en contexto de test.
++
++## Riesgos
++
++- `Reserva` puede seguir apareciendo en rutas o nombres tecnicos fuera del flujo visible de operador.
++- No se ejecuto validacion manual en navegador en esta fase.
++
++## GO/NO-GO
++
++GO tecnico condicionado a `git diff --check` final.

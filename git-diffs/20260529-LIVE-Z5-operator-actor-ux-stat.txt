@@ -1,0 +1,11 @@
+﻿ app/live.tsx               | 3097 +++++++++++++++++++++++++++++++++++++++++---
+ app/reservation-detail.tsx |  496 +++++--
+ locales/en/common.json     |  173 ++-
+ locales/es/common.json     |  173 ++-
+ services/accessControl.ts  |   13 +
+ 5 files changed, 3644 insertions(+), 308 deletions(-)
+app/live.tsx
+app/reservation-detail.tsx
+locales/en/common.json
+locales/es/common.json
+services/accessControl.ts

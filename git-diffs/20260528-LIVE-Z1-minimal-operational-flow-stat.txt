@@ -1,0 +1,9 @@
+ app/live.tsx                    | 165 ++++++++++++++++++++++++++++++++++------
+ locales/en/common.json          |  12 +++
+ locales/es/common.json          |  12 +++
+ services/liveWorkflowStorage.ts |  35 +++++++++
+ 4 files changed, 201 insertions(+), 23 deletions(-)
+app/live.tsx
+locales/en/common.json
+locales/es/common.json
+services/liveWorkflowStorage.ts

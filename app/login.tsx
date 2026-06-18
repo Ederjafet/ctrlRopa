@@ -5,6 +5,7 @@ import AppText from '@/components/ui/AppText';
 import { ApiError } from '@/services/apiClient';
 import { getAppearanceSettings } from '@/services/appearanceService';
 import { login } from '@/services/authService';
+import { consumeAuthNotice } from '@/services/sessionStorage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Image, StyleSheet, View } from 'react-native';
@@ -19,9 +20,27 @@ export default function LoginScreen() {
   const router = useRouter();
 
   useEffect(() => {
+    let cancelled = false;
+
     getAppearanceSettings()
-      .then((settings) => setLogoUrl(settings.loginLogoUrl || settings.logoUrl || null))
-      .catch(() => setLogoUrl(null));
+      .then((settings) => {
+        if (!cancelled) setLogoUrl(settings.loginLogoUrl || settings.logoUrl || null);
+      })
+      .catch(() => {
+        if (!cancelled) setLogoUrl(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    consumeAuthNotice().then((notice) => {
+      if (!notice) return;
+      setMessage(notice);
+      Alert.alert('Sesión cerrada', notice);
+    });
   }, []);
 
   const handleLogin = async () => {

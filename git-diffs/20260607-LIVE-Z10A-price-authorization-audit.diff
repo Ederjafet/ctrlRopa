@@ -1,0 +1,413 @@
+﻿diff --git a/app/live.tsx b/app/live.tsx
+index 6750ce8..260d588 100644
+--- a/app/live.tsx
++++ b/app/live.tsx
+@@ -109,14 +109,6 @@ type LiveReservationIssue = {
+   tone?: 'info' | 'warning' | 'danger' | 'success';
+ };
+
+-type AuthorizationRequestContext =
+-  | 'price'
+-  | 'release'
+-  | 'cancel'
+-  | 'close'
+-  | 'operationalSold'
+-  | 'startLive';
+-
+ type ActivityFeedEvent = {
+   badge: string;
+   label: string;
+@@ -451,8 +443,6 @@ export default function LiveScreen() {
+   const [closeLiveToConfirm, setCloseLiveToConfirm] = useState<Live | null>(null);
+   const [activateLiveToConfirm, setActivateLiveToConfirm] = useState<Live | null>(null);
+   const [cancelReservationToConfirm, setCancelReservationToConfirm] = useState<number | null>(null);
+-  const [authorizationRequestContext, setAuthorizationRequestContext] =
+-    useState<AuthorizationRequestContext | null>(null);
+   const [reservationIssue, setReservationIssue] = useState<LiveReservationIssue | null>(null);
+   const [showDemoMetrics, setShowDemoMetrics] = useState(true);
+   const [liveLayoutPreferences, setLiveLayoutPreferences] =
+@@ -1909,46 +1899,6 @@ export default function LiveScreen() {
+     await handleUpdateReservationOperationalStatus(reservationId, 'CANCELLED', reason);
+   };
+
+-  const handleRequestAuthorization = (context: AuthorizationRequestContext) => {
+-    setAuthorizationRequestContext(context);
+-  };
+-
+-  const getAuthorizationActionLabel = (context: AuthorizationRequestContext | null) => {
+-    switch (context) {
+-      case 'price':
+-        return t('live.authorizationActionPrice');
+-      case 'release':
+-        return t('live.authorizationActionReleaseItem');
+-      case 'cancel':
+-        return t('live.authorizationActionCancelHold');
+-      case 'close':
+-        return t('live.authorizationActionCloseLive');
+-      case 'operationalSold':
+-        return t('live.authorizationActionOperationalSold');
+-      case 'startLive':
+-        return t('live.authorizationActionStartLive');
+-      default:
+-        return t('live.authorizationGenericAction');
+-    }
+-  };
+-
+-  const getAuthorizationPrompt = (context: AuthorizationRequestContext | null) =>
+-    context === 'price'
+-      ? t('live.authorizationPricePrompt')
+-      : t('live.authorizationGenericPrompt', {
+-          action: getAuthorizationActionLabel(context),
+-        });
+-
+-  const confirmAuthorizationRequest = (reason: string) => {
+-    const action = getAuthorizationActionLabel(authorizationRequestContext);
+-    setAuthorizationRequestContext(null);
+-    setLiveNotice({
+-      title: t('live.authorizationRequestPendingTitle'),
+-      message: t('live.authorizationRequestPendingMessage', { action, reason }),
+-      tone: 'warning',
+-    });
+-  };
+-
+   const handleCreateLive = async () => {
+     if (!session) {
+       Alert.alert(t('live.sessionTitle'), t('live.noActiveSession'));
+@@ -4280,9 +4230,7 @@ export default function LiveScreen() {
+                         requiredCapability="canChangeLivePrice"
+                         reason={t('live.livePriceAuthorizationHelp')}
+                         entityContext={activeItem.code}
+-                        pendingBackendLabel={t('live.authorizationBackendRequired')}
+-                        requestLabel={t('live.requestAuthorization')}
+-                        onRequestAuthorization={() => handleRequestAuthorization('price')}
++                        pendingBackendLabel={t('live.priceAuthorizationUnavailableMessage')}
+                         style={styles.operatorPriceAuthorizationBox}
+                       />
+                     ) : null}
+@@ -4594,9 +4542,9 @@ export default function LiveScreen() {
+                                   entityContext={t('live.reservationNumber', {
+                                     id: reservation.id,
+                                   })}
+-                                  pendingBackendLabel={t('live.authorizationBackendRequired')}
+-                                  requestLabel={t('live.requestAuthorization')}
+-                                  onRequestAuthorization={() => handleRequestAuthorization('cancel')}
++                                  pendingBackendLabel={t('live.authorizationUnavailableMessage', {
++                                    action: t('live.authorizationActionCancelHold'),
++                                  })}
+                                   style={styles.authorizationInlinePanel}
+                                 />
+                               ) : null}
+@@ -5973,44 +5921,6 @@ export default function LiveScreen() {
+         />
+       </AppBottomModal>
+
+-      <AppBottomModal
+-        visible={authorizationRequestContext !== null}
+-        title={t('live.authorizationRequestTitle')}
+-        onClose={() => setAuthorizationRequestContext(null)}
+-        showCancelButton={false}
+-      >
+-        <AppText bold>
+-          {getAuthorizationActionLabel(authorizationRequestContext)}
+-        </AppText>
+-        <AppText color={theme.colors.mutedText}>
+-          {getAuthorizationPrompt(authorizationRequestContext)}
+-        </AppText>
+-        {[
+-          t('live.authorizationReasonLivePromotion'),
+-          t('live.authorizationReasonDefectAdjustment'),
+-          t('live.authorizationReasonFrequentCustomer'),
+-          t('live.authorizationReasonVerbalApproval'),
+-          t('live.authorizationReasonOther'),
+-        ].map((reason) => (
+-          <AppOptionRow
+-            key={reason}
+-            title={reason}
+-            subtitle={
+-              reason === t('live.authorizationReasonOther')
+-                ? t('live.authorizationRequestNotPersistedHelp')
+-                : undefined
+-            }
+-            onPress={() => confirmAuthorizationRequest(reason)}
+-          />
+-        ))}
+-        <AppButton
+-          title={t('common.cancel')}
+-          variant="secondary"
+-          onPress={() => setAuthorizationRequestContext(null)}
+-        />
+-      </AppBottomModal>
+-
+-
+       <AppBottomModal
+         visible={activateLiveToConfirm !== null}
+         title={t('live.activateLiveModalTitle')}
+diff --git a/components/live/AuthorizationRequestPanel.tsx b/components/live/AuthorizationRequestPanel.tsx
+index 0f22d35..7647e4a 100644
+--- a/components/live/AuthorizationRequestPanel.tsx
++++ b/components/live/AuthorizationRequestPanel.tsx
+@@ -10,8 +10,8 @@ type Props = {
+   requiredCapability: string;
+   reason: string;
+   entityContext?: string;
+-  onRequestAuthorization: () => void;
+-  requestLabel: string;
++  onRequestAuthorization?: () => void;
++  requestLabel?: string;
+   pendingBackendLabel?: string;
+   style?: StyleProp<ViewStyle>;
+ };
+@@ -57,11 +57,13 @@ export default function AuthorizationRequestPanel({
+           {pendingBackendLabel}
+         </AppText>
+       ) : null}
+-      <AppButton
+-        title={requestLabel}
+-        variant="secondary"
+-        onPress={onRequestAuthorization}
+-      />
++      {requestLabel && onRequestAuthorization ? (
++        <AppButton
++          title={requestLabel}
++          variant="secondary"
++          onPress={onRequestAuthorization}
++        />
++      ) : null}
+     </View>
+   );
+ }
+diff --git a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+index ffc5972..5cd2c93 100644
+--- a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
++++ b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+@@ -5,6 +5,8 @@
+
+ > Nota LIVE-Z9E: `Crear prenda rapida` mantiene `returnTo=/live` y ahora muestra validacion visible por campo cuando faltan datos obligatorios antes de generar prendas.
+
++> Nota LIVE-Z10A: la autorizacion de cambio de precio LIVE queda marcada como no disponible porque no existe backend real de solicitudes/aprobaciones. La UI ya no muestra `Solicitud pendiente` simulada.
++
+ ## Objetivo
+
+ Integrar `/live` al layout profesional del producto usando `AppShell`, sidebar, TopBar y navegacion lateral responsive, sin cambiar reglas operativas profundas ni backend.
+diff --git a/docs/LIVE_Z9G_SELLER_CAPABILITIES.md b/docs/LIVE_Z9G_SELLER_CAPABILITIES.md
+index 393311a..0c59e7d 100644
+--- a/docs/LIVE_Z9G_SELLER_CAPABILITIES.md
++++ b/docs/LIVE_Z9G_SELLER_CAPABILITIES.md
+@@ -76,6 +76,10 @@ No se modificaron:
+
+ LIVE-Z9H agrega refresh controlado para que el vendedor con flujo de apartados no tenga que salir y volver a entrar cuando Admin cambia el estado del live o la prenda al aire. El vendedor conserva sus capacidades reales, con boton `Actualizar`, ultima actualizacion visible, refresh al foco y polling de 15 segundos sin consultar pagos/caja.
+
++## Continuidad LIVE-Z10A
++
++LIVE-Z10A confirma que el cambio de precio LIVE no tiene autorizacion backend real todavia. Por seguridad, el vendedor u operador sin `canChangeLivePrice` no puede editar precio y la UI deja de mostrar solicitudes pendientes simuladas. El flujo futuro requiere backend de solicitud, aprobacion y auditoria antes de habilitar autorizaciones reales.
++
+ ## GO/NO-GO
+
+ GO tecnico si pasan lint, TypeScript, export web, Maven test/package y `git diff --check`.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index 65f9f75..7588469 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -79,6 +79,20 @@ Como no hay hallazgos confirmados, esta tabla representa severidad potencial de
+
+ Falta evidencia para los 28 casos del smoke PRODUCT-D4, incluyendo:
+
++## Anexo LIVE-Z10A - Autorizacion de precio LIVE
++
++Agregar evidencia manual para el flujo de cambio de precio LIVE:
++
++- usuario sin `canChangeLivePrice` en `/live`;
++- prenda al aire visible;
++- precio LIVE en solo lectura;
++- mensaje claro de autorizacion no disponible;
++- ausencia de modal de motivos de autorizacion;
++- ausencia de `Solicitud pendiente`;
++- validacion light/dark y mobile/tablet.
++
++Resultado esperado: la app no simula una solicitud de autorizacion y no permite cambio libre de precio sin capacidad real.
++
+ - capturas de `/`, `/live`, `/ui-kit`, `/customers`, `/reservations`, `/users`, `/system`, `/reports`, `/appearance` si existe y `reservation-detail`;
+ - ejecucion con usuarios `qa.admin@local.test`, `qa.vendedor.centro@local.test`, `qa.supervisor.centro@local.test` y `qa.sinpermisos@local.test`;
+ - validacion light/dark;
+diff --git a/locales/en/common.json b/locales/en/common.json
+index 119442d..d8e7567 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -230,7 +230,7 @@
+     "reserveMissingActiveItem": "Put an item on air first.",
+     "priceUsesActiveItemHelp": "This price applies only to the hold for the current live item. If adjusted, it does not change the item base price.",
+     "livePriceReadOnlyHelp": "This price applies only to the hold for the current live item. You do not have permission to change the LIVE price.",
+-    "livePriceAuthorizationHelp": "Request supervisor authorization if you need to change the LIVE price.",
++    "livePriceAuthorizationHelp": "Changing the LIVE price requires real authorization. This phase does not have a backend flow to request it from the app.",
+     "requestAuthorization": "Request authorization",
+     "authorizationRequestTitle": "Request authorization",
+     "authorizationPricePrompt": "Select the reason to request authorization for changing the LIVE price.",
+@@ -242,7 +242,11 @@
+     "authorizationActionCloseLive": "Close live",
+     "authorizationActionOperationalSold": "Close as LIVE sale",
+     "authorizationActionStartLive": "Start live",
+-    "authorizationBackendRequired": "Authorization requests still require backend integration.",
++    "authorizationBackendRequired": "Real authorization still requires backend integration.",
++    "priceAuthorizationUnavailableTitle": "Price authorization unavailable",
++    "priceAuthorizationUnavailableMessage": "LIVE price-change authorization is not available yet. Keep the suggested price or request support outside the system.",
++    "authorizationUnavailableTitle": "Authorization unavailable",
++    "authorizationUnavailableMessage": "Authorization for {{action}} is not available in the app yet. Request support outside the system.",
+     "authorizationCancelHelp": "Request authorization to cancel this hold.",
+     "authorizationCloseHelp": "Request authorization to close the live.",
+     "authorizationPendingRequestsTitle": "Pending requests",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index a1e6307..9b9dcb4 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -230,7 +230,7 @@
+     "reserveMissingActiveItem": "Primero pon una prenda al aire.",
+     "priceUsesActiveItemHelp": "Este precio aplica solo al apartado de la prenda al aire actual. Si lo ajustas, no modifica el precio base de la prenda.",
+     "livePriceReadOnlyHelp": "Este precio aplica solo al apartado de la prenda al aire actual. No tienes permiso para cambiar el precio LIVE.",
+-    "livePriceAuthorizationHelp": "Solicita autorizacion a un supervisor si necesitas cambiar el precio LIVE.",
++    "livePriceAuthorizationHelp": "El cambio de precio LIVE requiere autorizacion real. En esta fase no hay flujo backend para solicitarla desde la app.",
+     "requestAuthorization": "Solicitar autorizacion",
+     "authorizationRequestTitle": "Solicitar autorizacion",
+     "authorizationPricePrompt": "Selecciona el motivo para solicitar autorizacion de cambio de precio LIVE.",
+@@ -242,7 +242,11 @@
+     "authorizationActionCloseLive": "Finalizar en vivo",
+     "authorizationActionOperationalSold": "Cerrar como venta LIVE",
+     "authorizationActionStartLive": "Iniciar en vivo",
+-    "authorizationBackendRequired": "La solicitud de autorizacion todavia requiere integracion backend.",
++    "authorizationBackendRequired": "La autorizacion real todavia requiere integracion backend.",
++    "priceAuthorizationUnavailableTitle": "Autorizacion de precio no disponible",
++    "priceAuthorizationUnavailableMessage": "La autorizacion de cambio de precio aun no esta disponible. Manten el precio sugerido o solicita apoyo fuera del sistema.",
++    "authorizationUnavailableTitle": "Autorizacion no disponible",
++    "authorizationUnavailableMessage": "La autorizacion para {{action}} aun no esta disponible en la app. Solicita apoyo fuera del sistema.",
+     "authorizationCancelHelp": "Solicita autorizacion para cancelar este apartado.",
+     "authorizationCloseHelp": "Solicita autorizacion para finalizar el en vivo.",
+     "authorizationPendingRequestsTitle": "Solicitudes pendientes",
+diff --git a/locales/fr/common.json b/locales/fr/common.json
+index 482972a..69d1712 100644
+--- a/locales/fr/common.json
++++ b/locales/fr/common.json
+@@ -230,7 +230,7 @@
+     "reserveMissingActiveItem": "Mettre de côté manquant actif article",
+     "priceUsesActiveItemHelp": "Prix élément actif article",
+     "livePriceReadOnlyHelp": "LIVE prix lecture élément",
+-    "livePriceAuthorizationHelp": "LIVE prix autorisation",
++    "livePriceAuthorizationHelp": "Changer le prix LIVE exige une autorisation réelle. Cette phase ne dispose pas encore d'un flux backend pour la demander depuis l'app.",
+     "requestAuthorization": "Demande autorisation",
+     "authorizationRequestTitle": "Autorisation demande",
+     "authorizationPricePrompt": "Autorisation prix",
+@@ -242,7 +242,11 @@
+     "authorizationActionCloseLive": "Autorisation action fermer LIVE",
+     "authorizationActionOperationalSold": "Autorisation action opérationnel vendu",
+     "authorizationActionStartLive": "Autorisation action démarrer LIVE",
+-    "authorizationBackendRequired": "Autorisation élément obligatoire",
++    "authorizationBackendRequired": "L'autorisation réelle exige encore une intégration backend.",
++    "priceAuthorizationUnavailableTitle": "Autorisation de prix indisponible",
++    "priceAuthorizationUnavailableMessage": "L'autorisation de changement de prix LIVE n'est pas encore disponible. Gardez le prix suggéré ou demandez de l'aide hors du système.",
++    "authorizationUnavailableTitle": "Autorisation indisponible",
++    "authorizationUnavailableMessage": "L'autorisation pour {{action}} n'est pas encore disponible dans l'app. Demandez de l'aide hors du système.",
+     "authorizationCancelHelp": "Autorisation annuler",
+     "authorizationCloseHelp": "Autorisation fermer",
+     "authorizationPendingRequestsTitle": "Autorisation en attente demandes",
+diff --git a/locales/ja/common.json b/locales/ja/common.json
+index ff1edf3..ccb1442 100644
+--- a/locales/ja/common.json
++++ b/locales/ja/common.json
+@@ -230,7 +230,7 @@
+     "reserveMissingActiveItem": "取り置き 不足 現在 商品",
+     "priceUsesActiveItemHelp": "価格 項目 現在 商品",
+     "livePriceReadOnlyHelp": "LIVE 価格 閲覧 項目",
+-    "livePriceAuthorizationHelp": "LIVE 価格 承認",
++    "livePriceAuthorizationHelp": "LIVE価格の変更には実際の承認が必要です。この段階ではアプリから申請するバックエンド連携はまだありません。",
+     "requestAuthorization": "リクエスト 承認",
+     "authorizationRequestTitle": "承認 リクエスト",
+     "authorizationPricePrompt": "承認 価格",
+@@ -242,7 +242,11 @@
+     "authorizationActionCloseLive": "承認 操作 閉じる LIVE",
+     "authorizationActionOperationalSold": "承認 操作 運用 販売済み",
+     "authorizationActionStartLive": "承認 操作 開始 LIVE",
+-    "authorizationBackendRequired": "承認 項目 必須",
++    "authorizationBackendRequired": "実際の承認にはまだバックエンド連携が必要です。",
++    "priceAuthorizationUnavailableTitle": "価格承認は利用できません",
++    "priceAuthorizationUnavailableMessage": "LIVE価格変更の承認はまだ利用できません。推奨価格を維持するか、システム外でサポートを依頼してください。",
++    "authorizationUnavailableTitle": "承認は利用できません",
++    "authorizationUnavailableMessage": "{{action}} の承認はアプリではまだ利用できません。システム外でサポートを依頼してください。",
+     "authorizationCancelHelp": "承認 キャンセル",
+     "authorizationCloseHelp": "承認 閉じる",
+     "authorizationPendingRequestsTitle": "承認 保留 リクエスト",
+diff --git a/locales/ko/common.json b/locales/ko/common.json
+index 61e0c1d..c1202cf 100644
+--- a/locales/ko/common.json
++++ b/locales/ko/common.json
+@@ -230,7 +230,7 @@
+     "reserveMissingActiveItem": "홀드 누락 현재 상품",
+     "priceUsesActiveItemHelp": "가격 항목 현재 상품",
+     "livePriceReadOnlyHelp": "LIVE 가격 보기 항목",
+-    "livePriceAuthorizationHelp": "LIVE 가격 승인",
++    "livePriceAuthorizationHelp": "LIVE 가격 변경에는 실제 승인이 필요합니다. 이 단계에서는 앱에서 요청할 수 있는 백엔드 흐름이 아직 없습니다.",
+     "requestAuthorization": "요청 승인",
+     "authorizationRequestTitle": "승인 요청",
+     "authorizationPricePrompt": "승인 가격",
+@@ -242,7 +242,11 @@
+     "authorizationActionCloseLive": "승인 작업 닫기 LIVE",
+     "authorizationActionOperationalSold": "승인 작업 운영 판매됨",
+     "authorizationActionStartLive": "승인 작업 시작 LIVE",
+-    "authorizationBackendRequired": "승인 항목 필수",
++    "authorizationBackendRequired": "실제 승인은 아직 백엔드 연동이 필요합니다.",
++    "priceAuthorizationUnavailableTitle": "가격 승인을 사용할 수 없음",
++    "priceAuthorizationUnavailableMessage": "LIVE 가격 변경 승인은 아직 사용할 수 없습니다. 권장 가격을 유지하거나 시스템 외부에서 지원을 요청하세요.",
++    "authorizationUnavailableTitle": "승인을 사용할 수 없음",
++    "authorizationUnavailableMessage": "{{action}} 승인은 아직 앱에서 사용할 수 없습니다. 시스템 외부에서 지원을 요청하세요.",
+     "authorizationCancelHelp": "승인 취소",
+     "authorizationCloseHelp": "승인 닫기",
+     "authorizationPendingRequestsTitle": "승인 대기 요청",
+diff --git a/locales/pt-BR/common.json b/locales/pt-BR/common.json
+index fce23dd..00b73ea 100644
+--- a/locales/pt-BR/common.json
++++ b/locales/pt-BR/common.json
+@@ -230,7 +230,7 @@
+     "reserveMissingActiveItem": "Apartar faltando ativo peça",
+     "priceUsesActiveItemHelp": "Preço campo ativo peça",
+     "livePriceReadOnlyHelp": "LIVE preço leitura campo",
+-    "livePriceAuthorizationHelp": "LIVE preço autorização",
++    "livePriceAuthorizationHelp": "Alterar o preço LIVE exige autorização real. Esta fase ainda não tem fluxo backend para solicitar pela app.",
+     "requestAuthorization": "Solicitação autorização",
+     "authorizationRequestTitle": "Autorização solicitação",
+     "authorizationPricePrompt": "Autorização preço",
+@@ -242,7 +242,11 @@
+     "authorizationActionCloseLive": "Autorização ação fechar LIVE",
+     "authorizationActionOperationalSold": "Autorização ação operacional vendido",
+     "authorizationActionStartLive": "Autorização ação iniciar LIVE",
+-    "authorizationBackendRequired": "Autorização campo obrigatório",
++    "authorizationBackendRequired": "A autorização real ainda exige integração backend.",
++    "priceAuthorizationUnavailableTitle": "Autorização de preço indisponível",
++    "priceAuthorizationUnavailableMessage": "A autorização para alterar o preço LIVE ainda não está disponível. Mantenha o preço sugerido ou solicite apoio fora do sistema.",
++    "authorizationUnavailableTitle": "Autorização indisponível",
++    "authorizationUnavailableMessage": "A autorização para {{action}} ainda não está disponível na app. Solicite apoio fora do sistema.",
+     "authorizationCancelHelp": "Autorização cancelar",
+     "authorizationCloseHelp": "Autorização fechar",
+     "authorizationPendingRequestsTitle": "Autorização pendente solicitações",
+diff --git a/locales/zh/common.json b/locales/zh/common.json
+index 3fb283d..7d61555 100644
+--- a/locales/zh/common.json
++++ b/locales/zh/common.json
+@@ -230,7 +230,7 @@
+     "reserveMissingActiveItem": "预留缺少当前商品",
+     "priceUsesActiveItemHelp": "价格项目当前商品",
+     "livePriceReadOnlyHelp": "LIVE价格查看项目",
+-    "livePriceAuthorizationHelp": "LIVE价格授权",
++    "livePriceAuthorizationHelp": "更改 LIVE 价格需要真实授权。本阶段还没有可从应用内提交申请的后端流程。",
+     "requestAuthorization": "请求授权",
+     "authorizationRequestTitle": "授权请求",
+     "authorizationPricePrompt": "授权价格",
+@@ -242,7 +242,11 @@
+     "authorizationActionCloseLive": "授权操作关闭LIVE",
+     "authorizationActionOperationalSold": "授权操作运营已售",
+     "authorizationActionStartLive": "授权操作开始LIVE",
+-    "authorizationBackendRequired": "授权项目必填",
++    "authorizationBackendRequired": "真实授权仍需要后端集成。",
++    "priceAuthorizationUnavailableTitle": "价格授权不可用",
++    "priceAuthorizationUnavailableMessage": "LIVE 改价授权尚不可用。请保留建议价格，或在系统外请求支持。",
++    "authorizationUnavailableTitle": "授权不可用",
++    "authorizationUnavailableMessage": "{{action}} 的授权尚未在应用中可用。请在系统外请求支持。",
+     "authorizationCancelHelp": "授权取消",
+     "authorizationCloseHelp": "授权关闭",
+     "authorizationPendingRequestsTitle": "授权待处理请求",

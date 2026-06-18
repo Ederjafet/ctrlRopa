@@ -1,0 +1,12 @@
+﻿ app/live.tsx                                       | 150 ++++++++++-----------
+ docs/ERP_LIVE_ACTORS_MATRIX.md                     |  14 +-
+ docs/LIVE_Z6_CAPABILITIES_MATRIX.md                |  21 +--
+ docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md        |   4 +-
+ docs/LIVE_Z9F_1_CONTEXTUAL_ACTION_PANELS.md        |   2 +
+ docs/LIVE_Z9G_SELLER_CAPABILITIES.md               |  79 +++++++++++
+ docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md              |  12 ++
+ locales/en/common.json                             |   2 +-
+ locales/es/common.json                             |   2 +-
+ ...G-seller-capabilities-report-20260606-210231.md |  69 ++++++++++
+ services/liveCapabilities.ts                       |  22 +--
+ 11 files changed, 273 insertions(+), 104 deletions(-)

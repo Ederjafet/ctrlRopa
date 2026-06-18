@@ -1,0 +1,7 @@
+﻿ docs/PRODUCT_D_ROLE_BASED_QA_HANDOFF.md | 2 ++
+ 1 file changed, 2 insertions(+)
+
+Untracked/force-added evidence included:
+docs/PRODUCT_D2_VISUAL_QA_EXECUTION_HANDOFF.md | 155 lines
+qa-reports/PRODUCT-D2-visual-qa-execution-report-20260605-122258.md | 158 lines
+qa-reports/PRODUCT-D2-visual-qa-execution-smoke-20260605-122258.csv | 29 lines

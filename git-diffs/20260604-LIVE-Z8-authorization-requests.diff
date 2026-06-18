@@ -1,0 +1,337 @@
+diff --git a/app/live.tsx b/app/live.tsx
+index 5e2471b..4e91268 100644
+--- a/app/live.tsx
++++ b/app/live.tsx
+@@ -1,4 +1,5 @@
+ import QRScannerModal from '@/components/qr/QRScannerModal';
++import AuthorizationRequestPanel from '@/components/live/AuthorizationRequestPanel';
+ import AppShell from '@/components/layout/AppShell';
+ import { SidebarSection } from '@/components/layout/Sidebar';
+ import LiveDesktopLayout from '@/components/live/LiveDesktopLayout';
+@@ -16,6 +17,7 @@ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInfoCard from '@/components/ui/AppInfoCard';
+ import AppInput from '@/components/ui/AppInput';
++import EmptyState from '@/components/ui/EmptyState';
+ import AppOptionRow from '@/components/ui/AppOptionRow';
+ import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
+ import AppText from '@/components/ui/AppText';
+@@ -98,6 +100,14 @@ type LiveNotice = {
+   tone: 'success' | 'warning' | 'danger';
+ };
+
++type AuthorizationRequestContext =
++  | 'price'
++  | 'release'
++  | 'cancel'
++  | 'close'
++  | 'operationalSold'
++  | 'startLive';
++
+ type ActivityFeedEvent = {
+   badge: string;
+   label: string;
+@@ -489,9 +499,8 @@ export default function LiveScreen() {
+   const [closeLiveToConfirm, setCloseLiveToConfirm] = useState<Live | null>(null);
+   const [activateLiveToConfirm, setActivateLiveToConfirm] = useState<Live | null>(null);
+   const [cancelReservationToConfirm, setCancelReservationToConfirm] = useState<number | null>(null);
+-  const [authorizationRequestContext, setAuthorizationRequestContext] = useState<
+-    'price' | 'release' | 'close' | 'cancel' | null
+-  >(null);
++  const [authorizationRequestContext, setAuthorizationRequestContext] =
++    useState<AuthorizationRequestContext | null>(null);
+   const [reservationIssue, setReservationIssue] = useState<string | null>(null);
+   const [showDemoMetrics, setShowDemoMetrics] = useState(true);
+   const [liveLayoutPreferences, setLiveLayoutPreferences] =
+@@ -1669,17 +1678,42 @@ export default function LiveScreen() {
+     await handleUpdateReservationOperationalStatus(reservationId, 'CANCELLED', reason);
+   };
+
+-  const handleRequestAuthorization = (
+-    context: 'price' | 'release' | 'close' | 'cancel'
+-  ) => {
++  const handleRequestAuthorization = (context: AuthorizationRequestContext) => {
+     setAuthorizationRequestContext(context);
+   };
+
++  const getAuthorizationActionLabel = (context: AuthorizationRequestContext | null) => {
++    switch (context) {
++      case 'price':
++        return t('live.authorizationActionPrice');
++      case 'release':
++        return t('live.authorizationActionReleaseItem');
++      case 'cancel':
++        return t('live.authorizationActionCancelHold');
++      case 'close':
++        return t('live.authorizationActionCloseLive');
++      case 'operationalSold':
++        return t('live.authorizationActionOperationalSold');
++      case 'startLive':
++        return t('live.authorizationActionStartLive');
++      default:
++        return t('live.authorizationGenericAction');
++    }
++  };
++
++  const getAuthorizationPrompt = (context: AuthorizationRequestContext | null) =>
++    context === 'price'
++      ? t('live.authorizationPricePrompt')
++      : t('live.authorizationGenericPrompt', {
++          action: getAuthorizationActionLabel(context),
++        });
++
+   const confirmAuthorizationRequest = (reason: string) => {
++    const action = getAuthorizationActionLabel(authorizationRequestContext);
+     setAuthorizationRequestContext(null);
+     setLiveNotice({
+       title: t('live.authorizationRequestPendingTitle'),
+-      message: t('live.authorizationRequestPendingMessage', { reason }),
++      message: t('live.authorizationRequestPendingMessage', { action, reason }),
+       tone: 'warning',
+     });
+   };
+@@ -3460,6 +3494,20 @@ export default function LiveScreen() {
+
+         {renderSupportActiveItemPanel()}
+
++        <LiveCompactCard style={styles.supervisorSectionCard}>
++          <AppText variant="subtitle" bold>
++            {t('live.authorizationPendingRequestsTitle')}
++          </AppText>
++          <EmptyState
++            icon="pending-actions"
++            title={t('live.authorizationPendingRequestsEmptyTitle')}
++            message={t('live.authorizationPendingRequestsEmptyMessage')}
++          />
++          <AppText variant="caption" color={theme.colors.mutedText}>
++            {t('live.authorizationApprovalBackendPending')}
++          </AppText>
++        </LiveCompactCard>
++
+         <LiveCompactCard style={styles.supervisorSectionCard}>
+           <AppText variant="subtitle" bold>
+             {t('live.recentReservations')}
+@@ -3784,16 +3832,16 @@ export default function LiveScreen() {
+                         : t('live.operatorStepPriceEmpty')}
+                     </AppText>
+                     {activeItem && !mayChangeLivePrice ? (
+-                      <View style={styles.operatorPriceAuthorizationBox}>
+-                        <AppText variant="caption" color={theme.colors.mutedText}>
+-                          {t('live.livePriceAuthorizationHelp')}
+-                        </AppText>
+-                        <AppButton
+-                          title={t('live.requestAuthorization')}
+-                          variant="secondary"
+-                          onPress={() => handleRequestAuthorization('price')}
+-                        />
+-                      </View>
++                      <AuthorizationRequestPanel
++                        actionLabel={t('live.authorizationActionPrice')}
++                        requiredCapability="canChangeLivePrice"
++                        reason={t('live.livePriceAuthorizationHelp')}
++                        entityContext={activeItem.code}
++                        pendingBackendLabel={t('live.authorizationBackendRequired')}
++                        requestLabel={t('live.requestAuthorization')}
++                        onRequestAuthorization={() => handleRequestAuthorization('price')}
++                        style={styles.operatorPriceAuthorizationBox}
++                      />
+                     ) : null}
+                   </LiveCompactCard>
+
+@@ -4098,6 +4146,19 @@ export default function LiveScreen() {
+                                     onPress={() => handleCancelLiveReservation(reservation.id)}
+                                   />
+                                 </View>
++                              ) : !operationalCancelled && !mayCancelLiveReservation ? (
++                                <AuthorizationRequestPanel
++                                  actionLabel={t('live.authorizationActionCancelHold')}
++                                  requiredCapability="canCancelReservation"
++                                  reason={t('live.authorizationCancelHelp')}
++                                  entityContext={t('live.reservationNumber', {
++                                    id: reservation.id,
++                                  })}
++                                  pendingBackendLabel={t('live.authorizationBackendRequired')}
++                                  requestLabel={t('live.requestAuthorization')}
++                                  onRequestAuthorization={() => handleRequestAuthorization('cancel')}
++                                  style={styles.authorizationInlinePanel}
++                                />
+                               ) : null}
+                               {operationalCancelled && mayChangeLiveReservationStatus ? (
+                                 <View style={styles.buttonFill}>
+@@ -4137,6 +4198,19 @@ export default function LiveScreen() {
+                   disabled={isSavingLive || !selectedLiveIsOperable || !mayCloseLive}
+                   disabledReason={operatorFinishDisabledReason}
+                 />
++                {selectedLiveIsOperable && !mayCloseLive ? (
++                  <AuthorizationRequestPanel
++                    actionLabel={t('live.authorizationActionCloseLive')}
++                    requiredCapability="canCloseLive"
++                    reason={t('live.authorizationCloseHelp')}
++                    entityContext={
++                      selectedLive ? t('live.liveNumber', { id: selectedLive.id }) : undefined
++                    }
++                    pendingBackendLabel={t('live.authorizationBackendRequired')}
++                    requestLabel={t('live.requestAuthorization')}
++                    onRequestAuthorization={() => handleRequestAuthorization('close')}
++                  />
++                ) : null}
+               </>
+             )}
+           </LiveActionCard>
+@@ -5225,9 +5299,16 @@ export default function LiveScreen() {
+                 style={styles.buttonSpacing}
+               />
+             ) : (
+-              <AppText variant="caption" color={theme.colors.mutedText} style={styles.buttonSpacing}>
+-                {t('live.presenterReadOnlyHelp')}
+-              </AppText>
++              <AuthorizationRequestPanel
++                actionLabel={t('live.authorizationActionCloseLive')}
++                requiredCapability="canCloseLive"
++                reason={t('live.authorizationCloseHelp')}
++                entityContext={t('live.liveNumber', { id: selectedLive.id })}
++                pendingBackendLabel={t('live.authorizationBackendRequired')}
++                requestLabel={t('live.requestAuthorization')}
++                onRequestAuthorization={() => handleRequestAuthorization('close')}
++                style={styles.buttonSpacing}
++              />
+             )}
+           </AppCard>
+         ) : null}
+@@ -5417,10 +5498,11 @@ export default function LiveScreen() {
+         onClose={() => setAuthorizationRequestContext(null)}
+         showCancelButton={false}
+       >
++        <AppText bold>
++          {getAuthorizationActionLabel(authorizationRequestContext)}
++        </AppText>
+         <AppText color={theme.colors.mutedText}>
+-          {authorizationRequestContext === 'price'
+-            ? t('live.authorizationPricePrompt')
+-            : t('live.authorizationGenericPrompt')}
++          {getAuthorizationPrompt(authorizationRequestContext)}
+         </AppText>
+         {[
+           t('live.authorizationReasonLivePromotion'),
+@@ -5580,6 +5662,10 @@ const styles = StyleSheet.create({
+     justifyContent: 'space-between',
+     padding: 10,
+   },
++  authorizationInlinePanel: {
++    flexBasis: '100%',
++    marginTop: 4,
++  },
+   buttonRow: {
+     flexDirection: 'row',
+     flexWrap: 'wrap',
+diff --git a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+index 7c3910b..b55b04f 100644
+--- a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
++++ b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+@@ -411,6 +411,13 @@ Hacer que `/live` consuma el sistema visual de PRODUCT-B de forma real, con tema
+ - Si el precio LIVE difiere del precio sugerido/base, se solicita confirmacion antes de crear la reserva.
+ - La liberacion segura de prenda queda pendiente porque requiere confirmar pagos y un endpoint especifico.
+
++### Continuidad a LIVE-Z8
++
++- LIVE-Z8 agrega `AuthorizationRequestPanel` como UI reutilizable para acciones bloqueadas por capacidades.
++- La vista Supervisor/Admin muestra `Solicitudes pendientes` con EmptyState real mientras no exista backend.
++- No se simulan aprobaciones ni se ejecutan acciones despues de solicitar autorizacion.
++- Persistencia, inbox supervisor y auditoria operacional quedan para LIVE-Z9.
++
+ ## GO/NO-GO
+
+ GO tecnico para LIVE-Z6A, Z6B, Z6C y Z6C2.
+diff --git a/docs/LIVE_Z7_PERMISSIONS_PRICE_APPROVAL.md b/docs/LIVE_Z7_PERMISSIONS_PRICE_APPROVAL.md
+index 7cb2840..d357084 100644
+--- a/docs/LIVE_Z7_PERMISSIONS_PRICE_APPROVAL.md
++++ b/docs/LIVE_Z7_PERMISSIONS_PRICE_APPROVAL.md
+@@ -130,6 +130,18 @@ No se crea backend ni se simula aprobacion.
+
+ Pendiente recomendado: `LIVE-Z8 - mensajeria interna y solicitudes de autorizacion`.
+
++## Continuidad LIVE-Z8
++
++LIVE-Z8 implementa una base UI reutilizable para solicitudes de autorizacion:
++
++- `components/live/AuthorizationRequestPanel.tsx`.
++- Panel contextual para precio LIVE bloqueado.
++- Panel contextual para cancelar apartado sin capacidad.
++- Panel contextual para finalizar live sin capacidad.
++- Seccion `Solicitudes pendientes` para Supervisor/Admin con estado vacio real.
++
++No se simula aprobacion ni se desbloquean acciones. La persistencia backend queda pendiente para LIVE-Z9.
++
+ ## Auditoria operacional
+
+ Eventos existentes/revisados:
+diff --git a/locales/en/common.json b/locales/en/common.json
+index fd63083..d47e1dd 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -196,7 +196,21 @@
+     "requestAuthorization": "Request authorization",
+     "authorizationRequestTitle": "Request authorization",
+     "authorizationPricePrompt": "Select the reason to request authorization for changing the LIVE price.",
+-    "authorizationGenericPrompt": "Select the reason to request authorization.",
++    "authorizationGenericPrompt": "Select the reason to request authorization for: {{action}}.",
++    "authorizationGenericAction": "Operational action",
++    "authorizationActionPrice": "Change LIVE price",
++    "authorizationActionReleaseItem": "Release item",
++    "authorizationActionCancelHold": "Cancel hold",
++    "authorizationActionCloseLive": "Close live",
++    "authorizationActionOperationalSold": "Mark operational sold",
++    "authorizationActionStartLive": "Start live",
++    "authorizationBackendRequired": "Authorization requests still require backend integration.",
++    "authorizationCancelHelp": "Request authorization to cancel this hold.",
++    "authorizationCloseHelp": "Request authorization to close the live.",
++    "authorizationPendingRequestsTitle": "Pending requests",
++    "authorizationPendingRequestsEmptyTitle": "Authorization requests are pending integration.",
++    "authorizationPendingRequestsEmptyMessage": "When a request backend exists, pending authorizations will appear here.",
++    "authorizationApprovalBackendPending": "Real approval remains pending backend support; no sample data is shown.",
+     "authorizationReasonLivePromotion": "Live promotion",
+     "authorizationReasonDefectAdjustment": "Defect adjustment",
+     "authorizationReasonFrequentCustomer": "Frequent customer",
+@@ -250,6 +264,7 @@
+     "openLivesHelp": "Choose where reservations will be registered.",
+     "selectedLive": "Selected live",
+     "liveNumber": "Live #{{id}}",
++    "reservationNumber": "Reservation #{{id}}",
+     "liveSessionTitle": "Active stream",
+     "liveSessionEmpty": "No stream selected. Open one or choose a ready stream.",
+     "desktopHeaderHelp": "Commercial panel for activity, product, and reservations.",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index b88e643..9e62e7d 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -196,7 +196,21 @@
+     "requestAuthorization": "Solicitar autorizacion",
+     "authorizationRequestTitle": "Solicitar autorizacion",
+     "authorizationPricePrompt": "Selecciona el motivo para solicitar autorizacion de cambio de precio LIVE.",
+-    "authorizationGenericPrompt": "Selecciona el motivo para solicitar autorizacion.",
++    "authorizationGenericPrompt": "Selecciona el motivo para solicitar autorizacion de: {{action}}.",
++    "authorizationGenericAction": "Accion operativa",
++    "authorizationActionPrice": "Cambiar precio LIVE",
++    "authorizationActionReleaseItem": "Liberar prenda",
++    "authorizationActionCancelHold": "Cancelar apartado",
++    "authorizationActionCloseLive": "Finalizar en vivo",
++    "authorizationActionOperationalSold": "Marcar vendido operativo",
++    "authorizationActionStartLive": "Iniciar en vivo",
++    "authorizationBackendRequired": "La solicitud de autorizacion todavia requiere integracion backend.",
++    "authorizationCancelHelp": "Solicita autorizacion para cancelar este apartado.",
++    "authorizationCloseHelp": "Solicita autorizacion para finalizar el en vivo.",
++    "authorizationPendingRequestsTitle": "Solicitudes pendientes",
++    "authorizationPendingRequestsEmptyTitle": "Solicitudes de autorizacion pendientes de integrar.",
++    "authorizationPendingRequestsEmptyMessage": "Cuando exista backend de solicitudes, aqui apareceran las autorizaciones pendientes.",
++    "authorizationApprovalBackendPending": "La aprobacion real queda pendiente de backend; no se muestran datos de ejemplo.",
+     "authorizationReasonLivePromotion": "Promocion en vivo",
+     "authorizationReasonDefectAdjustment": "Ajuste por defecto",
+     "authorizationReasonFrequentCustomer": "Cliente frecuente",
+@@ -250,6 +264,7 @@
+     "openLivesHelp": "Elige dónde se registrarán las reservas.",
+     "selectedLive": "Transmisión seleccionada",
+     "liveNumber": "En vivo #{{id}}",
++    "reservationNumber": "Reserva #{{id}}",
+     "liveSessionTitle": "Transmisión activa",
+     "liveSessionEmpty": "No hay transmisión seleccionada. Crea una o elige una abierta.",
+     "desktopHeaderHelp": "Panel comercial para leer actividad, producto y reservas.",

@@ -11,6 +11,7 @@ import {
   isAdmin,
 } from '@/services/accessControl';
 import { logout as logoutSession, refreshSession } from '@/services/authService';
+import { canViewLive } from '@/services/livePermissionGuards';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -21,6 +22,7 @@ type DashboardAccess = {
   route?: string;
   channelCode?: string;
   permissionCode?: string;
+  liveAccess?: boolean;
   adminOnly?: boolean;
   pending?: boolean;
 };
@@ -69,7 +71,7 @@ const operationAccessGroups: DashboardAccessGroup[] = [
     title: 'Inicio',
     accesses: [
       {
-        label: 'Mi dashboard',
+        label: 'Mi panel',
         route: '/dashboard',
       },
     ],
@@ -78,9 +80,8 @@ const operationAccessGroups: DashboardAccessGroup[] = [
     title: 'Venta y Atencion',
     accesses: [
       {
-        label: 'Live',
-        channelCode: 'LIVE',
-        permissionCode: 'DO_LIVE_RESERVATION',
+        label: 'En vivo',
+        liveAccess: true,
         route: '/live',
       },
       {
@@ -108,7 +109,7 @@ const operationAccessGroups: DashboardAccessGroup[] = [
       },
       {
         label: 'Pagos / Cobros',
-        permissionCode: 'REGISTER_PAYMENTS',
+        permissionCode: 'VIEW_PAYMENTS',
         route: '/payments',
       },
     ],
@@ -188,7 +189,7 @@ const operationAccessGroups: DashboardAccessGroup[] = [
         route: '/movement-history',
       },
       {
-        label: 'Historial de lives',
+        label: 'Historial de transmisiones',
         permissionCode: 'VIEW_REPORTS',
         route: '/report-live',
       },
@@ -204,6 +205,10 @@ const operationAccessGroups: DashboardAccessGroup[] = [
 function canShowAccess(user: UserSession | null, access: DashboardAccess) {
   if (access.adminOnly) {
     return isAdmin(user);
+  }
+
+  if (access.liveAccess) {
+    return canViewLive(user);
   }
 
   if (access.channelCode && access.permissionCode) {
@@ -377,7 +382,7 @@ export default function HomeScreen() {
   return (
     <AppScreen>
       <AppText variant="title" bold>
-        {canSeeConfiguration ? 'Dashboard administrador' : 'Dashboard operativo'}
+        {canSeeConfiguration ? 'Panel administrador' : 'Panel operativo'}
       </AppText>
 
       <AppCard>

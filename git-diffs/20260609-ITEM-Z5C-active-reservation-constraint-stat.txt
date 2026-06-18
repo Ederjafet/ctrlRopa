@@ -1,0 +1,11 @@
+﻿ .../ctrlropa/reservation/ReservationService.java   |  25 +-
+ .../V53__active_reservation_item_constraint.sql    |  47 ++
+ .../reservation/ReservationServiceTests.java       |  46 +-
+ docs/ERP_BITACORA_CAMBIOS.md                       |  29 ++
+ docs/ERP_RIESGOS_OPERATIVOS.md                     |   1 +
+ docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md          |  19 +
+ docs/ITEM_Z5C_ACTIVE_RESERVATION_CONSTRAINT.md     | 175 ++++++++
+ ...ITEM-Z5C-active-reservation-constraint-stat.txt |   8 +
+ ...609-ITEM-Z5C-active-reservation-constraint.diff | 492 +++++++++++++++++++++
+ ...eservation-constraint-report-20260609-191854.md | 131 ++++++
+ 10 files changed, 962 insertions(+), 11 deletions(-)

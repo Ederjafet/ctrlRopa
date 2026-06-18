@@ -16,6 +16,7 @@ import com.hpsqsoft.ctrlropa.reservation.ReservationStatus;
 import com.hpsqsoft.ctrlropa.sale.Sale;
 import com.hpsqsoft.ctrlropa.sale.SaleRepository;
 import com.hpsqsoft.ctrlropa.sale.SaleStatus;
+import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +34,7 @@ public class CustomerOrderService {
     private final PaymentAllocationRepository paymentAllocationRepository;
     private final PaymentRepository paymentRepository;
     private final CustomerBalanceMovementRepository balanceMovementRepository;
+    private final TenantAccessGuard tenantAccessGuard;
 
     public CustomerOrderService(CustomerOrderRepository repository,
                                 CustomerOrderItemRepository orderItemRepository,
@@ -40,7 +42,8 @@ public class CustomerOrderService {
                                 SaleRepository saleRepository,
                                 PaymentAllocationRepository paymentAllocationRepository,
                                 PaymentRepository paymentRepository,
-                                CustomerBalanceMovementRepository balanceMovementRepository) {
+                                CustomerBalanceMovementRepository balanceMovementRepository,
+                                TenantAccessGuard tenantAccessGuard) {
         this.repository = repository;
         this.orderItemRepository = orderItemRepository;
         this.reservationRepository = reservationRepository;
@@ -48,11 +51,14 @@ public class CustomerOrderService {
         this.paymentAllocationRepository = paymentAllocationRepository;
         this.paymentRepository = paymentRepository;
         this.balanceMovementRepository = balanceMovementRepository;
+        this.tenantAccessGuard = tenantAccessGuard;
     }
 
     public CustomerOrder findEntityById(Long orderId) {
-        return repository.findById(orderId)
+        CustomerOrder order = repository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Orden no encontrada con id: " + orderId));
+        tenantAccessGuard.requireBranch(order.getBranch().getId(), "La orden no pertenece a la sucursal activa");
+        return order;
     }
 
     public CustomerOrder getOrderForReservation(Reservation reservation) {
@@ -68,6 +74,13 @@ public class CustomerOrderService {
 
         if (branch == null || branch.getId() == null) {
             throw new IllegalArgumentException("Sucursal inválida para pedido");
+        }
+
+        tenantAccessGuard.requireBranch(branch.getId(), "La sucursal de la orden no pertenece al tenant activo");
+        tenantAccessGuard.requireBranch(customer.getBranch().getId(), "El cliente no pertenece a la sucursal activa");
+
+        if (!customer.getBranch().getId().equals(branch.getId())) {
+            throw new IllegalArgumentException("El cliente no pertenece a la sucursal indicada");
         }
 
         return repository
@@ -90,6 +103,8 @@ public class CustomerOrderService {
             throw new IllegalArgumentException("Reserva inválida para pedido");
         }
 
+        tenantAccessGuard.requireBranch(reservation.getBranch().getId(), "La reserva no pertenece a la sucursal activa");
+
         return orderItemRepository.findFirstByReservation_Id(reservation.getId())
                 .map(CustomerOrderItem::getCustomerOrder)
                 .orElseGet(() -> {
@@ -111,6 +126,8 @@ public class CustomerOrderService {
         if (sale == null || sale.getId() == null) {
             throw new IllegalArgumentException("Venta inválida para pedido");
         }
+
+        tenantAccessGuard.requireBranch(sale.getBranch().getId(), "La venta no pertenece a la sucursal activa");
 
         return orderItemRepository.findFirstBySale_Id(sale.getId())
                 .map(CustomerOrderItem::getCustomerOrder)
@@ -156,6 +173,7 @@ public class CustomerOrderService {
 
     @Transactional(readOnly = true)
     public List<CustomerOrderResponse> findByCustomer(Long customerId) {
+        validateCustomerInActiveTenant(customerId);
         return repository.findByCustomerIdOrderByCreatedAtDesc(customerId)
                 .stream()
                 .filter(order -> !orderItemRepository.findByCustomerOrderIdOrderByCreatedAtAsc(order.getId()).isEmpty())
@@ -165,6 +183,7 @@ public class CustomerOrderService {
 
     @Transactional(readOnly = true)
     public List<CustomerOrderPendingPaymentResponse> findPendingPaymentByBranch(Long branchId) {
+        tenantAccessGuard.requireBranch(branchId, "La sucursal de pedidos no pertenece al tenant activo");
         return repository.findByBranchIdOrderByCreatedAtDesc(branchId)
                 .stream()
                 .filter(order -> order.getStatus() != CustomerOrderStatus.CANCELLED)
@@ -176,8 +195,7 @@ public class CustomerOrderService {
 
     @Transactional(readOnly = true)
     public CustomerOrderDetailResponse findDetail(Long orderId) {
-        CustomerOrder order = repository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("Orden no encontrada con id: " + orderId));
+        CustomerOrder order = findEntityById(orderId);
 
         List<CustomerOrderItem> orderItems = orderItemRepository.findByCustomerOrderIdOrderByCreatedAtAsc(orderId);
 
@@ -216,8 +234,7 @@ public class CustomerOrderService {
 
     @Transactional(readOnly = true)
     public CustomerOrderSettlementResponse getSettlement(Long orderId) {
-        CustomerOrder order = repository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("Orden no encontrada con id: " + orderId));
+        CustomerOrder order = findEntityById(orderId);
 
         BigDecimal total = calculateTotal(orderId);
         BigDecimal directPaid = calculateDirectPaid(orderId);
@@ -241,8 +258,7 @@ public class CustomerOrderService {
     }
 
     public void refreshStatus(Long orderId) {
-        CustomerOrder order = repository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("Orden no encontrada con id: " + orderId));
+        CustomerOrder order = findEntityById(orderId);
 
         if (order.getStatus() == CustomerOrderStatus.CANCELLED) {
             return;
@@ -341,6 +357,13 @@ public class CustomerOrderService {
 
         if (!sale.getBranch().getId().equals(order.getBranch().getId())) {
             throw new IllegalArgumentException("La venta no pertenece a la misma sucursal del pedido");
+        }
+    }
+
+    private void validateCustomerInActiveTenant(Long customerId) {
+        List<CustomerOrder> orders = repository.findByCustomerIdOrderByCreatedAtDesc(customerId);
+        if (!orders.isEmpty()) {
+            tenantAccessGuard.requireBranch(orders.get(0).getBranch().getId(), "El cliente no pertenece a la sucursal activa");
         }
     }
 

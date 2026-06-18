@@ -1,0 +1,1425 @@
+﻿diff --git a/app/customers.tsx b/app/customers.tsx
+index 0e89bfa..873e260 100644
+--- a/app/customers.tsx
++++ b/app/customers.tsx
+@@ -9,22 +9,26 @@ import EmptyState from '@/components/ui/EmptyState';
+ import StatusBadge from '@/components/ui/StatusBadge';
+ import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
+ import { canAccessByPermission } from '@/services/accessControl';
++import { getActionableApiErrorMessage } from '@/services/apiError';
+ import { ApiError } from '@/services/apiClient';
+ import { Customer, getCustomersByBranch } from '@/services/customerService';
+ import { getSession, UserSession } from '@/services/sessionStorage';
+ import { useFocusEffect, useRouter } from 'expo-router';
+ import { useCallback, useMemo, useState } from 'react';
++import { useTranslation } from 'react-i18next';
+ import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
+
+ export default function CustomersScreen() {
+   const router = useRouter();
+   const { isPhone } = useResponsiveLayout();
++  const { t } = useTranslation('common');
+   const listColumns = isPhone ? 1 : 2;
+
+   const [customers, setCustomers] = useState<Customer[]>([]);
+   const [filtered, setFiltered] = useState<Customer[]>([]);
+   const [search, setSearch] = useState('');
+   const [isLoading, setIsLoading] = useState(true);
++  const [errorMessage, setErrorMessage] = useState('');
+   const [canCreateCustomer, setCanCreateCustomer] = useState(false);
+   const [session, setSession] = useState<UserSession | null>(null);
+   const navSections = useMemo(() => buildMainNavSections(session), [session]);
+@@ -50,13 +54,17 @@ export default function CustomersScreen() {
+
+     try {
+       setIsLoading(true);
++      setErrorMessage('');
+       const data = await getCustomersByBranch(currentSession.branchId);
+       setCustomers(data);
+       setFiltered(data);
+     } catch (err: any) {
+-      if (!(err instanceof ApiError && err.suppressUserNotification)) {
+-        throw err;
++      if (err instanceof ApiError && err.suppressUserNotification) {
++        return;
+       }
++      setCustomers([]);
++      setFiltered([]);
++      setErrorMessage(getActionableApiErrorMessage(err, t));
+     } finally {
+       setIsLoading(false);
+     }
+@@ -122,6 +130,18 @@ export default function CustomersScreen() {
+         />
+       </View>
+
++      {errorMessage ? (
++        <AppCard variant="danger">
++          <AppText>{errorMessage}</AppText>
++          <AppButton
++            title={t('errors.retry')}
++            variant="secondary"
++            onPress={loadCustomers}
++            style={styles.retryButton}
++          />
++        </AppCard>
++      ) : null}
++
+       <FlatList
+         key={listColumns}
+         style={styles.list}
+@@ -200,4 +220,7 @@ const styles = StyleSheet.create({
+   search: {
+     marginBottom: 12,
+   },
++  retryButton: {
++    marginTop: 12,
++  },
+ });
+diff --git a/app/door-reservation.tsx b/app/door-reservation.tsx
+index f782fc2..6c4d0b2 100644
+--- a/app/door-reservation.tsx
++++ b/app/door-reservation.tsx
+@@ -8,6 +8,7 @@ import AppOptionRow from '@/components/ui/AppOptionRow';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+
++import { getActionableApiError } from '@/services/apiError';
+ import { getPaymentMethods, PaymentMethod } from '@/services/catalogService';
+ import { Customer, getCustomersByBranch } from '@/services/customerService';
+ import { getItemsByBranch, Item } from '@/services/itemService';
+@@ -75,6 +76,11 @@ export default function DoorReservationScreen() {
+   const [validationIssue, setValidationIssue] =
+     useState<ReservationValidationIssue>(null);
+
++  const showActionableError = (error: unknown) => {
++    const copy = getActionableApiError(error, t);
++    Alert.alert(copy.title, copy.message, [{ text: copy.primaryActionLabel }]);
++  };
++
+   useFocusEffect(
+     useCallback(() => {
+       checkAccessAndLoad();
+@@ -96,10 +102,7 @@ export default function DoorReservationScreen() {
+       setIsAllowed(true);
+       await loadData();
+     } catch (err: any) {
+-      Alert.alert(
+-        'Apartado puerta',
+-        err?.message || 'No se pudo cargar apartado puerta.'
+-      );
++      showActionableError(err);
+       setIsLoading(false);
+     }
+   };
+@@ -136,20 +139,26 @@ export default function DoorReservationScreen() {
+       setPaymentMethods(paymentData);
+       await addPendingQuickItemsToCart(availableItems);
+
+-      const errors = [itemResult, customerResult, paymentResult]
++      const errorCopies = [itemResult, customerResult, paymentResult]
+         .filter((result) => result.status === 'rejected')
+         .map((result) =>
+           result.status === 'rejected'
+-            ? result.reason?.message || 'No se pudo cargar un recurso.'
+-            : ''
++            ? getActionableApiError(result.reason, t)
++            : null
+         )
+-        .filter(Boolean);
+-
+-      if (errors.length > 0) {
+-        Alert.alert('Apartado puerta', errors.join('\n'));
++        .filter(
++          (copy): copy is ReturnType<typeof getActionableApiError> => Boolean(copy)
++        );
++
++      if (errorCopies.length > 0) {
++        const [copy] = errorCopies;
++        const messages = errorCopies.map((entry) => entry?.message ?? '');
++        Alert.alert(copy?.title ?? t('errors.unknown.title'), Array.from(new Set(messages)).join('\n'), [
++          { text: copy.primaryActionLabel },
++        ]);
+       }
+     } catch (e: any) {
+-      Alert.alert('Apartado puerta', e.message || 'No se pudo cargar apartado puerta.');
++      showActionableError(e);
+     } finally {
+       setIsLoading(false);
+     }
+@@ -427,7 +436,7 @@ export default function DoorReservationScreen() {
+
+       await loadData();
+     } catch (e: any) {
+-      Alert.alert('Error', e.message || 'No se pudo crear el apartado.');
++      showActionableError(e);
+     } finally {
+       setIsSaving(false);
+     }
+diff --git a/app/door-sale.tsx b/app/door-sale.tsx
+index 64e61cc..29f7ed5 100644
+--- a/app/door-sale.tsx
++++ b/app/door-sale.tsx
+@@ -8,6 +8,7 @@ import AppOptionRow from '@/components/ui/AppOptionRow';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+
++import { getActionableApiError } from '@/services/apiError';
+ import { getPaymentMethods, PaymentMethod } from '@/services/catalogService';
+ import {
+   Customer,
+@@ -68,6 +69,11 @@ export default function DoorSaleScreen() {
+   const [isScannerVisible, setIsScannerVisible] = useState(false);
+   const [validationIssue, setValidationIssue] = useState<SaleValidationIssue>(null);
+
++  const showActionableError = (error: unknown) => {
++    const copy = getActionableApiError(error, t);
++    Alert.alert(copy.title, copy.message, [{ text: copy.primaryActionLabel }]);
++  };
++
+   useFocusEffect(
+     useCallback(() => {
+       checkAccessAndLoad();
+@@ -86,7 +92,7 @@ export default function DoorSaleScreen() {
+       setIsAllowed(true);
+       await loadData();
+     } catch (err: any) {
+-      Alert.alert('Venta puerta', err?.message || 'No se pudo cargar venta puerta.');
++      showActionableError(err);
+       setIsLoading(false);
+     }
+   };
+@@ -116,20 +122,26 @@ export default function DoorSaleScreen() {
+       setPaymentMethods(paymentData);
+       await addPendingQuickItemsToCart(availableItems);
+
+-      const errors = [itemResult, customerResult, paymentResult]
++      const errorCopies = [itemResult, customerResult, paymentResult]
+         .filter((result) => result.status === 'rejected')
+         .map((result) =>
+           result.status === 'rejected'
+-            ? result.reason?.message || 'No se pudo cargar un recurso.'
+-            : ''
++            ? getActionableApiError(result.reason, t)
++            : null
+         )
+-        .filter(Boolean);
+-
+-      if (errors.length > 0) {
+-        Alert.alert('Venta puerta', errors.join('\n'));
++        .filter(
++          (copy): copy is ReturnType<typeof getActionableApiError> => Boolean(copy)
++        );
++
++      if (errorCopies.length > 0) {
++        const [copy] = errorCopies;
++        const messages = errorCopies.map((entry) => entry.message);
++        Alert.alert(copy.title, Array.from(new Set(messages)).join('\n'), [
++          { text: copy.primaryActionLabel },
++        ]);
+       }
+     } catch (e: any) {
+-      Alert.alert('Venta puerta', e.message || 'No se pudo cargar venta puerta.');
++      showActionableError(e);
+     } finally {
+       setIsLoading(false);
+     }
+@@ -371,7 +383,7 @@ export default function DoorSaleScreen() {
+
+       await loadData();
+     } catch (e: any) {
+-      Alert.alert('Error', e.message || 'No se pudo completar la venta.');
++      showActionableError(e);
+     } finally {
+       setIsSaving(false);
+     }
+diff --git a/app/items-create.tsx b/app/items-create.tsx
+index 20d31c9..e4478c4 100644
+--- a/app/items-create.tsx
++++ b/app/items-create.tsx
+@@ -10,6 +10,7 @@ import AppSelectorField from '@/components/ui/AppSelectorField';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+
++import { getActionableApiError } from '@/services/apiError';
+ import {
+   Batch,
+   Brand,
+@@ -133,6 +134,11 @@ export default function ItemsCreateScreen() {
+   const [selector, setSelector] = useState<SelectorConfig | null>(null);
+   const [selectorSearch, setSelectorSearch] = useState('');
+
++  const showActionableError = (error: unknown) => {
++    const copy = getActionableApiError(error, t);
++    Alert.alert(copy.title, copy.message, [{ text: copy.primaryActionLabel }]);
++  };
++
+   useEffect(() => {
+     loadCatalogs();
+   }, []);
+@@ -167,20 +173,26 @@ export default function ItemsCreateScreen() {
+         }
+       }
+
+-      const errors = [bootstrapResult, batchResult]
++      const errorCopies = [bootstrapResult, batchResult]
+         .filter((result) => result.status === 'rejected')
+         .map((result) =>
+           result.status === 'rejected'
+-            ? result.reason?.message || 'No se pudo cargar un catÃ¡logo.'
+-            : ''
++            ? getActionableApiError(result.reason, t)
++            : null
+         )
+-        .filter(Boolean);
+-
+-      if (errors.length > 0) {
+-        Alert.alert('CatÃ¡logos', errors.join('\n'));
++        .filter(
++          (copy): copy is ReturnType<typeof getActionableApiError> => Boolean(copy)
++        );
++
++      if (errorCopies.length > 0) {
++        const [copy] = errorCopies;
++        const messages = errorCopies.map((entry) => entry.message);
++        Alert.alert(copy.title, Array.from(new Set(messages)).join('\n'), [
++          { text: copy.primaryActionLabel },
++        ]);
+       }
+     } catch (e: any) {
+-      Alert.alert('CatÃ¡logos', e.message || 'No se pudieron cargar los catÃ¡logos.');
++      showActionableError(e);
+     }
+   };
+
+@@ -385,7 +397,7 @@ export default function ItemsCreateScreen() {
+
+       Alert.alert('Alta de prendas', message);
+     } catch (e: any) {
+-      Alert.alert('Error', e.message || 'No se pudieron crear las prendas.');
++      showActionableError(e);
+     } finally {
+       setIsSaving(false);
+     }
+diff --git a/app/live.tsx b/app/live.tsx
+index f625db1..4c2101f 100644
+--- a/app/live.tsx
++++ b/app/live.tsx
+@@ -25,6 +25,7 @@ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
+ import { hasEffectivePermission } from '@/services/accessControl';
++import { getActionableApiError } from '@/services/apiError';
+ import { ApiError } from '@/services/apiClient';
+ import { Customer, getCustomersByBranch } from '@/services/customerService';
+ import { getItemsByBranch, Item } from '@/services/itemService';
+@@ -135,13 +136,13 @@ function isForbiddenError(error: unknown) {
+ function resolveLoadIssue(
+   error: unknown,
+   fallbackMessage: string,
+-  forbiddenMessage: string
++  forbiddenMessage: string,
++  t?: (key: string) => unknown
+ ) {
+   if (isForbiddenError(error)) return forbiddenMessage;
+
+-  if (error instanceof Error && error.message) {
+-    return error.message;
+-  }
++  const copy = getActionableApiError(error, t);
++  if (copy.message) return copy.message;
+
+   return fallbackMessage;
+ }
+@@ -504,6 +505,7 @@ export default function LiveScreen() {
+   const [isCustomerModalVisible, setIsCustomerModalVisible] = useState(false);
+   const [isItemModalVisible, setIsItemModalVisible] = useState(false);
+   const [isScannerVisible, setIsScannerVisible] = useState(false);
++  const getActionableMessage = (error: unknown) => getActionableApiError(error, t).message;
+   const refreshLiveLayoutPreferences = useCallback(async (userId?: number | null) => {
+     try {
+       setLiveLayoutPreferences(await getLiveLayoutPreferences(userId));
+@@ -543,7 +545,7 @@ export default function LiveScreen() {
+     } catch (err: any) {
+       Alert.alert(
+         t('live.title'),
+-        resolveLoadIssue(err, t('live.loadingError'), t('live.accessDenied'))
++        resolveLoadIssue(err, t('live.loadingError'), t('live.accessDenied'), t)
+       );
+       setIsLoading(false);
+     }
+@@ -587,7 +589,8 @@ export default function LiveScreen() {
+           ? resolveLoadIssue(
+               liveResult.reason,
+               t('live.liveLoadError'),
+-              t('live.accessDenied')
++              t('live.accessDenied'),
++              t
+             )
+           : null;
+
+@@ -599,7 +602,8 @@ export default function LiveScreen() {
+           ? resolveLoadIssue(
+               customerResult.reason,
+               t('live.customerLoadError'),
+-              t('live.customerPermissionError')
++              t('live.customerPermissionError'),
++              t
+             )
+           : null
+       );
+@@ -610,7 +614,8 @@ export default function LiveScreen() {
+           ? resolveLoadIssue(
+               itemResult.reason,
+               t('live.itemLoadError'),
+-              t('live.itemPermissionError')
++              t('live.itemPermissionError'),
++              t
+             )
+           : null
+       );
+@@ -619,7 +624,8 @@ export default function LiveScreen() {
+           ? resolveLoadIssue(
+               reservationResult.reason,
+               t('live.reservationLoadError'),
+-              t('live.reservationPermissionError')
++              t('live.reservationPermissionError'),
++              t
+             )
+           : null
+       );
+@@ -707,7 +713,7 @@ export default function LiveScreen() {
+     } catch (err: any) {
+       Alert.alert(
+         t('live.title'),
+-        resolveLoadIssue(err, t('live.loadingError'), t('live.accessDenied'))
++        resolveLoadIssue(err, t('live.loadingError'), t('live.accessDenied'), t)
+       );
+     } finally {
+       setIsLoading(false);
+@@ -1591,7 +1597,8 @@ export default function LiveScreen() {
+           resolveLoadIssue(
+             reservationResult.reason,
+             t('live.reservationLoadError'),
+-            t('live.reservationPermissionError')
++            t('live.reservationPermissionError'),
++            t
+           )
+         );
+       }
+@@ -1617,7 +1624,8 @@ export default function LiveScreen() {
+       const message = resolveLoadIssue(
+         error,
+         t('live.liveRefreshError'),
+-        t('live.accessDenied')
++        t('live.accessDenied'),
++        t
+       );
+       setLiveRefreshIssue(message);
+
+@@ -1773,7 +1781,7 @@ export default function LiveScreen() {
+     } catch (err: any) {
+       setLiveNotice({
+         title: t('live.operationalStatusUpdateErrorTitle'),
+-        message: err?.message || t('live.operationalStatusUpdateError'),
++        message: getActionableMessage(err),
+         tone: 'danger',
+       });
+     } finally {
+@@ -1913,7 +1921,7 @@ export default function LiveScreen() {
+     } catch (err: any) {
+       setLiveNotice({
+         title: t('live.liveCreateErrorTitle'),
+-        message: err?.message || t('live.liveCreateError'),
++        message: getActionableMessage(err),
+         tone: 'danger',
+       });
+     } finally {
+@@ -1996,7 +2004,7 @@ export default function LiveScreen() {
+     } catch (err: any) {
+       setLiveNotice({
+         title: t('live.liveActivationErrorTitle'),
+-        message: err?.message || t('live.liveActivationError'),
++        message: getActionableMessage(err),
+         tone: 'danger',
+       });
+     } finally {
+@@ -2033,7 +2041,7 @@ export default function LiveScreen() {
+     } catch (err: any) {
+       setLiveNotice({
+         title: t('live.liveActivationErrorTitle'),
+-        message: err?.message || t('live.liveActivationError'),
++        message: getActionableMessage(err),
+         tone: 'danger',
+       });
+     } finally {
+@@ -2085,7 +2093,7 @@ export default function LiveScreen() {
+     } catch (err: any) {
+       setLiveNotice({
+         title: t('live.liveCloseErrorTitle'),
+-        message: err?.message || t('live.liveCloseError'),
++        message: getActionableMessage(err),
+         tone: 'danger',
+       });
+     } finally {
+@@ -2218,7 +2226,7 @@ export default function LiveScreen() {
+     } catch (err: any) {
+       setLiveNotice({
+         title: t('live.activeProductUpdateErrorTitle'),
+-        message: err?.message || t('live.activeProductUpdateError'),
++        message: getActionableMessage(err),
+         tone: 'danger',
+       });
+     } finally {
+@@ -2278,7 +2286,7 @@ export default function LiveScreen() {
+     } catch (err: any) {
+       setLiveNotice({
+         title: t('live.activeProductUpdateErrorTitle'),
+-        message: err?.message || t('live.activeProductUpdateError'),
++        message: getActionableMessage(err),
+         tone: 'danger',
+       });
+     } finally {
+@@ -2533,7 +2541,7 @@ export default function LiveScreen() {
+     } catch (err: any) {
+       setLiveNotice({
+         title: t('live.reservationCreateErrorTitle'),
+-        message: err?.message || t('live.reservationCreateError'),
++        message: getActionableMessage(err),
+         tone: 'danger',
+       });
+     } finally {
+diff --git a/app/reservations.tsx b/app/reservations.tsx
+index 47c48ed..6ce989f 100644
+--- a/app/reservations.tsx
++++ b/app/reservations.tsx
+@@ -9,6 +9,10 @@ import AppOptionRow from '@/components/ui/AppOptionRow';
+ import AppText from '@/components/ui/AppText';
+ import EmptyState from '@/components/ui/EmptyState';
+ import StatusBadge from '@/components/ui/StatusBadge';
++import {
++  getActionableApiError,
++  getActionableApiErrorMessage,
++} from '@/services/apiError';
+ import { Box, getActiveBoxesByBranch } from '@/services/boxService';
+ import {
+   assignReservationToBox,
+@@ -19,6 +23,7 @@ import {
+ import { getSession, UserSession } from '@/services/sessionStorage';
+ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+ import { useCallback, useMemo, useState } from 'react';
++import { useTranslation } from 'react-i18next';
+ import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
+
+ type ReservationFilter = 'ACTIVE' | 'WITHOUT_BOX';
+@@ -84,6 +89,7 @@ function getReservationTone(status?: string): 'success' | 'warning' | 'danger' |
+ export default function ReservationsScreen() {
+   const router = useRouter();
+   const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
++  const { t } = useTranslation('common');
+   const returnTo = Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo;
+   const isLiveContext = returnTo === '/live';
+
+@@ -139,13 +145,13 @@ export default function ReservationsScreen() {
+         setBoxes(boxData);
+       } catch (error) {
+         console.log('Error cargando reservaciones', error);
+-        setErrorMessage('No se pudieron cargar los apartados.');
++        setErrorMessage(getActionableApiErrorMessage(error, t));
+       } finally {
+         setIsLoading(false);
+         setIsRefreshing(false);
+       }
+     },
+-    [filter]
++    [filter, t]
+   );
+
+   useFocusEffect(
+@@ -202,7 +208,8 @@ export default function ReservationsScreen() {
+       setSelectedReservation(null);
+       await loadReservations(false);
+     } catch (error: any) {
+-      Alert.alert('Error', error.message || 'No se pudo asignar la caja.');
++      const copy = getActionableApiError(error, t);
++      Alert.alert(copy.title, copy.message, [{ text: copy.primaryActionLabel }]);
+     } finally {
+       setIsAssigningBox(false);
+     }
+diff --git a/app/users.tsx b/app/users.tsx
+index 0152f41..5c0b4a7 100644
+--- a/app/users.tsx
++++ b/app/users.tsx
+@@ -7,6 +7,7 @@ import AppInput from '@/components/ui/AppInput';
+ import AppText from '@/components/ui/AppText';
+ import EmptyState from '@/components/ui/EmptyState';
+ import StatusBadge from '@/components/ui/StatusBadge';
++import { getActionableApiError } from '@/services/apiError';
+ import { canManageUsers } from '@/services/livePermissionGuards';
+ import { getSession, UserSession } from '@/services/sessionStorage';
+ import {
+@@ -17,6 +18,7 @@ import {
+ } from '@/services/userAdminService';
+ import { useFocusEffect, useRouter } from 'expo-router';
+ import { useCallback, useMemo, useState } from 'react';
++import { useTranslation } from 'react-i18next';
+ import { ActivityIndicator, Alert, FlatList, StyleSheet, View } from 'react-native';
+
+ function isActive(user: AdminUser) {
+@@ -46,6 +48,7 @@ function inheritedPermissionCount(user: AdminUser) {
+
+ export default function UsersScreen() {
+   const router = useRouter();
++  const { t } = useTranslation('common');
+
+   const [users, setUsers] = useState<AdminUser[]>([]);
+   const [search, setSearch] = useState('');
+@@ -54,6 +57,11 @@ export default function UsersScreen() {
+   const [session, setSession] = useState<UserSession | null>(null);
+   const navSections = useMemo(() => buildMainNavSections(session), [session]);
+
++  const showActionableError = (error: unknown) => {
++    const copy = getActionableApiError(error, t);
++    Alert.alert(copy.title, copy.message, [{ text: copy.primaryActionLabel }]);
++  };
++
+   useFocusEffect(
+     useCallback(() => {
+       loadUsers();
+@@ -74,7 +82,7 @@ export default function UsersScreen() {
+       const data = await getUsers();
+       setUsers(data);
+     } catch (error: any) {
+-      Alert.alert('No se pudieron cargar usuarios', error?.message ?? 'Intenta nuevamente.');
++      showActionableError(error);
+     } finally {
+       setIsLoading(false);
+     }
+@@ -126,7 +134,7 @@ export default function UsersScreen() {
+       }
+       await loadUsers();
+     } catch (error: any) {
+-      Alert.alert('No se pudo actualizar el usuario', error?.message ?? 'Intenta nuevamente.');
++      showActionableError(error);
+     } finally {
+       setBusyUserId(null);
+     }
+diff --git a/docs/ERP_RIESGOS_OPERATIVOS.md b/docs/ERP_RIESGOS_OPERATIVOS.md
+index a39da29..1dfa283 100644
+--- a/docs/ERP_RIESGOS_OPERATIVOS.md
++++ b/docs/ERP_RIESGOS_OPERATIVOS.md
+@@ -205,6 +205,7 @@ Probabilidad:
+ - AUTH-F2 propone catalogo minimo pero no lo implementa; hasta crear migracion, seeds, frontend y enforcement, `CREATE_CUSTOMER`, `EDIT_CUSTOMER`, `VIEW_PAYMENTS` y `VIEW_SALES` siguen siendo decisiones pendientes, no permisos reales.
+ - AUTH-F3 crea permisos y enforcement P0 inicial; roles productivos reales no reciben permisos nuevos, por lo que QA/productivo deben actualizar asignaciones de forma controlada antes de validar flujos completos.
+ - AUTH-F3 protege consultas de pagos/ventas; pantallas o integraciones que antes dependian solo de `REGISTER_PAYMENTS` o `DO_DOOR_SALE` pueden requerir `VIEW_PAYMENTS`/`VIEW_SALES` en roles.
++- PRODUCT-ERR-A agrega mapper frontend de errores accionables; modulos fuera de las rutas criticas aun deben migrarse por dominio para evitar que `err.message` exponga mensajes genericos o tecnicos.
+ - Pagos/ventas sin regresion automatizada suficiente.
+ - Auditoria de negocio todavia parcial.
+ - Artefactos no rastreados antes de release.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index da064c2..c2ff6b3 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -369,3 +369,16 @@ Agregar a la corrida manual de LIVE:
+ - revisar `Prenda al aire ahora`;
+ - confirmar que sus acciones tambien quedan en fila con espacio suficiente y apiladas en mobile;
+ - validar light/dark.
++
++## Nota PRODUCT-ERR-A
++
++Agregar a la corrida manual de errores frontend:
++
++- detener backend o simular error de red;
++- abrir `/door-reservation` y confirmar mensaje accionable, no `Ocurrio un error interno inesperado`;
++- abrir `/door-sale` y confirmar que los fallos de carga/creacion muestran guia de reintento o soporte;
++- abrir `/live` y validar errores de carga, refresh y acciones operativas con mensajes limpios;
++- abrir `/items-create`, `/customers`, `/reservations` y `/users`;
++- probar un usuario sin permiso si aplica y confirmar mensaje de solicitud de acceso;
++- confirmar que no se muestran stack traces, SQL, endpoints completos ni claves crudas;
++- validar ES/EN/PT/FR/JA/ZH/KO y light/dark.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index 7c1273c..efc3e7a 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -1318,5 +1318,48 @@
+     "missingPasswordTitle": "Password required",
+     "missingPasswordMessage": "Enter an initial password for the user.",
+     "saveErrorTitle": "Could not save"
++  },
++  "errors": {
++    "connection": {
++      "title": "Could not connect to the server.",
++      "message": "Check your connection or try again."
++    },
++    "timeout": {
++      "title": "The server took too long to respond.",
++      "message": "Try again in a few seconds."
++    },
++    "sessionExpired": {
++      "title": "Your session expired.",
++      "message": "Sign in again to continue."
++    },
++    "forbidden": {
++      "title": "You do not have permission to perform this action.",
++      "message": "Ask your supervisor for access."
++    },
++    "notFound": {
++      "title": "The requested information was not found.",
++      "message": "It may have been removed or may no longer be available."
++    },
++    "conflict": {
++      "title": "The operation cannot be completed because the information changed.",
++      "message": "Refresh the screen and try again."
++    },
++    "validation": {
++      "title": "Review the entered data.",
++      "message": "Some information is missing or invalid."
++    },
++    "internal": {
++      "title": "The operation could not be completed.",
++      "message": "Try again. If it continues, report the case to support."
++    },
++    "unknown": {
++      "title": "The request could not be completed.",
++      "message": "Try again. If it continues, report the case to support."
++    },
++    "retry": "Retry",
++    "close": "Close",
++    "refresh": "Refresh",
++    "goToLogin": "Go to sign in",
++    "requestAccess": "Request access"
+   }
+ }
+diff --git a/locales/es/common.json b/locales/es/common.json
+index acf863f..5201c80 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -1318,5 +1318,48 @@
+     "missingPasswordTitle": "Falta contrasena",
+     "missingPasswordMessage": "Captura una contrasena inicial para el usuario.",
+     "saveErrorTitle": "No se pudo guardar"
++  },
++  "errors": {
++    "connection": {
++      "title": "No se pudo conectar con el servidor.",
++      "message": "Revisa tu conexiÃ³n o intenta nuevamente."
++    },
++    "timeout": {
++      "title": "El servidor tardÃ³ demasiado en responder.",
++      "message": "Intenta nuevamente en unos segundos."
++    },
++    "sessionExpired": {
++      "title": "Tu sesiÃ³n expirÃ³.",
++      "message": "Vuelve a iniciar sesiÃ³n para continuar."
++    },
++    "forbidden": {
++      "title": "No tienes permiso para realizar esta acciÃ³n.",
++      "message": "Solicita acceso a tu supervisor."
++    },
++    "notFound": {
++      "title": "No se encontrÃ³ la informaciÃ³n solicitada.",
++      "message": "Puede haber sido eliminada o ya no estar disponible."
++    },
++    "conflict": {
++      "title": "La operaciÃ³n no se puede completar porque la informaciÃ³n cambiÃ³.",
++      "message": "Actualiza la pantalla e intenta nuevamente."
++    },
++    "validation": {
++      "title": "Revisa los datos capturados.",
++      "message": "Hay informaciÃ³n pendiente o invÃ¡lida."
++    },
++    "internal": {
++      "title": "No se pudo completar la operaciÃ³n.",
++      "message": "Intenta nuevamente. Si continÃºa, reporta el caso a soporte."
++    },
++    "unknown": {
++      "title": "No se pudo completar la solicitud.",
++      "message": "Intenta nuevamente. Si continÃºa, reporta el caso a soporte."
++    },
++    "retry": "Reintentar",
++    "close": "Cerrar",
++    "refresh": "Actualizar",
++    "goToLogin": "Ir a iniciar sesiÃ³n",
++    "requestAccess": "Solicitar acceso"
+   }
+ }
+diff --git a/locales/fr/common.json b/locales/fr/common.json
+index 7d026cc..c752eb5 100644
+--- a/locales/fr/common.json
++++ b/locales/fr/common.json
+@@ -1318,5 +1318,48 @@
+     "missingPasswordTitle": "Manquant mot de passe",
+     "missingPasswordMessage": "Manquant mot de passe",
+     "saveErrorTitle": "Enregistrer erreur"
++  },
++  "errors": {
++    "connection": {
++      "title": "Impossible de se connecter au serveur.",
++      "message": "VÃ©rifiez votre connexion ou rÃ©essayez."
++    },
++    "timeout": {
++      "title": "Le serveur a mis trop de temps Ã  rÃ©pondre.",
++      "message": "RÃ©essayez dans quelques secondes."
++    },
++    "sessionExpired": {
++      "title": "Votre session a expirÃ©.",
++      "message": "Reconnectez-vous pour continuer."
++    },
++    "forbidden": {
++      "title": "Vous n'avez pas l'autorisation d'effectuer cette action.",
++      "message": "Demandez lâ€™accÃ¨s Ã  votre superviseur."
++    },
++    "notFound": {
++      "title": "Les informations demandÃ©es sont introuvables.",
++      "message": "Elles ont peut-Ãªtre Ã©tÃ© supprimÃ©es ou ne sont plus disponibles."
++    },
++    "conflict": {
++      "title": "Lâ€™opÃ©ration ne peut pas Ãªtre terminÃ©e car les informations ont changÃ©.",
++      "message": "Actualisez lâ€™Ã©cran et rÃ©essayez."
++    },
++    "validation": {
++      "title": "VÃ©rifiez les donnÃ©es saisies.",
++      "message": "Certaines informations sont manquantes ou invalides."
++    },
++    "internal": {
++      "title": "Impossible de terminer lâ€™opÃ©ration.",
++      "message": "RÃ©essayez. Si le problÃ¨me persiste, signalez le cas au support."
++    },
++    "unknown": {
++      "title": "Impossible de terminer la demande.",
++      "message": "RÃ©essayez. Si le problÃ¨me persiste, signalez le cas au support."
++    },
++    "retry": "RÃ©essayer",
++    "close": "Fermer",
++    "refresh": "Actualiser",
++    "goToLogin": "Aller Ã  la connexion",
++    "requestAccess": "Demander lâ€™accÃ¨s"
+   }
+ }
+diff --git a/locales/ja/common.json b/locales/ja/common.json
+index 1b9fb6d..5ef9fe2 100644
+--- a/locales/ja/common.json
++++ b/locales/ja/common.json
+@@ -1318,5 +1318,48 @@
+     "missingPasswordTitle": "ä¸è¶³ ãƒ‘ã‚¹ãƒ¯ãƒ¼ãƒ‰",
+     "missingPasswordMessage": "ä¸è¶³ ãƒ‘ã‚¹ãƒ¯ãƒ¼ãƒ‰",
+     "saveErrorTitle": "ä¿å­˜ ã‚¨ãƒ©ãƒ¼"
++  },
++  "errors": {
++    "connection": {
++      "title": "ã‚µãƒ¼ãƒãƒ¼ã«æŽ¥ç¶šã§ãã¾ã›ã‚“ã§ã—ãŸã€‚",
++      "message": "æŽ¥ç¶šã‚’ç¢ºèªã™ã‚‹ã‹ã€ã‚‚ã†ä¸€åº¦ãŠè©¦ã—ãã ã•ã„ã€‚"
++    },
++    "timeout": {
++      "title": "ã‚µãƒ¼ãƒãƒ¼ã®å¿œç­”ã«æ™‚é–“ãŒã‹ã‹ã‚Šã™ãŽã¦ã„ã¾ã™ã€‚",
++      "message": "æ•°ç§’å¾Œã«ã‚‚ã†ä¸€åº¦ãŠè©¦ã—ãã ã•ã„ã€‚"
++    },
++    "sessionExpired": {
++      "title": "ã‚»ãƒƒã‚·ãƒ§ãƒ³ã®æœ‰åŠ¹æœŸé™ãŒåˆ‡ã‚Œã¾ã—ãŸã€‚",
++      "message": "ç¶šè¡Œã™ã‚‹ã«ã¯ã‚‚ã†ä¸€åº¦ã‚µã‚¤ãƒ³ã‚¤ãƒ³ã—ã¦ãã ã•ã„ã€‚"
++    },
++    "forbidden": {
++      "title": "ã“ã®æ“ä½œã‚’è¡Œã†æ¨©é™ãŒã‚ã‚Šã¾ã›ã‚“ã€‚",
++      "message": "ä¸Šé•·ã«ã‚¢ã‚¯ã‚»ã‚¹æ¨©ã‚’ä¾é ¼ã—ã¦ãã ã•ã„ã€‚"
++    },
++    "notFound": {
++      "title": "è¦æ±‚ã•ã‚ŒãŸæƒ…å ±ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“ã§ã—ãŸã€‚",
++      "message": "å‰Šé™¤ã•ã‚ŒãŸã‹ã€åˆ©ç”¨ã§ããªããªã£ã¦ã„ã‚‹å¯èƒ½æ€§ãŒã‚ã‚Šã¾ã™ã€‚"
++    },
++    "conflict": {
++      "title": "æƒ…å ±ãŒå¤‰æ›´ã•ã‚ŒãŸãŸã‚æ“ä½œã‚’å®Œäº†ã§ãã¾ã›ã‚“ã€‚",
++      "message": "ç”»é¢ã‚’æ›´æ–°ã—ã¦ã€ã‚‚ã†ä¸€åº¦ãŠè©¦ã—ãã ã•ã„ã€‚"
++    },
++    "validation": {
++      "title": "å…¥åŠ›å†…å®¹ã‚’ç¢ºèªã—ã¦ãã ã•ã„ã€‚",
++      "message": "æœªå…¥åŠ›ã¾ãŸã¯ç„¡åŠ¹ãªæƒ…å ±ãŒã‚ã‚Šã¾ã™ã€‚"
++    },
++    "internal": {
++      "title": "æ“ä½œã‚’å®Œäº†ã§ãã¾ã›ã‚“ã§ã—ãŸã€‚",
++      "message": "ã‚‚ã†ä¸€åº¦ãŠè©¦ã—ãã ã•ã„ã€‚ç¶šãå ´åˆã¯ã‚µãƒãƒ¼ãƒˆã¸é€£çµ¡ã—ã¦ãã ã•ã„ã€‚"
++    },
++    "unknown": {
++      "title": "ãƒªã‚¯ã‚¨ã‚¹ãƒˆã‚’å®Œäº†ã§ãã¾ã›ã‚“ã§ã—ãŸã€‚",
++      "message": "ã‚‚ã†ä¸€åº¦ãŠè©¦ã—ãã ã•ã„ã€‚ç¶šãå ´åˆã¯ã‚µãƒãƒ¼ãƒˆã¸é€£çµ¡ã—ã¦ãã ã•ã„ã€‚"
++    },
++    "retry": "å†è©¦è¡Œ",
++    "close": "é–‰ã˜ã‚‹",
++    "refresh": "æ›´æ–°",
++    "goToLogin": "ã‚µã‚¤ãƒ³ã‚¤ãƒ³ã¸",
++    "requestAccess": "ã‚¢ã‚¯ã‚»ã‚¹ã‚’ä¾é ¼"
+   }
+ }
+diff --git a/locales/ko/common.json b/locales/ko/common.json
+index c2023ca..5a69606 100644
+--- a/locales/ko/common.json
++++ b/locales/ko/common.json
+@@ -1318,5 +1318,48 @@
+     "missingPasswordTitle": "ëˆ„ë½ ë¹„ë°€ë²ˆí˜¸",
+     "missingPasswordMessage": "ëˆ„ë½ ë¹„ë°€ë²ˆí˜¸",
+     "saveErrorTitle": "ì €ìž¥ ì˜¤ë¥˜"
++  },
++  "errors": {
++    "connection": {
++      "title": "ì„œë²„ì— ì—°ê²°í•  ìˆ˜ ì—†ìŠµë‹ˆë‹¤.",
++      "message": "ì—°ê²°ì„ í™•ì¸í•˜ê±°ë‚˜ ë‹¤ì‹œ ì‹œë„í•˜ì„¸ìš”."
++    },
++    "timeout": {
++      "title": "ì„œë²„ ì‘ë‹µì´ ë„ˆë¬´ ì˜¤ëž˜ ê±¸ë ¸ìŠµë‹ˆë‹¤.",
++      "message": "ëª‡ ì´ˆ í›„ ë‹¤ì‹œ ì‹œë„í•˜ì„¸ìš”."
++    },
++    "sessionExpired": {
++      "title": "ì„¸ì…˜ì´ ë§Œë£Œë˜ì—ˆìŠµë‹ˆë‹¤.",
++      "message": "ê³„ì†í•˜ë ¤ë©´ ë‹¤ì‹œ ë¡œê·¸ì¸í•˜ì„¸ìš”."
++    },
++    "forbidden": {
++      "title": "ì´ ìž‘ì—…ì„ ìˆ˜í–‰í•  ê¶Œí•œì´ ì—†ìŠµë‹ˆë‹¤.",
++      "message": "ê´€ë¦¬ìžì—ê²Œ ì ‘ê·¼ ê¶Œí•œì„ ìš”ì²­í•˜ì„¸ìš”."
++    },
++    "notFound": {
++      "title": "ìš”ì²­í•œ ì •ë³´ë¥¼ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤.",
++      "message": "ì‚­ì œë˜ì—ˆê±°ë‚˜ ë” ì´ìƒ ì‚¬ìš©í•  ìˆ˜ ì—†ì„ ìˆ˜ ìžˆìŠµë‹ˆë‹¤."
++    },
++    "conflict": {
++      "title": "ì •ë³´ê°€ ë³€ê²½ë˜ì–´ ìž‘ì—…ì„ ì™„ë£Œí•  ìˆ˜ ì—†ìŠµë‹ˆë‹¤.",
++      "message": "í™”ë©´ì„ ìƒˆë¡œ ê³ ì¹œ ë’¤ ë‹¤ì‹œ ì‹œë„í•˜ì„¸ìš”."
++    },
++    "validation": {
++      "title": "ìž…ë ¥í•œ ì •ë³´ë¥¼ í™•ì¸í•˜ì„¸ìš”.",
++      "message": "ëˆ„ë½ë˜ì—ˆê±°ë‚˜ ì˜¬ë°”ë¥´ì§€ ì•Šì€ ì •ë³´ê°€ ìžˆìŠµë‹ˆë‹¤."
++    },
++    "internal": {
++      "title": "ìž‘ì—…ì„ ì™„ë£Œí•  ìˆ˜ ì—†ìŠµë‹ˆë‹¤.",
++      "message": "ë‹¤ì‹œ ì‹œë„í•˜ì„¸ìš”. ê³„ì†ë˜ë©´ ì§€ì›íŒ€ì— ë¬¸ì˜í•˜ì„¸ìš”."
++    },
++    "unknown": {
++      "title": "ìš”ì²­ì„ ì™„ë£Œí•  ìˆ˜ ì—†ìŠµë‹ˆë‹¤.",
++      "message": "ë‹¤ì‹œ ì‹œë„í•˜ì„¸ìš”. ê³„ì†ë˜ë©´ ì§€ì›íŒ€ì— ë¬¸ì˜í•˜ì„¸ìš”."
++    },
++    "retry": "ë‹¤ì‹œ ì‹œë„",
++    "close": "ë‹«ê¸°",
++    "refresh": "ìƒˆë¡œ ê³ ì¹¨",
++    "goToLogin": "ë¡œê·¸ì¸ìœ¼ë¡œ ì´ë™",
++    "requestAccess": "ì ‘ê·¼ ê¶Œí•œ ìš”ì²­"
+   }
+ }
+diff --git a/locales/pt-BR/common.json b/locales/pt-BR/common.json
+index 3995af3..9957f58 100644
+--- a/locales/pt-BR/common.json
++++ b/locales/pt-BR/common.json
+@@ -1318,5 +1318,48 @@
+     "missingPasswordTitle": "Faltando senha",
+     "missingPasswordMessage": "Faltando senha",
+     "saveErrorTitle": "Salvar erro"
++  },
++  "errors": {
++    "connection": {
++      "title": "NÃ£o foi possÃ­vel conectar ao servidor.",
++      "message": "Verifique sua conexÃ£o ou tente novamente."
++    },
++    "timeout": {
++      "title": "O servidor demorou demais para responder.",
++      "message": "Tente novamente em alguns segundos."
++    },
++    "sessionExpired": {
++      "title": "Sua sessÃ£o expirou.",
++      "message": "Entre novamente para continuar."
++    },
++    "forbidden": {
++      "title": "VocÃª nÃ£o tem permissÃ£o para realizar esta aÃ§Ã£o.",
++      "message": "Solicite acesso ao seu supervisor."
++    },
++    "notFound": {
++      "title": "As informaÃ§Ãµes solicitadas nÃ£o foram encontradas.",
++      "message": "Elas podem ter sido removidas ou nÃ£o estar mais disponÃ­veis."
++    },
++    "conflict": {
++      "title": "A operaÃ§Ã£o nÃ£o pode ser concluÃ­da porque as informaÃ§Ãµes mudaram.",
++      "message": "Atualize a tela e tente novamente."
++    },
++    "validation": {
++      "title": "Revise os dados informados.",
++      "message": "HÃ¡ informaÃ§Ãµes pendentes ou invÃ¡lidas."
++    },
++    "internal": {
++      "title": "NÃ£o foi possÃ­vel concluir a operaÃ§Ã£o.",
++      "message": "Tente novamente. Se continuar, reporte o caso ao suporte."
++    },
++    "unknown": {
++      "title": "NÃ£o foi possÃ­vel concluir a solicitaÃ§Ã£o.",
++      "message": "Tente novamente. Se continuar, reporte o caso ao suporte."
++    },
++    "retry": "Tentar novamente",
++    "close": "Fechar",
++    "refresh": "Atualizar",
++    "goToLogin": "Ir para login",
++    "requestAccess": "Solicitar acesso"
+   }
+ }
+diff --git a/locales/zh/common.json b/locales/zh/common.json
+index 33e5ddd..92e137d 100644
+--- a/locales/zh/common.json
++++ b/locales/zh/common.json
+@@ -1318,5 +1318,48 @@
+     "missingPasswordTitle": "ç¼ºå°‘å¯†ç ",
+     "missingPasswordMessage": "ç¼ºå°‘å¯†ç ",
+     "saveErrorTitle": "ä¿å­˜é”™è¯¯"
++  },
++  "errors": {
++    "connection": {
++      "title": "æ— æ³•è¿žæŽ¥åˆ°æœåŠ¡å™¨ã€‚",
++      "message": "è¯·æ£€æŸ¥è¿žæŽ¥æˆ–é‡è¯•ã€‚"
++    },
++    "timeout": {
++      "title": "æœåŠ¡å™¨å“åº”æ—¶é—´è¿‡é•¿ã€‚",
++      "message": "è¯·ç¨åŽé‡è¯•ã€‚"
++    },
++    "sessionExpired": {
++      "title": "ä¼šè¯å·²è¿‡æœŸã€‚",
++      "message": "è¯·é‡æ–°ç™»å½•ä»¥ç»§ç»­ã€‚"
++    },
++    "forbidden": {
++      "title": "ä½ æ²¡æœ‰æƒé™æ‰§è¡Œæ­¤æ“ä½œã€‚",
++      "message": "è¯·å‘ä¸»ç®¡ç”³è¯·è®¿é—®æƒé™ã€‚"
++    },
++    "notFound": {
++      "title": "æœªæ‰¾åˆ°è¯·æ±‚çš„ä¿¡æ¯ã€‚",
++      "message": "è¯¥ä¿¡æ¯å¯èƒ½å·²è¢«åˆ é™¤æˆ–ä¸å†å¯ç”¨ã€‚"
++    },
++    "conflict": {
++      "title": "ä¿¡æ¯å·²æ›´æ”¹ï¼Œæ— æ³•å®Œæˆæ“ä½œã€‚",
++      "message": "è¯·åˆ·æ–°é¡µé¢åŽé‡è¯•ã€‚"
++    },
++    "validation": {
++      "title": "è¯·æ£€æŸ¥å¡«å†™çš„æ•°æ®ã€‚",
++      "message": "æœ‰ä¿¡æ¯ç¼ºå¤±æˆ–æ— æ•ˆã€‚"
++    },
++    "internal": {
++      "title": "æ— æ³•å®Œæˆæ“ä½œã€‚",
++      "message": "è¯·é‡è¯•ã€‚å¦‚æžœé—®é¢˜ä»ç„¶å­˜åœ¨ï¼Œè¯·è”ç³»æ”¯æŒã€‚"
++    },
++    "unknown": {
++      "title": "æ— æ³•å®Œæˆè¯·æ±‚ã€‚",
++      "message": "è¯·é‡è¯•ã€‚å¦‚æžœé—®é¢˜ä»ç„¶å­˜åœ¨ï¼Œè¯·è”ç³»æ”¯æŒã€‚"
++    },
++    "retry": "é‡è¯•",
++    "close": "å…³é—­",
++    "refresh": "åˆ·æ–°",
++    "goToLogin": "å‰å¾€ç™»å½•",
++    "requestAccess": "ç”³è¯·è®¿é—®æƒé™"
+   }
+ }
+diff --git a/services/apiClient.ts b/services/apiClient.ts
+index 6da8d2c..d1c8508 100644
+--- a/services/apiClient.ts
++++ b/services/apiClient.ts
+@@ -41,12 +41,13 @@ export class SessionRedirectError extends ApiError {
+
+ function friendlyStatusMessage(status: number): string {
+   if (status === 0) return 'No se pudo conectar con el servidor. Revisa tu conexion o intenta nuevamente.';
+-  if (status === 400) return 'Revisa la informaciÃ³n capturada e intenta de nuevo.';
+-  if (status === 401) return 'Tu sesiÃ³n expirÃ³. Inicia sesiÃ³n nuevamente.';
+-  if (status === 403) return 'No tienes permisos para realizar esta acciÃ³n.';
+-  if (status === 404) return 'No se encontrÃ³ la informaciÃ³n solicitada.';
+-  if (status === 409) return 'La acciÃ³n no se puede completar por el estado actual.';
+-  if (status >= 500) return 'OcurriÃ³ un error del servidor. Intenta de nuevo mÃ¡s tarde.';
++  if (status === 400 || status === 422) return 'Revisa los datos capturados. Hay informacion pendiente o invalida.';
++  if (status === 401) return 'Tu sesion expiro. Vuelve a iniciar sesion para continuar.';
++  if (status === 403) return 'No tienes permiso para realizar esta accion. Solicita acceso a tu supervisor.';
++  if (status === 404) return 'No se encontro la informacion solicitada. Puede haber sido eliminada o ya no estar disponible.';
++  if (status === 408 || status === 504) return 'El servidor tardo demasiado en responder. Intenta nuevamente en unos segundos.';
++  if (status === 409) return 'La operacion no se puede completar porque la informacion cambio. Actualiza la pantalla e intenta nuevamente.';
++  if (status >= 500) return 'No se pudo completar la operacion. Intenta nuevamente. Si continua, reporta el caso a soporte.';
+   return `No se pudo completar la solicitud (${status}).`;
+ }
+
+diff --git a/services/apiError.ts b/services/apiError.ts
+index 0966ebf..ae5af3d 100644
+--- a/services/apiError.ts
++++ b/services/apiError.ts
+@@ -8,6 +8,7 @@ export type NormalizedApiError = {
+     | 'not-found'
+     | 'conflict'
+     | 'validation'
++    | 'timeout'
+     | 'server'
+     | 'network'
+     | 'unknown';
+@@ -16,6 +17,55 @@ export type NormalizedApiError = {
+   raw?: unknown;
+ };
+
++export type ActionableErrorKind =
++  | 'connection'
++  | 'timeout'
++  | 'sessionExpired'
++  | 'forbidden'
++  | 'notFound'
++  | 'conflict'
++  | 'validation'
++  | 'internal'
++  | 'unknown';
++
++export type ActionableErrorCopy = {
++  kind: ActionableErrorKind;
++  status?: number;
++  title: string;
++  message: string;
++  primaryActionLabel: string;
++  variant: 'info' | 'warning' | 'danger';
++  requiredPermission?: string;
++};
++
++type ErrorTranslator = (key: string) => unknown;
++
++const DEFAULT_ERROR_TEXT: Record<string, string> = {
++  'errors.connection.title': 'No se pudo conectar con el servidor.',
++  'errors.connection.message': 'Revisa tu conexion o intenta nuevamente.',
++  'errors.timeout.title': 'El servidor tardo demasiado en responder.',
++  'errors.timeout.message': 'Intenta nuevamente en unos segundos.',
++  'errors.sessionExpired.title': 'Tu sesion expiro.',
++  'errors.sessionExpired.message': 'Vuelve a iniciar sesion para continuar.',
++  'errors.forbidden.title': 'No tienes permiso para realizar esta accion.',
++  'errors.forbidden.message': 'Solicita acceso a tu supervisor.',
++  'errors.notFound.title': 'No se encontro la informacion solicitada.',
++  'errors.notFound.message': 'Puede haber sido eliminada o ya no estar disponible.',
++  'errors.conflict.title': 'La operacion no se puede completar porque la informacion cambio.',
++  'errors.conflict.message': 'Actualiza la pantalla e intenta nuevamente.',
++  'errors.validation.title': 'Revisa los datos capturados.',
++  'errors.validation.message': 'Hay informacion pendiente o invalida.',
++  'errors.internal.title': 'No se pudo completar la operacion.',
++  'errors.internal.message': 'Intenta nuevamente. Si continua, reporta el caso a soporte.',
++  'errors.unknown.title': 'No se pudo completar la solicitud.',
++  'errors.unknown.message': 'Intenta nuevamente. Si continua, reporta el caso a soporte.',
++  'errors.retry': 'Reintentar',
++  'errors.close': 'Cerrar',
++  'errors.refresh': 'Actualizar',
++  'errors.goToLogin': 'Ir a iniciar sesion',
++  'errors.requestAccess': 'Solicitar acceso',
++};
++
+ function parseRaw(value: unknown): any {
+   if (!value) return null;
+   if (typeof value === 'string') {
+@@ -28,6 +78,16 @@ function parseRaw(value: unknown): any {
+   return value;
+ }
+
++function translateError(t: ErrorTranslator | undefined, key: string) {
++  const fallback = DEFAULT_ERROR_TEXT[key] ?? key;
++  if (!t) return fallback;
++
++  const translated = t(key);
++  return typeof translated === 'string' && translated && translated !== key
++    ? translated
++    : fallback;
++}
++
+ function getStatus(error: any): number | undefined {
+   const candidates = [
+     error?.status,
+@@ -41,6 +101,83 @@ function getStatus(error: any): number | undefined {
+   return status === undefined ? undefined : Number(status);
+ }
+
++function normalizeMessage(value: string) {
++  return value
++    .normalize('NFD')
++    .replace(/[\u0300-\u036f]/g, '')
++    .toLowerCase()
++    .trim();
++}
++
++function getMessageCandidate(error: any, raw: any) {
++  const candidates = [
++    raw?.message,
++    raw?.error,
++    raw?.detail,
++    error?.message,
++  ];
++
++  const value = candidates.find(
++    (candidate) => typeof candidate === 'string' && candidate.trim()
++  );
++
++  return typeof value === 'string' ? value.trim() : '';
++}
++
++function isTimeoutMessage(message: string) {
++  const normalized = normalizeMessage(message);
++  return (
++    normalized.includes('timeout') ||
++    normalized.includes('timed out') ||
++    normalized.includes('tiempo de espera') ||
++    normalized.includes('tardo demasiado') ||
++    normalized.includes('demasiado en responder')
++  );
++}
++
++function isNetworkMessage(message: string) {
++  const normalized = normalizeMessage(message);
++  return (
++    normalized.includes('networkerror') ||
++    normalized.includes('network request failed') ||
++    normalized.includes('failed to fetch') ||
++    normalized.includes('fetch') ||
++    normalized.includes('no se pudo conectar') ||
++    normalized.includes('connection refused')
++  );
++}
++
++function isGenericInternalMessage(message: string) {
++  const normalized = normalizeMessage(message);
++  return (
++    normalized.includes('ocurrio un error interno inesperado') ||
++    normalized.includes('error interno inesperado') ||
++    normalized.includes('internal server error') ||
++    normalized.includes('unexpected internal') ||
++    normalized.includes('something went wrong')
++  );
++}
++
++function hasSensitiveTechnicalDetails(message: string) {
++  const normalized = normalizeMessage(message);
++  return (
++    /https?:\/\//i.test(message) ||
++    /\b(select|insert|update|delete|from|where)\b/i.test(message) ||
++    /\b(stacktrace|trace|exception|java\.|org\.springframework|hibernate|sql|jdbc)\b/i.test(message) ||
++    normalized.includes('/api/') ||
++    normalized.includes('nullpointer') ||
++    normalized.includes('constraint violation')
++  );
++}
++
++function getSafeUnknownMessage(message: string) {
++  if (!message.trim()) return '';
++  if (message.length > 220) return '';
++  if (isGenericInternalMessage(message)) return '';
++  if (hasSensitiveTechnicalDetails(message)) return '';
++  return message.trim();
++}
++
+ export function getRequiredPermission(error: unknown): string | undefined {
+   const apiError = error as any;
+   const raw = parseRaw(apiError?.rawMessage ?? apiError?.message ?? apiError);
+@@ -72,18 +209,29 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
+   const raw = parseRaw(apiError?.rawMessage ?? apiError?.message ?? apiError);
+   const status = getStatus(apiError) ?? getStatus(raw);
+   const requiredPermission = getRequiredPermission(error);
++  const messageCandidate = getMessageCandidate(apiError, raw);
++
++  if (status === 408 || status === 504 || (!status && isTimeoutMessage(messageCandidate))) {
++    return {
++      status,
++      category: 'timeout',
++      message: DEFAULT_ERROR_TEXT['errors.timeout.message'],
++      requiredPermission,
++      raw: error,
++    };
++  }
+
+   if (!status && !(error instanceof ApiError)) {
+-    const message = String(apiError?.message ?? '');
+-    const category = message.includes('NetworkError') || message.includes('fetch')
++    const message = String(messageCandidate || apiError?.message || '');
++    const category = isNetworkMessage(message)
+       ? 'network'
+       : 'unknown';
+     return {
+       category,
+       message:
+         category === 'network'
+-          ? 'No se pudo conectar con el servidor.'
+-          : message || 'No se pudo completar la solicitud.',
++          ? DEFAULT_ERROR_TEXT['errors.connection.title']
++          : getSafeUnknownMessage(message) || DEFAULT_ERROR_TEXT['errors.unknown.message'],
+       requiredPermission,
+       raw: error,
+     };
+@@ -93,7 +241,7 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
+     return {
+       status,
+       category: 'network',
+-      message: 'No se pudo conectar con el servidor. Revisa tu conexion o intenta nuevamente.',
++      message: DEFAULT_ERROR_TEXT['errors.connection.message'],
+       requiredPermission,
+       raw: error,
+     };
+@@ -103,7 +251,7 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
+     return {
+       status,
+       category: 'unauthorized',
+-      message: 'Tu sesion expiro. Inicia sesion nuevamente.',
++      message: DEFAULT_ERROR_TEXT['errors.sessionExpired.message'],
+       requiredPermission,
+       raw: error,
+     };
+@@ -113,7 +261,7 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
+     return {
+       status,
+       category: 'forbidden',
+-      message: 'No tienes permiso para consultar esta informacion.',
++      message: DEFAULT_ERROR_TEXT['errors.forbidden.message'],
+       requiredPermission,
+       raw: error,
+     };
+@@ -123,7 +271,7 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
+     return {
+       status,
+       category: 'not-found',
+-      message: 'No se encontro la informacion solicitada.',
++      message: DEFAULT_ERROR_TEXT['errors.notFound.message'],
+       requiredPermission,
+       raw: error,
+     };
+@@ -133,17 +281,17 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
+     return {
+       status,
+       category: 'conflict',
+-      message: 'La accion no se puede completar por el estado actual.',
++      message: DEFAULT_ERROR_TEXT['errors.conflict.message'],
+       requiredPermission,
+       raw: error,
+     };
+   }
+
+-  if (status === 422) {
++  if (status === 400 || status === 422) {
+     return {
+       status,
+       category: 'validation',
+-      message: 'Revisa la informacion capturada e intenta de nuevo.',
++      message: DEFAULT_ERROR_TEXT['errors.validation.message'],
+       requiredPermission,
+       raw: error,
+     };
+@@ -153,7 +301,7 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
+     return {
+       status,
+       category: 'server',
+-      message: 'Ocurrio un error al cargar la informacion.',
++      message: DEFAULT_ERROR_TEXT['errors.internal.message'],
+       requiredPermission,
+       raw: error,
+     };
+@@ -162,12 +310,113 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
+   return {
+     status,
+     category: 'unknown',
+-    message: apiError?.message || 'No se pudo completar la solicitud.',
++    message:
++      getSafeUnknownMessage(messageCandidate || apiError?.message || '') ||
++      DEFAULT_ERROR_TEXT['errors.unknown.message'],
+     requiredPermission,
+     raw: error,
+   };
+ }
+
++function getActionableKind(category: NormalizedApiError['category']): ActionableErrorKind {
++  switch (category) {
++    case 'network':
++      return 'connection';
++    case 'timeout':
++      return 'timeout';
++    case 'unauthorized':
++      return 'sessionExpired';
++    case 'forbidden':
++      return 'forbidden';
++    case 'not-found':
++      return 'notFound';
++    case 'conflict':
++      return 'conflict';
++    case 'validation':
++      return 'validation';
++    case 'server':
++      return 'internal';
++    default:
++      return 'unknown';
++  }
++}
++
++function getActionKey(kind: ActionableErrorKind) {
++  switch (kind) {
++    case 'connection':
++    case 'timeout':
++    case 'internal':
++      return 'errors.retry';
++    case 'sessionExpired':
++      return 'errors.goToLogin';
++    case 'forbidden':
++      return 'errors.requestAccess';
++    case 'conflict':
++      return 'errors.refresh';
++    default:
++      return 'errors.close';
++  }
++}
++
++function getVariant(kind: ActionableErrorKind): ActionableErrorCopy['variant'] {
++  switch (kind) {
++    case 'internal':
++      return 'danger';
++    case 'connection':
++    case 'timeout':
++    case 'sessionExpired':
++    case 'forbidden':
++    case 'conflict':
++    case 'validation':
++      return 'warning';
++    default:
++      return 'info';
++  }
++}
++
++function getKindKey(kind: ActionableErrorKind) {
++  switch (kind) {
++    case 'sessionExpired':
++      return 'sessionExpired';
++    case 'notFound':
++      return 'notFound';
++    default:
++      return kind;
++  }
++}
++
++export function getActionableApiError(
++  error: unknown,
++  t?: ErrorTranslator
++): ActionableErrorCopy {
++  const normalized = normalizeApiError(error);
++  const kind = getActionableKind(normalized.category);
++  const kindKey = getKindKey(kind);
++  const isSafeUnknown =
++    kind === 'unknown' &&
++    normalized.message &&
++    normalized.message !== DEFAULT_ERROR_TEXT['errors.unknown.message'];
++
++  return {
++    kind,
++    status: normalized.status,
++    title: translateError(t, `errors.${kindKey}.title`),
++    message: isSafeUnknown
++      ? normalized.message
++      : translateError(t, `errors.${kindKey}.message`),
++    primaryActionLabel: translateError(t, getActionKey(kind)),
++    variant: getVariant(kind),
++    requiredPermission: normalized.requiredPermission,
++  };
++}
++
++export function getActionableApiErrorMessage(
++  error: unknown,
++  t?: ErrorTranslator
++): string {
++  return getActionableApiError(error, t).message;
++}
++
+ export function isUnauthorizedError(error: unknown): boolean {
+   return normalizeApiError(error).category === 'unauthorized';
+ }
+@@ -181,5 +430,5 @@ export function isNotFoundError(error: unknown): boolean {
+ }
+
+ export function getUserFacingApiErrorMessage(error: unknown): string {
+-  return normalizeApiError(error).message;
++  return getActionableApiErrorMessage(error);
+ }

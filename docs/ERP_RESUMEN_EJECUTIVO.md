@@ -1,7 +1,8 @@
 # ERP - Resumen ejecutivo
 
-Fecha de analisis: 2026-05-11  
-Alcance: Fase 0, solo analisis y documentacion. No se modifico codigo, logica ni base de datos.
+Fecha de analisis inicial: 2026-05-11  
+Ultima actualizacion: 2026-05-18
+Alcance: Fase 0 a Fase 2O, LIVE-A/B/C/D/E y DEMO-A, incluyendo RC candidato Fase 1, smoke runtime tenant-aware, primeras tablas P0 tenant-aware, lotes tenant-aware runtime, dataset QA Empresa A/B, validacion runtime A/B, base i18n frontend para LIVE, diseno LIVE metrics/engagement, normalizacion UX del flujo LIVE, smoke tecnico frontend LIVE, modo demo visual de metricas LIVE y material de presentacion SaaS/LIVE.
 
 ## Estado general
 
@@ -9,7 +10,7 @@ Estado estimado: MEDIO, con modulos FRAGILES en flujos operativos de alto cambio
 
 El proyecto ya tiene una base util para crecer: frontend Expo/React Native con rutas por pantalla en `app/`, backend Spring Boot modular en `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa`, migraciones Flyway en `backend/control-ropa/src/main/resources/db/migration` y permisos centralizados por codigo en `PermissionCode.java`.
 
-La principal alerta enterprise es que aun no hay una capa homogenea de UX, validaciones, seguridad declarativa, auditoria funcional y regresion automatizada. Hay funcionalidades reales, pero todavia dependen de validaciones repetidas por pantalla/servicio y de convenciones no siempre aplicadas igual.
+La principal alerta enterprise sigue siendo que aun no hay una capa homogenea de UX, validaciones, seguridad declarativa, auditoria funcional y regresion automatizada amplia. La Fase 1G ejecuto la primera corrida QA real: API operativa en flujos principales, pero RC rechazado por bloqueos de frontend web, health check y dataset de perfiles de seguridad/soporte. En validaciones posteriores, los usuarios QA de permisos negativos, reportes y soporte ya iniciaron sesion correctamente, y el healthcheck backend fue validado por runtime real en `http://localhost:8090/api/health` con `HTTP/1.1 200 OK`. En Fase 1K el frontend QA responde en `http://localhost:8081`, las rutas base validadas decodifican UTF-8 sin mojibake y `npm run web` ya no se bloquea por permisos de log/cache. En Fase 1L no quedan bloqueos `SEV-1` ni `SEV-2`; la decision recomendada es `GO PARA RC CANDIDATO APROBABLE`, sin aprobar release final automatico. En Fase 2A se inicia el diseno SaaS multi-compania: la recomendacion arquitectonica es una sola aplicacion y una sola base con `company_id` obligatorio, tenant context backend, QA estricto de aislamiento y consola SaaS privada HPSQ-SOFT separada del ERP operativo de clientes. En Fase 2D se implemento bootstrap minimo `companies` + company default + `branches.company_id`; en Fase 2F se agregaron `user_companies` y sesiones con `active_company_id`/`active_branch_id`; en Fase 2I se ejecuto smoke runtime con usuarios QA completos. En Fase 2J `customers` se convierte en la primera tabla P0 tenant-aware. En Fase 2K `items`/inventario se convierte en la segunda tabla P0 tenant-aware. En Fase 2M `batches` queda tenant-aware para endpoints directos. En Fase 2N se prepara dataset QA Empresa A/B. En Fase 2O se valida runtime A/B: login, tenant current, customers, items, lookup code/QR y batches por folio quedan aislados entre `QA_A` y `QA_B`, y `DEFAULT` sigue operativo. En LIVE-A se agrega base minima i18n frontend y se migra LIVE a traducciones ES/EN sin tocar backend ni reglas operativas. En LIVE-B se documenta arquitectura futura para metricas, engagement, eventos y Facebook/Meta sin implementar runtime. En LIVE-C se normaliza UX del estado operativo de LIVE con instrucciones y confirmaciones mas claras, sin tocar backend. En LIVE-D el build/export frontend de LIVE queda tecnicamente correcto, pero el smoke visual en navegador real queda pendiente porque `8081` no quedo accesible desde la sesion QA. En LIVE-E se agrega modo demo visual de metricas y engagement, sin Facebook runtime ni backend realtime. En DEMO-A se prepara guion, checklist y talk track para presentar SaaS multi-compania y LIVE commerce sin prometer funciones no terminadas. En el refinamiento posterior se centraliza el idioma en `Configuracion -> Sistema`, se corrige terminologia visible de LIVE en espanol, se localiza la linea de tiempo demo y se mejora la carga de clientes/prendas para no ocultar fallas como listas vacias. Despues se corrige el manejo de 403 secundarios en LIVE para evitar modales duplicados y diferenciar errores de clientes, prendas y reservaciones. En LIVE-I se revisa el 403 de clientes y se determina que, por codigo actual, la causa mas probable es tenant/branch/session desalineado y no falta directa de `VIEW_CUSTOMERS`; se entrega SQL QA idempotente para normalizar usuarios/sesiones LIVE. Aun no se debe declarar SaaS real porque faltan proveedores tenant-aware, permisos por company y revision de consumidores legacy en ventas, pagos, live, reservaciones y reportes.
 
 ## Hallazgos clave
 
@@ -19,37 +20,88 @@ La principal alerta enterprise es que aun no hay una capa homogenea de UX, valid
 - Proveedores ya existen en backend con `SupplierController.java`, `SupplierService.java` y migracion `V37__suppliers_and_batch_quality.sql`.
 - Lotes ya guardan proveedor, fecha de recepcion y calidad por `BatchService.java`, pero faltan filtros backend especificos por proveedor, estatus, fecha y calidad.
 - UX esta mejorando con componentes reutilizables como `AppButton`, `AppBottomModal`, `AppNoticeDropdown`, `AppScreen`, pero muchas pantallas siguen usando `Alert.alert` directo.
-- Hay problemas reales de codificacion en textos: ejemplos visibles en `services/apiClient.ts`, `components/ui/AppNoticeDropdown.tsx`, `SupplierService.java` y `BatchService.java` con cadenas como `sesiÃ³n`, `acciÃ³n`, `cÃ³digo`, `recepciÃ³n`.
-- El directorio actual no parece estar dentro de un repo Git inicializado: `git status` respondio `fatal: not a git repository`. Esto es riesgo fuerte para control de cambios y releases.
+- Hay riesgo recurrente de codificacion de textos; se requiere barrido de mojibake antes de release.
+- El repositorio Git ya existe y la Fase 1G se trabaja sobre `feature/fase1g-primera-corrida-qa-real`; queda pendiente limpiar o ignorar `.tmp-pdf-images/` y diffs no rastreados de fases anteriores.
+- Primera corrida QA real: venta QA `saleId=1` y pago QA `paymentId=1` creados correctamente en ambiente QA.
+- Decision QA actual: `GO PARA RC CANDIDATO APROBABLE`; backend/API queda tecnicamente validado y `KI-002`, `KI-003`, `KI-004`, `KI-005`, `KI-006`, `KI-007` y `KI-008` quedaron resueltos validados. `KI-001` queda abierto como `SEV-3` no bloqueante para RC candidato. Falta ejecutar checklist RC completo con evidencia visual formal antes de aprobar release final.
+- Multi-compania actual: ya existe `company_id` en `branches`, `customers` e `items`; la arquitectura operativa sigue siendo mono-company `DEFAULT` hasta completar dataset Empresa A/B y migrar el resto de tablas P0.
+- Decision arquitectonica Fase 2A: adoptar una sola base compartida con `company_id`, no base por compania ni esquema por compania para la primera evolucion.
+- Riesgo critico Fase 2A: no implementar multi-compania funcional hasta que backend valide tenant por cada endpoint y reporte.
+- HPSQ-SOFT debe tener una consola SaaS privada para administrar empresas, planes, soporte, auditoria, salud y branding; esta consola no debe ser visible para usuarios cliente.
+- Roles SaaS HPSQ-SOFT deben separarse de roles ERP cliente para evitar administracion global accidental.
+- Billing/facturacion automatica no debe implementarse todavia; primero se recomienda control administrativo de planes, limites, suspension y reactivacion.
+- Fase 2B convierte el diseno en matrices tecnicas: endpoints P0, tablas P0, acciones HPSQ-SOFT auditables y backlog de implementacion.
+- Los modulos de mayor riesgo tenant son pagos/ventas/caja, reportes/dashboard, inventario/items, usuarios/permisos y soporte/logs.
+- Fase 2C define el tenant core foundation: `CurrentTenantContext`, auth tenant-aware, enforcement obligatorio, migracion incremental y escenarios de riesgo SaaS.
+- La implementacion real no debe iniciar por ventas/pagos/reportes; debe iniciar por contexto tenant, company default, branch validation y auditoria.
+- Fase 2D/2F/2I: bootstrap tenant minimo y sesiones tenant-aware implementadas; usuarios QA tenant validados. Se permite avanzar solo a primera P0 de bajo riesgo con rollback y sin tocar ventas/pagos/live/reportes.
+- Fase 2J: `customers` queda tenant-aware en endpoints directos. Fase 2K: `items` queda tenant-aware en endpoints directos. Todavia falta dataset Empresa A/B y migrar consumidores legacy antes de declarar aislamiento SaaS real.
+- Fase 2L/2M: `batches` queda planificado e implementado como tenant-aware en endpoints directos. La implementacion se mantuvo aislada de ventas/pagos/live/reportes.
+- Fase 2N: se crea dataset QA Empresa A/B para ejecutar pruebas negativas reales de customers/items/batches. No se ejecuto SQL ni se modifico codigo productivo.
+- Fase 2O: se valida runtime A/B y no se detecta fuga cross-company en endpoints directos de customers/items/batches.
+- LIVE-A: se crea base i18n frontend con `i18next`, `react-i18next` y `expo-localization`; LIVE queda preparado con textos principales traducibles ES/EN.
+- LIVE-B: se define arquitectura futura de metricas, eventos, engagement y adapter Facebook/Meta tenant-aware, sin cambios runtime.
+- LIVE-C: se mejora UX del flujo LIVE con tarjeta de estado operativo, instrucciones de siguiente paso y confirmaciones para activar/cerrar.
+- LIVE-D: lint, TypeScript y export web pasan; smoke visual real en navegador queda pendiente por servidor `8081` no accesible.
+- LIVE-E: se agrega panel demo visual de viewers, engagement, actividad por minuto, productos destacados y timeline simulado sin tocar backend.
+- DEMO-A: se crea material de presentacion comercial/tecnica para explicar SaaS multi-compania, LIVE commerce, limites actuales y roadmap.
+- Refinamiento LIVE: idioma global movido a Sistema, terminologia espanola profesionalizada y seleccion de clientes/prendas con mensajes de carga mas claros.
+- Correccion LIVE permisos: los 403 secundarios ya no se concatenan en un modal duplicado; quedan mensajes por recurso.
+- LIVE-I: se crea script QA para normalizar permisos, user_company, user_branch, canal LIVE y sesiones de usuarios QA afectados.
+- LIVE-J: se pule el flujo visual En vivo -> Reserva -> Pagos con notificaciones compactas y detalle de cobro agrupado/responsive, sin tocar backend ni logica financiera.
+- LIVE-K: se transforma `En vivo` a un layout tablet-first tipo live commerce con producto visual, captura central, reservas recientes y metricas demo compactas, manteniendo backend y finanzas intactos.
+- LIVE-L: se separa visualmente `En vivo` por desktop/tablet/movil mediante componentes de layout y se documenta el flujo operativo real, adaptadores futuros por plataforma y reporte final deseado.
+- LIVE-M: se rediseña especificamente tablet para operacion real, priorizando captura, reservas recientes y producto visual compacto sin tocar backend ni logica financiera.
+- LIVE-N: se crea base inicial de design system y microcopy live-commerce para que `En vivo` deje de sentirse como ERP administrativo y avance hacia producto SaaS comercial.
+- LIVE-O: se incorpora Product Spotlight, consola del operador y activity feed humano para acercar `En vivo` a una experiencia moderna de streaming commerce.
+- LIVE-P: se agrega capa visual multioperador para presentadora, operador y supervisor; se prepara pulso runtime simulado y guia de operacion tablet sin backend realtime.
+- LIVE-Q: se atiende feedback QA de usabilidad, safe area Android/tablet, microcopy comercial y estado demo candidate condicionado.
+- LIVE-R: tras reinicio abrupto se valida rama, arbol limpio, puerto 8081, Expo web, lint, TypeScript, export y checklist demo candidate; queda GO tecnico y GO demo condicionado a smoke fisico.
+- LIVE-S: se atiende feedback QA operativo con analiticos activables desde Sistema, producto activo visible, alta rapida de cliente desde En vivo y aviso operativo contra reservas falsas; no se tocaron backend, finanzas, reportes ni integraciones.
+- LIVE-T: se corrige base de conectividad LAN para QA con host API dinamico, CORS LAN para `http://192.168.0.128:8081`, login directo QA validado contra `192.168.0.128:8090` y safe area Android reforzada; queda pendiente reiniciar backend y smoke fisico Android/tablet/equipo QA.
+- LIVE-U: se reemplaza el producto demo del spotlight por datos reales disponibles de prenda seleccionada o ultima reserva; la vista presentadora y estado operativo quedan ligados a transmision/producto actual, con roles informativos no accionables.
+- LIVE-V: se agrega configuracion local de widgets En vivo desde Sistema para spotlight, vista presentadora, estado operativo, roles, analiticos y actividad; mobile oculta automaticamente widgets de alto ruido.
+- LIVE-W: se reorganiza la captura En vivo como flujo guiado, priorizando cliente existente, codigo/QR de prenda, busqueda secundaria y altas rapidas terciarias.
+- LIVE-W adicional: se agrega colapso real de layout cuando widgets estan ocultos, la consola del operador gana prioridad visual y las altas rapidas se vuelven acciones discretas para reducir ruido operacional.
+- LIVE-X: se agregan helpers frontend de permisos LIVE para diferenciar presentadora, operador y supervisor; Sistema y Usuarios reciben guard de navegacion directa. Queda pendiente AUTH-A para cerrar permisos backend en lecturas/altas de customers/items/live listados.
+- AUTH-A: login backend ahora bloquea `NO_ACCESS`, usuarios sin permisos efectivos y usuarios sin company/branch activa asignada; se revocan sesiones activas previas del mismo usuario y login/me devuelven company activa. Frontend agrega helpers generales y guards directos para Clientes, Inventario y Lotes. No se creo migracion Flyway porque `user_api_sessions` ya contiene columnas requeridas.
+- AUTH-A ajuste: el frontend ahora reacciona ante `401` de token revocado, limpia sesion local, redirige a `/login` y muestra aviso de sesion cerrada por login en otro equipo.
 
 ## Madurez ERP estimada
 
 | Area | Madurez |
 |---|---:|
-| Usuarios y permisos | 70% |
-| Clientes | 60% |
+| Usuarios y permisos | 78% |
+| Clientes | 68% |
 | Proveedores | 45% |
-| Inventario | 65% |
-| Lotes | 55% |
+| Inventario | 70% |
+| Lotes | 66% |
 | Recepcion | 50% |
 | Ventas | 60% |
 | Caja | 55% |
 | Pagos | 60% |
 | Reportes | 50% |
 | Dashboard | 55% |
-| Auditoria | 35% |
-| Seguridad | 65% |
-| QA | 35% |
-| UX homogenea | 40% |
-| Trazabilidad | 35% |
-| ERP readiness general | 52% |
+| Auditoria | 38% |
+| Seguridad | 70% |
+| Multi-compania / SaaS readiness | 68% |
+| QA | 78% |
+| UX homogenea | 52% |
+| Trazabilidad | 50% |
+| Gobernanza ERP | 76% |
+| ERP readiness general | 74% |
 
 ## Prioridad inmediata
 
-1. Congelar crecimiento funcional no critico.
-2. Homologar validaciones y notificaciones.
-3. Cerrar matriz de permisos por endpoint.
-4. Definir regresion minima por flujo critico.
-5. Reforzar auditoria funcional en operaciones sensibles.
-6. Corregir codificacion de textos de forma controlada en una fase posterior.
+1. Mantener cambios pequenos, seguros y reversibles.
+2. Limpiar artefactos Git no rastreados antes de release.
+3. Ejecutar checklist RC completo y consolidar evidencia visual formal para frontend web.
+4. Cerrar matriz tabla-endpoint-tenant antes de cualquier migracion multi-compania.
+5. Crear dataset Empresa A/B para probar aislamiento real en customers/items/batches.
+6. Tenantizar proveedores o definirlos formalmente como catalogo global antes de SaaS real.
+7. Mantener ventas/pagos/reportes/live fuera de alcance hasta completar QA cross-company.
+8. Cerrar matriz de roles SaaS vs roles ERP antes de exponer consola HPSQ-SOFT.
+9. Validar matriz endpoint-permiso en Fase 4 sin asumir cobertura.
+10. Reforzar auditoria funcional en operaciones sensibles.
+11. Homologar UX despues de definir tenant context.
 

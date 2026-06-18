@@ -1,0 +1,18 @@
+﻿ app/appearance.tsx                                 | 187 +++++++++++----------
+ app/report-cancellations.tsx                       |  59 ++++---
+ app/report-daily-store.tsx                         |  63 +++----
+ app/report-deliveries.tsx                          |  55 +++---
+ app/report-deposits.tsx                            |  44 ++---
+ app/report-live.tsx                                |  59 ++++---
+ app/report-remissions.tsx                          |  61 ++++---
+ app/system-channels.tsx                            |  19 +--
+ app/system-roles.tsx                               |  30 ++--
+ app/system-security-audit.tsx                      |  84 ++++-----
+ app/users-form.tsx                                 | 143 ++++++++--------
+ components/layout/AppShellPage.tsx                 |  61 +++++++
+ docs/PRODUCT_D6_2B_VISIBLE_I18N_HARDCODES.md       |   6 +
+ docs/PRODUCT_D6_3_LEGACY_PREMIUM_MIGRATION.md      |  92 ++++++++++
+ locales/en/common.json                             | 160 +++++++++++++++++-
+ locales/es/common.json                             | 160 +++++++++++++++++-
+ ...acy-premium-migration-report-20260606-175759.md |  60 +++++++
+ 17 files changed, 958 insertions(+), 385 deletions(-)

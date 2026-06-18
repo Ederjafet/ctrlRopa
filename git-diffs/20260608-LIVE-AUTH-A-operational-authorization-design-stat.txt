@@ -1,0 +1,7 @@
+ ...LIVE_AUTH_A_OPERATIONAL_AUTHORIZATION_DESIGN.md | 339 +++++++++++++++++++++
+ docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md             |   1 +
+ docs/PROJECT_BACKLOG_PRIORITIZED.md                |   4 +
+ docs/PROJECT_MASTER_STATUS.md                      |  15 +-
+ docs/QA_TODO_HANDOFF.md                            |   1 +
+ ...-authorization-design-report-20260608-192625.md |  47 +++
+ 6 files changed, 401 insertions(+), 6 deletions(-)

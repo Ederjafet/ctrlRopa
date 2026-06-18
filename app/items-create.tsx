@@ -1,15 +1,16 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
+import AppActionDialog from '@/components/ui/AppActionDialog';
 import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
 import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
-import AppScreen from '@/components/ui/AppScreen';
 import AppSelectorField from '@/components/ui/AppSelectorField';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 
+import { getActionableApiError } from '@/services/apiError';
 import {
   Batch,
   Brand,
@@ -27,8 +28,9 @@ import {
 import { getSession } from '@/services/sessionStorage';
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Alert, FlatList, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Alert, FlatList, StyleSheet, TextInput, View } from 'react-native';
 
 type CatalogOption = {
   id: number;
@@ -42,6 +44,17 @@ type SelectorConfig = {
   options: CatalogOption[];
   onSelect: (option: CatalogOption | null) => void;
   allowClear?: boolean;
+};
+
+type FormErrors = Partial<
+  Record<'productType' | 'size' | 'price' | 'quantity', string>
+>;
+
+type FormErrorKey = keyof FormErrors;
+
+type ValidationDialogState = {
+  details: string[];
+  firstField?: FormErrorKey;
 };
 
 const mapBatchToOption = (batch: Batch): CatalogOption => ({
@@ -77,6 +90,9 @@ export default function ItemsCreateScreen() {
   const router = useRouter();
   const { returnTo, batchId, batchFolio } = useLocalSearchParams();
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
+  const priceInputRef = useRef<TextInput>(null);
+  const quantityInputRef = useRef<TextInput>(null);
 
   const returnRoute = typeof returnTo === 'string' ? returnTo : '/items';
   const preselectedBatchId = typeof batchId === 'string' ? Number(batchId) : null;
@@ -111,9 +127,17 @@ export default function ItemsCreateScreen() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
+  const [validationDialog, setValidationDialog] =
+    useState<ValidationDialogState | null>(null);
 
   const [selector, setSelector] = useState<SelectorConfig | null>(null);
   const [selectorSearch, setSelectorSearch] = useState('');
+
+  const showActionableError = (error: unknown) => {
+    const copy = getActionableApiError(error, t);
+    Alert.alert(copy.title, copy.message, [{ text: copy.primaryActionLabel }]);
+  };
 
   useEffect(() => {
     loadCatalogs();
@@ -149,20 +173,26 @@ export default function ItemsCreateScreen() {
         }
       }
 
-      const errors = [bootstrapResult, batchResult]
+      const errorCopies = [bootstrapResult, batchResult]
         .filter((result) => result.status === 'rejected')
         .map((result) =>
           result.status === 'rejected'
-            ? result.reason?.message || 'No se pudo cargar un catálogo.'
-            : ''
+            ? getActionableApiError(result.reason, t)
+            : null
         )
-        .filter(Boolean);
+        .filter(
+          (copy): copy is ReturnType<typeof getActionableApiError> => Boolean(copy)
+        );
 
-      if (errors.length > 0) {
-        Alert.alert('Catálogos', errors.join('\n'));
+      if (errorCopies.length > 0) {
+        const [copy] = errorCopies;
+        const messages = errorCopies.map((entry) => entry.message);
+        Alert.alert(copy.title, Array.from(new Set(messages)).join('\n'), [
+          { text: copy.primaryActionLabel },
+        ]);
       }
     } catch (e: any) {
-      Alert.alert('Catálogos', e.message || 'No se pudieron cargar los catálogos.');
+      showActionableError(e);
     }
   };
 
@@ -177,6 +207,7 @@ export default function ItemsCreateScreen() {
     setPrice('');
     setQuantity('1');
     setComments('');
+    setFormErrors({});
   };
 
   const openSelector = (config: SelectorConfig) => {
@@ -189,7 +220,101 @@ export default function ItemsCreateScreen() {
     setSelectorSearch('');
   };
 
+  const openProductTypeSelector = () => {
+    openSelector({
+      title: 'Seleccionar tipo de prenda',
+      options: productTypes,
+      onSelect: (option) => {
+        setSelectedProductType(option);
+        setFormErrors((current) => ({ ...current, productType: undefined }));
+      },
+    });
+  };
+
+  const openSizeSelector = () => {
+    openSelector({
+      title: 'Seleccionar talla',
+      options: sizes,
+      onSelect: (option) => {
+        setSelectedSize(option);
+        setFormErrors((current) => ({ ...current, size: undefined }));
+      },
+    });
+  };
+
+  const validateForm = () => {
+    const nextErrors: FormErrors = {};
+    const details: string[] = [];
+    let firstField: FormErrorKey | undefined;
+
+    const addError = (field: FormErrorKey, message: string) => {
+      nextErrors[field] = message;
+      details.push(message);
+      firstField = firstField ?? field;
+    };
+
+    if (!selectedProductType) {
+      addError('productType', t('itemsCreate.selectItemType'));
+    }
+
+    if (!selectedSize) {
+      addError('size', t('itemsCreate.selectSize'));
+    }
+
+    const qty = Number(quantity);
+    if (!qty || qty <= 0 || !Number.isInteger(qty)) {
+      addError('quantity', t('itemsCreate.validQuantity'));
+    }
+
+    const parsedPrice = price.trim() ? Number(price) : null;
+    if (requiresPrice && !price.trim()) {
+      addError('price', t('itemsCreate.validPrice'));
+    } else if (parsedPrice !== null && (Number.isNaN(parsedPrice) || parsedPrice < 0)) {
+      addError('price', t('itemsCreate.validPrice'));
+    } else if (requiresPrice && (!parsedPrice || parsedPrice <= 0)) {
+      addError('price', t('itemsCreate.validPrice'));
+    }
+
+    setFormErrors(nextErrors);
+
+    if (details.length > 0) {
+      setValidationDialog({ details, firstField });
+      return false;
+    }
+
+    setValidationDialog(null);
+    return true;
+  };
+
+  const goToFirstInvalidField = () => {
+    const field = validationDialog?.firstField;
+    setValidationDialog(null);
+
+    if (field === 'productType') {
+      openProductTypeSelector();
+      return;
+    }
+
+    if (field === 'size') {
+      openSizeSelector();
+      return;
+    }
+
+    if (field === 'price') {
+      priceInputRef.current?.focus();
+      return;
+    }
+
+    if (field === 'quantity') {
+      quantityInputRef.current?.focus();
+    }
+  };
+
   const handleCreate = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
     if (!selectedProductType) {
       Alert.alert('Validación', 'Selecciona el tipo de prenda.');
       return;
@@ -230,6 +355,7 @@ export default function ItemsCreateScreen() {
     try {
       setIsSaving(true);
       setSuccessMessage('');
+      setFormErrors({});
 
       const createdItemIds: number[] = [];
 
@@ -271,7 +397,7 @@ export default function ItemsCreateScreen() {
 
       Alert.alert('Alta de prendas', message);
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'No se pudieron crear las prendas.');
+      showActionableError(e);
     } finally {
       setIsSaving(false);
     }
@@ -281,16 +407,20 @@ export default function ItemsCreateScreen() {
     selector?.options.filter((option) => matchesOption(option, selectorSearch)) ?? [];
 
   return (
-    <AppScreen>
-        <AppBackButton fallbackRoute={returnRoute} />
-        <AppText variant="title" bold>
-          Alta masiva de prendas
-        </AppText>
-
+    <AppShellPage
+      title={t('navigation.items.createItems')}
+      subtitle={t('operationalScreens.itemsCreate.subtitle')}
+      activeRoute="items-create"
+      rightContent={
+        <AppButton
+          title={t('operationalScreens.itemsCreate.backToFlow')}
+          variant="secondary"
+          onPress={() => router.replace(returnRoute as any)}
+        />
+      }
+    >
         <AppText variant="caption" style={styles.intro}>
-          Crea una o varias prendas disponibles para inventario. El tipo de
-          prenda y la talla son obligatorios; lote, marca, ubicación y precio
-          sugerido son opcionales.
+          {t('operationalScreens.itemsCreate.intro')}
         </AppText>
 
         {successMessage ? (
@@ -302,6 +432,14 @@ export default function ItemsCreateScreen() {
           >
             <AppText>{successMessage}</AppText>
           </View>
+        ) : null}
+
+        {quickItemTarget === 'live' ? (
+          <AppCard variant="info">
+            <AppText variant="caption" color={theme.colors.textSecondary}>
+              {t('itemsCreate.liveReturnHelp')}
+            </AppText>
+          </AppCard>
         ) : null}
 
         <AppCard>
@@ -328,13 +466,8 @@ export default function ItemsCreateScreen() {
             label="Tipo de prenda *"
             value={selectedProductType?.name}
             placeholder="Seleccionar tipo"
-            onPress={() =>
-              openSelector({
-                title: 'Seleccionar tipo de prenda',
-                options: productTypes,
-                onSelect: setSelectedProductType,
-              })
-            }
+            error={formErrors.productType}
+            onPress={openProductTypeSelector}
           />
 
           <AppSelectorField
@@ -355,13 +488,8 @@ export default function ItemsCreateScreen() {
             label="Talla *"
             value={selectedSize?.name}
             placeholder="Seleccionar talla"
-            onPress={() =>
-              openSelector({
-                title: 'Seleccionar talla',
-                options: sizes,
-                onSelect: setSelectedSize,
-              })
-            }
+            error={formErrors.size}
+            onPress={openSizeSelector}
           />
 
           <AppSelectorField
@@ -383,19 +511,29 @@ export default function ItemsCreateScreen() {
         <AppCard>
           <AppResponsiveGrid>
           <AppInput
+            ref={priceInputRef}
             label={requiresPrice ? 'Precio *' : 'Precio sugerido'}
             value={price}
-            onChangeText={setPrice}
+            onChangeText={(value) => {
+              setPrice(value);
+              setFormErrors((current) => ({ ...current, price: undefined }));
+            }}
             keyboardType="numeric"
             placeholder={requiresPrice ? 'Obligatorio' : 'Opcional'}
+            error={formErrors.price}
           />
 
           <AppInput
+            ref={quantityInputRef}
             label="Cantidad *"
             value={quantity}
-            onChangeText={setQuantity}
+            onChangeText={(value) => {
+              setQuantity(value);
+              setFormErrors((current) => ({ ...current, quantity: undefined }));
+            }}
             keyboardType="numeric"
             placeholder="Ej. 1"
+            error={formErrors.quantity}
           />
 
           <AppInput
@@ -408,10 +546,31 @@ export default function ItemsCreateScreen() {
         </AppCard>
 
         <AppButton
-          title="Generar prendas"
+          title={t('operationalScreens.itemsCreate.generateItems')}
           onPress={handleCreate}
           loading={isSaving}
         />
+      <AppActionDialog
+        visible={!!validationDialog}
+        title={t('itemsCreate.validationTitle')}
+        message={t('itemsCreate.validationMessage')}
+        details={validationDialog?.details ?? []}
+        variant="warning"
+        onClose={() => setValidationDialog(null)}
+        primaryAction={{
+          label: t('common.understood'),
+          onPress: () => setValidationDialog(null),
+        }}
+        secondaryAction={
+          validationDialog?.firstField
+            ? {
+                label: t('itemsCreate.goToFirstField'),
+                onPress: goToFirstInvalidField,
+                variant: 'secondary',
+              }
+            : undefined
+        }
+      />
       <AppBottomModal
         visible={!!selector}
         title={selector?.title ?? ''}
@@ -458,7 +617,7 @@ export default function ItemsCreateScreen() {
           }
         />
       </AppBottomModal>
-    </AppScreen>
+    </AppShellPage>
   );
 }
 

@@ -29,16 +29,18 @@ public class OperationMenuService {
 
         List<OperationMenuResponse.MenuModule> modules = new ArrayList<>();
 
-        modules.add(permissionOnly("CUSTOMERS", "Clientes", userId, PermissionCode.VIEW_INVENTORY));
+        modules.add(permissionOnly("CUSTOMERS", "Clientes", userId, PermissionCode.VIEW_CUSTOMERS));
         modules.add(permissionOnly("INVENTORY", "Inventario", userId, PermissionCode.VIEW_INVENTORY));
 
-        modules.add(permissionAndChannel(
+        modules.add(permissionAndChannelAny(
                 "LIVE",
                 "Live",
                 userId,
                 user.branchId(),
-                PermissionCode.DO_LIVE_RESERVATION,
-                ChannelCode.LIVE
+                ChannelCode.LIVE,
+                PermissionCode.VIEW_LIVE,
+                PermissionCode.OPERATE_LIVE,
+                PermissionCode.DO_LIVE_RESERVATION
         ));
 
         modules.add(permissionAndChannel(
@@ -59,7 +61,7 @@ public class OperationMenuService {
                 ChannelCode.DOOR_RESERVATION
         ));
 
-        modules.add(permissionOnly("PAYMENTS", "Pagos", userId, PermissionCode.REGISTER_PAYMENTS));
+        modules.add(permissionOnly("PAYMENTS", "Pagos", userId, PermissionCode.VIEW_PAYMENTS));
         modules.add(permissionOnly("BALANCE", "Saldo a favor", userId, PermissionCode.APPLY_CUSTOMER_BALANCE));
         modules.add(permissionOnly("PACKAGES", "Paquetes", userId, PermissionCode.CREATE_CLOSE_CUSTOMER_PACKAGE));
         modules.add(permissionOnly("SHIPMENTS", "Envíos", userId, PermissionCode.MANAGE_SHIPMENTS));
@@ -118,6 +120,38 @@ public class OperationMenuService {
 
         if (!hasPermission) {
             reason = "Permiso requerido: " + permissionCode;
+        } else if (!channelEnabled) {
+            reason = "Canal deshabilitado: " + channelCode;
+        }
+
+        return new OperationMenuResponse.MenuModule(
+                code,
+                name,
+                enabled,
+                reason
+        );
+    }
+
+    private OperationMenuResponse.MenuModule permissionAndChannelAny(String code,
+                                                                     String name,
+                                                                     Long userId,
+                                                                     Long branchId,
+                                                                     String channelCode,
+                                                                     String... permissionCodes) {
+        boolean hasPermission = false;
+        for (String permissionCode : permissionCodes) {
+            if (hasPermission(userId, permissionCode)) {
+                hasPermission = true;
+                break;
+            }
+        }
+
+        boolean channelEnabled = isChannelEnabled(branchId, channelCode);
+        boolean enabled = hasPermission && channelEnabled;
+        String reason = null;
+
+        if (!hasPermission) {
+            reason = "Permiso requerido: " + String.join(" o ", permissionCodes);
         } else if (!channelEnabled) {
             reason = "Canal deshabilitado: " + channelCode;
         }

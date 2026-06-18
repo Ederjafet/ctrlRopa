@@ -36,23 +36,27 @@ export default function AppText({
 
 const styles = StyleSheet.create({
   base: {
-    color: '#111111',
+    letterSpacing: 0,
   },
 });
 
 const variantStyles = StyleSheet.create({
   title: {
-    fontSize: 22,
-    marginBottom: 12,
+    fontSize: 24,
+    lineHeight: 31,
+    marginBottom: 10,
   },
   subtitle: {
-    fontSize: 16,
-    marginBottom: 8,
+    fontSize: 17,
+    lineHeight: 24,
+    marginBottom: 6,
   },
   body: {
     fontSize: 14,
+    lineHeight: 21,
   },
   caption: {
     fontSize: 12,
+    lineHeight: 17,
   },
 });

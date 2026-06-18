@@ -1,18 +1,31 @@
 package com.hpsqsoft.ctrlropa.batch;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.hpsqsoft.ctrlropa.branch.Branch;
 import com.hpsqsoft.ctrlropa.catalog.Supplier;
+import com.hpsqsoft.ctrlropa.company.Company;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "batches")
+@Table(
+        name = "batches",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uq_batches_company_folio",
+                columnNames = {"company_id", "folio"}
+        )
+)
 public class Batch {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @JsonIgnore
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id", nullable = false)
+    private Company company;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "branch_id", nullable = false)
@@ -22,7 +35,7 @@ public class Batch {
     @JoinColumn(name = "supplier_id")
     private Supplier supplier;
 
-    @Column(nullable = false, unique = true, length = 50)
+    @Column(nullable = false, length = 50)
     private String folio;
 
     @Column(name = "expected_quantity", nullable = false)
@@ -72,6 +85,9 @@ public class Batch {
     }
 
     public Long getId() { return id; }
+
+    public Company getCompany() { return company; }
+    public void setCompany(Company company) { this.company = company; }
 
     public Branch getBranch() { return branch; }
     public void setBranch(Branch branch) { this.branch = branch; }

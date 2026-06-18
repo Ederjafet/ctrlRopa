@@ -1,0 +1,1758 @@
+﻿diff --git a/app/batches.tsx b/app/batches.tsx
+index 4d12f6d..8b8cddf 100644
+--- a/app/batches.tsx
++++ b/app/batches.tsx
+@@ -1,8 +1,7 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import {
+@@ -16,16 +15,17 @@ import { hasAnyPermission } from '@/services/accessControl';
+ import { getSession } from '@/services/sessionStorage';
+ import { useFocusEffect, useRouter } from 'expo-router';
+ import { useCallback, useMemo, useState } from 'react';
++import { useTranslation } from 'react-i18next';
+ import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
+
+ type BatchStatusFilter = 'ALL' | BatchStatus;
+
+-const statusFilters: { label: string; value: BatchStatusFilter }[] = [
+-  { label: 'Todo', value: 'ALL' },
+-  { label: 'Por recibir', value: 'ANNOUNCED' },
+-  { label: 'Recibidos', value: 'RECEIVED' },
+-  { label: 'Cerrados', value: 'RECONCILED' },
+-  { label: 'Cancelados', value: 'CANCELLED' },
++const statusFilters: { labelKey: string; value: BatchStatusFilter }[] = [
++  { labelKey: 'operationalScreens.batches.filterAll', value: 'ALL' },
++  { labelKey: 'operationalScreens.batches.filterAnnounced', value: 'ANNOUNCED' },
++  { labelKey: 'operationalScreens.batches.filterReceived', value: 'RECEIVED' },
++  { labelKey: 'operationalScreens.batches.filterReconciled', value: 'RECONCILED' },
++  { labelKey: 'operationalScreens.batches.filterCancelled', value: 'CANCELLED' },
+ ];
+
+ function normalize(value?: string | null) {
+@@ -35,6 +35,7 @@ function normalize(value?: string | null) {
+ export default function BatchesScreen() {
+   const router = useRouter();
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+
+   const [batches, setBatches] = useState<Batch[]>([]);
+   const [search, setSearch] = useState('');
+@@ -108,32 +109,33 @@ export default function BatchesScreen() {
+
+   if (loading) {
+     return (
+-      <AppScreen scroll={false}>
++      <AppShellPage
++        title={t('navigation.items.batches')}
++        subtitle={t('operationalScreens.batches.subtitle')}
++        activeRoute="batches"
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+   return (
+-    <AppScreen scroll={false}>
+-      <AppBackButton fallbackRoute="/" />
+-
+-      <AppText variant="title" bold>
+-        Lotes
+-      </AppText>
+-
+-      <AppText variant="caption" color={theme.colors.mutedText} style={styles.intro}>
+-        Administra recepción, clasificación y conciliación de lotes de inventario.
+-      </AppText>
+-
+-      {canManageInventory ? (
+-        <View style={styles.createButtonWrapper}>
+-          <AppButton title="+ Nuevo lote" onPress={() => router.push('/batch-form')} />
+-        </View>
+-      ) : null}
++    <AppShellPage
++      title={t('navigation.items.batches')}
++      subtitle={t('operationalScreens.batches.subtitle')}
++      activeRoute="batches"
++      rightContent={
++        canManageInventory ? (
++          <AppButton
++            title={t('operationalScreens.batches.createBatch')}
++            onPress={() => router.push('/batch-form')}
++          />
++        ) : null
++      }
++    >
+
+       <AppInput
+-        placeholder="Buscar por folio, estado o notas"
++        placeholder={t('operationalScreens.batches.searchPlaceholder')}
+         value={search}
+         onChangeText={setSearch}
+       />
+@@ -142,7 +144,7 @@ export default function BatchesScreen() {
+         {statusFilters.map((filter) => (
+           <View key={filter.value} style={styles.filterButton}>
+             <AppButton
+-              title={filter.label}
++              title={t(filter.labelKey)}
+               variant={statusFilter === filter.value ? 'primary' : 'secondary'}
+               onPress={() => setStatusFilter(filter.value)}
+             />
+@@ -177,10 +179,10 @@ export default function BatchesScreen() {
+                     {item.folio}
+                   </AppText>
+                   <AppText variant="caption" color={theme.colors.mutedText}>
+-                    {item.branchName || 'Sucursal actual'}
++                    {item.branchName || t('operationalScreens.batches.currentBranch')}
+                   </AppText>
+                   <AppText variant="caption" color={theme.colors.mutedText}>
+-                    Proveedor: {item.supplierName || 'Sin proveedor'}
++                    {t('operationalScreens.batches.supplier')}: {item.supplierName || t('operationalScreens.batches.noSupplier')}
+                   </AppText>
+                 </View>
+
+@@ -201,18 +203,18 @@ export default function BatchesScreen() {
+               </View>
+
+               <View style={styles.metricsRow}>
+-                <AppText>Esperado: {item.expectedQuantity ?? 0}</AppText>
+-                <AppText>Recibido: {item.receivedQuantity ?? '-'}</AppText>
++                <AppText>{t('operationalScreens.batches.expected')}: {item.expectedQuantity ?? 0}</AppText>
++                <AppText>{t('operationalScreens.batches.received')}: {item.receivedQuantity ?? '-'}</AppText>
+               </View>
+
+               <View style={styles.metricsRow}>
+-                <AppText>Clasificado: {item.classifiedQuantity ?? 0}</AppText>
+-                <AppText>Items: {item.itemCount ?? 0}</AppText>
++                <AppText>{t('operationalScreens.batches.classified')}: {item.classifiedQuantity ?? 0}</AppText>
++                <AppText>{t('operationalScreens.batches.items')}: {item.itemCount ?? 0}</AppText>
+               </View>
+
+               {item.receivedAt ? (
+                 <AppText variant="caption" color={theme.colors.mutedText} style={styles.note}>
+-                  Recibido: {new Date(item.receivedAt).toLocaleString('es-MX')}
++                  {t('operationalScreens.batches.received')}: {new Date(item.receivedAt).toLocaleString('es-MX')}
+                 </AppText>
+               ) : null}
+
+@@ -223,31 +225,28 @@ export default function BatchesScreen() {
+               ) : null}
+
+               <AppText variant="caption" color={theme.colors.mutedText} style={styles.hint}>
+-                Tocar para ver detalle
++                {t('operationalScreens.batches.tapDetail')}
+               </AppText>
+             </AppCard>
+           </Pressable>
+         )}
+         ListEmptyComponent={
+           <AppCard>
+-            <AppText>No hay lotes para mostrar.</AppText>
++            <AppText>{t('operationalScreens.batches.noBatches')}</AppText>
+             <View style={styles.emptyAction}>
+-              <AppButton title="Crear primer lote" onPress={() => router.push('/batch-form')} />
++              <AppButton
++                title={t('operationalScreens.batches.createFirst')}
++                onPress={() => router.push('/batch-form')}
++              />
+             </View>
+           </AppCard>
+         }
+       />
+-    </AppScreen>
++    </AppShellPage>
+   );
+ }
+
+ const styles = StyleSheet.create({
+-  intro: {
+-    marginBottom: 12,
+-  },
+-  createButtonWrapper: {
+-    marginBottom: 12,
+-  },
+   filterRow: {
+     flexDirection: 'row',
+     flexWrap: 'wrap',
+diff --git a/app/door-reservation.tsx b/app/door-reservation.tsx
+index 67550bf..f782fc2 100644
+--- a/app/door-reservation.tsx
++++ b/app/door-reservation.tsx
+@@ -1,11 +1,10 @@
++import AppShellPage from '@/components/layout/AppShellPage';
+ import QRScannerModal from '@/components/qr/QRScannerModal';
+-import AppBackButton from '@/components/ui/AppBackButton';
+ import AppBottomModal from '@/components/ui/AppBottomModal';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+ import AppOptionRow from '@/components/ui/AppOptionRow';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+
+@@ -30,6 +29,7 @@ import {
+   StyleSheet,
+   View,
+ } from 'react-native';
++import { useTranslation } from 'react-i18next';
+
+ type CartLine = {
+   item: Item;
+@@ -47,6 +47,7 @@ type ReservationValidationIssue =
+ export default function DoorReservationScreen() {
+   const router = useRouter();
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+
+   const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
+   const [isLoading, setIsLoading] = useState(true);
+@@ -434,35 +435,42 @@ export default function DoorReservationScreen() {
+
+   if (isAllowed === null || isLoading) {
+     return (
+-      <AppScreen>
++      <AppShellPage
++        title={t('navigation.items.doorHold')}
++        subtitle={t('operationalScreens.doorReservation.subtitle')}
++        activeRoute="door-reservation"
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+   return (
+     <>
+-      <AppScreen>
+-      <AppBackButton fallbackRoute="/" />
+-
+-      <AppText variant="title" bold>
+-        Crear apartado en puerta
+-      </AppText>
++      <AppShellPage
++        title={t('navigation.items.doorHold')}
++        subtitle={t('operationalScreens.doorReservation.subtitle')}
++        activeRoute="door-reservation"
++      >
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Cliente
++          {t('operationalScreens.shared.customer')}
+         </AppText>
+
+         <AppText>
+           {selectedCustomer
+             ? selectedCustomer.name
+-            : 'Selecciona un cliente real. No se permite cliente genérico.'}
++            : t('operationalScreens.doorReservation.selectRealCustomer')}
+         </AppText>
+
+         <View style={styles.actionSpacing}>
+           <AppButton
+-            title={selectedCustomer ? 'Cambiar cliente' : 'Seleccionar cliente'}
++            title={
++              selectedCustomer
++                ? t('operationalScreens.shared.changeCustomer')
++                : t('operationalScreens.shared.selectCustomer')
++            }
+             variant="operation"
+             onPress={() => setIsCustomerModalVisible(true)}
+           />
+@@ -471,28 +479,28 @@ export default function DoorReservationScreen() {
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Agregar prenda
++          {t('operationalScreens.shared.addItem')}
+         </AppText>
+         <AppText color={theme.colors.mutedText}>
+-          Usa código, QR, búsqueda o alta rapida para agregar prendas al apartado.
++          {t('operationalScreens.doorReservation.addItemHelp')}
+         </AppText>
+
+         <AppInput
+-          placeholder="Escanea o escribe código/QR"
++          placeholder={t('operationalScreens.shared.scanOrCodePlaceholder')}
+           value={scanInput}
+           onChangeText={setScanInput}
+           onSubmitEditing={() => addItemByCode(scanInput)}
+         />
+
+         <AppButton
+-          title="Agregar por código"
++          title={t('operationalScreens.shared.addByCode')}
+           variant="operation"
+           onPress={() => addItemByCode(scanInput)}
+         />
+
+         <View style={styles.actionSpacing}>
+           <AppButton
+-            title="Buscar prenda"
++            title={t('operationalScreens.shared.searchItem')}
+             variant="operation"
+             onPress={() => setIsItemModalVisible(true)}
+           />
+@@ -500,7 +508,7 @@ export default function DoorReservationScreen() {
+
+         <View style={styles.actionSpacing}>
+           <AppButton
+-            title="Escanear con cámara"
++            title={t('operationalScreens.shared.scanWithCamera')}
+             variant="operation"
+             onPress={() => setIsScannerVisible(true)}
+           />
+@@ -509,32 +517,37 @@ export default function DoorReservationScreen() {
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Prendas
++          {t('operationalScreens.shared.items')}
+         </AppText>
+
+         {cart.length === 0 ? (
+-          <AppText color={theme.colors.mutedText}>No hay prendas agregadas.</AppText>
++          <AppText color={theme.colors.mutedText}>
++            {t('operationalScreens.shared.noItemsAdded')}
++          </AppText>
+         ) : (
+           cart.map((line) => (
+-            <View key={line.item.id} style={styles.cartLine}>
++            <View
++              key={line.item.id}
++              style={[styles.cartLine, { borderBottomColor: theme.colors.borderSubtle }]}
++            >
+               <AppText bold>{line.item.code}</AppText>
+
+               <AppText>
+-                {line.item.productTypeName || 'Sin tipo'} ·{' '}
+-                {line.item.brandName || 'Sin marca'} ·{' '}
+-                {line.item.sizeName || 'Sin talla'}
++                {line.item.productTypeName || t('operationalScreens.shared.noType')} ·{' '}
++                {line.item.brandName || t('operationalScreens.shared.noBrand')} ·{' '}
++                {line.item.sizeName || t('operationalScreens.shared.noSize')}
+               </AppText>
+
+               <AppInput
+-                label="Precio apartado *"
++                label={t('operationalScreens.doorReservation.holdPrice')}
+                 value={line.priceText}
+                 onChangeText={(value) => updateLinePrice(line.item.id, value)}
+                 keyboardType="numeric"
+-                placeholder="Captura precio"
++                placeholder={t('operationalScreens.doorReservation.pricePlaceholder')}
+               />
+
+               <AppButton
+-                title="Quitar"
++                title={t('operationalScreens.shared.remove')}
+                 variant="danger"
+                 onPress={() => removeItemFromCart(line.item.id)}
+               />
+@@ -543,14 +556,14 @@ export default function DoorReservationScreen() {
+         )}
+
+         <AppButton
+-          title="Agregar prenda"
++          title={t('operationalScreens.shared.addItem')}
+           variant="operation"
+           onPress={() => setIsItemModalVisible(true)}
+         />
+
+         <View style={styles.actionSpacing}>
+           <AppButton
+-            title="Alta rápida de prenda"
++            title={t('operationalScreens.doorReservation.quickItem')}
+             variant="operation"
+             onPress={() =>
+               router.push('/items-create?returnTo=/door-reservation' as any)
+@@ -561,29 +574,29 @@ export default function DoorReservationScreen() {
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Anticipo
++          {t('operationalScreens.doorReservation.advance')}
+         </AppText>
+
+         <AppInput
+-          label="Anticipo opcional"
++          label={t('operationalScreens.doorReservation.optionalAdvance')}
+           value={advanceText}
+           onChangeText={setAdvanceText}
+           keyboardType="numeric"
+-          placeholder="0.00"
++          placeholder={t('operationalScreens.doorReservation.advancePlaceholder')}
+         />
+
+         {getAdvance() > 0 ? (
+           <>
+             <AppText>
+-              Método:{' '}
++              {t('operationalScreens.shared.paymentMethod')}:{' '}
+               {selectedPaymentMethod
+                 ? selectedPaymentMethod.name
+-                : 'Sin seleccionar'}
++                : t('operationalScreens.shared.noSelection')}
+             </AppText>
+
+             <View style={styles.actionSpacing}>
+               <AppButton
+-                title="Seleccionar método de pago"
++                title={t('operationalScreens.shared.selectPaymentMethod')}
+                 variant="operation"
+                 onPress={() => setIsPaymentModalVisible(true)}
+               />
+@@ -591,17 +604,17 @@ export default function DoorReservationScreen() {
+           </>
+         ) : (
+           <AppText color={theme.colors.mutedText}>
+-            Si no capturas anticipo, solo se creará el apartado.
++            {t('operationalScreens.doorReservation.advanceHelp')}
+           </AppText>
+         )}
+
+         <View style={styles.totalRow}>
+-          <AppText bold>Total apartado</AppText>
++          <AppText bold>{t('operationalScreens.doorReservation.holdTotal')}</AppText>
+           <AppText bold>{formatMoney(getTotal())}</AppText>
+         </View>
+
+         <View style={styles.totalRow}>
+-          <AppText bold>Saldo pendiente</AppText>
++          <AppText bold>{t('operationalScreens.doorReservation.pendingBalance')}</AppText>
+           <AppText bold>
+             {formatMoney(Math.max(getTotal() - getAdvance(), 0))}
+           </AppText>
+@@ -609,12 +622,12 @@ export default function DoorReservationScreen() {
+       </AppCard>
+
+       <AppButton
+-        title="Crear apartado"
++        title={t('operationalScreens.doorReservation.createHold')}
+         onPress={handleSave}
+         loading={isSaving}
+         disabled={isSaving}
+       />
+-      </AppScreen>
++      </AppShellPage>
+
+       <QRScannerModal
+         visible={isScannerVisible}
+@@ -624,12 +637,12 @@ export default function DoorReservationScreen() {
+
+       <AppBottomModal
+         visible={isCustomerModalVisible}
+-        title="Seleccionar cliente"
++        title={t('operationalScreens.shared.selectCustomer')}
+         onClose={() => setIsCustomerModalVisible(false)}
+         scroll={false}
+       >
+         <AppInput
+-          placeholder="Buscar cliente"
++          placeholder={t('operationalScreens.shared.searchCustomerPlaceholder')}
+           value={customerSearch}
+           onChangeText={setCustomerSearch}
+         />
+@@ -642,24 +655,24 @@ export default function DoorReservationScreen() {
+           renderItem={({ item }) => (
+             <AppOptionRow
+               title={item.name}
+-              subtitle={`${item.phone || 'Sin teléfono'} · ${
+-                item.email || 'Sin correo'
++              subtitle={`${item.phone || t('operationalScreens.shared.noPhone')} · ${
++                item.email || t('operationalScreens.shared.noEmail')
+               }`}
+               onPress={() => selectCustomer(item)}
+             />
+           )}
+-          ListEmptyComponent={<AppText>No hay clientes reales activos.</AppText>}
++          ListEmptyComponent={<AppText>{t('operationalScreens.shared.noCustomers')}</AppText>}
+         />
+       </AppBottomModal>
+
+       <AppBottomModal
+         visible={isItemModalVisible}
+-        title="Agregar prenda"
++        title={t('operationalScreens.shared.addItem')}
+         onClose={() => setIsItemModalVisible(false)}
+         scroll={false}
+       >
+         <AppInput
+-          placeholder="Buscar por código, tipo, marca o talla"
++          placeholder={t('operationalScreens.shared.searchItemPlaceholder')}
+           value={itemSearch}
+           onChangeText={setItemSearch}
+         />
+@@ -672,26 +685,28 @@ export default function DoorReservationScreen() {
+           renderItem={({ item }) => (
+             <AppOptionRow
+               title={item.code}
+-              subtitle={`${item.productTypeName || 'Sin tipo'} · ${
+-                item.brandName || 'Sin marca'
+-              } · ${item.sizeName || 'Sin talla'}`}
++              subtitle={`${item.productTypeName || t('operationalScreens.shared.noType')} · ${
++                item.brandName || t('operationalScreens.shared.noBrand')
++              } · ${item.sizeName || t('operationalScreens.shared.noSize')}`}
+               onPress={() => addItemToCart(item)}
+             >
+               <AppText variant="caption" color={theme.colors.mutedText}>
+-                Precio sugerido:{' '}
++                {t('operationalScreens.shared.suggestedPrice')}:{' '}
+                 {item.price !== null && item.price !== undefined
+                   ? formatMoney(item.price)
+-                  : 'Sin precio'}
++                  : t('operationalScreens.shared.noPrice')}
+               </AppText>
+             </AppOptionRow>
+           )}
+-          ListEmptyComponent={<AppText>No hay prendas disponibles.</AppText>}
++          ListEmptyComponent={
++            <AppText>{t('operationalScreens.shared.noItemsAvailable')}</AppText>
++          }
+         />
+       </AppBottomModal>
+
+       <AppBottomModal
+         visible={isPaymentModalVisible}
+-        title="Método de pago"
++        title={t('operationalScreens.shared.paymentMethod')}
+         onClose={() => setIsPaymentModalVisible(false)}
+       >
+         {paymentMethods.map((method) => (
+@@ -705,30 +720,30 @@ export default function DoorReservationScreen() {
+
+       <AppBottomModal
+         visible={validationIssue !== null}
+-        title="Falta completar el apartado"
++        title={t('operationalScreens.doorReservation.validationTitle')}
+         onClose={() => setValidationIssue(null)}
+         showCancelButton={false}
+       >
+         {validationIssue === 'CUSTOMER' ? (
+-          <AppText>Selecciona un cliente real para crear el apartado.</AppText>
++          <AppText>{t('operationalScreens.doorReservation.validationCustomer')}</AppText>
+         ) : null}
+         {validationIssue === 'ITEM' ? (
+-          <AppText>Agrega al menos una prenda al apartado.</AppText>
++          <AppText>{t('operationalScreens.doorReservation.validationItem')}</AppText>
+         ) : null}
+         {validationIssue === 'PRICE' ? (
+-          <AppText>Revisa que todas las prendas tengan precio mayor a cero.</AppText>
++          <AppText>{t('operationalScreens.doorReservation.validationPrice')}</AppText>
+         ) : null}
+         {validationIssue === 'ADVANCE' ? (
+-          <AppText>El anticipo debe ser cero o mayor, y no puede superar el total.</AppText>
++          <AppText>{t('operationalScreens.doorReservation.validationAdvance')}</AppText>
+         ) : null}
+         {validationIssue === 'PAYMENT' ? (
+-          <AppText>Selecciona el metodo de pago para registrar el anticipo.</AppText>
++          <AppText>{t('operationalScreens.doorReservation.validationPayment')}</AppText>
+         ) : null}
+
+         <View style={styles.modalActions}>
+           <View style={styles.modalAction}>
+             <AppButton
+-              title="Cerrar"
++              title={t('operationalScreens.shared.close')}
+               variant="secondary"
+               onPress={() => setValidationIssue(null)}
+             />
+@@ -737,12 +752,12 @@ export default function DoorReservationScreen() {
+             <AppButton
+               title={
+                 validationIssue === 'CUSTOMER'
+-                  ? 'Elegir cliente'
++                  ? t('operationalScreens.doorReservation.chooseCustomer')
+                   : validationIssue === 'ITEM'
+-                    ? 'Agregar prenda'
++                    ? t('operationalScreens.shared.addItem')
+                     : validationIssue === 'PAYMENT'
+-                      ? 'Elegir pago'
+-                      : 'Revisar'
++                      ? t('operationalScreens.shared.choosePayment')
++                      : t('operationalScreens.shared.review')
+               }
+               onPress={() => {
+                 const issue = validationIssue;
+@@ -775,7 +790,6 @@ const styles = StyleSheet.create({
+     marginTop: 12,
+     paddingBottom: 12,
+     borderBottomWidth: 1,
+-    borderBottomColor: '#eeeeee',
+   },
+   modalList: {
+     maxHeight: 420,
+diff --git a/app/door-sale.tsx b/app/door-sale.tsx
+index 662a07c..64e61cc 100644
+--- a/app/door-sale.tsx
++++ b/app/door-sale.tsx
+@@ -1,11 +1,10 @@
++import AppShellPage from '@/components/layout/AppShellPage';
+ import QRScannerModal from '@/components/qr/QRScannerModal';
+-import AppBackButton from '@/components/ui/AppBackButton';
+ import AppBottomModal from '@/components/ui/AppBottomModal';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+ import AppOptionRow from '@/components/ui/AppOptionRow';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+
+@@ -31,6 +30,7 @@ import {
+   StyleSheet,
+   View,
+ } from 'react-native';
++import { useTranslation } from 'react-i18next';
+
+ type CartLine = {
+   item: Item;
+@@ -42,6 +42,7 @@ type SaleValidationIssue = 'ITEM' | 'PAYMENT' | 'PRICE' | null;
+ export default function DoorSaleScreen() {
+   const router = useRouter();
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+
+   const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
+   const [isLoading, setIsLoading] = useState(true);
+@@ -378,35 +379,42 @@ export default function DoorSaleScreen() {
+
+   if (isAllowed === null || isLoading) {
+     return (
+-      <AppScreen>
++      <AppShellPage
++        title={t('navigation.items.doorSale')}
++        subtitle={t('operationalScreens.doorSale.subtitle')}
++        activeRoute="door-sale"
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+   return (
+     <>
+-      <AppScreen>
+-      <AppBackButton fallbackRoute="/" />
+-
+-      <AppText variant="title" bold>
+-        Venta puerta
+-      </AppText>
++      <AppShellPage
++        title={t('navigation.items.doorSale')}
++        subtitle={t('operationalScreens.doorSale.subtitle')}
++        activeRoute="door-sale"
++      >
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Cliente
++          {t('operationalScreens.shared.customer')}
+         </AppText>
+
+         <AppText>
+           {selectedCustomer
+             ? selectedCustomer.name
+-            : 'Sin cliente seleccionado. Se usará cliente genérico puerta.'}
++            : t('operationalScreens.doorSale.genericCustomer')}
+         </AppText>
+
+         <View style={styles.actions}>
+           <AppButton
+-            title={selectedCustomer ? 'Cambiar cliente' : 'Seleccionar cliente'}
++            title={
++              selectedCustomer
++                ? t('operationalScreens.shared.changeCustomer')
++                : t('operationalScreens.shared.selectCustomer')
++            }
+             variant="operation"
+             onPress={() => setIsCustomerModalVisible(true)}
+           />
+@@ -414,7 +422,7 @@ export default function DoorSaleScreen() {
+           {selectedCustomer ? (
+             <View style={styles.actionSpacing}>
+               <AppButton
+-                title="Usar genérico puerta"
++                title={t('operationalScreens.doorSale.useGenericCustomer')}
+                 variant="secondary"
+                 onPress={() => setSelectedCustomer(null)}
+               />
+@@ -425,28 +433,28 @@ export default function DoorSaleScreen() {
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Agregar prenda
++          {t('operationalScreens.shared.addItem')}
+         </AppText>
+         <AppText color={theme.colors.mutedText}>
+-          Usa código, QR, búsqueda o alta rapida para agregar prendas a la venta.
++          {t('operationalScreens.doorSale.addItemHelp')}
+         </AppText>
+
+         <AppInput
+-          placeholder="Escanea o escribe código/QR"
++          placeholder={t('operationalScreens.shared.scanOrCodePlaceholder')}
+           value={scanInput}
+           onChangeText={setScanInput}
+           onSubmitEditing={() => addItemByCode(scanInput)}
+         />
+
+         <AppButton
+-          title="Agregar por código"
++          title={t('operationalScreens.shared.addByCode')}
+           variant="operation"
+           onPress={() => addItemByCode(scanInput)}
+         />
+
+         <View style={styles.actionSpacing}>
+           <AppButton
+-            title="Buscar prenda"
++            title={t('operationalScreens.shared.searchItem')}
+             variant="operation"
+             onPress={() => setIsItemModalVisible(true)}
+           />
+@@ -454,7 +462,7 @@ export default function DoorSaleScreen() {
+
+         <View style={styles.actionSpacing}>
+           <AppButton
+-            title="Escanear con cámara"
++            title={t('operationalScreens.shared.scanWithCamera')}
+             variant="operation"
+             onPress={() => setIsScannerVisible(true)}
+           />
+@@ -462,7 +470,7 @@ export default function DoorSaleScreen() {
+
+         <View style={styles.actionSpacing}>
+           <AppButton
+-            title="Alta rapida de prenda"
++            title={t('operationalScreens.doorSale.quickItem')}
+             variant="operation"
+             onPress={() =>
+               router.push('/items-create?returnTo=/door-sale' as any)
+@@ -473,31 +481,36 @@ export default function DoorSaleScreen() {
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Prendas
++          {t('operationalScreens.shared.items')}
+         </AppText>
+
+         {cart.length === 0 ? (
+-          <AppText color={theme.colors.mutedText}>No hay prendas agregadas.</AppText>
++          <AppText color={theme.colors.mutedText}>
++            {t('operationalScreens.shared.noItemsAdded')}
++          </AppText>
+         ) : (
+           cart.map((line) => (
+-            <View key={line.item.id} style={styles.cartLine}>
++            <View
++              key={line.item.id}
++              style={[styles.cartLine, { borderBottomColor: theme.colors.borderSubtle }]}
++            >
+               <AppText bold>{line.item.code}</AppText>
+               <AppText>
+-                {line.item.productTypeName || 'Sin tipo'} ·{' '}
+-                {line.item.brandName || 'Sin marca'} ·{' '}
+-                {line.item.sizeName || 'Sin talla'}
++                {line.item.productTypeName || t('operationalScreens.shared.noType')} ·{' '}
++                {line.item.brandName || t('operationalScreens.shared.noBrand')} ·{' '}
++                {line.item.sizeName || t('operationalScreens.shared.noSize')}
+               </AppText>
+
+               <AppInput
+-                label="Precio de venta *"
++                label={t('operationalScreens.doorSale.salePrice')}
+                 value={line.priceText}
+                 onChangeText={(value) => updateLinePrice(line.item.id, value)}
+                 keyboardType="numeric"
+-                placeholder="Captura precio"
++                placeholder={t('operationalScreens.doorSale.pricePlaceholder')}
+               />
+
+               <AppButton
+-                title="Quitar"
++                title={t('operationalScreens.shared.remove')}
+                 variant="danger"
+                 onPress={() => removeItemFromCart(line.item.id)}
+               />
+@@ -509,35 +522,37 @@ export default function DoorSaleScreen() {
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Pago
++          {t('operationalScreens.shared.payment')}
+         </AppText>
+
+         <AppText>
+-          Método:{' '}
+-          {selectedPaymentMethod ? selectedPaymentMethod.name : 'Sin seleccionar'}
++          {t('operationalScreens.shared.paymentMethod')}:{' '}
++          {selectedPaymentMethod
++            ? selectedPaymentMethod.name
++            : t('operationalScreens.shared.noSelection')}
+         </AppText>
+
+         <View style={styles.actionSpacing}>
+           <AppButton
+-            title="Seleccionar método de pago"
++            title={t('operationalScreens.shared.selectPaymentMethod')}
+             variant="operation"
+             onPress={() => setIsPaymentModalVisible(true)}
+           />
+         </View>
+
+         <View style={styles.totalRow}>
+-          <AppText bold>Total</AppText>
++          <AppText bold>{t('operationalScreens.shared.total')}</AppText>
+           <AppText bold>{formatMoney(getTotal())}</AppText>
+         </View>
+       </AppCard>
+
+       <AppButton
+-        title="Registrar venta pagada"
++        title={t('operationalScreens.doorSale.registerPaidSale')}
+         onPress={handleSale}
+         loading={isSaving}
+         disabled={isSaving}
+       />
+-      </AppScreen>
++      </AppShellPage>
+
+       <QRScannerModal
+         visible={isScannerVisible}
+@@ -547,12 +562,12 @@ export default function DoorSaleScreen() {
+
+       <AppBottomModal
+         visible={isCustomerModalVisible}
+-        title="Seleccionar cliente"
++        title={t('operationalScreens.shared.selectCustomer')}
+         onClose={() => setIsCustomerModalVisible(false)}
+         scroll={false}
+       >
+         <AppInput
+-          placeholder="Buscar cliente"
++          placeholder={t('operationalScreens.shared.searchCustomerPlaceholder')}
+           value={customerSearch}
+           onChangeText={setCustomerSearch}
+         />
+@@ -565,22 +580,22 @@ export default function DoorSaleScreen() {
+           renderItem={({ item }) => (
+             <AppOptionRow
+               title={item.name}
+-              subtitle={item.phone || 'Sin teléfono'}
++              subtitle={item.phone || t('operationalScreens.shared.noPhone')}
+               onPress={() => selectCustomer(item)}
+             />
+           )}
+-          ListEmptyComponent={<AppText>No hay clientes.</AppText>}
++          ListEmptyComponent={<AppText>{t('operationalScreens.shared.noCustomers')}</AppText>}
+         />
+       </AppBottomModal>
+
+       <AppBottomModal
+         visible={isItemModalVisible}
+-        title="Agregar prenda"
++        title={t('operationalScreens.shared.addItem')}
+         onClose={() => setIsItemModalVisible(false)}
+         scroll={false}
+       >
+         <AppInput
+-          placeholder="Buscar por código, tipo, marca o talla"
++          placeholder={t('operationalScreens.shared.searchItemPlaceholder')}
+           value={itemSearch}
+           onChangeText={setItemSearch}
+         />
+@@ -593,26 +608,28 @@ export default function DoorSaleScreen() {
+           renderItem={({ item }) => (
+             <AppOptionRow
+               title={item.code}
+-              subtitle={`${item.productTypeName || 'Sin tipo'} · ${
+-                item.brandName || 'Sin marca'
+-              } · ${item.sizeName || 'Sin talla'}`}
++              subtitle={`${item.productTypeName || t('operationalScreens.shared.noType')} · ${
++                item.brandName || t('operationalScreens.shared.noBrand')
++              } · ${item.sizeName || t('operationalScreens.shared.noSize')}`}
+               onPress={() => addItemToCart(item)}
+             >
+               <AppText variant="caption" color={theme.colors.mutedText}>
+-                Precio sugerido:{' '}
++                {t('operationalScreens.shared.suggestedPrice')}:{' '}
+                 {item.price !== null && item.price !== undefined
+                   ? formatMoney(item.price)
+-                  : 'Sin precio'}
++                  : t('operationalScreens.shared.noPrice')}
+               </AppText>
+             </AppOptionRow>
+           )}
+-          ListEmptyComponent={<AppText>No hay prendas disponibles.</AppText>}
++          ListEmptyComponent={
++            <AppText>{t('operationalScreens.shared.noItemsAvailable')}</AppText>
++          }
+         />
+       </AppBottomModal>
+
+       <AppBottomModal
+         visible={isPaymentModalVisible}
+-        title="Método de pago"
++        title={t('operationalScreens.shared.paymentMethod')}
+         onClose={() => setIsPaymentModalVisible(false)}
+       >
+         {paymentMethods.map((method) => (
+@@ -626,24 +643,24 @@ export default function DoorSaleScreen() {
+
+       <AppBottomModal
+         visible={validationIssue !== null}
+-        title="Falta completar la venta"
++        title={t('operationalScreens.doorSale.validationTitle')}
+         onClose={() => setValidationIssue(null)}
+         showCancelButton={false}
+       >
+         {validationIssue === 'ITEM' ? (
+-          <AppText>Agrega al menos una prenda para poder registrar la venta.</AppText>
++          <AppText>{t('operationalScreens.doorSale.validationItem')}</AppText>
+         ) : null}
+         {validationIssue === 'PAYMENT' ? (
+-          <AppText>Selecciona el metodo de pago antes de registrar la venta.</AppText>
++          <AppText>{t('operationalScreens.doorSale.validationPayment')}</AppText>
+         ) : null}
+         {validationIssue === 'PRICE' ? (
+-          <AppText>Revisa que todas las prendas tengan precio mayor a cero.</AppText>
++          <AppText>{t('operationalScreens.doorSale.validationPrice')}</AppText>
+         ) : null}
+
+         <View style={styles.modalActions}>
+           <View style={styles.modalAction}>
+             <AppButton
+-              title="Cerrar"
++              title={t('operationalScreens.shared.close')}
+               variant="secondary"
+               onPress={() => setValidationIssue(null)}
+             />
+@@ -652,10 +669,10 @@ export default function DoorSaleScreen() {
+             <AppButton
+               title={
+                 validationIssue === 'ITEM'
+-                  ? 'Agregar prenda'
++                  ? t('operationalScreens.doorSale.addItemAction')
+                   : validationIssue === 'PAYMENT'
+-                    ? 'Elegir pago'
+-                    : 'Revisar precios'
++                    ? t('operationalScreens.shared.choosePayment')
++                    : t('operationalScreens.doorSale.reviewPrices')
+               }
+               onPress={() => {
+                 const issue = validationIssue;
+@@ -690,7 +707,6 @@ const styles = StyleSheet.create({
+     marginTop: 12,
+     paddingBottom: 12,
+     borderBottomWidth: 1,
+-    borderBottomColor: '#eeeeee',
+   },
+   modalList: {
+     maxHeight: 420,
+diff --git a/app/items-create.tsx b/app/items-create.tsx
+index db03fcc..5c539b1 100644
+--- a/app/items-create.tsx
++++ b/app/items-create.tsx
+@@ -1,11 +1,10 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppBottomModal from '@/components/ui/AppBottomModal';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+ import AppOptionRow from '@/components/ui/AppOptionRow';
+ import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppSelectorField from '@/components/ui/AppSelectorField';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+@@ -339,16 +338,20 @@ export default function ItemsCreateScreen() {
+     selector?.options.filter((option) => matchesOption(option, selectorSearch)) ?? [];
+
+   return (
+-    <AppScreen>
+-        <AppBackButton fallbackRoute={returnRoute} />
+-        <AppText variant="title" bold>
+-          Alta masiva de prendas
+-        </AppText>
+-
++    <AppShellPage
++      title={t('navigation.items.createItems')}
++      subtitle={t('operationalScreens.itemsCreate.subtitle')}
++      activeRoute="items-create"
++      rightContent={
++        <AppButton
++          title={t('operationalScreens.itemsCreate.backToFlow')}
++          variant="secondary"
++          onPress={() => router.replace(returnRoute as any)}
++        />
++      }
++    >
+         <AppText variant="caption" style={styles.intro}>
+-          Crea una o varias prendas disponibles para inventario. El tipo de
+-          prenda y la talla son obligatorios; lote, marca, ubicación y precio
+-          sugerido son opcionales.
++          {t('operationalScreens.itemsCreate.intro')}
+         </AppText>
+
+         {successMessage ? (
+@@ -510,7 +513,7 @@ export default function ItemsCreateScreen() {
+         </AppCard>
+
+         <AppButton
+-          title="Generar prendas"
++          title={t('operationalScreens.itemsCreate.generateItems')}
+           onPress={handleCreate}
+           loading={isSaving}
+         />
+@@ -560,7 +563,7 @@ export default function ItemsCreateScreen() {
+           }
+         />
+       </AppBottomModal>
+-    </AppScreen>
++    </AppShellPage>
+   );
+ }
+
+diff --git a/app/items.tsx b/app/items.tsx
+index 2e8492a..8a260da 100644
+--- a/app/items.tsx
++++ b/app/items.tsx
+@@ -1,8 +1,7 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+
+@@ -14,6 +13,7 @@ import { getSession } from '@/services/sessionStorage';
+
+ import { useFocusEffect, useRouter } from 'expo-router';
+ import { useCallback, useEffect, useState } from 'react';
++import { useTranslation } from 'react-i18next';
+ import {
+   ActivityIndicator,
+   Alert,
+@@ -25,16 +25,17 @@ import {
+
+ type InventoryStatusFilter = 'ALL' | ItemStatus;
+
+-const statusFilters: Array<{ label: string; value: InventoryStatusFilter }> = [
+-  { label: 'Todo', value: 'ALL' },
+-  { label: 'Disponible', value: 'AVAILABLE' },
+-  { label: 'Reservado', value: 'RESERVED' },
+-  { label: 'Vendido', value: 'SOLD' },
++const statusFilters: { labelKey: string; value: InventoryStatusFilter }[] = [
++  { labelKey: 'operationalScreens.items.filterAll', value: 'ALL' },
++  { labelKey: 'operationalScreens.items.filterAvailable', value: 'AVAILABLE' },
++  { labelKey: 'operationalScreens.items.filterReserved', value: 'RESERVED' },
++  { labelKey: 'operationalScreens.items.filterSold', value: 'SOLD' },
+ ];
+
+ export default function ItemsScreen() {
+   const router = useRouter();
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+
+   const [items, setItems] = useState<Item[]>([]);
+   const [filtered, setFiltered] = useState<Item[]>([]);
+@@ -109,20 +110,20 @@ export default function ItemsScreen() {
+   };
+
+   const formatMoney = (value?: number | null) => {
+-    if (value === null || value === undefined) return 'Sin precio';
++    if (value === null || value === undefined) return t('operationalScreens.shared.noPrice');
+     return `$${value.toFixed(2)}`;
+   };
+
+   const getStatusColor = (status: string) => {
+     switch (status) {
+       case 'AVAILABLE':
+-        return '#2e7d32';
++        return theme.colors.success;
+       case 'SOLD':
+-        return '#999999';
++        return theme.colors.textMuted;
+       case 'RESERVED':
+-        return '#f9a825';
++        return theme.colors.danger;
+       case 'ON_CONSIGNMENT':
+-        return '#7e57c2';
++        return theme.colors.accent;
+       case 'DISABLED':
+         return theme.colors.mutedText;
+       default:
+@@ -139,33 +140,28 @@ export default function ItemsScreen() {
+
+   if (isLoading) {
+     return (
+-      <AppScreen scroll={false}>
++      <AppShellPage
++        title={t('navigation.items.itemsInventory')}
++        subtitle={t('operationalScreens.items.subtitle')}
++        activeRoute="items"
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+   return (
+-    <AppScreen scroll={false}>
+-      <AppBackButton fallbackRoute="/" />
+-
+-      <View style={styles.headerRow}>
+-        <View style={styles.titleWrapper}>
+-          <AppText variant="title" bold>
+-            Inventario
+-          </AppText>
+-          <AppText variant="caption" color={theme.colors.mutedText}>
+-            Consulta prendas y da de alta nuevas piezas desde este módulo.
+-          </AppText>
+-        </View>
+-      </View>
+-
+-      <View style={styles.createButtonWrapper}>
+-        <AppButton title="+ Alta prenda" onPress={goToCreateItem} />
+-      </View>
++    <AppShellPage
++      title={t('navigation.items.itemsInventory')}
++      subtitle={t('operationalScreens.items.subtitle')}
++      activeRoute="items"
++      rightContent={
++        <AppButton title={t('operationalScreens.items.createItem')} onPress={goToCreateItem} />
++      }
++    >
+
+       <AppInput
+-        placeholder="Buscar por código, tipo, marca, talla, lote o ubicación"
++        placeholder={t('operationalScreens.items.searchPlaceholder')}
+         value={search}
+         onChangeText={setSearch}
+       />
+@@ -180,7 +176,7 @@ export default function ItemsScreen() {
+         {statusFilters.map((filter) => (
+           <View key={filter.value} style={styles.filterButton}>
+             <AppButton
+-              title={filter.label}
++              title={t(filter.labelKey)}
+               variant={statusFilter === filter.value ? 'primary' : 'secondary'}
+               onPress={() => setStatusFilter(filter.value)}
+             />
+@@ -209,18 +205,18 @@ export default function ItemsScreen() {
+               <AppText bold>{item.code}</AppText>
+
+               <AppText>
+-                {item.productTypeName || 'Sin tipo'} ·{' '}
+-                {item.brandName || 'Sin marca'} ·{' '}
+-                {item.sizeName || 'Sin talla'}
++                {item.productTypeName || t('operationalScreens.shared.noType')} ·{' '}
++                {item.brandName || t('operationalScreens.shared.noBrand')} ·{' '}
++                {item.sizeName || t('operationalScreens.shared.noSize')}
+               </AppText>
+
+               <View style={styles.metaBlock}>
+                 <AppText variant="caption" color={theme.colors.mutedText}>
+-                  Lote: {item.batchFolio || 'Sin lote'}
++                  {t('operationalScreens.items.batch')}: {item.batchFolio || t('operationalScreens.items.noBatch')}
+                 </AppText>
+
+                 <AppText variant="caption" color={theme.colors.mutedText}>
+-                  Ubicación: {item.storageLocationName || 'Sin ubicación'}
++                  {t('operationalScreens.items.location')}: {item.storageLocationName || t('operationalScreens.items.noLocation')}
+                 </AppText>
+               </View>
+
+@@ -242,21 +238,21 @@ export default function ItemsScreen() {
+                 color={theme.colors.mutedText}
+                 style={styles.hint}
+               >
+-                Tocar para ver detalle
++                {t('operationalScreens.items.tapDetail')}
+               </AppText>
+             </AppCard>
+           </Pressable>
+         )}
+         ListEmptyComponent={
+           <AppCard>
+-            <AppText>No hay prendas en inventario.</AppText>
++            <AppText>{t('operationalScreens.items.noInventory')}</AppText>
+             <View style={styles.emptyAction}>
+-              <AppButton title="Crear primera prenda" onPress={goToCreateItem} />
++              <AppButton title={t('operationalScreens.items.createFirst')} onPress={goToCreateItem} />
+             </View>
+           </AppCard>
+         }
+       />
+-    </AppScreen>
++    </AppShellPage>
+   );
+ }
+
+@@ -267,15 +263,6 @@ const styles = StyleSheet.create({
+   listContent: {
+     paddingBottom: 24,
+   },
+-  headerRow: {
+-    marginBottom: 12,
+-  },
+-  titleWrapper: {
+-    flex: 1,
+-  },
+-  createButtonWrapper: {
+-    marginBottom: 12,
+-  },
+   filterRow: {
+     flexDirection: 'row',
+     flexWrap: 'wrap',
+diff --git a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+index ef1c635..71c2aa2 100644
+--- a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
++++ b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+@@ -279,3 +279,19 @@ Ver:
+ - `docs/PRODUCT_D_ROLE_BASED_QA_MATRIX.md`
+ - `docs/PRODUCT_D_QA_CHECKLIST.md`
+ - `docs/PRODUCT_D_ROLE_BASED_QA_HANDOFF.md`
++
++---
++
++## Continuidad PRODUCT-D6.4 - Operacion legacy a AppShell
++
++Fecha: 2026-06-06
++
++PRODUCT-D6.4 extiende el sistema visual premium a pantallas operativas legacy:
++
++- `/door-sale`
++- `/door-reservation`
++- `/items`
++- `/items-create`
++- `/batches`
++
++La fase no cambia tokens ni reglas de negocio. Aplica `AppShellPage`, sidebar/drawer, active state e i18n principal para que venta puerta, apartado puerta, inventario, alta de prendas y lotes ya no se vean como pantallas aisladas.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index ba27ce3..fcae6cd 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -120,3 +120,15 @@ La corrida manual desde LIVE debe agregar el caso `Crear prenda rapida`:
+ - confirmar que aparece resumen de validacion y error visible por campo;
+ - completar datos validos;
+ - confirmar que la creacion correcta mantiene el regreso a LIVE.
++
++## Nota PRODUCT-D6.4
++
++La siguiente corrida manual debe confirmar AppShell/sidebar/drawer y ausencia de navegacion legacy en:
++
++- `/door-sale`;
++- `/door-reservation`;
++- `/items`;
++- `/items-create?returnTo=%2Flive`;
++- `/batches`.
++
++Validar tambien active state correcto, idioma Espanol/English, light/dark, presets visuales y responsive desktop/tablet/mobile.
+diff --git a/docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md b/docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md
+index 95f85bf..ec09627 100644
+--- a/docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md
++++ b/docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md
+@@ -40,6 +40,10 @@ PRODUCT-D6.1 refuerza esta decision: las pantallas AppShell auditadas deben cons
+
+ La navegacion traducible depende de la fuente global `i18next` + AsyncStorage (`app_language`). El shell comun (`Sidebar`, `TopBar`, logout y theme toggle) debe usar `useTranslation('common')` para evitar mezclas de idioma entre menu y contenido.
+
++## Nota PRODUCT-D6.4
++
++Las rutas operativas expuestas desde D5 en el menu (`/door-sale`, `/door-reservation`, `/items`, `/items-create`, `/batches`) fueron migradas en PRODUCT-D6.4 a `AppShellPage`, manteniendo los mismos permisos/canales documentados en esta matriz.
++
+ Reglas aplicadas:
+
+ - No se muestran categorias vacias.
+diff --git a/docs/PRODUCT_D6_3_LEGACY_PREMIUM_MIGRATION.md b/docs/PRODUCT_D6_3_LEGACY_PREMIUM_MIGRATION.md
+index 28f3c68..78cf0f3 100644
+--- a/docs/PRODUCT_D6_3_LEGACY_PREMIUM_MIGRATION.md
++++ b/docs/PRODUCT_D6_3_LEGACY_PREMIUM_MIGRATION.md
+@@ -69,6 +69,18 @@ No se traducen claves tecnicas, codigos de permisos, codigos de canal, estados b
+
+ No quedaron pantallas del listado D6.3 sin migrar. Rutas fuera del listado se dejan para fases posteriores si QA las detecta como legacy.
+
++## Nota PRODUCT-D6.4
++
++PRODUCT-D6.4 extiende la misma estrategia de `AppShellPage` a pantallas operativas que no entraron en el listado D6.3:
++
++- `/door-sale`
++- `/door-reservation`
++- `/items`
++- `/items-create`
++- `/batches`
++
++Las rutas de caja (`cash-closures`, `cash-closure-detail`) se documentan como legacy pendiente, pero no se migran en D6.4 porque caja queda explicitamente fuera de alcance.
++
+ ## Riesgos pendientes
+
+ - Algunas tablas de reportes muestran estados/codigos que vienen del backend; se mantienen como datos tecnicos.
+diff --git a/docs/PRODUCT_D6_4_OPERATIONAL_LEGACY_APPSHELL.md b/docs/PRODUCT_D6_4_OPERATIONAL_LEGACY_APPSHELL.md
+new file mode 100644
+index 0000000..b908e63
+--- /dev/null
++++ b/docs/PRODUCT_D6_4_OPERATIONAL_LEGACY_APPSHELL.md
+@@ -0,0 +1,88 @@
++# PRODUCT-D6.4 - Migracion premium de pantallas operativas legacy a AppShell
++
++Fecha: 2026-06-06
++
++## Objetivo
++
++Migrar pantallas operativas legacy a `AppShell` premium, especialmente `Venta puerta`, sin cambiar backend, AUTH/RBAC funcional, pagos, caja, reportes backend, billing, IA, endpoints, contratos API ni reglas LIVE.
++
++## Rutas auditadas
++
++| Ruta | Archivo | Estado previo | Menu | Permiso/canal esperado | Decision D6.4 |
++| --- | --- | --- | --- | --- | --- |
++| `/door-sale` | `app/door-sale.tsx` | `AppScreen` + `AppBackButton` | Operacion / Venta puerta | `DOOR_SALE` + `DO_DOOR_SALE` | Migrada a `AppShellPage` |
++| `/door-reservation` | `app/door-reservation.tsx` | `AppScreen` + `AppBackButton` | Operacion / Apartado puerta | `DOOR_RESERVATION` + `DO_DOOR_RESERVATION` | Migrada a `AppShellPage` |
++| `/items` | `app/items.tsx` | `AppScreen` + `AppBackButton` | Inventario / Prendas | `VIEW_INVENTORY` o `MANAGE_INVENTORY` | Migrada a `AppShellPage` |
++| `/items-create` | `app/items-create.tsx` | `AppScreen` + `AppBackButton` | Inventario / Alta de prendas | `MANAGE_INVENTORY` | Migrada a `AppShellPage` |
++| `/batches` | `app/batches.tsx` | `AppScreen` + `AppBackButton` | Inventario / Lotes | `VIEW_INVENTORY` o `MANAGE_INVENTORY` | Migrada a `AppShellPage` |
++| `/inventory` | No encontrada | N/A | N/A | N/A | No existe ruta real |
++| `/checkout` | No encontrada | N/A | N/A | N/A | No existe ruta real |
++| `/sales` | No encontrada | N/A | N/A | N/A | No existe ruta real |
++| `/pos` | No encontrada | N/A | N/A | N/A | No existe ruta real |
++| `/cash-closures` | `app/cash-closures.tsx` | Legacy | No auditado para menu D6.4 | Caja | Documentada, no migrada por exclusion de caja |
++| `/cash-closure-detail` | `app/cash-closure-detail.tsx` | Legacy | No auditado para menu D6.4 | Caja | Documentada, no migrada por exclusion de caja |
++
++## Pantallas migradas
++
++- `app/door-sale.tsx`
++- `app/door-reservation.tsx`
++- `app/items.tsx`
++- `app/items-create.tsx`
++- `app/batches.tsx`
++
++## Cambios visuales aplicados
++
++- Se reemplazo `AppScreen` por `AppShellPage`.
++- Se retiro `AppBackButton` como navegacion superior legacy en rutas migradas.
++- El titulo principal ahora vive en `TopBar` dentro de `AppShell`.
++- El sidebar categorizado queda visible en desktop y el drawer en tablet/mobile.
++- Se asignaron `activeRoute` especificos:
++  - `door-sale`
++  - `door-reservation`
++  - `items`
++  - `items-create`
++  - `batches`
++- Acciones principales como `Alta prenda`, `Volver` y `Nuevo lote` pasan al header cuando aplica.
++- Se conservaron formularios, filtros, listas, modales, validaciones, `returnTo=/live`, llamadas a servicios y permisos existentes.
++
++## i18n aplicado
++
++Se agrego `operationalScreens.*` en `locales/es/common.json` y `locales/en/common.json` para:
++
++- subtitulos de pantallas operativas;
++- botones principales;
++- filtros de inventario/lotes;
++- labels de cliente, prenda, pago, anticipo y validaciones visibles;
++- textos principales de `items-create`.
++
++No se traducen codigos tecnicos, estados backend ni datos retornados por API.
++
++## Pantallas no migradas
++
++- `cash-closures` y `cash-closure-detail` quedan pendientes porque D6.4 excluye caja.
++- Rutas no encontradas: `/inventory`, `/checkout`, `/sales`, `/pos`, `/cash`.
++
++## Riesgos pendientes
++
++- Algunas alertas historicas y textos secundarios de flujo operativo siguen hardcodeados; no se tocaron para evitar cambios funcionales fuera de la migracion visual.
++- `batch-form`, `batch-detail` e `items/[id]` siguen como rutas hijas con patron legacy. Se recomienda evaluarlas en una fase posterior si QA las marca como parte del recorrido visual.
++- Las rutas de caja siguen legacy por alcance y requieren una fase separada si se decide migrarlas.
++
++## Validacion manual esperada
++
++1. Entrar con `qa.admin@local.test`.
++2. Abrir `/door-sale` y confirmar AppShell/sidebar/drawer.
++3. Confirmar que no aparece `Menu principal` ni barra superior legacy.
++4. Abrir `/door-reservation`.
++5. Abrir `/items`.
++6. Abrir `/items-create?returnTo=%2Flive`.
++7. Abrir `/batches`.
++8. Confirmar active state correcto en sidebar.
++9. Confirmar que `returnTo=/live` se conserva en alta de prendas.
++10. Confirmar light/dark y presets visuales.
++11. Confirmar idioma Espanol/English en titulos, acciones principales y filtros.
++12. Confirmar responsive desktop/tablet/mobile.
++
++## GO/NO-GO
++
++GO tecnico condicionado a validacion visual manual en navegador/AnyDesk.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index 14bb15e..a20a17b 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -629,6 +629,122 @@
+     "validQuantity": "Enter a valid quantity.",
+     "liveReturnHelp": "After creating the item, you can return to LIVE to prepare it or put it on air."
+   },
++  "operationalScreens": {
++    "shared": {
++      "customer": "Customer",
++      "item": "Item",
++      "items": "Items",
++      "addItem": "Add item",
++      "searchItem": "Search item",
++      "scanWithCamera": "Scan with camera",
++      "addByCode": "Add by code",
++      "scanOrCodePlaceholder": "Scan or type code/QR",
++      "searchItemPlaceholder": "Search by code, type, brand, or size",
++      "searchCustomerPlaceholder": "Search customer",
++      "changeCustomer": "Change customer",
++      "selectCustomer": "Select customer",
++      "remove": "Remove",
++      "payment": "Payment",
++      "paymentMethod": "Payment method",
++      "selectPaymentMethod": "Select payment method",
++      "noSelection": "Not selected",
++      "total": "Total",
++      "noType": "No type",
++      "noBrand": "No brand",
++      "noSize": "No size",
++      "noPhone": "No phone",
++      "noEmail": "No email",
++      "noCustomers": "No customers.",
++      "suggestedPrice": "Suggested price",
++      "noPrice": "No price",
++      "noItemsAvailable": "No available items.",
++      "noItemsAdded": "No items added.",
++      "close": "Close",
++      "choosePayment": "Choose payment",
++      "review": "Review"
++    },
++    "doorSale": {
++      "subtitle": "Direct door sale with available items, customer, and payment.",
++      "genericCustomer": "No customer selected. The generic door customer will be used.",
++      "useGenericCustomer": "Use generic door customer",
++      "addItemHelp": "Use code, QR, search, or quick item creation to add items to the sale.",
++      "quickItem": "Quick item creation",
++      "salePrice": "Sale price *",
++      "pricePlaceholder": "Enter price",
++      "registerPaidSale": "Register paid sale",
++      "validationTitle": "Sale is incomplete",
++      "validationItem": "Add at least one item before registering the sale.",
++      "validationPayment": "Select the payment method before registering the sale.",
++      "validationPrice": "Check that every item has a price greater than zero.",
++      "addItemAction": "Add item",
++      "reviewPrices": "Review prices"
++    },
++    "doorReservation": {
++      "title": "Create door hold",
++      "subtitle": "Door hold with a real customer, items, optional advance, and balance.",
++      "selectRealCustomer": "Select a real customer. Generic customers are not allowed.",
++      "addItemHelp": "Use code, QR, search, or quick item creation to add items to the hold.",
++      "quickItem": "Quick item creation",
++      "holdPrice": "Hold price *",
++      "pricePlaceholder": "Enter price",
++      "advance": "Advance",
++      "optionalAdvance": "Optional advance",
++      "advancePlaceholder": "0.00",
++      "advanceHelp": "If no advance is entered, only the hold will be created.",
++      "holdTotal": "Hold total",
++      "pendingBalance": "Pending balance",
++      "createHold": "Create hold",
++      "validationTitle": "Hold is incomplete",
++      "validationCustomer": "Select a real customer before creating the hold.",
++      "validationItem": "Add at least one item to the hold.",
++      "validationPrice": "Check that every item has a price greater than zero.",
++      "validationAdvance": "The advance must be zero or greater, and cannot exceed the total.",
++      "validationPayment": "Select the payment method to register the advance.",
++      "chooseCustomer": "Choose customer"
++    },
++    "items": {
++      "subtitle": "Review items, filter inventory, and create new pieces.",
++      "createItem": "+ Create item",
++      "searchPlaceholder": "Search by code, type, brand, size, batch, or location",
++      "filterAll": "All",
++      "filterAvailable": "Available",
++      "filterReserved": "Reserved",
++      "filterSold": "Sold",
++      "noInventory": "No items in inventory.",
++      "createFirst": "Create first item",
++      "batch": "Batch",
++      "location": "Location",
++      "noBatch": "No batch",
++      "noLocation": "No location",
++      "tapDetail": "Tap to view detail"
++    },
++    "itemsCreate": {
++      "subtitle": "Quick or bulk item creation for inventory and operational flows.",
++      "backToFlow": "Back",
++      "intro": "Create one or more available items for inventory. Item type and size are required; batch, brand, location, and suggested price are optional.",
++      "generateItems": "Create items"
++    },
++    "batches": {
++      "subtitle": "Manage inventory batch receiving, classification, and reconciliation.",
++      "createBatch": "+ New batch",
++      "searchPlaceholder": "Search by folio, status, or notes",
++      "filterAll": "All",
++      "filterAnnounced": "Expected",
++      "filterReceived": "Received",
++      "filterReconciled": "Closed",
++      "filterCancelled": "Cancelled",
++      "currentBranch": "Current branch",
++      "supplier": "Supplier",
++      "noSupplier": "No supplier",
++      "expected": "Expected",
++      "received": "Received",
++      "classified": "Classified",
++      "items": "Items",
++      "noBatches": "No batches to show.",
++      "createFirst": "Create first batch",
++      "tapDetail": "Tap to view detail"
++    }
++  },
+   "navigation": {
+     "brandHelp": "Operation and control",
+     "closeMenu": "Close menu",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index 4dd054d..6f99f1f 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -629,6 +629,122 @@
+     "validQuantity": "Ingresa una cantidad valida.",
+     "liveReturnHelp": "Al generar la prenda, podras volver al LIVE para prepararla o ponerla al aire."
+   },
++  "operationalScreens": {
++    "shared": {
++      "customer": "Cliente",
++      "item": "Prenda",
++      "items": "Prendas",
++      "addItem": "Agregar prenda",
++      "searchItem": "Buscar prenda",
++      "scanWithCamera": "Escanear con camara",
++      "addByCode": "Agregar por codigo",
++      "scanOrCodePlaceholder": "Escanea o escribe codigo/QR",
++      "searchItemPlaceholder": "Buscar por codigo, tipo, marca o talla",
++      "searchCustomerPlaceholder": "Buscar cliente",
++      "changeCustomer": "Cambiar cliente",
++      "selectCustomer": "Seleccionar cliente",
++      "remove": "Quitar",
++      "payment": "Pago",
++      "paymentMethod": "Metodo de pago",
++      "selectPaymentMethod": "Seleccionar metodo de pago",
++      "noSelection": "Sin seleccionar",
++      "total": "Total",
++      "noType": "Sin tipo",
++      "noBrand": "Sin marca",
++      "noSize": "Sin talla",
++      "noPhone": "Sin telefono",
++      "noEmail": "Sin correo",
++      "noCustomers": "No hay clientes.",
++      "suggestedPrice": "Precio sugerido",
++      "noPrice": "Sin precio",
++      "noItemsAvailable": "No hay prendas disponibles.",
++      "noItemsAdded": "No hay prendas agregadas.",
++      "close": "Cerrar",
++      "choosePayment": "Elegir pago",
++      "review": "Revisar"
++    },
++    "doorSale": {
++      "subtitle": "Venta directa en puerta con prendas disponibles, cliente y pago.",
++      "genericCustomer": "Sin cliente seleccionado. Se usara cliente generico puerta.",
++      "useGenericCustomer": "Usar generico puerta",
++      "addItemHelp": "Usa codigo, QR, busqueda o alta rapida para agregar prendas a la venta.",
++      "quickItem": "Alta rapida de prenda",
++      "salePrice": "Precio de venta *",
++      "pricePlaceholder": "Captura precio",
++      "registerPaidSale": "Registrar venta pagada",
++      "validationTitle": "Falta completar la venta",
++      "validationItem": "Agrega al menos una prenda para poder registrar la venta.",
++      "validationPayment": "Selecciona el metodo de pago antes de registrar la venta.",
++      "validationPrice": "Revisa que todas las prendas tengan precio mayor a cero.",
++      "addItemAction": "Agregar prenda",
++      "reviewPrices": "Revisar precios"
++    },
++    "doorReservation": {
++      "title": "Crear apartado en puerta",
++      "subtitle": "Apartado en puerta con cliente real, prendas, anticipo opcional y saldo.",
++      "selectRealCustomer": "Selecciona un cliente real. No se permite cliente generico.",
++      "addItemHelp": "Usa codigo, QR, busqueda o alta rapida para agregar prendas al apartado.",
++      "quickItem": "Alta rapida de prenda",
++      "holdPrice": "Precio apartado *",
++      "pricePlaceholder": "Captura precio",
++      "advance": "Anticipo",
++      "optionalAdvance": "Anticipo opcional",
++      "advancePlaceholder": "0.00",
++      "advanceHelp": "Si no capturas anticipo, solo se creara el apartado.",
++      "holdTotal": "Total apartado",
++      "pendingBalance": "Saldo pendiente",
++      "createHold": "Crear apartado",
++      "validationTitle": "Falta completar el apartado",
++      "validationCustomer": "Selecciona un cliente real para crear el apartado.",
++      "validationItem": "Agrega al menos una prenda al apartado.",
++      "validationPrice": "Revisa que todas las prendas tengan precio mayor a cero.",
++      "validationAdvance": "El anticipo debe ser cero o mayor, y no puede superar el total.",
++      "validationPayment": "Selecciona el metodo de pago para registrar el anticipo.",
++      "chooseCustomer": "Elegir cliente"
++    },
++    "items": {
++      "subtitle": "Consulta prendas, filtra inventario y da de alta nuevas piezas.",
++      "createItem": "+ Alta prenda",
++      "searchPlaceholder": "Buscar por codigo, tipo, marca, talla, lote o ubicacion",
++      "filterAll": "Todo",
++      "filterAvailable": "Disponible",
++      "filterReserved": "Reservado",
++      "filterSold": "Vendido",
++      "noInventory": "No hay prendas en inventario.",
++      "createFirst": "Crear primera prenda",
++      "batch": "Lote",
++      "location": "Ubicacion",
++      "noBatch": "Sin lote",
++      "noLocation": "Sin ubicacion",
++      "tapDetail": "Tocar para ver detalle"
++    },
++    "itemsCreate": {
++      "subtitle": "Alta rapida o masiva de prendas para inventario y flujos operativos.",
++      "backToFlow": "Volver",
++      "intro": "Crea una o varias prendas disponibles para inventario. El tipo de prenda y la talla son obligatorios; lote, marca, ubicacion y precio sugerido son opcionales.",
++      "generateItems": "Generar prendas"
++    },
++    "batches": {
++      "subtitle": "Administra recepcion, clasificacion y conciliacion de lotes de inventario.",
++      "createBatch": "+ Nuevo lote",
++      "searchPlaceholder": "Buscar por folio, estado o notas",
++      "filterAll": "Todo",
++      "filterAnnounced": "Por recibir",
++      "filterReceived": "Recibidos",
++      "filterReconciled": "Cerrados",
++      "filterCancelled": "Cancelados",
++      "currentBranch": "Sucursal actual",
++      "supplier": "Proveedor",
++      "noSupplier": "Sin proveedor",
++      "expected": "Esperado",
++      "received": "Recibido",
++      "classified": "Clasificado",
++      "items": "Items",
++      "noBatches": "No hay lotes para mostrar.",
++      "createFirst": "Crear primer lote",
++      "tapDetail": "Tocar para ver detalle"
++    }
++  },
+   "navigation": {
+     "brandHelp": "Operacion y control",
+     "closeMenu": "Cerrar menu",
+diff --git a/qa-reports/PRODUCT-D6-4-operational-legacy-appshell-report-20260606-182517.md b/qa-reports/PRODUCT-D6-4-operational-legacy-appshell-report-20260606-182517.md
+new file mode 100644
+index 0000000..94cc8d9
+--- /dev/null
++++ b/qa-reports/PRODUCT-D6-4-operational-legacy-appshell-report-20260606-182517.md
+@@ -0,0 +1,99 @@
++# PRODUCT-D6.4 - Operational Legacy AppShell Report
++
++Fecha/hora: 2026-06-06 18:25:17
++
++## Objetivo
++
++Migrar pantallas operativas legacy a `AppShell` premium, con foco en `Venta puerta`, sin tocar backend, AUTH/RBAC funcional, pagos, caja, reportes backend, billing, IA, endpoints, contratos API ni reglas LIVE.
++
++## Alcance ejecutado
++
++Pantallas migradas:
++
++- `/door-sale` (`app/door-sale.tsx`)
++- `/door-reservation` (`app/door-reservation.tsx`)
++- `/items` (`app/items.tsx`)
++- `/items-create` (`app/items-create.tsx`)
++- `/batches` (`app/batches.tsx`)
++
++Pantallas auditadas y no migradas:
++
++- `/cash-closures` y `/cash-closure-detail`: existen, siguen legacy, no se migran porque caja queda explicitamente fuera de alcance.
++
++Rutas no encontradas:
++
++- `/inventory`
++- `/checkout`
++- `/sales`
++- `/pos`
++- `/cash`
++
++## Cambios aplicados
++
++- Reemplazo de `AppScreen` por `AppShellPage` en rutas prioritarias.
++- Eliminacion de `AppBackButton` como navegacion superior legacy en esas rutas.
++- `activeRoute` corregido para:
++  - `door-sale`
++  - `door-reservation`
++  - `items`
++  - `items-create`
++  - `batches`
++- Acciones principales movidas al TopBar cuando aplica:
++  - alta de prenda en inventario;
++  - volver contextual en alta de prendas;
++  - nuevo lote en lotes.
++- Textos principales conectados a i18n en `operationalScreens.*`.
++- Bordes de tarjetas de prendas en venta/apartado pasan a token `borderSubtle`.
++- Colores de estado de inventario pasan a tokens semanticos (`success`, `danger`, `accent`, `textMuted`).
++
++## No se cambio
++
++- Logica de venta puerta.
++- Logica de apartado puerta.
++- Validacion de alta rapida de prendas agregada en LIVE-Z9E.
++- `returnTo=/live`.
++- Permisos/canales.
++- Llamadas a servicios.
++- Endpoints.
++- Persistencia.
++- Caja.
++
++## Validaciones tecnicas
++
++- `git branch --show-current`: OK, `feature/product-d6-4-operational-legacy-appshell`
++- `git status`: OK inicial limpio
++- `git --no-pager diff --check`: OK inicial y OK final sin errores
++- `npm.cmd run lint`: OK, 0 errores, 51 warnings heredados/estructurales
++- `npx.cmd tsc --noEmit`: OK
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK
++- `./mvnw.cmd test`: OK, 73 tests, 0 failures, 0 errors
++- `./mvnw.cmd -q -DskipTests package`: OK
++
++Warnings relevantes:
++
++- Lint mantiene warnings existentes de hooks, BOM y tipos en rutas no intervenidas.
++- En rutas intervenidas quedan warnings de dependencias de hooks ya existentes; no se modificaron para evitar cambios funcionales.
++- Maven registra warnings conocidos de MySQL 5.7 y Mockito/dynamic agent, sin afectar el resultado.
++
++## Riesgos y pendientes
++
++- Textos secundarios/alertas historicas pueden seguir hardcodeados en algunas rutas operativas; D6.4 prioriza shell, active state e i18n principal sin alterar flujo.
++- Rutas hijas `batch-form`, `batch-detail` e `items/[id]` siguen fuera del alcance de esta fase.
++- Rutas de caja siguen legacy por exclusion explicita.
++
++## Validacion manual esperada
++
++1. Entrar con `qa.admin@local.test`.
++2. Abrir `/door-sale`.
++3. Confirmar AppShell/sidebar/drawer.
++4. Confirmar que no aparece `Menu principal` legacy.
++5. Confirmar active state `Venta puerta`.
++6. Abrir `/door-reservation` y confirmar `Apartado puerta`.
++7. Abrir `/items` y confirmar `Prendas / Inventario`.
++8. Abrir `/items-create?returnTo=%2Flive` y confirmar retorno contextual.
++9. Abrir `/batches` y confirmar `Lotes`.
++10. Validar Espanol/English, light/dark, presets y responsive desktop/tablet/mobile.
++
++## GO/NO-GO
++
++GO tecnico. GO visual queda sujeto a validacion manual en navegador/AnyDesk.

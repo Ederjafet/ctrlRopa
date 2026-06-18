@@ -1,10 +1,9 @@
 
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppDateField from '@/components/ui/AppDateField';
 import AppInput from '@/components/ui/AppInput';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { Branch, getActiveBranches } from '@/services/branchAdminService';
@@ -15,6 +14,7 @@ import {
 } from '@/services/reportService';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 
 function todayIsoDate() {
@@ -31,7 +31,7 @@ function formatMoney(value?: number | null) {
 }
 
 function formatDateTime(value?: string | null) {
-  if (!value) return '—';
+  if (!value) return 'â€”';
   return new Date(value).toLocaleString();
 }
 
@@ -139,6 +139,7 @@ const sharedStyles = StyleSheet.create({
 
 export default function ReportDeliveriesScreen() {
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
 
   const [session, setSession] = useState<UserSession | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -228,34 +229,38 @@ export default function ReportDeliveriesScreen() {
 
   if (initialLoading) {
     return (
-      <AppScreen>
+      <AppShellPage
+        title={t('reports.dailyDeliveriesTitle')}
+        subtitle={t('reports.dailyDeliveriesDescription')}
+        activeRoute="report-deliveries"
+        session={session}
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute="/reports" />
-
-      <AppText variant="title" bold>
-        Entregas diarias
-      </AppText>
-
+    <AppShellPage
+      title={t('reports.dailyDeliveriesTitle')}
+      subtitle={t('reports.dailyDeliveriesDescription')}
+      activeRoute="report-deliveries"
+      session={session}
+    >
       <AppCard>
         <AppText variant="subtitle" bold>
-          Filtros
+          {t('common.filters')}
         </AppText>
 
         <View style={sharedStyles.filters}>
           <AppDateField
-            label="Fecha"
+            label={t('common.date')}
             value={date}
             onChange={setDate}
           />
 
           <AppText variant="subtitle" bold>
-            Sucursal
+            {t('common.branch')}
           </AppText>
           <BranchSelector
             branches={branches}
@@ -265,7 +270,7 @@ export default function ReportDeliveriesScreen() {
         </View>
 
         <AppButton
-          title={loading ? 'Consultando...' : 'Consultar'}
+          title={loading ? t('reports.querying') : t('reports.query')}
           onPress={loadReport}
           loading={loading}
           disabled={loading}
@@ -276,7 +281,7 @@ export default function ReportDeliveriesScreen() {
         <>
           <AppCard>
             <AppText variant="subtitle" bold>
-              {report.branchName || report.branchCode || 'Sucursal'} · {report.date}
+              {report.branchName || report.branchCode || 'Sucursal'} Â· {report.date}
             </AppText>
             <AppText color={theme.colors.mutedText}>
               Seguimiento de paquetes en ruta, entregados, devueltos y pendientes.
@@ -295,7 +300,7 @@ export default function ReportDeliveriesScreen() {
 
           <AppInput
             label="Buscar en entregas"
-            placeholder="Envío, paquete, cliente, dirección, estado..."
+            placeholder="EnvÃ­o, paquete, cliente, direcciÃ³n, estado..."
             value={search}
             onChangeText={setSearch}
           />
@@ -319,7 +324,7 @@ export default function ReportDeliveriesScreen() {
                         {line.packageFolio || `Paquete #${line.packageId || index + 1}`}
                       </AppText>
                       <AppText color={theme.colors.mutedText}>
-                        Envío {line.shipmentFolio || `#${line.shipmentId || '—'}`} · {line.deliveryType || 'Entrega'}
+                        EnvÃ­o {line.shipmentFolio || `#${line.shipmentId || 'â€”'}`} Â· {line.deliveryType || 'Entrega'}
                       </AppText>
                     </View>
                     <AppText bold>{formatMoney(line.total)}</AppText>
@@ -327,19 +332,19 @@ export default function ReportDeliveriesScreen() {
 
                   <View style={sharedStyles.meta}>
                     <AppText>
-                      {line.customerName || 'Sin cliente'} {line.customerPhone ? `· ${line.customerPhone}` : ''}
+                      {line.customerName || 'Sin cliente'} {line.customerPhone ? `Â· ${line.customerPhone}` : ''}
                     </AppText>
                     {line.addressText ? (
                       <AppText color={theme.colors.mutedText}>{line.addressText}</AppText>
                     ) : null}
                     <AppText color={theme.colors.mutedText}>
-                      Pagado {formatMoney(line.paid)} · Pendiente {formatMoney(line.pending)} · Pago {line.paymentStatus || '—'}
+                      Pagado {formatMoney(line.paid)} Â· Pendiente {formatMoney(line.pending)} Â· Pago {line.paymentStatus || 'â€”'}
                     </AppText>
                     <AppText variant="caption" color={theme.colors.mutedText}>
-                      Envío: {line.shipmentStatus || '—'} · Paquete: {line.packageStatus || '—'}
+                      EnvÃ­o: {line.shipmentStatus || 'â€”'} Â· Paquete: {line.packageStatus || 'â€”'}
                     </AppText>
                     <AppText variant="caption" color={theme.colors.mutedText}>
-                      Creado: {formatDateTime(line.createdAt)} · Enviado: {formatDateTime(line.sentAt)} · Entregado: {formatDateTime(line.deliveredAt)}
+                      Creado: {formatDateTime(line.createdAt)} Â· Enviado: {formatDateTime(line.sentAt)} Â· Entregado: {formatDateTime(line.deliveredAt)}
                     </AppText>
                     {line.observation ? <AppText>{line.observation}</AppText> : null}
                   </View>
@@ -351,10 +356,10 @@ export default function ReportDeliveriesScreen() {
       ) : (
         <AppCard>
           <AppText color={theme.colors.mutedText}>
-            Selecciona fecha y sucursal para consultar el reporte.
+            {t('reports.selectDateBranchHint')}
           </AppText>
         </AppCard>
       )}
-    </AppScreen>
+    </AppShellPage>
   );
 }

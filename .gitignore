@@ -33,7 +33,11 @@ backend/control-ropa/logs/
 *.pem
 
 # local env files
+.env
+.env.*
 .env*.local
+!.env.example
+!*.env.example
 
 # typescript
 *.tsbuildinfo
@@ -64,3 +68,6 @@ tmp/
 temp/
 *.tmp.tmp-pdf-images/
 pdf-images/
+git-diffs/
+.tmp-pdf-images/
+qa-reports/

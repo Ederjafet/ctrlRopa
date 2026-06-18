@@ -1,9 +1,8 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import {
@@ -374,9 +373,13 @@ export default function BatchDetailScreen() {
 
   if (loading || !batch) {
     return (
-      <AppScreen>
+      <AppShellPage
+        title="Detalle de lote"
+        subtitle="Recepcion, clasificacion y cierre"
+        activeRoute="batches"
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
@@ -390,12 +393,18 @@ export default function BatchDetailScreen() {
 
   return (
     <>
-      <AppScreen>
-        <AppBackButton fallbackRoute="/batches" />
-
-        <AppText variant="title" bold>
-          Lote {batch.folio}
-        </AppText>
+      <AppShellPage
+        title={`Lote ${batch.folio}`}
+        subtitle="Recepcion, clasificacion y cierre"
+        activeRoute="batches"
+        rightContent={
+          <AppButton
+            title="Volver"
+            variant="secondary"
+            onPress={() => router.replace('/batches' as any)}
+          />
+        }
+      >
 
         <AppCard>
           <View style={styles.headerRow}>
@@ -580,7 +589,7 @@ export default function BatchDetailScreen() {
             </View>
           </View>
         </AppCard>
-      </AppScreen>
+      </AppShellPage>
 
       <AppBottomModal
         visible={showReceiveModal}

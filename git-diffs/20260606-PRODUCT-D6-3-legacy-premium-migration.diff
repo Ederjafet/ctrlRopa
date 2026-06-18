@@ -1,0 +1,2885 @@
+﻿diff --git a/app/appearance.tsx b/app/appearance.tsx
+index 0f91edc..a2950a3 100644
+--- a/app/appearance.tsx
++++ b/app/appearance.tsx
+@@ -1,9 +1,8 @@
+-﻿import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import ColorField from '@/components/ui/ColorField';
+ import { AppDatePreview } from '@/components/ui/AppDateField';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import {
+@@ -18,6 +17,7 @@ import { isAdmin } from '@/services/accessControl';
+ import { getSession, UserSession } from '@/services/sessionStorage';
+ import { useRouter } from 'expo-router';
+ import { useEffect, useState } from 'react';
++import { useTranslation } from 'react-i18next';
+ import { Alert, Image, Pressable, StyleSheet, Switch, TextInput, View } from 'react-native';
+
+ const DEFAULT_FORM: AppearanceSettings = {
+@@ -104,6 +104,7 @@ const normalizeHex = (value?: string | null) => {
+ export default function AppearanceScreen() {
+   const router = useRouter();
+   const { theme, reloadTheme } = useAppTheme();
++  const { t } = useTranslation('common');
+   const [user, setUser] = useState<UserSession | null>(null);
+   const [form, setForm] = useState<AppearanceSettings>(DEFAULT_FORM);
+   const [loading, setLoading] = useState(true);
+@@ -155,7 +156,7 @@ export default function AppearanceScreen() {
+     const invalidFields = COLOR_FIELDS.filter((key) => !isValidHex(form[key] as string));
+
+     if (invalidFields.length > 0) {
+-      Alert.alert('Color invalido', 'Revisa los colores. Deben tener formato HEX, por ejemplo #2563EB.');
++      Alert.alert(t('appearance.invalidColorTitle'), t('appearance.invalidColorMessage'));
+       return false;
+     }
+
+@@ -243,9 +244,9 @@ export default function AppearanceScreen() {
+       });
+
+       await reloadTheme();
+-      Alert.alert('Listo', 'La apariencia se guardo correctamente.');
++      Alert.alert(t('appearance.savedTitle'), t('appearance.savedMessage'));
+     } catch (error) {
+-      Alert.alert('Error', 'No se pudo guardar la apariencia.');
++      Alert.alert(t('appearance.saveErrorTitle'), t('appearance.saveErrorMessage'));
+     } finally {
+       setSaving(false);
+     }
+@@ -253,80 +254,84 @@ export default function AppearanceScreen() {
+
+   if (loading || !user) {
+     return (
+-      <AppScreen>
+-        <AppText>Cargando apariencia...</AppText>
+-      </AppScreen>
++      <AppShellPage
++        title={t('navigation.items.appearance')}
++        subtitle={t('appearance.subtitle')}
++        activeRoute="appearance"
++        session={user}
++      >
++        <AppText>{t('common.loading')}</AppText>
++      </AppShellPage>
+     );
+   }
+
+   return (
+-    <AppScreen>
+-      <AppBackButton fallbackRoute="/" />
+-
+-      <AppText variant="title" bold>
+-        Apariencia / Branding
+-      </AppText>
+-
++    <AppShellPage
++      title={t('navigation.items.appearance')}
++      subtitle={t('appearance.subtitle')}
++      activeRoute="appearance"
++      session={user}
++    >
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Identidad
++          {t('appearance.identity')}
+         </AppText>
+
+         <Field
+-          label="Nombre del sistema"
++          label={t('appearance.systemName')}
+           value={form.appName || ''}
+           onChangeText={(value) => updateField('appName', value)}
+         />
+
+         <Field
+-          label="Logo general URL"
++          label={t('appearance.logoUrl')}
+           value={form.logoUrl || ''}
+           onChangeText={(value) => updateField('logoUrl', value)}
+         />
+
+         <Field
+-          label="Favicon URL"
++          label={t('appearance.faviconUrl')}
+           value={form.faviconUrl || ''}
+           onChangeText={(value) => updateField('faviconUrl', value)}
+         />
+
+         <Field
+-          label="Logo login URL"
++          label={t('appearance.loginLogoUrl')}
+           value={form.loginLogoUrl || ''}
+           onChangeText={(value) => updateField('loginLogoUrl', value)}
+         />
+-        <LogoPreview title="Vista previa login" url={form.loginLogoUrl || form.logoUrl || ''} />
++        <LogoPreview title={t('appearance.loginPreview')} url={form.loginLogoUrl || form.logoUrl || ''} />
+
+         <Field
+-          label="Logo impresion URL"
++          label={t('appearance.printLogoUrl')}
+           value={form.printLogoUrl || ''}
+           onChangeText={(value) => updateField('printLogoUrl', value)}
+         />
+-        <LogoPreview title="Vista previa impresion" url={form.printLogoUrl || form.logoUrl || ''} />
++        <LogoPreview title={t('appearance.printPreview')} url={form.printLogoUrl || form.logoUrl || ''} />
+       </AppCard>
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Tarjetas informativas
++          {t('appearance.infoCards')}
+         </AppText>
+         <AppText color={theme.colors.mutedText} style={styles.sectionHint}>
+-          Se usan para textos de introduccion o contexto, no para acciones.
++          {t('appearance.infoCardsHelp')}
+         </AppText>
+
+         <ColorField
+-          label="Tarjeta informativa - fondo"
++          label={t('appearance.infoCardBackground')}
+           value={form.infoCardBackgroundColor || ''}
+           onChangeText={(value) => updateColorField('infoCardBackgroundColor', value)}
+         />
+
+         <ColorField
+-          label="Tarjeta informativa - texto"
++          label={t('appearance.infoCardText')}
+           value={form.infoCardTextColor || ''}
+           onChangeText={(value) => updateColorField('infoCardTextColor', value)}
+         />
+
+         <ColorField
+-          label="Tarjeta informativa - borde"
++          label={t('appearance.infoCardBorder')}
+           value={form.infoCardBorderColor || ''}
+           onChangeText={(value) => updateColorField('infoCardBorderColor', value)}
+         />
+@@ -341,33 +346,33 @@ export default function AppearanceScreen() {
+           ]}
+         >
+           <AppText bold color={form.infoCardTextColor}>
+-            Ejemplo informativo
++            {t('appearance.infoExampleTitle')}
+           </AppText>
+           <AppText color={form.infoCardTextColor}>
+-            Este bloque no es un boton; solo da contexto.
++            {t('appearance.infoExampleText')}
+           </AppText>
+         </View>
+       </AppCard>
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Colores generales
++          {t('appearance.generalColors')}
+         </AppText>
+
+         <ColorField
+-          label="Color primario"
++          label={t('appearance.primaryColor')}
+           value={form.primaryColor || ''}
+           onChangeText={(value) => updateColorField('primaryColor', value)}
+         />
+
+         <ColorField
+-          label="Color secundario"
++          label={t('appearance.secondaryColor')}
+           value={form.secondaryColor || ''}
+           onChangeText={(value) => updateColorField('secondaryColor', value)}
+         />
+
+         <ColorField
+-          label="Color de acento"
++          label={t('appearance.accentColor')}
+           value={form.accentColor || ''}
+           onChangeText={(value) => updateColorField('accentColor', value)}
+         />
+@@ -375,131 +380,131 @@ export default function AppearanceScreen() {
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Botones
++          {t('appearance.buttons')}
+         </AppText>
+
+         <ColorField
+-          label="Boton primario - fondo"
++          label={t('appearance.primaryButtonBackground')}
+           value={form.primaryButtonColor || ''}
+           onChangeText={(value) => updateColorField('primaryButtonColor', value)}
+         />
+
+         <ColorField
+-          label="Boton primario - texto"
++          label={t('appearance.primaryButtonText')}
+           value={form.primaryButtonTextColor || ''}
+           onChangeText={(value) => updateColorField('primaryButtonTextColor', value)}
+         />
+         <ButtonPreview
+-          label="Vista previa primario"
+-          title="Primario"
++          label={t('appearance.primaryPreview')}
++          title={t('appearance.primaryButton')}
+           backgroundColor={form.primaryButtonColor}
+           textColor={form.primaryButtonTextColor}
+         />
+
+         <ColorField
+-          label="Boton secundario - fondo"
++          label={t('appearance.secondaryButtonBackground')}
+           value={form.secondaryButtonColor || ''}
+           onChangeText={(value) => updateColorField('secondaryButtonColor', value)}
+         />
+
+         <ColorField
+-          label="Boton secundario - texto"
++          label={t('appearance.secondaryButtonText')}
+           value={form.secondaryButtonTextColor || ''}
+           onChangeText={(value) => updateColorField('secondaryButtonTextColor', value)}
+         />
+         <ButtonPreview
+-          label="Vista previa secundario"
+-          title="Secundario"
++          label={t('appearance.secondaryPreview')}
++          title={t('appearance.secondaryButton')}
+           backgroundColor={form.secondaryButtonColor}
+           textColor={form.secondaryButtonTextColor}
+         />
+
+         <ColorField
+-          label="Boton operativo - fondo"
++          label={t('appearance.operationButtonBackground')}
+           value={form.operationButtonColor || ''}
+           onChangeText={(value) => updateColorField('operationButtonColor', value)}
+         />
+
+         <ColorField
+-          label="Boton operativo - texto"
++          label={t('appearance.operationButtonText')}
+           value={form.operationButtonTextColor || ''}
+           onChangeText={(value) => updateColorField('operationButtonTextColor', value)}
+         />
+         <ButtonPreview
+-          label="Vista previa operativo"
+-          title="Seleccionar cliente"
++          label={t('appearance.operationPreview')}
++          title={t('appearance.selectCustomerPreview')}
+           backgroundColor={form.operationButtonColor}
+           textColor={form.operationButtonTextColor}
+         />
+
+         <ColorField
+-          label="Boton peligro - fondo"
++          label={t('appearance.dangerButtonBackground')}
+           value={form.dangerButtonColor || ''}
+           onChangeText={(value) => updateColorField('dangerButtonColor', value)}
+         />
+
+         <ColorField
+-          label="Boton peligro - texto"
++          label={t('appearance.dangerButtonText')}
+           value={form.dangerButtonTextColor || ''}
+           onChangeText={(value) => updateColorField('dangerButtonTextColor', value)}
+         />
+         <ButtonPreview
+-          label="Vista previa peligro"
+-          title="Cancelar venta"
++          label={t('appearance.dangerPreview')}
++          title={t('appearance.cancelSalePreview')}
+           backgroundColor={form.dangerButtonColor}
+           textColor={form.dangerButtonTextColor}
+         />
+
+         <ColorField
+-          label="Boton cancelar - fondo"
++          label={t('appearance.cancelButtonBackground')}
+           value={form.cancelButtonColor || ''}
+           onChangeText={(value) => updateColorField('cancelButtonColor', value)}
+         />
+
+         <ColorField
+-          label="Boton cancelar - texto"
++          label={t('appearance.cancelButtonText')}
+           value={form.cancelButtonTextColor || ''}
+           onChangeText={(value) => updateColorField('cancelButtonTextColor', value)}
+         />
+         <ButtonPreview
+-          label="Vista previa cancelar"
+-          title="Cancelar"
++          label={t('appearance.cancelPreview')}
++          title={t('common.cancel')}
+           backgroundColor={form.cancelButtonColor}
+           textColor={form.cancelButtonTextColor}
+         />
+
+         <ColorField
+-          label="Boton volver - fondo"
++          label={t('appearance.backButtonBackground')}
+           value={form.backButtonColor || ''}
+           onChangeText={(value) => updateColorField('backButtonColor', value)}
+         />
+
+         <ColorField
+-          label="Boton volver - texto"
++          label={t('appearance.backButtonText')}
+           value={form.backButtonTextColor || ''}
+           onChangeText={(value) => updateColorField('backButtonTextColor', value)}
+         />
+         <ButtonPreview
+-          label="Vista previa volver"
+-          title="Volver"
++          label={t('appearance.backPreview')}
++          title={t('common.back')}
+           backgroundColor={form.backButtonColor}
+           textColor={form.backButtonTextColor}
+         />
+
+         <ColorField
+-          label="Boton menu principal - fondo"
++          label={t('appearance.mainMenuButtonBackground')}
+           value={form.menuButtonColor || ''}
+           onChangeText={(value) => updateColorField('menuButtonColor', value)}
+         />
+
+         <ColorField
+-          label="Boton menu principal - texto"
++          label={t('appearance.mainMenuButtonText')}
+           value={form.menuButtonTextColor || ''}
+           onChangeText={(value) => updateColorField('menuButtonTextColor', value)}
+         />
+         <ButtonPreview
+-          label="Vista previa menu principal"
+-          title="Menu principal"
++          label={t('appearance.mainMenuPreview')}
++          title={t('common.mainMenu')}
+           backgroundColor={form.menuButtonColor}
+           textColor={form.menuButtonTextColor}
+         />
+@@ -508,23 +513,23 @@ export default function AppearanceScreen() {
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Calendario
++          {t('appearance.calendar')}
+         </AppText>
+
+         <ColorField
+-          label="Dia seleccionado - fondo"
++          label={t('appearance.selectedDayBackground')}
+           value={form.calendarSelectedColor || ''}
+           onChangeText={(value) => updateColorField('calendarSelectedColor', value)}
+         />
+
+         <ColorField
+-          label="Dia seleccionado - texto"
++          label={t('appearance.selectedDayText')}
+           value={form.calendarSelectedTextColor || ''}
+           onChangeText={(value) => updateColorField('calendarSelectedTextColor', value)}
+         />
+
+         <ColorField
+-          label="Calendario - texto"
++          label={t('appearance.calendarText')}
+           value={form.calendarTextColor || ''}
+           onChangeText={(value) => updateColorField('calendarTextColor', value)}
+         />
+@@ -538,23 +543,23 @@ export default function AppearanceScreen() {
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Mi dashboard
++          {t('appearance.dashboard')}
+         </AppText>
+
+         <ColorField
+-          label="Metrica - fondo"
++          label={t('appearance.metricBackground')}
+           value={form.dashboardMetricBackgroundColor || ''}
+           onChangeText={(value) => updateColorField('dashboardMetricBackgroundColor', value)}
+         />
+
+         <ColorField
+-          label="Metrica - texto"
++          label={t('appearance.metricText')}
+           value={form.dashboardMetricTextColor || ''}
+           onChangeText={(value) => updateColorField('dashboardMetricTextColor', value)}
+         />
+
+         <ColorField
+-          label="Dashboard - acento"
++          label={t('appearance.dashboardAccent')}
+           value={form.dashboardAccentColor || ''}
+           onChangeText={(value) => updateColorField('dashboardAccentColor', value)}
+         />
+@@ -569,7 +574,7 @@ export default function AppearanceScreen() {
+           ]}
+         >
+           <AppText variant="caption" color={form.dashboardMetricTextColor}>
+-            Ventas de hoy
++            {t('appearance.todaySales')}
+           </AppText>
+           <AppText bold color={form.dashboardAccentColor}>
+             $1,250.00
+@@ -579,36 +584,36 @@ export default function AppearanceScreen() {
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Tema y estilo
++          {t('appearance.themeAndStyle')}
+         </AppText>
+
+         <OptionGroup<ThemeMode>
+-          label="Tema"
++          label={t('appearance.theme')}
+           value={form.themeMode || 'LIGHT'}
+           options={[
+-            { label: 'Claro', value: 'LIGHT' },
+-            { label: 'Oscuro', value: 'DARK' },
+-            { label: 'Auto', value: 'AUTO' },
++            { label: t('theme.light'), value: 'LIGHT' },
++            { label: t('theme.dark'), value: 'DARK' },
++            { label: t('appearance.autoTheme'), value: 'AUTO' },
+           ]}
+           onChange={(value) => updateField('themeMode', value)}
+         />
+
+         <OptionGroup<DensityMode>
+-          label="Densidad"
++          label={t('appearance.density')}
+           value={form.densityMode || 'NORMAL'}
+           options={[
+-            { label: 'Normal', value: 'NORMAL' },
+-            { label: 'Compacta', value: 'COMPACT' },
++            { label: t('appearance.normalDensity'), value: 'NORMAL' },
++            { label: t('appearance.compactDensity'), value: 'COMPACT' },
+           ]}
+           onChange={(value) => updateField('densityMode', value)}
+         />
+
+         <OptionGroup<ButtonStyle>
+-          label="Estilo de botones"
++          label={t('appearance.buttonStyle')}
+           value={form.buttonStyle || 'ROUNDED'}
+           options={[
+-            { label: 'Redondeados', value: 'ROUNDED' },
+-            { label: 'Rectos', value: 'STRAIGHT' },
++            { label: t('appearance.roundedButtons'), value: 'ROUNDED' },
++            { label: t('appearance.straightButtons'), value: 'STRAIGHT' },
+           ]}
+           onChange={(value) => updateField('buttonStyle', value)}
+         />
+@@ -616,11 +621,11 @@ export default function AppearanceScreen() {
+
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Impresion
++          {t('appearance.printing')}
+         </AppText>
+
+         <View style={styles.switchRow}>
+-          <AppText>Mostrar logo en documentos</AppText>
++          <AppText>{t('appearance.showLogoOnPrints')}</AppText>
+           <Switch
+             value={form.showLogoOnPrints ?? true}
+             onValueChange={(value) => updateField('showLogoOnPrints', value)}
+@@ -628,22 +633,22 @@ export default function AppearanceScreen() {
+         </View>
+
+         <Field
+-          label="Pie de pagina"
++          label={t('appearance.footerText')}
+           value={form.printFooterText || ''}
+           onChangeText={(value) => updateField('printFooterText', value)}
+           multiline
+         />
+
+         <Field
+-          label="Mensaje de agradecimiento en paquete"
++          label={t('appearance.packageThanks')}
+           value={form.packageThankYouText || ''}
+           onChangeText={(value) => updateField('packageThankYouText', value)}
+           multiline
+         />
+       </AppCard>
+
+-      <AppButton title="Guardar cambios" loading={saving} onPress={save} />
+-    </AppScreen>
++      <AppButton title={t('appearance.saveChanges')} loading={saving} onPress={save} />
++    </AppShellPage>
+   );
+ }
+
+@@ -719,6 +724,7 @@ function ButtonPreview({
+
+ function LogoPreview({ title, url }: { title: string; url?: string }) {
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+
+   return (
+     <View style={styles.logoPreviewBlock}>
+@@ -729,7 +735,7 @@ function LogoPreview({ title, url }: { title: string; url?: string }) {
+         {url ? (
+           <Image source={{ uri: url }} resizeMode="contain" style={styles.logoImage} />
+         ) : (
+-          <AppText color={theme.colors.mutedText}>Sin logo configurado</AppText>
++          <AppText color={theme.colors.mutedText}>{t('appearance.noLogoConfigured')}</AppText>
+         )}
+       </View>
+     </View>
+@@ -871,4 +877,3 @@ const styles = StyleSheet.create({
+     marginBottom: 10,
+   },
+ });
+-
+diff --git a/app/report-cancellations.tsx b/app/report-cancellations.tsx
+index 7bd601b..b00a1c8 100644
+--- a/app/report-cancellations.tsx
++++ b/app/report-cancellations.tsx
+@@ -1,16 +1,16 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppDateField from '@/components/ui/AppDateField';
+ import AppInput from '@/components/ui/AppInput';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import { Branch, getActiveBranches } from '@/services/branchAdminService';
+ import { getSession, UserSession } from '@/services/sessionStorage';
+ import { useEffect, useMemo, useState } from 'react';
++import { useTranslation } from 'react-i18next';
+ import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+-import { DailyCancellationLine, DailyCancellationsReport, getDailyCancellationsReport } from '@/services/reportService';
++import { DailyCancellationsReport, getDailyCancellationsReport } from '@/services/reportService';
+
+ function todayIsoDate() {
+   const now = new Date();
+@@ -26,7 +26,7 @@ function formatMoney(value?: number | null) {
+ }
+
+ function formatDateTime(value?: string | null) {
+-  if (!value) return '—';
++  if (!value) return 'â€”';
+   return new Date(value).toLocaleString();
+ }
+
+@@ -94,6 +94,7 @@ function BranchSelector({
+
+ export default function ReportCancellationsScreen() {
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+
+   const [session, setSession] = useState<UserSession | null>(null);
+   const [branches, setBranches] = useState<Branch[]>([]);
+@@ -172,34 +173,38 @@ export default function ReportCancellationsScreen() {
+
+   if (initialLoading) {
+     return (
+-      <AppScreen>
++      <AppShellPage
++        title={t('reports.dailyCancellationsTitle')}
++        subtitle={t('reports.dailyCancellationsDescription')}
++        activeRoute="report-cancellations"
++        session={session}
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+   return (
+-    <AppScreen>
+-      <AppBackButton fallbackRoute="/reports" />
+-
+-      <AppText variant="title" bold>
+-        Cancelaciones diarias
+-      </AppText>
+-
++    <AppShellPage
++      title={t('reports.dailyCancellationsTitle')}
++      subtitle={t('reports.dailyCancellationsDescription')}
++      activeRoute="report-cancellations"
++      session={session}
++    >
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Filtros
++          {t('common.filters')}
+         </AppText>
+
+         <View style={sharedStyles.filters}>
+           <AppDateField
+-            label="Fecha"
++            label={t('common.date')}
+             value={date}
+             onChange={setDate}
+           />
+
+           <AppText variant="subtitle" bold>
+-            Sucursal
++            {t('common.branch')}
+           </AppText>
+
+           <BranchSelector
+@@ -209,7 +214,7 @@ export default function ReportCancellationsScreen() {
+           />
+
+           <AppButton
+-            title={loading ? 'Consultando...' : 'Consultar'}
++            title={loading ? t('reports.querying') : t('reports.query')}
+             onPress={loadReport}
+             loading={loading}
+             disabled={loading}
+@@ -221,7 +226,7 @@ export default function ReportCancellationsScreen() {
+         <>
+           <AppCard>
+             <AppText variant="subtitle" bold>
+-              Resumen · {report.branchName || report.branchCode || 'Sucursal'} · {report.date}
++              Resumen Â· {report.branchName || report.branchCode || 'Sucursal'} Â· {report.date}
+             </AppText>
+
+             <View style={sharedStyles.summaryGrid}>
+@@ -235,7 +240,7 @@ export default function ReportCancellationsScreen() {
+           </AppCard>
+
+           <AppInput
+-            label="Buscar en líneas"
++            label="Buscar en lÃ­neas"
+             placeholder="Cliente, folio, estado, referencia..."
+             value={search}
+             onChangeText={setSearch}
+@@ -248,7 +253,7 @@ export default function ReportCancellationsScreen() {
+
+             {filteredLines.length === 0 ? (
+               <AppText color={theme.colors.mutedText}>
+-                No hay líneas para mostrar.
++                No hay lÃ­neas para mostrar.
+               </AppText>
+             ) : (
+               filteredLines.map((line: any, index: number) => (
+@@ -261,9 +266,9 @@ export default function ReportCancellationsScreen() {
+                 >
+                   <View style={sharedStyles.headerRow}>
+                     <View style={sharedStyles.headerText}>
+-                      <AppText bold>{line.folio || `${line.sourceType || 'Origen'} #${line.sourceId || '—'}`}</AppText>
++                      <AppText bold>{line.folio || `${line.sourceType || 'Origen'} #${line.sourceId || 'â€”'}`}</AppText>
+                       <AppText color={theme.colors.mutedText}>
+-                        {line.customerName || 'Cliente sin nombre'} · {line.itemCode || 'Sin item'}
++                        {line.customerName || 'Cliente sin nombre'} Â· {line.itemCode || 'Sin item'}
+                       </AppText>
+                     </View>
+                     <AppText bold color={theme.colors.danger}>
+@@ -271,9 +276,9 @@ export default function ReportCancellationsScreen() {
+                     </AppText>
+                   </View>
+                   <View style={sharedStyles.meta}>
+-                    <AppText color={theme.colors.mutedText}>Estado: {line.status || '—'}</AppText>
+-                    <AppText color={theme.colors.mutedText}>Canceló: {line.cancelledByUserName || line.cancelledByUserId || '—'}</AppText>
+-                    <AppText color={theme.colors.mutedText}>Refund: {line.refundStatus || '—'} · {formatMoney(line.refundAmount)}</AppText>
++                    <AppText color={theme.colors.mutedText}>Estado: {line.status || 'â€”'}</AppText>
++                    <AppText color={theme.colors.mutedText}>CancelÃ³: {line.cancelledByUserName || line.cancelledByUserId || 'â€”'}</AppText>
++                    <AppText color={theme.colors.mutedText}>Refund: {line.refundStatus || 'â€”'} Â· {formatMoney(line.refundAmount)}</AppText>
+                     <AppText variant="caption" color={theme.colors.mutedText}>
+                       {formatDateTime(line.cancelledAt)}
+                     </AppText>
+@@ -287,11 +292,11 @@ export default function ReportCancellationsScreen() {
+       ) : (
+         <AppCard>
+           <AppText color={theme.colors.mutedText}>
+-            Selecciona fecha y sucursal, luego consulta el reporte.
++            {t('reports.selectDateBranchHint')}
+           </AppText>
+         </AppCard>
+       )}
+-    </AppScreen>
++    </AppShellPage>
+   );
+ }
+
+diff --git a/app/report-daily-store.tsx b/app/report-daily-store.tsx
+index 21e04c3..2ae25d3 100644
+--- a/app/report-daily-store.tsx
++++ b/app/report-daily-store.tsx
+@@ -1,10 +1,9 @@
+
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppDateField from '@/components/ui/AppDateField';
+ import AppInput from '@/components/ui/AppInput';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import { Branch, getActiveBranches } from '@/services/branchAdminService';
+@@ -15,6 +14,7 @@ import {
+ } from '@/services/reportService';
+ import { getSession, UserSession } from '@/services/sessionStorage';
+ import { useEffect, useMemo, useState } from 'react';
++import { useTranslation } from 'react-i18next';
+ import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+
+ function todayIsoDate() {
+@@ -31,7 +31,7 @@ function formatMoney(value?: number | null) {
+ }
+
+ function formatDateTime(value?: string | null) {
+-  if (!value) return '—';
++  if (!value) return 'â€”';
+   return new Date(value).toLocaleString();
+ }
+
+@@ -139,6 +139,7 @@ const sharedStyles = StyleSheet.create({
+
+ export default function ReportDailyStoreScreen() {
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+
+   const [session, setSession] = useState<UserSession | null>(null);
+   const [branches, setBranches] = useState<Branch[]>([]);
+@@ -228,34 +229,38 @@ export default function ReportDailyStoreScreen() {
+
+   if (initialLoading) {
+     return (
+-      <AppScreen>
++      <AppShellPage
++        title={t('reports.dailyStoreTitle')}
++        subtitle={t('reports.dailyStoreDescription')}
++        activeRoute="report-daily-store"
++        session={session}
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+   return (
+-    <AppScreen>
+-      <AppBackButton fallbackRoute="/reports" />
+-
+-      <AppText variant="title" bold>
+-        Reporte diario tienda
+-      </AppText>
+-
++    <AppShellPage
++      title={t('reports.dailyStoreTitle')}
++      subtitle={t('reports.dailyStoreDescription')}
++      activeRoute="report-daily-store"
++      session={session}
++    >
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Filtros
++          {t('common.filters')}
+         </AppText>
+
+         <View style={sharedStyles.filters}>
+           <AppDateField
+-            label="Fecha"
++            label={t('common.date')}
+             value={date}
+             onChange={setDate}
+           />
+
+           <AppText variant="subtitle" bold>
+-            Sucursal
++            {t('common.branch')}
+           </AppText>
+           <BranchSelector
+             branches={branches}
+@@ -265,7 +270,7 @@ export default function ReportDailyStoreScreen() {
+         </View>
+
+         <AppButton
+-          title={loading ? 'Consultando...' : 'Consultar'}
++          title={loading ? t('reports.querying') : t('reports.query')}
+           onPress={loadReport}
+           loading={loading}
+           disabled={loading}
+@@ -276,10 +281,10 @@ export default function ReportDailyStoreScreen() {
+         <>
+           <AppCard>
+             <AppText variant="subtitle" bold>
+-              {report.branchName || report.branchCode || 'Sucursal'} · {report.date}
++              {report.branchName || report.branchCode || 'Sucursal'} Â· {report.date}
+             </AppText>
+             <AppText color={theme.colors.mutedText}>
+-              Resumen de operación, pagos y caja.
++              Resumen de operaciÃ³n, pagos y caja.
+             </AppText>
+           </AppCard>
+
+@@ -305,20 +310,20 @@ export default function ReportDailyStoreScreen() {
+           <View style={sharedStyles.summaryGrid}>
+             <SummaryValue
+               label="Ventas activas"
+-              value={`${report.operationSummary?.activeSalesCount ?? 0} · ${formatMoney(
++              value={`${report.operationSummary?.activeSalesCount ?? 0} Â· ${formatMoney(
+                 report.operationSummary?.activeSalesTotal
+               )}`}
+             />
+             <SummaryValue
+               label="Apartados activos"
+-              value={`${report.operationSummary?.activeReservationsCount ?? 0} · ${formatMoney(
++              value={`${report.operationSummary?.activeReservationsCount ?? 0} Â· ${formatMoney(
+                 report.operationSummary?.activeReservationsTotal
+               )}`}
+             />
+             <SummaryValue
+               label="Cancelaciones"
+               value={`${(report.operationSummary?.cancelledSalesCount ?? 0) +
+-                (report.operationSummary?.cancelledReservationsCount ?? 0)} · ${formatMoney(
++                (report.operationSummary?.cancelledReservationsCount ?? 0)} Â· ${formatMoney(
+                 Number(report.operationSummary?.cancelledSalesTotal ?? 0) +
+                   Number(report.operationSummary?.cancelledReservationsTotal ?? 0)
+               )}`}
+@@ -326,7 +331,7 @@ export default function ReportDailyStoreScreen() {
+             />
+             <SummaryValue
+               label="Refunds procesados"
+-              value={`${report.operationSummary?.refundsCount ?? 0} · ${formatMoney(
++              value={`${report.operationSummary?.refundsCount ?? 0} Â· ${formatMoney(
+                 report.operationSummary?.processedRefundsTotal
+               )}`}
+             />
+@@ -350,7 +355,7 @@ export default function ReportDailyStoreScreen() {
+           </View>
+
+           <AppInput
+-            label="Buscar en líneas"
++            label="Buscar en lÃ­neas"
+             placeholder="Folio, cliente, canal, estado..."
+             value={search}
+             onChangeText={setSearch}
+@@ -375,7 +380,7 @@ export default function ReportDailyStoreScreen() {
+                         {line.folio || `${line.sourceType || 'Movimiento'} #${line.sourceId || index + 1}`}
+                       </AppText>
+                       <AppText color={theme.colors.mutedText}>
+-                        {line.customerName || 'Sin cliente'} · {line.operationType || line.channelCode || 'Operación'}
++                        {line.customerName || 'Sin cliente'} Â· {line.operationType || line.channelCode || 'OperaciÃ³n'}
+                       </AppText>
+                     </View>
+                     <AppText bold>{formatMoney(line.total)}</AppText>
+@@ -383,13 +388,13 @@ export default function ReportDailyStoreScreen() {
+
+                   <View style={sharedStyles.meta}>
+                     <AppText color={theme.colors.mutedText}>
+-                      Pagado {formatMoney(line.paid)} · Pendiente {formatMoney(line.pending)}
++                      Pagado {formatMoney(line.paid)} Â· Pendiente {formatMoney(line.pending)}
+                     </AppText>
+                     <AppText color={theme.colors.mutedText}>
+-                      Efectivo {formatMoney(line.cash)} · Transf. {formatMoney(line.transfer)} · Tarjeta {formatMoney(line.card)}
++                      Efectivo {formatMoney(line.cash)} Â· Transf. {formatMoney(line.transfer)} Â· Tarjeta {formatMoney(line.card)}
+                     </AppText>
+                     <AppText variant="caption" color={theme.colors.mutedText}>
+-                      Estado: {line.status || '—'} · Pago: {line.paymentStatus || '—'} · Atendió: {line.attendedBy || '—'}
++                      Estado: {line.status || 'â€”'} Â· Pago: {line.paymentStatus || 'â€”'} Â· AtendiÃ³: {line.attendedBy || 'â€”'}
+                     </AppText>
+                     <AppText variant="caption" color={theme.colors.mutedText}>
+                       Fecha: {formatDateTime(line.createdAt)}
+@@ -404,10 +409,10 @@ export default function ReportDailyStoreScreen() {
+       ) : (
+         <AppCard>
+           <AppText color={theme.colors.mutedText}>
+-            Selecciona fecha y sucursal para consultar el reporte.
++            {t('reports.selectDateBranchHint')}
+           </AppText>
+         </AppCard>
+       )}
+-    </AppScreen>
++    </AppShellPage>
+   );
+ }
+diff --git a/app/report-deliveries.tsx b/app/report-deliveries.tsx
+index 418d0d4..bf48291 100644
+--- a/app/report-deliveries.tsx
++++ b/app/report-deliveries.tsx
+@@ -1,10 +1,9 @@
+
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppDateField from '@/components/ui/AppDateField';
+ import AppInput from '@/components/ui/AppInput';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import { Branch, getActiveBranches } from '@/services/branchAdminService';
+@@ -15,6 +14,7 @@ import {
+ } from '@/services/reportService';
+ import { getSession, UserSession } from '@/services/sessionStorage';
+ import { useEffect, useMemo, useState } from 'react';
++import { useTranslation } from 'react-i18next';
+ import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+
+ function todayIsoDate() {
+@@ -31,7 +31,7 @@ function formatMoney(value?: number | null) {
+ }
+
+ function formatDateTime(value?: string | null) {
+-  if (!value) return '—';
++  if (!value) return 'â€”';
+   return new Date(value).toLocaleString();
+ }
+
+@@ -139,6 +139,7 @@ const sharedStyles = StyleSheet.create({
+
+ export default function ReportDeliveriesScreen() {
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+
+   const [session, setSession] = useState<UserSession | null>(null);
+   const [branches, setBranches] = useState<Branch[]>([]);
+@@ -228,34 +229,38 @@ export default function ReportDeliveriesScreen() {
+
+   if (initialLoading) {
+     return (
+-      <AppScreen>
++      <AppShellPage
++        title={t('reports.dailyDeliveriesTitle')}
++        subtitle={t('reports.dailyDeliveriesDescription')}
++        activeRoute="report-deliveries"
++        session={session}
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+   return (
+-    <AppScreen>
+-      <AppBackButton fallbackRoute="/reports" />
+-
+-      <AppText variant="title" bold>
+-        Entregas diarias
+-      </AppText>
+-
++    <AppShellPage
++      title={t('reports.dailyDeliveriesTitle')}
++      subtitle={t('reports.dailyDeliveriesDescription')}
++      activeRoute="report-deliveries"
++      session={session}
++    >
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Filtros
++          {t('common.filters')}
+         </AppText>
+
+         <View style={sharedStyles.filters}>
+           <AppDateField
+-            label="Fecha"
++            label={t('common.date')}
+             value={date}
+             onChange={setDate}
+           />
+
+           <AppText variant="subtitle" bold>
+-            Sucursal
++            {t('common.branch')}
+           </AppText>
+           <BranchSelector
+             branches={branches}
+@@ -265,7 +270,7 @@ export default function ReportDeliveriesScreen() {
+         </View>
+
+         <AppButton
+-          title={loading ? 'Consultando...' : 'Consultar'}
++          title={loading ? t('reports.querying') : t('reports.query')}
+           onPress={loadReport}
+           loading={loading}
+           disabled={loading}
+@@ -276,7 +281,7 @@ export default function ReportDeliveriesScreen() {
+         <>
+           <AppCard>
+             <AppText variant="subtitle" bold>
+-              {report.branchName || report.branchCode || 'Sucursal'} · {report.date}
++              {report.branchName || report.branchCode || 'Sucursal'} Â· {report.date}
+             </AppText>
+             <AppText color={theme.colors.mutedText}>
+               Seguimiento de paquetes en ruta, entregados, devueltos y pendientes.
+@@ -295,7 +300,7 @@ export default function ReportDeliveriesScreen() {
+
+           <AppInput
+             label="Buscar en entregas"
+-            placeholder="Envío, paquete, cliente, dirección, estado..."
++            placeholder="EnvÃ­o, paquete, cliente, direcciÃ³n, estado..."
+             value={search}
+             onChangeText={setSearch}
+           />
+@@ -319,7 +324,7 @@ export default function ReportDeliveriesScreen() {
+                         {line.packageFolio || `Paquete #${line.packageId || index + 1}`}
+                       </AppText>
+                       <AppText color={theme.colors.mutedText}>
+-                        Envío {line.shipmentFolio || `#${line.shipmentId || '—'}`} · {line.deliveryType || 'Entrega'}
++                        EnvÃ­o {line.shipmentFolio || `#${line.shipmentId || 'â€”'}`} Â· {line.deliveryType || 'Entrega'}
+                       </AppText>
+                     </View>
+                     <AppText bold>{formatMoney(line.total)}</AppText>
+@@ -327,19 +332,19 @@ export default function ReportDeliveriesScreen() {
+
+                   <View style={sharedStyles.meta}>
+                     <AppText>
+-                      {line.customerName || 'Sin cliente'} {line.customerPhone ? `· ${line.customerPhone}` : ''}
++                      {line.customerName || 'Sin cliente'} {line.customerPhone ? `Â· ${line.customerPhone}` : ''}
+                     </AppText>
+                     {line.addressText ? (
+                       <AppText color={theme.colors.mutedText}>{line.addressText}</AppText>
+                     ) : null}
+                     <AppText color={theme.colors.mutedText}>
+-                      Pagado {formatMoney(line.paid)} · Pendiente {formatMoney(line.pending)} · Pago {line.paymentStatus || '—'}
++                      Pagado {formatMoney(line.paid)} Â· Pendiente {formatMoney(line.pending)} Â· Pago {line.paymentStatus || 'â€”'}
+                     </AppText>
+                     <AppText variant="caption" color={theme.colors.mutedText}>
+-                      Envío: {line.shipmentStatus || '—'} · Paquete: {line.packageStatus || '—'}
++                      EnvÃ­o: {line.shipmentStatus || 'â€”'} Â· Paquete: {line.packageStatus || 'â€”'}
+                     </AppText>
+                     <AppText variant="caption" color={theme.colors.mutedText}>
+-                      Creado: {formatDateTime(line.createdAt)} · Enviado: {formatDateTime(line.sentAt)} · Entregado: {formatDateTime(line.deliveredAt)}
++                      Creado: {formatDateTime(line.createdAt)} Â· Enviado: {formatDateTime(line.sentAt)} Â· Entregado: {formatDateTime(line.deliveredAt)}
+                     </AppText>
+                     {line.observation ? <AppText>{line.observation}</AppText> : null}
+                   </View>
+@@ -351,10 +356,10 @@ export default function ReportDeliveriesScreen() {
+       ) : (
+         <AppCard>
+           <AppText color={theme.colors.mutedText}>
+-            Selecciona fecha y sucursal para consultar el reporte.
++            {t('reports.selectDateBranchHint')}
+           </AppText>
+         </AppCard>
+       )}
+-    </AppScreen>
++    </AppShellPage>
+   );
+ }
+diff --git a/app/report-deposits.tsx b/app/report-deposits.tsx
+index 74aab5c..d1d8013 100644
+--- a/app/report-deposits.tsx
++++ b/app/report-deposits.tsx
+@@ -1,14 +1,14 @@
+-﻿import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppDateField from '@/components/ui/AppDateField';
+ import AppInput from '@/components/ui/AppInput';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import { Branch, getActiveBranches } from '@/services/branchAdminService';
+-import { getSession } from '@/services/sessionStorage';
++import { getSession, UserSession } from '@/services/sessionStorage';
+ import { useEffect, useMemo, useState } from 'react';
++import { useTranslation } from 'react-i18next';
+ import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+ import { DailyDepositsReport, getDailyDepositsReport } from '@/services/reportService';
+
+@@ -94,7 +94,9 @@ function BranchSelector({
+
+ export default function ReportDepositsScreen() {
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+
++  const [session, setSession] = useState<UserSession | null>(null);
+   const [branches, setBranches] = useState<Branch[]>([]);
+   const [selectedBranchId, setSelectedBranchId] = useState<number | null>(null);
+   const [date, setDate] = useState(todayIsoDate());
+@@ -118,6 +120,7 @@ export default function ReportDepositsScreen() {
+
+       if (!currentSession) return;
+
++      setSession(currentSession);
+       setBranches(branchData);
+       setSelectedBranchId(currentSession.branchId);
+     } catch (err: any) {
+@@ -170,34 +173,38 @@ export default function ReportDepositsScreen() {
+
+   if (initialLoading) {
+     return (
+-      <AppScreen>
++      <AppShellPage
++        title={t('reports.dailyDepositsTitle')}
++        subtitle={t('reports.dailyDepositsDescription')}
++        activeRoute="report-deposits"
++        session={session}
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+   return (
+-    <AppScreen>
+-      <AppBackButton fallbackRoute="/reports" />
+-
+-      <AppText variant="title" bold>
+-        Depositos diarios
+-      </AppText>
+-
++    <AppShellPage
++      title={t('reports.dailyDepositsTitle')}
++      subtitle={t('reports.dailyDepositsDescription')}
++      activeRoute="report-deposits"
++      session={session}
++    >
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Filtros
++          {t('common.filters')}
+         </AppText>
+
+         <View style={sharedStyles.filters}>
+           <AppDateField
+-            label="Fecha"
++            label={t('common.date')}
+             value={date}
+             onChange={setDate}
+           />
+
+           <AppText variant="subtitle" bold>
+-            Sucursal
++            {t('common.branch')}
+           </AppText>
+
+           <BranchSelector
+@@ -207,7 +214,7 @@ export default function ReportDepositsScreen() {
+           />
+
+           <AppButton
+-            title={loading ? 'Consultando...' : 'Consultar'}
++            title={loading ? t('reports.querying') : t('reports.query')}
+             onPress={loadReport}
+             loading={loading}
+             disabled={loading}
+@@ -282,11 +289,11 @@ export default function ReportDepositsScreen() {
+       ) : (
+         <AppCard>
+           <AppText color={theme.colors.mutedText}>
+-            Selecciona fecha y sucursal, luego consulta el reporte.
++            {t('reports.selectDateBranchHint')}
+           </AppText>
+         </AppCard>
+       )}
+-    </AppScreen>
++    </AppShellPage>
+   );
+ }
+
+@@ -329,4 +336,3 @@ const sharedStyles = StyleSheet.create({
+     minWidth: 145,
+   },
+ });
+-
+diff --git a/app/report-live.tsx b/app/report-live.tsx
+index e0c12fd..761b97c 100644
+--- a/app/report-live.tsx
++++ b/app/report-live.tsx
+@@ -1,16 +1,16 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppDateField from '@/components/ui/AppDateField';
+ import AppInput from '@/components/ui/AppInput';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import { Branch, getActiveBranches } from '@/services/branchAdminService';
+ import { getSession, UserSession } from '@/services/sessionStorage';
+ import { useEffect, useMemo, useState } from 'react';
++import { useTranslation } from 'react-i18next';
+ import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+-import { LiveControlLine, LiveControlReport, getLiveControlReport } from '@/services/reportService';
++import { LiveControlReport, getLiveControlReport } from '@/services/reportService';
+
+ function todayIsoDate() {
+   const now = new Date();
+@@ -26,7 +26,7 @@ function formatMoney(value?: number | null) {
+ }
+
+ function formatDateTime(value?: string | null) {
+-  if (!value) return '—';
++  if (!value) return 'â€”';
+   return new Date(value).toLocaleString();
+ }
+
+@@ -94,6 +94,7 @@ function BranchSelector({
+
+ export default function ReportLiveScreen() {
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+
+   const [session, setSession] = useState<UserSession | null>(null);
+   const [branches, setBranches] = useState<Branch[]>([]);
+@@ -172,34 +173,38 @@ export default function ReportLiveScreen() {
+
+   if (initialLoading) {
+     return (
+-      <AppScreen>
++      <AppShellPage
++        title={t('reports.liveControlTitle')}
++        subtitle={t('reports.liveControlDescription')}
++        activeRoute="report-live"
++        session={session}
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+   return (
+-    <AppScreen>
+-      <AppBackButton fallbackRoute="/reports" />
+-
+-      <AppText variant="title" bold>
+-        Control Live
+-      </AppText>
+-
++    <AppShellPage
++      title={t('reports.liveControlTitle')}
++      subtitle={t('reports.liveControlDescription')}
++      activeRoute="report-live"
++      session={session}
++    >
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Filtros
++          {t('common.filters')}
+         </AppText>
+
+         <View style={sharedStyles.filters}>
+           <AppDateField
+-            label="Fecha"
++            label={t('common.date')}
+             value={date}
+             onChange={setDate}
+           />
+
+           <AppText variant="subtitle" bold>
+-            Sucursal
++            {t('common.branch')}
+           </AppText>
+
+           <BranchSelector
+@@ -209,7 +214,7 @@ export default function ReportLiveScreen() {
+           />
+
+           <AppButton
+-            title={loading ? 'Consultando...' : 'Consultar'}
++            title={loading ? t('reports.querying') : t('reports.query')}
+             onPress={loadReport}
+             loading={loading}
+             disabled={loading}
+@@ -221,7 +226,7 @@ export default function ReportLiveScreen() {
+         <>
+           <AppCard>
+             <AppText variant="subtitle" bold>
+-              Resumen · {report.branchName || report.branchCode || 'Sucursal'} · {report.date}
++              Resumen Â· {report.branchName || report.branchCode || 'Sucursal'} Â· {report.date}
+             </AppText>
+
+             <View style={sharedStyles.summaryGrid}>
+@@ -236,7 +241,7 @@ export default function ReportLiveScreen() {
+           </AppCard>
+
+           <AppInput
+-            label="Buscar en líneas"
++            label="Buscar en lÃ­neas"
+             placeholder="Cliente, folio, estado, referencia..."
+             value={search}
+             onChangeText={setSearch}
+@@ -249,7 +254,7 @@ export default function ReportLiveScreen() {
+
+             {filteredLines.length === 0 ? (
+               <AppText color={theme.colors.mutedText}>
+-                No hay líneas para mostrar.
++                No hay lÃ­neas para mostrar.
+               </AppText>
+             ) : (
+               filteredLines.map((line: any, index: number) => (
+@@ -262,18 +267,18 @@ export default function ReportLiveScreen() {
+                 >
+                   <View style={sharedStyles.headerRow}>
+                     <View style={sharedStyles.headerText}>
+-                      <AppText bold>{line.packageFolio || `Paquete #${line.packageId || '—'}`}</AppText>
++                      <AppText bold>{line.packageFolio || `Paquete #${line.packageId || 'â€”'}`}</AppText>
+                       <AppText color={theme.colors.mutedText}>
+-                        {line.customerName || 'Cliente sin nombre'} · {line.pieces ?? 0} piezas
++                        {line.customerName || 'Cliente sin nombre'} Â· {line.pieces ?? 0} piezas
+                       </AppText>
+                     </View>
+                     <AppText bold>{formatMoney(line.total)}</AppText>
+                   </View>
+                   <View style={sharedStyles.meta}>
+-                    <AppText color={theme.colors.mutedText}>Pagado: {formatMoney(line.paid)} · Pendiente: {formatMoney(line.pending)}</AppText>
+-                    <AppText color={theme.colors.mutedText}>Pago: {line.paymentStatus || '—'} · Paquete: {line.packageStatus || '—'} · Pedido: {line.orderStatus || '—'}</AppText>
++                    <AppText color={theme.colors.mutedText}>Pagado: {formatMoney(line.paid)} Â· Pendiente: {formatMoney(line.pending)}</AppText>
++                    <AppText color={theme.colors.mutedText}>Pago: {line.paymentStatus || 'â€”'} Â· Paquete: {line.packageStatus || 'â€”'} Â· Pedido: {line.orderStatus || 'â€”'}</AppText>
+                     <AppText variant="caption" color={theme.colors.mutedText}>
+-                      Creado: {formatDateTime(line.createdAt)} · Liquidado: {formatDateTime(line.settledAt)}
++                      Creado: {formatDateTime(line.createdAt)} Â· Liquidado: {formatDateTime(line.settledAt)}
+                     </AppText>
+                   </View>
+                 </View>
+@@ -284,11 +289,11 @@ export default function ReportLiveScreen() {
+       ) : (
+         <AppCard>
+           <AppText color={theme.colors.mutedText}>
+-            Selecciona fecha y sucursal, luego consulta el reporte.
++            {t('reports.selectDateBranchHint')}
+           </AppText>
+         </AppCard>
+       )}
+-    </AppScreen>
++    </AppShellPage>
+   );
+ }
+
+diff --git a/app/report-remissions.tsx b/app/report-remissions.tsx
+index e6d75e2..e93c74b 100644
+--- a/app/report-remissions.tsx
++++ b/app/report-remissions.tsx
+@@ -1,16 +1,16 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppDateField from '@/components/ui/AppDateField';
+ import AppInput from '@/components/ui/AppInput';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import { Branch, getActiveBranches } from '@/services/branchAdminService';
+ import { getSession, UserSession } from '@/services/sessionStorage';
+ import { useEffect, useMemo, useState } from 'react';
++import { useTranslation } from 'react-i18next';
+ import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+-import { RemissionLine, RemissionsReport, getRemissionsReport } from '@/services/reportService';
++import { RemissionsReport, getRemissionsReport } from '@/services/reportService';
+
+ function todayIsoDate() {
+   const now = new Date();
+@@ -26,7 +26,7 @@ function formatMoney(value?: number | null) {
+ }
+
+ function formatDateTime(value?: string | null) {
+-  if (!value) return '—';
++  if (!value) return 'â€”';
+   return new Date(value).toLocaleString();
+ }
+
+@@ -94,6 +94,7 @@ function BranchSelector({
+
+ export default function ReportRemissionsScreen() {
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+
+   const [session, setSession] = useState<UserSession | null>(null);
+   const [branches, setBranches] = useState<Branch[]>([]);
+@@ -172,34 +173,38 @@ export default function ReportRemissionsScreen() {
+
+   if (initialLoading) {
+     return (
+-      <AppScreen>
++      <AppShellPage
++        title={t('reports.remissionsTitle')}
++        subtitle={t('reports.remissionsDescription')}
++        activeRoute="report-remissions"
++        session={session}
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+   return (
+-    <AppScreen>
+-      <AppBackButton fallbackRoute="/reports" />
+-
+-      <AppText variant="title" bold>
+-        Remisiones
+-      </AppText>
+-
++    <AppShellPage
++      title={t('reports.remissionsTitle')}
++      subtitle={t('reports.remissionsDescription')}
++      activeRoute="report-remissions"
++      session={session}
++    >
+       <AppCard>
+         <AppText variant="subtitle" bold>
+-          Filtros
++          {t('common.filters')}
+         </AppText>
+
+         <View style={sharedStyles.filters}>
+           <AppDateField
+-            label="Fecha"
++            label={t('common.date')}
+             value={date}
+             onChange={setDate}
+           />
+
+           <AppText variant="subtitle" bold>
+-            Sucursal
++            {t('common.branch')}
+           </AppText>
+
+           <BranchSelector
+@@ -209,7 +214,7 @@ export default function ReportRemissionsScreen() {
+           />
+
+           <AppButton
+-            title={loading ? 'Consultando...' : 'Consultar'}
++            title={loading ? t('reports.querying') : t('reports.query')}
+             onPress={loadReport}
+             loading={loading}
+             disabled={loading}
+@@ -221,7 +226,7 @@ export default function ReportRemissionsScreen() {
+         <>
+           <AppCard>
+             <AppText variant="subtitle" bold>
+-              Resumen · {report.branchName || report.branchCode || 'Sucursal'} · {report.date}
++              Resumen Â· {report.branchName || report.branchCode || 'Sucursal'} Â· {report.date}
+             </AppText>
+
+             <View style={sharedStyles.summaryGrid}>
+@@ -234,7 +239,7 @@ export default function ReportRemissionsScreen() {
+           </AppCard>
+
+           <AppInput
+-            label="Buscar en líneas"
++            label="Buscar en lÃ­neas"
+             placeholder="Cliente, folio, estado, referencia..."
+             value={search}
+             onChangeText={setSearch}
+@@ -247,7 +252,7 @@ export default function ReportRemissionsScreen() {
+
+             {filteredLines.length === 0 ? (
+               <AppText color={theme.colors.mutedText}>
+-                No hay líneas para mostrar.
++                No hay lÃ­neas para mostrar.
+               </AppText>
+             ) : (
+               filteredLines.map((line: any, index: number) => (
+@@ -260,18 +265,18 @@ export default function ReportRemissionsScreen() {
+                 >
+                   <View style={sharedStyles.headerRow}>
+                     <View style={sharedStyles.headerText}>
+-                      <AppText bold>{line.itemCode || line.qrCode || `Origen #${line.sourceId || '—'}`}</AppText>
++                      <AppText bold>{line.itemCode || line.qrCode || `Origen #${line.sourceId || 'â€”'}`}</AppText>
+                       <AppText color={theme.colors.mutedText}>
+-                        {line.customerName || 'Cliente sin nombre'} · {line.productType || 'Sin tipo'}
++                        {line.customerName || 'Cliente sin nombre'} Â· {line.productType || 'Sin tipo'}
+                       </AppText>
+                     </View>
+                     <AppText bold>{formatMoney(line.price)}</AppText>
+                   </View>
+                   <View style={sharedStyles.meta}>
+-                    <AppText color={theme.colors.mutedText}>Marca: {line.brand || '—'} · Talla: {line.size || '—'}</AppText>
+-                    <AppText color={theme.colors.mutedText}>Canal: {line.channelCode || '—'} · Paquete: {line.packageFolio || '—'}</AppText>
+-                    <AppText color={theme.colors.mutedText}>Pago: {line.paymentStatus || '—'} · Pagado: {formatMoney(line.paid)} · Pendiente: {formatMoney(line.pending)}</AppText>
+-                    <AppText color={theme.colors.mutedText}>Vendedor: {line.sellerName || '—'}</AppText>
++                    <AppText color={theme.colors.mutedText}>Marca: {line.brand || 'â€”'} Â· Talla: {line.size || 'â€”'}</AppText>
++                    <AppText color={theme.colors.mutedText}>Canal: {line.channelCode || 'â€”'} Â· Paquete: {line.packageFolio || 'â€”'}</AppText>
++                    <AppText color={theme.colors.mutedText}>Pago: {line.paymentStatus || 'â€”'} Â· Pagado: {formatMoney(line.paid)} Â· Pendiente: {formatMoney(line.pending)}</AppText>
++                    <AppText color={theme.colors.mutedText}>Vendedor: {line.sellerName || 'â€”'}</AppText>
+                     <AppText variant="caption" color={theme.colors.mutedText}>
+                       {formatDateTime(line.createdAt)}
+                     </AppText>
+@@ -284,11 +289,11 @@ export default function ReportRemissionsScreen() {
+       ) : (
+         <AppCard>
+           <AppText color={theme.colors.mutedText}>
+-            Selecciona fecha y sucursal, luego consulta el reporte.
++            {t('reports.selectDateBranchHint')}
+           </AppText>
+         </AppCard>
+       )}
+-    </AppScreen>
++    </AppShellPage>
+   );
+ }
+
+diff --git a/app/system-channels.tsx b/app/system-channels.tsx
+index 829fb9a..d6b5505 100644
+--- a/app/system-channels.tsx
++++ b/app/system-channels.tsx
+@@ -1,7 +1,6 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import {
+@@ -62,7 +61,7 @@ export default function SystemChannelsScreen() {
+
+   const discardBlockedReason = useMemo(() => {
+     if (loading) return t('systemChannels.waitLoad');
+-    if (saving) return 'Se esta guardando la configuración.';
++    if (saving) return t('systemChannels.saving');
+     if (!hasChanges) return t('systemChannels.noPendingDiscard');
+     return undefined;
+   }, [loading, saving, hasChanges, t]);
+@@ -132,13 +131,11 @@ export default function SystemChannelsScreen() {
+   };
+
+   return (
+-    <AppScreen>
+-      <AppBackButton fallbackRoute="/system" />
+-
+-      <AppText variant="title" bold>
+-        {t('systemChannels.title')}
+-      </AppText>
+-
++    <AppShellPage
++      title={t('systemChannels.title')}
++      subtitle={t('systemChannels.globalRuleHelp')}
++      activeRoute="system-channels"
++    >
+       <AppCard>
+         <AppText variant="subtitle" bold>
+           {t('systemChannels.globalRuleTitle')}
+@@ -233,7 +230,7 @@ export default function SystemChannelsScreen() {
+           style={{ marginTop: 10 }}
+         />
+       </View>
+-    </AppScreen>
++    </AppShellPage>
+   );
+ }
+
+diff --git a/app/system-roles.tsx b/app/system-roles.tsx
+index 3998666..c95397d 100644
+--- a/app/system-roles.tsx
++++ b/app/system-roles.tsx
+@@ -1,9 +1,8 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppBottomModal from '@/components/ui/AppBottomModal';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import {
+@@ -145,21 +144,24 @@ export default function SystemRolesScreen() {
+
+   if (loading) {
+     return (
+-      <AppScreen scroll={false}>
++      <AppShellPage
++        title={t('systemRoles.title')}
++        subtitle={t('systemRoles.cardHelp')}
++        activeRoute="system-roles"
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+   return (
+     <>
+-      <AppScreen>
+-        <AppBackButton fallbackRoute="/system" />
+-
+-        <AppText variant="title" bold>
+-          {t('systemRoles.title')}
+-        </AppText>
+-
++      <AppShellPage
++        title={t('systemRoles.title')}
++        subtitle={t('systemRoles.cardHelp')}
++        activeRoute="system-roles"
++        rightContent={<AppButton title={t('systemRoles.newRole')} variant="secondary" onPress={openNew} />}
++      >
+         <AppCard>
+           <AppText variant="subtitle" bold>
+             {t('systemRoles.cardTitle')}
+@@ -169,8 +171,6 @@ export default function SystemRolesScreen() {
+           </AppText>
+         </AppCard>
+
+-        <AppButton title={t('systemRoles.newRole')} onPress={openNew} />
+-
+         {loadError ? (
+           <AppCard>
+             <AppText color={theme.colors.danger}>{loadError}</AppText>
+@@ -203,7 +203,7 @@ export default function SystemRolesScreen() {
+             </AppCard>
+           ))
+         )}
+-      </AppScreen>
++      </AppShellPage>
+
+       <AppBottomModal
+         visible={modalVisible}
+@@ -239,7 +239,7 @@ export default function SystemRolesScreen() {
+
+         <AppCard>
+           <AppText variant="subtitle" bold>
+-            Permisos existentes
++            {t('systemRoles.existingPermissions')}
+           </AppText>
+           <AppText color={theme.colors.mutedText}>
+             {t('systemRoles.existingPermissionsHelp')}
+diff --git a/app/system-security-audit.tsx b/app/system-security-audit.tsx
+index 994a28c..6ac8e51 100644
+--- a/app/system-security-audit.tsx
++++ b/app/system-security-audit.tsx
+@@ -1,7 +1,6 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import { hasPermission } from '@/services/accessControl';
+@@ -200,21 +199,22 @@ export default function SystemSecurityAuditScreen() {
+
+   if (!authorized) {
+     return (
+-      <AppScreen>
+-        <AppBackButton fallbackRoute="/system" />
++      <AppShellPage
++        title={t('securityAudit.title')}
++        subtitle={t('securityAudit.help')}
++        activeRoute="system-security-audit"
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+   return (
+-    <AppScreen>
+-      <AppBackButton fallbackRoute="/system" />
+-
+-      <AppText variant="title" bold>
+-        {t('securityAudit.title')}
+-      </AppText>
+-
++    <AppShellPage
++      title={t('securityAudit.title')}
++      subtitle={t('securityAudit.help')}
++      activeRoute="system-security-audit"
++    >
+       <AppCard>
+         <AppText variant="subtitle" bold>
+           {t('securityAudit.blockedEvents')}
+@@ -352,7 +352,7 @@ export default function SystemSecurityAuditScreen() {
+           />
+         </View>
+       </AppCard>
+-    </AppScreen>
++    </AppShellPage>
+   );
+ }
+
+@@ -366,6 +366,7 @@ function SecurityAuditAlertsPanel({
+   error: string | null;
+ }) {
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+   const lines = alerts?.alerts ?? [];
+
+   return (
+@@ -373,10 +374,10 @@ function SecurityAuditAlertsPanel({
+       <View style={styles.listHeader}>
+         <View>
+           <AppText variant="subtitle" bold>
+-            Alertas recientes
++            {t('securityAudit.alertsRecent')}
+           </AppText>
+           <AppText color={theme.colors.mutedText}>
+-            Patrones criticos detectados en los ultimos 60 minutos.
++            {t('securityAudit.alertsHelp')}
+           </AppText>
+         </View>
+         {loading ? <ActivityIndicator /> : null}
+@@ -389,7 +390,7 @@ function SecurityAuditAlertsPanel({
+       ) : null}
+
+       {!loading && !error && lines.length === 0 ? (
+-        <AppText color={theme.colors.mutedText}>Sin alertas criticas.</AppText>
++        <AppText color={theme.colors.mutedText}>{t('securityAudit.noCriticalAlerts')}</AppText>
+       ) : (
+         <View style={styles.alertGrid}>
+           {lines.map((alert, index) => (
+@@ -403,6 +404,7 @@ function SecurityAuditAlertsPanel({
+
+ function SecurityAuditAlertCard({ alert }: { alert: SecurityAuditAlertLine }) {
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+   const color = alert.severity === 'CRITICAL' || alert.severity === 'HIGH'
+     ? theme.colors.danger
+     : alert.severity === 'MEDIUM'
+@@ -417,11 +419,11 @@ function SecurityAuditAlertCard({ alert }: { alert: SecurityAuditAlertLine }) {
+       </View>
+       <AppText bold>{alert.alertType}</AppText>
+       <AppText color={theme.colors.mutedText}>{alert.description}</AppText>
+-      {alert.email ? <AuditDetail label="Email" value={alert.email} /> : null}
+-      {alert.path ? <AuditDetail label="Ruta" value={alert.path} /> : null}
++      {alert.email ? <AuditDetail label={t('securityAudit.email')} value={alert.email} /> : null}
++      {alert.path ? <AuditDetail label={t('securityAudit.path')} value={alert.path} /> : null}
+       <View style={styles.detailGrid}>
+-        <AuditDetail label="Company" value={alert.companyId} />
+-        <AuditDetail label="Branch" value={alert.branchId} />
++        <AuditDetail label={t('securityAudit.company')} value={alert.companyId} />
++        <AuditDetail label={t('securityAudit.branch')} value={alert.branchId} />
+       </View>
+       <AppText variant="caption" color={theme.colors.mutedText}>
+         {formatDate(alert.firstSeen)} - {formatDate(alert.lastSeen)}
+@@ -440,16 +442,17 @@ function SecurityAuditSummaryDashboard({
+   error: string | null;
+ }) {
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+
+   return (
+     <AppCard>
+       <View style={styles.listHeader}>
+         <View>
+           <AppText variant="subtitle" bold>
+-            Resumen de seguridad
++            {t('securityAudit.summaryTitle')}
+           </AppText>
+           <AppText color={theme.colors.mutedText}>
+-            Vista rapida de bloqueos, usuarios y rutas frecuentes.
++            {t('securityAudit.summaryHelp')}
+           </AppText>
+         </View>
+         {loading ? <ActivityIndicator /> : null}
+@@ -462,27 +465,27 @@ function SecurityAuditSummaryDashboard({
+       ) : null}
+
+       <View style={styles.metricGrid}>
+-        <AuditMetricCard label="Total eventos" value={summary?.totalEvents ?? 0} />
+-        <AuditMetricCard label="Total 401" value={summary?.total401 ?? 0} tone="danger" />
+-        <AuditMetricCard label="Total 403" value={summary?.total403 ?? 0} tone="warning" />
++        <AuditMetricCard label={t('securityAudit.metricTotalEvents')} value={summary?.totalEvents ?? 0} />
++        <AuditMetricCard label={t('securityAudit.metricTotal401')} value={summary?.total401 ?? 0} tone="danger" />
++        <AuditMetricCard label={t('securityAudit.metricTotal403')} value={summary?.total403 ?? 0} tone="warning" />
+       </View>
+
+       <View style={styles.summaryGrid}>
+-        <AuditSummarySection title="Eventos por tipo" items={summary?.byEventType ?? []} />
+-        <AuditSummarySection title="Eventos por status" items={summary?.byStatusCode ?? []} />
+-        <AuditSummarySection title="Top usuarios" items={summary?.topEmails ?? []} />
+-        <AuditSummarySection title="Top endpoints" items={summary?.topPaths ?? []} />
++        <AuditSummarySection title={t('securityAudit.byEventType')} items={summary?.byEventType ?? []} />
++        <AuditSummarySection title={t('securityAudit.byStatusCode')} items={summary?.byStatusCode ?? []} />
++        <AuditSummarySection title={t('securityAudit.topUsers')} items={summary?.topEmails ?? []} />
++        <AuditSummarySection title={t('securityAudit.topEndpoints')} items={summary?.topPaths ?? []} />
+       </View>
+
+       <View style={styles.criticalSection}>
+-        <AppText bold>Eventos criticos recientes</AppText>
++        <AppText bold>{t('securityAudit.recentCriticalEvents')}</AppText>
+         {summary?.recentCriticalEvents?.length ? (
+           summary.recentCriticalEvents.map((event) => (
+             <CriticalEventRow key={event.id} event={event} />
+           ))
+         ) : (
+           <AppText color={theme.colors.mutedText}>
+-            No hay eventos criticos recientes con estos filtros.
++            {t('securityAudit.noRecentCriticalEvents')}
+           </AppText>
+         )}
+       </View>
+@@ -526,12 +529,13 @@ function AuditSummarySection({
+   items: SecurityAuditCountLine[];
+ }) {
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+
+   return (
+     <View style={[styles.summarySection, { borderColor: theme.colors.border }]}>
+       <AppText bold>{title}</AppText>
+       {items.length === 0 ? (
+-        <AppText color={theme.colors.mutedText}>Sin datos.</AppText>
++        <AppText color={theme.colors.mutedText}>{t('securityAudit.noData')}</AppText>
+       ) : (
+         items.map((item) => (
+           <View key={`${title}-${item.key}`} style={styles.summaryLine}>
+@@ -546,6 +550,7 @@ function AuditSummarySection({
+
+ function CriticalEventRow({ event }: { event: SecurityAuditCriticalEventLine }) {
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+
+   return (
+     <View style={[styles.criticalRow, { borderBottomColor: theme.colors.border }]}>
+@@ -561,7 +566,7 @@ function CriticalEventRow({ event }: { event: SecurityAuditCriticalEventLine })
+         </AppText>
+       </View>
+       <AppText color={theme.colors.mutedText}>
+-        {event.email || 'Sin email'} - {event.httpMethod || '-'} {event.path || '-'}
++        {event.email || t('securityAudit.noEmail')} - {event.httpMethod || '-'} {event.path || '-'}
+       </AppText>
+       {event.reason ? <AppText>{event.reason}</AppText> : null}
+     </View>
+@@ -611,6 +616,7 @@ function AuditInput({
+
+ function AuditEventRow({ event }: { event: SecurityAuditEventLine }) {
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+
+   return (
+     <View style={[styles.eventRow, { borderBottomColor: theme.colors.border }]}>
+@@ -627,12 +633,12 @@ function AuditEventRow({ event }: { event: SecurityAuditEventLine }) {
+       </View>
+
+       <View style={styles.detailGrid}>
+-        <AuditDetail label="Email" value={event.email} />
+-        <AuditDetail label="Company" value={event.companyId} />
+-        <AuditDetail label="Branch" value={event.branchId} />
+-        <AuditDetail label="Metodo" value={event.httpMethod} />
+-        <AuditDetail label="Ruta" value={event.path} wide />
+-        <AuditDetail label="Motivo" value={event.reason} wide />
++        <AuditDetail label={t('securityAudit.email')} value={event.email} />
++        <AuditDetail label={t('securityAudit.company')} value={event.companyId} />
++        <AuditDetail label={t('securityAudit.branch')} value={event.branchId} />
++        <AuditDetail label={t('securityAudit.method')} value={event.httpMethod} />
++        <AuditDetail label={t('securityAudit.path')} value={event.path} wide />
++        <AuditDetail label={t('securityAudit.reason')} value={event.reason} wide />
+       </View>
+     </View>
+   );
+diff --git a/app/users-form.tsx b/app/users-form.tsx
+index dae516c..caf7d90 100644
+--- a/app/users-form.tsx
++++ b/app/users-form.tsx
+@@ -1,10 +1,9 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShellPage from '@/components/layout/AppShellPage';
+ import AppBottomModal from '@/components/ui/AppBottomModal';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+ import AppOptionRow from '@/components/ui/AppOptionRow';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppSelectorField from '@/components/ui/AppSelectorField';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+@@ -27,6 +26,7 @@ import {
+ } from '@/services/userAdminService';
+ import { useLocalSearchParams, useRouter } from 'expo-router';
+ import { useCallback, useEffect, useMemo, useState } from 'react';
++import { useTranslation } from 'react-i18next';
+ import {
+   ActivityIndicator,
+   Alert,
+@@ -103,6 +103,7 @@ export default function UsersFormScreen() {
+   const userId = parseId(id);
+   const isEdit = userId !== null;
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+
+   const [form, setForm] = useState<FormState>(initialForm);
+   const [branches, setBranches] = useState<AdminBranch[]>([]);
+@@ -158,11 +159,11 @@ export default function UsersFormScreen() {
+         }));
+       }
+     } catch (error: any) {
+-      Alert.alert('No se pudo cargar el formulario', error?.message ?? 'Intenta nuevamente.');
++      Alert.alert(t('usersForm.loadErrorTitle'), error?.message ?? t('usersForm.retryHelp'));
+     } finally {
+       setIsLoading(false);
+     }
+-  }, [userId]);
++  }, [t, userId]);
+
+   useEffect(() => {
+     loadData();
+@@ -174,8 +175,8 @@ export default function UsersFormScreen() {
+   );
+
+   const selectedAssignedBranches = useMemo(
+-    () => selectedNames(branches, mergeIds(form.branchIds, form.branchId), 'Seleccionar sucursales'),
+-    [branches, form.branchId, form.branchIds]
++    () => selectedNames(branches, mergeIds(form.branchIds, form.branchId), t('usersForm.selectBranches')),
++    [branches, form.branchId, form.branchIds, t]
+   );
+
+   const draftPermissionCodes = useMemo(
+@@ -229,27 +230,27 @@ export default function UsersFormScreen() {
+
+   const validate = () => {
+     if (!form.name.trim()) {
+-      Alert.alert('Falta nombre', 'Captura el nombre del usuario.');
++      Alert.alert(t('usersForm.missingNameTitle'), t('usersForm.missingNameMessage'));
+       return false;
+     }
+
+     if (!form.email.trim()) {
+-      Alert.alert('Falta correo', 'Captura el correo del usuario.');
++      Alert.alert(t('usersForm.missingEmailTitle'), t('usersForm.missingEmailMessage'));
+       return false;
+     }
+
+     if (!form.branchId) {
+-      Alert.alert('Falta sucursal', 'Selecciona una sucursal.');
++      Alert.alert(t('usersForm.missingBranchTitle'), t('usersForm.missingBranchMessage'));
+       return false;
+     }
+
+     if (form.roleIds.length === 0) {
+-      Alert.alert('Falta rol', 'Selecciona al menos un rol para el usuario.');
++      Alert.alert(t('usersForm.missingRoleTitle'), t('usersForm.missingRoleMessage'));
+       return false;
+     }
+
+     if (!isEdit && !form.password.trim()) {
+-      Alert.alert('Falta contraseña', 'Captura una contraseña inicial para el usuario.');
++      Alert.alert(t('usersForm.missingPasswordTitle'), t('usersForm.missingPasswordMessage'));
+       return false;
+     }
+
+@@ -283,7 +284,7 @@ export default function UsersFormScreen() {
+
+       router.replace('/users' as any);
+     } catch (error: any) {
+-      Alert.alert('No se pudo guardar', error?.message ?? 'Revisa los datos e intenta nuevamente.');
++      Alert.alert(t('usersForm.saveErrorTitle'), error?.message ?? t('usersForm.retryHelp'));
+     } finally {
+       setIsSaving(false);
+     }
+@@ -291,35 +292,37 @@ export default function UsersFormScreen() {
+
+   if (isLoading) {
+     return (
+-      <AppScreen scroll={false}>
++      <AppShellPage
++        title={isEdit ? t('usersForm.editTitle') : t('usersForm.newTitle')}
++        subtitle={t('usersForm.subtitle')}
++        activeRoute="users"
++      >
+         <ActivityIndicator />
+-      </AppScreen>
++      </AppShellPage>
+     );
+   }
+
+   return (
+     <>
+-      <AppScreen>
+-        <AppBackButton fallbackRoute="/users" preferHistory={false} />
+-
+-        <AppText variant="title" bold>
+-          {isEdit ? 'Editar usuario' : 'Nuevo usuario'}
+-        </AppText>
+-
++      <AppShellPage
++        title={isEdit ? t('usersForm.editTitle') : t('usersForm.newTitle')}
++        subtitle={t('usersForm.subtitle')}
++        activeRoute="users"
++      >
+         <AppCard>
+           <AppText variant="subtitle" bold>
+-            Datos generales
++            {t('usersForm.generalData')}
+           </AppText>
+
+           <AppInput
+-            label="Nombre"
++            label={t('usersForm.name')}
+             value={form.name}
+             onChangeText={(name) => setForm((current) => ({ ...current, name }))}
+-            placeholder="Nombre completo"
++            placeholder={t('usersForm.fullName')}
+           />
+
+           <AppInput
+-            label="Correo electrónico"
++            label={t('usersForm.email')}
+             value={form.email}
+             onChangeText={(email) => setForm((current) => ({ ...current, email }))}
+             placeholder="correo@ejemplo.com"
+@@ -328,26 +331,26 @@ export default function UsersFormScreen() {
+           />
+
+           <AppInput
+-            label="Teléfono"
++            label={t('usersForm.phone')}
+             value={form.phone}
+             onChangeText={(phone) => setForm((current) => ({ ...current, phone }))}
+-            placeholder="Opcional"
++            placeholder={t('usersForm.optional')}
+             keyboardType="phone-pad"
+           />
+
+           <AppInput
+-            label={isEdit ? 'Nueva contraseña (opcional)' : 'Contraseña inicial'}
++            label={isEdit ? t('usersForm.newPasswordOptional') : t('usersForm.initialPassword')}
+             value={form.password}
+             onChangeText={(password) => setForm((current) => ({ ...current, password }))}
+-            placeholder={isEdit ? 'Dejar vacío para no cambiar' : 'Contraseña'}
++            placeholder={isEdit ? t('usersForm.leaveEmptyPassword') : t('usersForm.password')}
+             secureTextEntry
+           />
+
+           <View style={styles.switchRow}>
+             <View style={styles.switchText}>
+-              <AppText>Forzar cambio en siguiente login</AppText>
++              <AppText>{t('usersForm.forcePasswordChange')}</AppText>
+               <AppText variant="caption" color={theme.colors.mutedText}>
+-                Recomendado cuando soporte asigna o resetea una contraseña.
++                {t('usersForm.forcePasswordChangeHelp')}
+               </AppText>
+             </View>
+             <Switch
+@@ -361,51 +364,51 @@ export default function UsersFormScreen() {
+           </View>
+
+           <AppSelectorField
+-            label="Sucursal principal"
+-            value={selectedBranch ? `${selectedBranch.code} · ${selectedBranch.name}` : null}
+-            placeholder="Seleccionar sucursal"
++            label={t('usersForm.primaryBranch')}
++            value={selectedBranch ? `${selectedBranch.code} Â· ${selectedBranch.name}` : null}
++            placeholder={t('usersForm.selectBranch')}
+             onPress={() => setBranchModalVisible(true)}
+           />
+
+           <AppSelectorField
+-            label="Sucursales asignadas"
++            label={t('usersForm.assignedBranches')}
+             value={selectedAssignedBranches}
+-            placeholder="Seleccionar sucursales"
++            placeholder={t('usersForm.selectBranches')}
+             onPress={() => setAssignedBranchesModalVisible(true)}
+           />
+
+           <AppText color={theme.colors.mutedText} variant="caption">
+-            La sucursal principal se usa por defecto. Las asignadas permiten ver dashboard y operar varias sucursales.
++            {t('usersForm.branchHelp')}
+           </AppText>
+         </AppCard>
+
+         <AppCard>
+           <AppText variant="subtitle" bold>
+-            Acceso
++            {t('usersForm.access')}
+           </AppText>
+
+           <AppSelectorField
+-            label="Roles"
+-            value={selectedNames(roles, form.roleIds, 'Seleccionar roles')}
+-            placeholder="Seleccionar roles"
++            label={t('usersForm.roles')}
++            value={selectedNames(roles, form.roleIds, t('usersForm.selectRoles'))}
++            placeholder={t('usersForm.selectRoles')}
+             onPress={openRolesModal}
+           />
+
+           <AppSelectorField
+-            label="Permisos directos adicionales"
+-            value={selectedNames(permissions, form.permissionIds, 'Sin permisos adicionales')}
+-            placeholder="Seleccionar permisos directos"
++            label={t('usersForm.directPermissions')}
++            value={selectedNames(permissions, form.permissionIds, t('usersForm.noDirectPermissions'))}
++            placeholder={t('usersForm.selectDirectPermissions')}
+             onPress={openPermissionsModal}
+           />
+
+           <AppText color={theme.colors.mutedText} variant="caption">
+-            Los roles definen las capacidades base. Los permisos adicionales solo refinan acciones específicas.
++            {t('usersForm.accessHelp')}
+           </AppText>
+         </AppCard>
+
+         <AppCard>
+           <AppText variant="subtitle" bold>
+-            Estado
++            {t('usersForm.status')}
+           </AppText>
+
+           <View style={styles.statusRow}>
+@@ -423,7 +426,7 @@ export default function UsersFormScreen() {
+                 },
+               ]}
+             >
+-              <AppText bold={form.status === 'ACTIVE'}>Activo</AppText>
++              <AppText bold={form.status === 'ACTIVE'}>{t('usersForm.active')}</AppText>
+             </Pressable>
+
+             <Pressable
+@@ -440,24 +443,24 @@ export default function UsersFormScreen() {
+                 },
+               ]}
+             >
+-              <AppText bold={form.status === 'INACTIVE'}>Inactivo</AppText>
++              <AppText bold={form.status === 'INACTIVE'}>{t('usersForm.inactive')}</AppText>
+             </Pressable>
+           </View>
+         </AppCard>
+
+-        <AppButton title="Guardar" loading={isSaving} onPress={save} />
+-      </AppScreen>
++        <AppButton title={t('common.save')} loading={isSaving} onPress={save} />
++      </AppShellPage>
+
+       <AppBottomModal
+         visible={branchModalVisible}
+-        title="Seleccionar sucursal"
++        title={t('usersForm.selectBranch')}
+         onClose={() => setBranchModalVisible(false)}
+       >
+         {branches.map((branch) => (
+           <AppOptionRow
+             key={branch.id}
+-            title={`${branch.code} · ${branch.name}`}
+-            subtitle={branch.status === 'INACTIVE' ? 'Inactiva' : 'Activa'}
++            title={`${branch.code} Â· ${branch.name}`}
++            subtitle={branch.status === 'INACTIVE' ? t('usersForm.inactive') : t('usersForm.active')}
+             onPress={() => {
+               setForm((current) => ({
+                 ...current,
+@@ -472,11 +475,11 @@ export default function UsersFormScreen() {
+
+       <AppBottomModal
+         visible={assignedBranchesModalVisible}
+-        title="Sucursales asignadas"
++        title={t('usersForm.assignedBranches')}
+         onClose={() => setAssignedBranchesModalVisible(false)}
+       >
+         <AppText color={theme.colors.mutedText} style={styles.modalDescription}>
+-          La sucursal principal siempre queda asignada. Agrega otras cuando el usuario atienda mas de una sucursal.
++          {t('usersForm.assignedBranchesHelp')}
+         </AppText>
+
+         {branches.map((branch) => {
+@@ -486,7 +489,7 @@ export default function UsersFormScreen() {
+             <AppOptionRow
+               key={branch.id}
+               title={`${branch.code} - ${branch.name}`}
+-              subtitle={isPrimary ? 'Principal' : branch.status === 'INACTIVE' ? 'Inactiva' : 'Asignable'}
++              subtitle={isPrimary ? t('usersForm.primary') : branch.status === 'INACTIVE' ? t('usersForm.inactive') : t('usersForm.assignable')}
+               onPress={() =>
+                 setForm((current) => ({
+                   ...current,
+@@ -495,30 +498,30 @@ export default function UsersFormScreen() {
+               }
+             >
+               <AppText color={selected ? theme.colors.accent : theme.colors.mutedText} bold={selected}>
+-                {selected ? 'Asignada' : 'Tocar para asignar'}
++                {selected ? t('usersForm.assigned') : t('usersForm.tapToAssign')}
+               </AppText>
+             </AppOptionRow>
+           );
+         })}
+
+         <View style={styles.modalActions}>
+-          <AppButton title="Listo" onPress={() => setAssignedBranchesModalVisible(false)} />
++          <AppButton title={t('common.close')} onPress={() => setAssignedBranchesModalVisible(false)} />
+         </View>
+       </AppBottomModal>
+
+       <AppBottomModal
+         visible={rolesModalVisible}
+-        title="Seleccionar roles"
++        title={t('usersForm.selectRoles')}
+         onClose={cancelRolesModal}
+         maxHeight="88%"
+         showCancelButton={false}
+         footer={
+           <View style={styles.modalFooterActions}>
+             <View style={styles.modalFooterButton}>
+-              <AppButton title="Cancelar" variant="secondary" onPress={cancelRolesModal} />
++              <AppButton title={t('common.cancel')} variant="secondary" onPress={cancelRolesModal} />
+             </View>
+             <View style={styles.modalFooterButton}>
+-              <AppButton title="Guardar" onPress={saveRolesModal} />
++              <AppButton title={t('common.save')} onPress={saveRolesModal} />
+             </View>
+           </View>
+         }
+@@ -535,7 +538,7 @@ export default function UsersFormScreen() {
+               }
+             >
+               <AppText color={selected ? theme.colors.accent : theme.colors.mutedText} bold={selected}>
+-                {selected ? 'Seleccionado' : 'Agregar'}
++                {selected ? t('usersForm.selected') : t('usersForm.add')}
+               </AppText>
+             </AppOptionRow>
+           );
+@@ -545,34 +548,34 @@ export default function UsersFormScreen() {
+
+       <AppBottomModal
+         visible={permissionsModalVisible}
+-        title="Permisos directos adicionales"
++        title={t('usersForm.directPermissions')}
+         onClose={cancelPermissionsModal}
+         maxHeight="88%"
+         showCancelButton={false}
+         footer={
+           <View style={styles.modalFooterActions}>
+             <View style={styles.modalFooterButton}>
+-              <AppButton title="Cancelar" variant="secondary" onPress={cancelPermissionsModal} />
++              <AppButton title={t('common.cancel')} variant="secondary" onPress={cancelPermissionsModal} />
+             </View>
+             <View style={styles.modalFooterButton}>
+-              <AppButton title="Guardar permisos" onPress={savePermissionsModal} />
++              <AppButton title={t('usersForm.savePermissions')} onPress={savePermissionsModal} />
+             </View>
+           </View>
+         }
+       >
+         <AppText color={theme.colors.mutedText} style={styles.modalDescription}>
+-          Estos permisos se agregan directamente al usuario y se suman a los heredados por sus roles.
++          {t('usersForm.directPermissionsHelp')}
+         </AppText>
+
+         <AppInput
+-          placeholder="Buscar por permiso, codigo o grupo"
++          placeholder={t('usersForm.searchPermissions')}
+           value={permissionSearch}
+           onChangeText={setPermissionSearch}
+         />
+
+         {groupedPermissionOptions.length === 0 ? (
+           <AppText color={theme.colors.mutedText} style={styles.emptyPermissions}>
+-            No se encontraron permisos con ese filtro.
++            {t('usersForm.noPermissionsFound')}
+           </AppText>
+         ) : (
+           groupedPermissionOptions.map((group) => (
+@@ -590,14 +593,14 @@ export default function UsersFormScreen() {
+                   <AppOptionRow
+                     key={permission.id}
+                     title={formatPermissionCode(permission.code)}
+-                    subtitle={`Codigo interno: ${permission.code}`}
++                    subtitle={t('systemRoles.internalCode', { code: permission.code })}
+                     onPress={() =>
+                       setDraftPermissionIds((current) => toggleId(current, permission.id))
+                     }
+                   >
+                     <View style={styles.permissionStatusRow}>
+                       <AppText color={selected ? theme.colors.accent : theme.colors.mutedText} bold={selected}>
+-                        {selected ? 'Incluido' : 'Agregar'}
++                        {selected ? t('systemRoles.included') : t('usersForm.add')}
+                       </AppText>
+                     </View>
+                     {dependencyWarnings.map((warning) => (
+diff --git a/components/layout/AppShellPage.tsx b/components/layout/AppShellPage.tsx
+new file mode 100644
+index 0000000..508f330
+--- /dev/null
++++ b/components/layout/AppShellPage.tsx
+@@ -0,0 +1,61 @@
++import AppShell from '@/components/layout/AppShell';
++import { buildMainNavSections, getSessionScopeLabel } from '@/components/layout/appNavigation';
++import { getSession, UserSession } from '@/services/sessionStorage';
++import { ReactNode, useEffect, useMemo, useState } from 'react';
++
++type Props = {
++  title: string;
++  subtitle?: string;
++  contextTitle?: string;
++  contextSubtitle?: string;
++  activeRoute: string;
++  session?: UserSession | null;
++  rightContent?: ReactNode;
++  children: ReactNode;
++};
++
++export default function AppShellPage({
++  title,
++  subtitle,
++  contextTitle,
++  contextSubtitle,
++  activeRoute,
++  session: providedSession,
++  rightContent,
++  children,
++}: Props) {
++  const [loadedSession, setLoadedSession] = useState<UserSession | null>(providedSession ?? null);
++  const session = providedSession === undefined ? loadedSession : providedSession;
++  const navSections = useMemo(() => buildMainNavSections(session), [session]);
++
++  useEffect(() => {
++    if (providedSession !== undefined) {
++      setLoadedSession(providedSession);
++      return;
++    }
++
++    let mounted = true;
++    getSession().then((currentSession) => {
++      if (mounted) setLoadedSession(currentSession);
++    });
++
++    return () => {
++      mounted = false;
++    };
++  }, [providedSession]);
++
++  return (
++    <AppShell
++      title={title}
++      subtitle={subtitle}
++      contextTitle={contextTitle ?? title}
++      contextSubtitle={contextSubtitle ?? getSessionScopeLabel(session)}
++      activeRoute={activeRoute}
++      session={session}
++      navSections={navSections}
++      rightContent={rightContent}
++    >
++      {children}
++    </AppShell>
++  );
++}
+diff --git a/docs/PRODUCT_D6_2B_VISIBLE_I18N_HARDCODES.md b/docs/PRODUCT_D6_2B_VISIBLE_I18N_HARDCODES.md
+index d24d2ac..794e723 100644
+--- a/docs/PRODUCT_D6_2B_VISIBLE_I18N_HARDCODES.md
++++ b/docs/PRODUCT_D6_2B_VISIBLE_I18N_HARDCODES.md
+@@ -50,6 +50,12 @@ Las siguientes pantallas siguen siendo candidatas a migracion/traduccion mas pro
+
+ En esta fase se evita redisenarlas o reestructurarlas para no mezclar i18n con migracion visual.
+
++## Actualizacion PRODUCT-D6.3
++
++PRODUCT-D6.3 migro las pantallas listadas a `AppShellPage`/`AppShell`, retiro la navegacion legacy `Volver` / `Menu principal` como barra superior y amplio i18n visible en `appearance`, `users-form`, reportes detallados y auditoria de seguridad.
++
++La deuda restante queda acotada a estados/codigos retornados por backend y a pantallas fuera del listado D6.3 que QA pueda identificar posteriormente.
++
+ ## Validacion manual esperada
+
+ 1. Entrar con `qa.admin@local.test`.
+diff --git a/docs/PRODUCT_D6_3_LEGACY_PREMIUM_MIGRATION.md b/docs/PRODUCT_D6_3_LEGACY_PREMIUM_MIGRATION.md
+new file mode 100644
+index 0000000..28f3c68
+--- /dev/null
++++ b/docs/PRODUCT_D6_3_LEGACY_PREMIUM_MIGRATION.md
+@@ -0,0 +1,92 @@
++# PRODUCT-D6.3 - Migracion premium de pantallas legacy a AppShell
++
++Fecha: 2026-06-06
++
++## Objetivo
++
++Migrar pantallas legacy detectadas durante QA visual a `AppShell` premium, manteniendo intactas las reglas funcionales, endpoints, permisos, calculos y datos reales.
++
++No se modifica backend, AUTH/RBAC funcional, pagos, caja, reportes backend, billing, IA ni reglas LIVE.
++
++## Estrategia
++
++Se agrego `components/layout/AppShellPage.tsx` como wrapper ligero sobre `AppShell`.
++
++El wrapper:
++
++- obtiene o recibe la sesion actual;
++- construye navegacion con `buildMainNavSections(session)`;
++- usa `getSessionScopeLabel(session)` para el contexto;
++- mantiene el mismo `AppShell`, sidebar, drawer, topbar, logout, tema e i18n global;
++- evita duplicar carga de navegacion en cada pantalla migrada.
++
++## Pantallas migradas
++
++### Administracion / configuracion
++
++- `/appearance` (`app/appearance.tsx`)
++- `/system-roles` (`app/system-roles.tsx`)
++- `/system-channels` (`app/system-channels.tsx`)
++- `/system-security-audit` (`app/system-security-audit.tsx`)
++- `/users-form` (`app/users-form.tsx`)
++
++### Reportes
++
++- `/report-daily-store` (`app/report-daily-store.tsx`)
++- `/report-deliveries` (`app/report-deliveries.tsx`)
++- `/report-deposits` (`app/report-deposits.tsx`)
++- `/report-cancellations` (`app/report-cancellations.tsx`)
++- `/report-live` (`app/report-live.tsx`)
++- `/report-remissions` (`app/report-remissions.tsx`)
++
++## Cambios visuales aplicados
++
++- Se reemplazo `AppScreen` por `AppShellPage` en las pantallas objetivo.
++- Se retiro `AppBackButton` como navegacion primaria legacy.
++- Los titulos principales ahora viven en TopBar/AppShell.
++- Sidebar categorizado queda visible en desktop y drawer en mobile/tablet.
++- Los filtros y resultados conservan `AppCard`, `AppButton`, `AppInput` y componentes existentes.
++- El active state del menu usa la ruta logica de cada pantalla.
++
++## Decisiones sobre Volver / Menu principal
++
++- Se elimino el patron legacy superior `Volver` / `Menu principal` de las pantallas migradas.
++- No se agregaron botones de volver contextuales nuevos porque las rutas tienen navegacion global por sidebar/drawer.
++- `users-form` conserva el flujo funcional de guardado y vuelve a `/users` como antes.
++
++## i18n corregido
++
++Se agregaron/reforzaron claves:
++
++- `appearance.*` para labels principales de identidad visual;
++- `usersForm.*` para formulario de usuarios y modales principales;
++- `reports.query`, `reports.querying`, `reports.selectDateBranchHint`;
++- `securityAudit.*` para paneles internos, metricas y detalles visibles.
++
++No se traducen claves tecnicas, codigos de permisos, codigos de canal, estados backend ni datos retornados por API.
++
++## Pantallas no migradas
++
++No quedaron pantallas del listado D6.3 sin migrar. Rutas fuera del listado se dejan para fases posteriores si QA las detecta como legacy.
++
++## Riesgos pendientes
++
++- Algunas tablas de reportes muestran estados/codigos que vienen del backend; se mantienen como datos tecnicos.
++- Lint conserva warnings heredados del proyecto en hooks, BOM y tipos `Array<T>`.
++- `/appearance` mantiene campos legacy de configuracion visual backend; D6.3 solo migra shell e i18n visible, no redefine el modelo de branding.
++
++## Validacion manual esperada
++
++1. Entrar con `qa.admin@local.test`.
++2. Abrir `/appearance`, `/system-roles`, `/system-channels`, `/system-security-audit`, `/users-form?id=<id valido>`.
++3. Abrir `/report-daily-store`, `/report-deliveries`, `/report-deposits`, `/report-cancellations`, `/report-live`, `/report-remissions`.
++4. Confirmar que todas usan AppShell/sidebar/drawer.
++5. Confirmar que no aparece `Menu principal` legacy.
++6. Confirmar active state correcto en sidebar.
++7. Confirmar idioma espanol/ingles en headers, filtros y labels principales.
++8. Confirmar light/dark y presets visuales.
++9. Confirmar responsive desktop/tablet/mobile.
++
++## GO/NO-GO
++
++GO tecnico condicionado a validacion visual manual en navegador/AnyDesk.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index 394ecfe..14bb15e 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -695,7 +695,10 @@
+     "liveControlTitle": "Live control",
+     "liveControlDescription": "Packages, pieces, balances, and Live operation settlement.",
+     "remissionsTitle": "Remissions",
+-    "remissionsDescription": "Detail of items, customers, payments, packages, and sellers."
++    "remissionsDescription": "Detail of items, customers, payments, packages, and sellers.",
++    "query": "Run report",
++    "querying": "Running...",
++    "selectDateBranchHint": "Select date and branch, then run the report."
+   },
+   "systemRoles": {
+     "title": "Roles",
+@@ -776,6 +779,159 @@
+     "noEvents": "No events match those filters.",
+     "previous": "Previous",
+     "next": "Next",
+-    "page": "Page {{page}}"
++    "page": "Page {{page}}",
++    "alertsRecent": "Recent alerts",
++    "alertsHelp": "Critical patterns detected in the last 60 minutes.",
++    "noCriticalAlerts": "No critical alerts.",
++    "company": "Company",
++    "method": "Method",
++    "reason": "Reason",
++    "summaryTitle": "Security summary",
++    "summaryHelp": "Quick view of blocks, users, and frequent routes.",
++    "metricTotalEvents": "Total events",
++    "metricTotal401": "Total 401",
++    "metricTotal403": "Total 403",
++    "byEventType": "Events by type",
++    "byStatusCode": "Events by status",
++    "topUsers": "Top users",
++    "topEndpoints": "Top endpoints",
++    "recentCriticalEvents": "Recent critical events",
++    "noRecentCriticalEvents": "No recent critical events with these filters.",
++    "noData": "No data.",
++    "noEmail": "No email"
++  },
++  "appearance": {
++    "subtitle": "Visual identity, branding, and operational preferences",
++    "invalidColorTitle": "Invalid color",
++    "invalidColorMessage": "Review the colors. They must use HEX format, for example #2563EB.",
++    "savedTitle": "Done",
++    "savedMessage": "Appearance was saved successfully.",
++    "saveErrorTitle": "Error",
++    "saveErrorMessage": "Could not save appearance.",
++    "identity": "Identity",
++    "systemName": "System name",
++    "logoUrl": "General logo URL",
++    "faviconUrl": "Favicon URL",
++    "loginLogoUrl": "Login logo URL",
++    "printLogoUrl": "Print logo URL",
++    "loginPreview": "Login preview",
++    "printPreview": "Print preview",
++    "noLogoConfigured": "No logo configured",
++    "infoCards": "Information cards",
++    "infoCardsHelp": "Used for introduction or context text, not actions.",
++    "infoCardBackground": "Info card - background",
++    "infoCardText": "Info card - text",
++    "infoCardBorder": "Info card - border",
++    "infoExampleTitle": "Information example",
++    "infoExampleText": "This block is not a button; it only gives context.",
++    "generalColors": "General colors",
++    "primaryColor": "Primary color",
++    "secondaryColor": "Secondary color",
++    "accentColor": "Accent color",
++    "buttons": "Buttons",
++    "primaryButtonBackground": "Primary button - background",
++    "primaryButtonText": "Primary button - text",
++    "primaryPreview": "Primary preview",
++    "primaryButton": "Primary",
++    "secondaryButtonBackground": "Secondary button - background",
++    "secondaryButtonText": "Secondary button - text",
++    "secondaryPreview": "Secondary preview",
++    "secondaryButton": "Secondary",
++    "operationButtonBackground": "Operational button - background",
++    "operationButtonText": "Operational button - text",
++    "operationPreview": "Operational preview",
++    "selectCustomerPreview": "Select customer",
++    "dangerButtonBackground": "Danger button - background",
++    "dangerButtonText": "Danger button - text",
++    "dangerPreview": "Danger preview",
++    "cancelSalePreview": "Cancel sale",
++    "cancelButtonBackground": "Cancel button - background",
++    "cancelButtonText": "Cancel button - text",
++    "cancelPreview": "Cancel preview",
++    "backButtonBackground": "Back button - background",
++    "backButtonText": "Back button - text",
++    "backPreview": "Back preview",
++    "mainMenuButtonBackground": "Main menu button - background",
++    "mainMenuButtonText": "Main menu button - text",
++    "mainMenuPreview": "Main menu preview",
++    "calendar": "Calendar",
++    "selectedDayBackground": "Selected day - background",
++    "selectedDayText": "Selected day - text",
++    "calendarText": "Calendar - text",
++    "dashboard": "My dashboard",
++    "metricBackground": "Metric - background",
++    "metricText": "Metric - text",
++    "dashboardAccent": "Dashboard - accent",
++    "todaySales": "Today sales",
++    "themeAndStyle": "Theme and style",
++    "theme": "Theme",
++    "autoTheme": "Auto",
++    "density": "Density",
++    "normalDensity": "Normal",
++    "compactDensity": "Compact",
++    "buttonStyle": "Button style",
++    "roundedButtons": "Rounded",
++    "straightButtons": "Straight",
++    "printing": "Printing",
++    "showLogoOnPrints": "Show logo on documents",
++    "footerText": "Footer text",
++    "packageThanks": "Package thank-you message",
++    "saveChanges": "Save changes"
++  },
++  "usersForm": {
++    "newTitle": "New user",
++    "editTitle": "Edit user",
++    "subtitle": "Profile, access, branches, and permissions",
++    "loadErrorTitle": "Could not load form",
++    "retryHelp": "Review the data and try again.",
++    "generalData": "General data",
++    "name": "Name",
++    "fullName": "Full name",
++    "email": "Email",
++    "phone": "Phone",
++    "optional": "Optional",
++    "newPasswordOptional": "New password (optional)",
++    "initialPassword": "Initial password",
++    "leaveEmptyPassword": "Leave empty to keep current password",
++    "password": "Password",
++    "forcePasswordChange": "Force change on next login",
++    "forcePasswordChangeHelp": "Recommended when support assigns or resets a password.",
++    "primaryBranch": "Primary branch",
++    "selectBranch": "Select branch",
++    "assignedBranches": "Assigned branches",
++    "selectBranches": "Select branches",
++    "branchHelp": "The primary branch is used by default. Assigned branches allow dashboard visibility and multi-branch operation.",
++    "access": "Access",
++    "roles": "Roles",
++    "selectRoles": "Select roles",
++    "directPermissions": "Additional direct permissions",
++    "noDirectPermissions": "No additional permissions",
++    "selectDirectPermissions": "Select direct permissions",
++    "accessHelp": "Roles define base capabilities. Additional permissions only refine specific actions.",
++    "status": "Status",
++    "active": "Active",
++    "inactive": "Inactive",
++    "primary": "Primary",
++    "assignable": "Assignable",
++    "assigned": "Assigned",
++    "tapToAssign": "Tap to assign",
++    "selected": "Selected",
++    "add": "Add",
++    "assignedBranchesHelp": "The primary branch is always assigned. Add others when the user serves more than one branch.",
++    "savePermissions": "Save permissions",
++    "directPermissionsHelp": "These permissions are assigned directly to the user and added to role permissions.",
++    "searchPermissions": "Search by permission, code, or group",
++    "noPermissionsFound": "No permissions found with that filter.",
++    "missingNameTitle": "Name required",
++    "missingNameMessage": "Enter the user name.",
++    "missingEmailTitle": "Email required",
++    "missingEmailMessage": "Enter the user email.",
++    "missingBranchTitle": "Branch required",
++    "missingBranchMessage": "Select a branch.",
++    "missingRoleTitle": "Role required",
++    "missingRoleMessage": "Select at least one role for the user.",
++    "missingPasswordTitle": "Password required",
++    "missingPasswordMessage": "Enter an initial password for the user.",
++    "saveErrorTitle": "Could not save"
+   }
+ }
+diff --git a/locales/es/common.json b/locales/es/common.json
+index 893c526..4dd054d 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -695,7 +695,10 @@
+     "liveControlTitle": "Control Live",
+     "liveControlDescription": "Paquetes, piezas, saldos y liquidacion de operacion Live.",
+     "remissionsTitle": "Remisiones",
+-    "remissionsDescription": "Detalle de prendas, clientes, pagos, paquetes y vendedores."
++    "remissionsDescription": "Detalle de prendas, clientes, pagos, paquetes y vendedores.",
++    "query": "Consultar",
++    "querying": "Consultando...",
++    "selectDateBranchHint": "Selecciona fecha y sucursal para consultar el reporte."
+   },
+   "systemRoles": {
+     "title": "Roles",
+@@ -776,6 +779,159 @@
+     "noEvents": "No hay eventos con esos filtros.",
+     "previous": "Anterior",
+     "next": "Siguiente",
+-    "page": "Pagina {{page}}"
++    "page": "Pagina {{page}}",
++    "alertsRecent": "Alertas recientes",
++    "alertsHelp": "Patrones criticos detectados en los ultimos 60 minutos.",
++    "noCriticalAlerts": "Sin alertas criticas.",
++    "company": "Empresa",
++    "method": "Metodo",
++    "reason": "Motivo",
++    "summaryTitle": "Resumen de seguridad",
++    "summaryHelp": "Vista rapida de bloqueos, usuarios y rutas frecuentes.",
++    "metricTotalEvents": "Total eventos",
++    "metricTotal401": "Total 401",
++    "metricTotal403": "Total 403",
++    "byEventType": "Eventos por tipo",
++    "byStatusCode": "Eventos por status",
++    "topUsers": "Top usuarios",
++    "topEndpoints": "Top endpoints",
++    "recentCriticalEvents": "Eventos criticos recientes",
++    "noRecentCriticalEvents": "No hay eventos criticos recientes con estos filtros.",
++    "noData": "Sin datos.",
++    "noEmail": "Sin email"
++  },
++  "appearance": {
++    "subtitle": "Identidad visual, branding y preferencias operativas",
++    "invalidColorTitle": "Color invalido",
++    "invalidColorMessage": "Revisa los colores. Deben tener formato HEX, por ejemplo #2563EB.",
++    "savedTitle": "Listo",
++    "savedMessage": "La apariencia se guardo correctamente.",
++    "saveErrorTitle": "Error",
++    "saveErrorMessage": "No se pudo guardar la apariencia.",
++    "identity": "Identidad",
++    "systemName": "Nombre del sistema",
++    "logoUrl": "Logo general URL",
++    "faviconUrl": "Favicon URL",
++    "loginLogoUrl": "Logo login URL",
++    "printLogoUrl": "Logo impresion URL",
++    "loginPreview": "Vista previa login",
++    "printPreview": "Vista previa impresion",
++    "noLogoConfigured": "Sin logo configurado",
++    "infoCards": "Tarjetas informativas",
++    "infoCardsHelp": "Se usan para textos de introduccion o contexto, no para acciones.",
++    "infoCardBackground": "Tarjeta informativa - fondo",
++    "infoCardText": "Tarjeta informativa - texto",
++    "infoCardBorder": "Tarjeta informativa - borde",
++    "infoExampleTitle": "Ejemplo informativo",
++    "infoExampleText": "Este bloque no es un boton; solo da contexto.",
++    "generalColors": "Colores generales",
++    "primaryColor": "Color primario",
++    "secondaryColor": "Color secundario",
++    "accentColor": "Color de acento",
++    "buttons": "Botones",
++    "primaryButtonBackground": "Boton primario - fondo",
++    "primaryButtonText": "Boton primario - texto",
++    "primaryPreview": "Vista previa primario",
++    "primaryButton": "Primario",
++    "secondaryButtonBackground": "Boton secundario - fondo",
++    "secondaryButtonText": "Boton secundario - texto",
++    "secondaryPreview": "Vista previa secundario",
++    "secondaryButton": "Secundario",
++    "operationButtonBackground": "Boton operativo - fondo",
++    "operationButtonText": "Boton operativo - texto",
++    "operationPreview": "Vista previa operativo",
++    "selectCustomerPreview": "Seleccionar cliente",
++    "dangerButtonBackground": "Boton peligro - fondo",
++    "dangerButtonText": "Boton peligro - texto",
++    "dangerPreview": "Vista previa peligro",
++    "cancelSalePreview": "Cancelar venta",
++    "cancelButtonBackground": "Boton cancelar - fondo",
++    "cancelButtonText": "Boton cancelar - texto",
++    "cancelPreview": "Vista previa cancelar",
++    "backButtonBackground": "Boton volver - fondo",
++    "backButtonText": "Boton volver - texto",
++    "backPreview": "Vista previa volver",
++    "mainMenuButtonBackground": "Boton menu principal - fondo",
++    "mainMenuButtonText": "Boton menu principal - texto",
++    "mainMenuPreview": "Vista previa menu principal",
++    "calendar": "Calendario",
++    "selectedDayBackground": "Dia seleccionado - fondo",
++    "selectedDayText": "Dia seleccionado - texto",
++    "calendarText": "Calendario - texto",
++    "dashboard": "Mi dashboard",
++    "metricBackground": "Metrica - fondo",
++    "metricText": "Metrica - texto",
++    "dashboardAccent": "Dashboard - acento",
++    "todaySales": "Ventas de hoy",
++    "themeAndStyle": "Tema y estilo",
++    "theme": "Tema",
++    "autoTheme": "Auto",
++    "density": "Densidad",
++    "normalDensity": "Normal",
++    "compactDensity": "Compacta",
++    "buttonStyle": "Estilo de botones",
++    "roundedButtons": "Redondeados",
++    "straightButtons": "Rectos",
++    "printing": "Impresion",
++    "showLogoOnPrints": "Mostrar logo en documentos",
++    "footerText": "Pie de pagina",
++    "packageThanks": "Mensaje de agradecimiento en paquete",
++    "saveChanges": "Guardar cambios"
++  },
++  "usersForm": {
++    "newTitle": "Nuevo usuario",
++    "editTitle": "Editar usuario",
++    "subtitle": "Datos, acceso, sucursales y permisos",
++    "loadErrorTitle": "No se pudo cargar el formulario",
++    "retryHelp": "Revisa los datos e intenta nuevamente.",
++    "generalData": "Datos generales",
++    "name": "Nombre",
++    "fullName": "Nombre completo",
++    "email": "Correo electronico",
++    "phone": "Telefono",
++    "optional": "Opcional",
++    "newPasswordOptional": "Nueva contrasena (opcional)",
++    "initialPassword": "Contrasena inicial",
++    "leaveEmptyPassword": "Dejar vacio para no cambiar",
++    "password": "Contrasena",
++    "forcePasswordChange": "Forzar cambio en siguiente login",
++    "forcePasswordChangeHelp": "Recomendado cuando soporte asigna o resetea una contrasena.",
++    "primaryBranch": "Sucursal principal",
++    "selectBranch": "Seleccionar sucursal",
++    "assignedBranches": "Sucursales asignadas",
++    "selectBranches": "Seleccionar sucursales",
++    "branchHelp": "La sucursal principal se usa por defecto. Las asignadas permiten ver dashboard y operar varias sucursales.",
++    "access": "Acceso",
++    "roles": "Roles",
++    "selectRoles": "Seleccionar roles",
++    "directPermissions": "Permisos directos adicionales",
++    "noDirectPermissions": "Sin permisos adicionales",
++    "selectDirectPermissions": "Seleccionar permisos directos",
++    "accessHelp": "Los roles definen las capacidades base. Los permisos adicionales solo refinan acciones especificas.",
++    "status": "Estado",
++    "active": "Activa",
++    "inactive": "Inactiva",
++    "primary": "Principal",
++    "assignable": "Asignable",
++    "assigned": "Asignada",
++    "tapToAssign": "Tocar para asignar",
++    "selected": "Seleccionado",
++    "add": "Agregar",
++    "assignedBranchesHelp": "La sucursal principal siempre queda asignada. Agrega otras cuando el usuario atienda mas de una sucursal.",
++    "savePermissions": "Guardar permisos",
++    "directPermissionsHelp": "Estos permisos se agregan directamente al usuario y se suman a los heredados por sus roles.",
++    "searchPermissions": "Buscar por permiso, codigo o grupo",
++    "noPermissionsFound": "No se encontraron permisos con ese filtro.",
++    "missingNameTitle": "Falta nombre",
++    "missingNameMessage": "Captura el nombre del usuario.",
++    "missingEmailTitle": "Falta correo",
++    "missingEmailMessage": "Captura el correo del usuario.",
++    "missingBranchTitle": "Falta sucursal",
++    "missingBranchMessage": "Selecciona una sucursal.",
++    "missingRoleTitle": "Falta rol",
++    "missingRoleMessage": "Selecciona al menos un rol para el usuario.",
++    "missingPasswordTitle": "Falta contrasena",
++    "missingPasswordMessage": "Captura una contrasena inicial para el usuario.",
++    "saveErrorTitle": "No se pudo guardar"
+   }
+ }
+diff --git a/qa-reports/PRODUCT-D6-3-legacy-premium-migration-report-20260606-175759.md b/qa-reports/PRODUCT-D6-3-legacy-premium-migration-report-20260606-175759.md
+new file mode 100644
+index 0000000..3f751f2
+--- /dev/null
++++ b/qa-reports/PRODUCT-D6-3-legacy-premium-migration-report-20260606-175759.md
+@@ -0,0 +1,60 @@
++# PRODUCT-D6.3 - Legacy premium migration report
++
++Fecha: 2026-06-06 17:57
++
++## Objetivo
++
++Migrar pantallas legacy a AppShell premium sin cambiar logica funcional, endpoints, permisos, calculos ni datos reales.
++
++## Alcance
++
++Pantallas migradas:
++
++- `/appearance`
++- `/system-roles`
++- `/system-channels`
++- `/system-security-audit`
++- `/users-form`
++- `/report-daily-store`
++- `/report-deliveries`
++- `/report-deposits`
++- `/report-cancellations`
++- `/report-live`
++- `/report-remissions`
++
++## Cambios realizados
++
++- Se agrego `components/layout/AppShellPage.tsx`.
++- Se reemplazo `AppScreen` por `AppShellPage` en pantallas objetivo.
++- Se retiro `AppBackButton`/navegacion superior legacy en pantallas migradas.
++- Se mantuvieron formularios, filtros, llamadas a servicios, permisos y calculos.
++- Se agregaron claves i18n para `appearance`, `usersForm`, reportes y auditoria de seguridad.
++- Se conservo la navegacion central con `buildMainNavSections(session)`.
++
++## Pantallas no migradas
++
++No quedaron pantallas del listado D6.3 sin migrar. Cualquier ruta legacy fuera de la lista queda para QA posterior.
++
++## Validaciones tecnicas
++
++- `npm.cmd run lint`: OK con warnings heredados, sin errores.
++- `npx.cmd tsc --noEmit`: OK.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
++- `./mvnw.cmd test`: OK, 73 tests, 0 failures, 0 errors.
++- `./mvnw.cmd -q -DskipTests package`: OK.
++- `git --no-pager diff --check`: OK.
++- `git --no-pager diff --cached --check`: OK.
++
++## Warnings
++
++Lint mantiene warnings heredados de hooks, BOM, tipos `Array<T>` y variables no usadas en pantallas fuera de alcance. En pantallas tocadas se mantienen algunos warnings historicos de `appearance`, `system-roles` y `system-channels` para no cambiar patrones funcionales de carga.
++
++## Riesgos
++
++- La validacion visual real en navegador/AnyDesk sigue pendiente.
++- Estados y codigos retornados por backend se muestran como datos tecnicos y no se traducen.
++- `/appearance` conserva modelo legacy de branding backend; esta fase solo migra shell e i18n visible.
++
++## GO/NO-GO
++
++GO tecnico. Validaciones completas OK; listo para commit.

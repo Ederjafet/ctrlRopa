@@ -8,6 +8,8 @@ import java.util.List;
 @RequestMapping("/api/reservations")
 public class ReservationController {
 
+    private static final String IDEMPOTENCY_KEY_HEADER = "X-Idempotency-Key";
+
     private final ReservationService service;
 
     public ReservationController(ReservationService service) {
@@ -35,8 +37,11 @@ public class ReservationController {
     }
 
     @PostMapping
-    public ReservationResponse create(@RequestBody ReservationService.CreateReservationRequest request) {
-        return service.create(request);
+    public ReservationResponse create(
+            @RequestBody ReservationService.CreateReservationRequest request,
+            @RequestHeader(value = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey
+    ) {
+        return service.create(request, idempotencyKey);
     }
 
     @PatchMapping("/{reservationId}/box/{boxId}")
@@ -54,6 +59,14 @@ public class ReservationController {
     public ReservationResponse cancel(@PathVariable Long reservationId,
                                       @RequestBody CancelReservationRequest request) {
         return service.cancel(reservationId, request.getReason());
+    }
+
+    @PatchMapping("/{reservationId}/live-operational-status")
+    public ReservationResponse updateLiveOperationalStatus(
+            @PathVariable Long reservationId,
+            @RequestBody ReservationService.UpdateLiveOperationalStatusRequest request
+    ) {
+        return service.updateLiveOperationalStatus(reservationId, request);
     }
 
     public static class CancelReservationRequest {

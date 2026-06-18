@@ -1,0 +1,699 @@
+﻿diff --git a/app/live.tsx b/app/live.tsx
+index 634dd2e..9e09d51 100644
+--- a/app/live.tsx
++++ b/app/live.tsx
+@@ -36,7 +36,6 @@ import {
+   activateLive,
+   closeLive,
+   createLive,
+-  getLiveById,
+   getLiveEvents,
+   getLivesByBranch,
+   getLiveStatusLabel,
+@@ -77,6 +76,7 @@ import { useTranslation } from 'react-i18next';
+ import {
+   ActivityIndicator,
+   Alert,
++  AppState,
+   FlatList,
+   Pressable,
+   StyleSheet,
+@@ -124,7 +124,7 @@ type LiveNoticeModalProps = {
+ };
+
+ const LIVE_MINIMAL_OPERATIONAL_MODE = true;
+-const LIVE_ACTIVE_ITEM_POLL_MS = 5000;
++const LIVE_VIEW_REFRESH_POLL_MS = 15000;
+
+ function isForbiddenError(error: unknown) {
+   return error instanceof ApiError && error.status === 403;
+@@ -175,6 +175,16 @@ function formatLiveDateTime(value?: string | null) {
+   });
+ }
+
++function formatLiveRefreshTime(value: Date | null) {
++  if (!value) return '';
++
++  return value.toLocaleTimeString([], {
++    hour: '2-digit',
++    minute: '2-digit',
++    second: '2-digit',
++  });
++}
++
+ function getLiveTimestamp(live?: Live | null) {
+   if (!live) return 0;
+   const value = live.endedAt || live.startedAt || live.createdAt;
+@@ -443,6 +453,9 @@ export default function LiveScreen() {
+   const [customerLoadIssue, setCustomerLoadIssue] = useState<string | null>(null);
+   const [itemLoadIssue, setItemLoadIssue] = useState<string | null>(null);
+   const [reservationLoadIssue, setReservationLoadIssue] = useState<string | null>(null);
++  const [isRefreshingLiveView, setIsRefreshingLiveView] = useState(false);
++  const [lastLiveRefreshAt, setLastLiveRefreshAt] = useState<Date | null>(null);
++  const [liveRefreshIssue, setLiveRefreshIssue] = useState<string | null>(null);
+
+   const [lives, setLives] = useState<Live[]>([]);
+   const [selectedLive, setSelectedLive] = useState<Live | null>(null);
+@@ -474,8 +487,7 @@ export default function LiveScreen() {
+   const [activeItem, setActiveItem] = useState<Item | null>(null);
+   const [priceText, setPriceText] = useState('');
+   const [scanInput, setScanInput] = useState('');
+-  const activeItemRef = useRef<Item | null>(null);
+-  const activeLivePollInFlightRef = useRef(false);
++  const liveViewRefreshInFlightRef = useRef(false);
+   const setActiveItemForReservation = useCallback((item: Item | null) => {
+     setActiveItem(item);
+     setPriceText(
+@@ -483,10 +495,6 @@ export default function LiveScreen() {
+     );
+   }, []);
+
+-  useEffect(() => {
+-    activeItemRef.current = activeItem;
+-  }, [activeItem]);
+-
+   const [customerSearch, setCustomerSearch] = useState('');
+   const [itemSearch, setItemSearch] = useState('');
+   const [isCustomerModalVisible, setIsCustomerModalVisible] = useState(false);
+@@ -663,6 +671,8 @@ export default function LiveScreen() {
+         hasEffectivePermission(currentSession, 'VIEW_PAYMENTS')
+       );
+       await updateLiveEvents(contextLiveId);
++      setLiveRefreshIssue(null);
++      setLastLiveRefreshAt(new Date());
+
+       const pendingItemIds = await consumePendingQuickItems('live');
+       const createdItems = pendingItemIds
+@@ -768,89 +778,6 @@ export default function LiveScreen() {
+   const operatorLiveIsActive = selectedLiveStatus === 'ACTIVE';
+   const operatorFlowEnabled = !isOperatorFocusedView || operatorLiveIsActive;
+
+-  useEffect(() => {
+-    if (!selectedLive?.id || selectedLiveStatus !== 'ACTIVE') return undefined;
+-
+-    let cancelled = false;
+-
+-    const pollActiveLive = async () => {
+-      if (activeLivePollInFlightRef.current) return;
+-
+-      activeLivePollInFlightRef.current = true;
+-
+-      try {
+-        const refreshedLive = await getLiveById(selectedLive.id);
+-        if (cancelled) return;
+-
+-        setLives((currentLives) => {
+-          const exists = currentLives.some((live) => live.id === refreshedLive.id);
+-
+-          return exists
+-            ? currentLives.map((live) =>
+-                live.id === refreshedLive.id ? refreshedLive : live
+-              )
+-            : [refreshedLive, ...currentLives];
+-        });
+-
+-        setSelectedLive((currentLive) =>
+-          currentLive?.id === refreshedLive.id ? refreshedLive : currentLive
+-        );
+-
+-        const refreshedStatus = normalizeStatus(refreshedLive.status);
+-        const refreshedActiveItem =
+-          refreshedStatus === 'CLOSED' ? null : activeItemFromLive(refreshedLive);
+-        const currentActiveItem = activeItemRef.current;
+-        const activeItemChanged =
+-          currentActiveItem?.id !== refreshedActiveItem?.id ||
+-          currentActiveItem?.code !== refreshedActiveItem?.code ||
+-          currentActiveItem?.price !== refreshedActiveItem?.price ||
+-          currentActiveItem?.status !== refreshedActiveItem?.status;
+-
+-        if (refreshedStatus === 'CLOSED' || activeItemChanged) {
+-          setActiveItemForReservation(refreshedActiveItem);
+-        }
+-
+-        if (isSupervisorView && session) {
+-          const [reservationResult, eventResult] = await Promise.allSettled([
+-            getReservationsByBranch(session.branchId),
+-            getLiveEvents(refreshedLive.id),
+-          ]);
+-
+-          if (cancelled) return;
+-
+-          if (reservationResult.status === 'fulfilled') {
+-            setBranchReservations(reservationResult.value);
+-            setRecentReservations(
+-              mapLiveReservations(reservationResult.value, refreshedLive.id)
+-            );
+-          }
+-
+-          if (eventResult.status === 'fulfilled') {
+-            setLiveEvents(eventResult.value);
+-            setLiveEventsLiveId(refreshedLive.id);
+-          }
+-        }
+-      } catch {
+-        // Keep the current on-air item on transient polling failures.
+-      } finally {
+-        activeLivePollInFlightRef.current = false;
+-      }
+-    };
+-
+-    const interval = setInterval(pollActiveLive, LIVE_ACTIVE_ITEM_POLL_MS);
+-
+-    return () => {
+-      cancelled = true;
+-      clearInterval(interval);
+-    };
+-  }, [
+-    isSupervisorView,
+-    selectedLive?.id,
+-    selectedLiveStatus,
+-    session,
+-    setActiveItemForReservation,
+-  ]);
+-
+   const hasValidReservationPrice =
+     !!priceText.trim() && !Number.isNaN(Number(priceText)) && Number(priceText) > 0;
+   const reservationSourcesForActiveItem = [
+@@ -1459,16 +1386,19 @@ export default function LiveScreen() {
+     }
+   };
+
+-  const updateRecentReservations = async (
++  const updateRecentReservations = useCallback(async (
+     reservations: Reservation[],
+     liveId?: number | null,
+-    canLoadPayments = canViewPayments
++    canLoadPayments = canViewPayments,
++    options: { clearPaymentsWhenSkipped?: boolean } = {}
+   ) => {
+     const mappedReservations = mapLiveReservations(reservations, liveId);
+     setRecentReservations(mappedReservations);
+
+     if (!canLoadPayments) {
+-      setPaidByReservationId({});
++      if (options.clearPaymentsWhenSkipped !== false) {
++        setPaidByReservationId({});
++      }
+       return;
+     }
+
+@@ -1488,9 +1418,9 @@ export default function LiveScreen() {
+     );
+
+     setPaidByReservationId(Object.fromEntries(entries));
+-  };
++  }, [canViewPayments]);
+
+-  const updateLiveEvents = async (liveId?: number | null) => {
++  const updateLiveEvents = useCallback(async (liveId?: number | null) => {
+     if (!liveId) {
+       setLiveEvents([]);
+       setLiveEventsLiveId(null);
+@@ -1507,7 +1437,173 @@ export default function LiveScreen() {
+     } finally {
+       setIsLoadingClosedLiveEvents(false);
+     }
+-  };
++  }, []);
++
++  const refreshLiveViewData = useCallback(async (
++    options: { showSuccess?: boolean; showError?: boolean } = {}
++  ) => {
++    if (liveViewRefreshInFlightRef.current) {
++      return false;
++    }
++
++    liveViewRefreshInFlightRef.current = true;
++    setIsRefreshingLiveView(true);
++
++    try {
++      const currentSession = await getSession();
++
++      if (!currentSession) {
++        router.replace('/login');
++        return false;
++      }
++
++      if (!canViewLive(currentSession)) {
++        return false;
++      }
++
++      setSession(currentSession);
++
++      const liveData = await getLivesByBranch(currentSession.branchId);
++      const savedLiveId = await getSelectedLiveId(
++        currentSession.branchId,
++        currentSession.userId
++      );
++      const refreshedSelectedLive = selectedLive
++        ? liveData.find((live) => live.id === selectedLive.id)
++        : null;
++      const savedLive = savedLiveId
++        ? liveData.find((live) => live.id === savedLiveId && live.status !== 'CLOSED')
++        : null;
++      const nextSelectedLive =
++        refreshedSelectedLive && refreshedSelectedLive.status !== 'CLOSED'
++          ? refreshedSelectedLive
++          : savedLive ??
++            liveData.find((live) => live.status === 'ACTIVE') ??
++            liveData.find((live) => live.status === 'OPEN') ??
++            null;
++      const latestClosedLive = liveData
++        .filter((live) => normalizeStatus(live.status) === 'CLOSED')
++        .sort((a, b) => {
++          const timeDiff = getLiveTimestamp(b) - getLiveTimestamp(a);
++          if (timeDiff !== 0) return timeDiff;
++          return b.id - a.id;
++        })[0];
++      const contextLiveId = nextSelectedLive?.id ?? latestClosedLive?.id;
++
++      setLives(liveData);
++      setSelectedLive(nextSelectedLive);
++      if (!nextSelectedLive) {
++        setSelectedClosedLiveSource('auto');
++      }
++      setActiveItemForReservation(activeItemFromLive(nextSelectedLive));
++      setLiveLoadIssue(null);
++
++      const [reservationResult, eventResult] = await Promise.allSettled([
++        getReservationsByBranch(currentSession.branchId),
++        contextLiveId ? getLiveEvents(contextLiveId) : Promise.resolve([]),
++      ]);
++
++      if (reservationResult.status === 'fulfilled') {
++        setReservationLoadIssue(null);
++        setBranchReservations(reservationResult.value);
++        await updateRecentReservations(
++          reservationResult.value,
++          nextSelectedLive?.id,
++          false,
++          { clearPaymentsWhenSkipped: false }
++        );
++      } else {
++        setReservationLoadIssue(
++          resolveLoadIssue(
++            reservationResult.reason,
++            t('live.reservationLoadError'),
++            t('live.reservationPermissionError')
++          )
++        );
++      }
++
++      if (eventResult.status === 'fulfilled') {
++        setLiveEvents(eventResult.value);
++        setLiveEventsLiveId(contextLiveId ?? null);
++      }
++
++      setLiveRefreshIssue(null);
++      setLastLiveRefreshAt(new Date());
++
++      if (options.showSuccess) {
++        setLiveNotice({
++          title: t('live.liveRefreshSuccessTitle'),
++          message: t('live.liveRefreshSuccessMessage'),
++          tone: 'success',
++        });
++      }
++
++      return true;
++    } catch (error) {
++      const message = resolveLoadIssue(
++        error,
++        t('live.liveRefreshError'),
++        t('live.accessDenied')
++      );
++      setLiveRefreshIssue(message);
++
++      if (options.showError) {
++        setLiveNotice({
++          title: t('live.liveRefreshErrorTitle'),
++          message,
++          tone: 'warning',
++        });
++      }
++
++      return false;
++    } finally {
++      liveViewRefreshInFlightRef.current = false;
++      setIsRefreshingLiveView(false);
++    }
++  }, [
++    router,
++    selectedLive,
++    setActiveItemForReservation,
++    t,
++    updateRecentReservations,
++  ]);
++
++  const handleRefreshLiveView = useCallback(() => {
++    void refreshLiveViewData({ showSuccess: true, showError: true });
++  }, [refreshLiveViewData]);
++
++  const shouldAutoRefreshLiveView =
++    isAllowed === true &&
++    liveCapabilities.canViewLive &&
++    (liveActorContext.actor === 'SELLER' || liveActorContext.actor === 'SUPERVISOR');
++
++  useEffect(() => {
++    if (!shouldAutoRefreshLiveView) return undefined;
++
++    const interval = setInterval(() => {
++      if (AppState.currentState !== 'active') return;
++
++      void refreshLiveViewData();
++    }, LIVE_VIEW_REFRESH_POLL_MS);
++
++    return () => clearInterval(interval);
++  }, [refreshLiveViewData, shouldAutoRefreshLiveView]);
++
++  useEffect(() => {
++    if (!shouldAutoRefreshLiveView) return undefined;
++
++    let previousState = AppState.currentState;
++    const subscription = AppState.addEventListener('change', (nextState) => {
++      const wasHidden = previousState === 'inactive' || previousState === 'background';
++      previousState = nextState;
++
++      if (wasHidden && nextState === 'active') {
++        void refreshLiveViewData();
++      }
++    });
++
++    return () => subscription.remove();
++  }, [refreshLiveViewData, shouldAutoRefreshLiveView]);
+
+   const handleUpdateReservationOperationalStatus = async (
+     reservationId: number,
+@@ -3732,6 +3828,13 @@ export default function LiveScreen() {
+   const liveShellContextSubtitle = selectedLive
+     ? operatorHeaderMeta.join(' · ')
+     : t('live.noActiveTransmission');
++  const liveRefreshStatusLabel = lastLiveRefreshAt
++    ? t('live.lastUpdatedAt', { time: formatLiveRefreshTime(lastLiveRefreshAt) })
++    : t('live.noRecentUpdate');
++  const shouldShowLiveRefreshControls =
++    isAllowed === true &&
++    liveCapabilities.canViewLive &&
++    liveActorContext.actor !== 'NO_ACCESS';
+
+   if (isAllowed === null || isLoading) {
+     return (
+@@ -3770,6 +3873,29 @@ export default function LiveScreen() {
+             <AppText>{reservationLoadIssue}</AppText>
+           </AppInfoCard>
+         ) : null}
++        {shouldShowLiveRefreshControls ? (
++          <AppCard style={styles.liveRefreshCard}>
++            <View style={styles.liveRefreshRow}>
++              <View style={styles.liveRefreshText}>
++                <AppText variant="caption" color={theme.colors.mutedText} bold>
++                  {liveRefreshStatusLabel}
++                </AppText>
++                {liveRefreshIssue ? (
++                  <AppText variant="caption" color={theme.colors.warning}>
++                    {liveRefreshIssue}
++                  </AppText>
++                ) : null}
++              </View>
++              <AppButton
++                title={isRefreshingLiveView ? t('live.refreshing') : t('live.refresh')}
++                variant="neutral"
++                onPress={handleRefreshLiveView}
++                loading={isRefreshingLiveView}
++                disabled={isRefreshingLiveView}
++              />
++            </View>
++          </AppCard>
++        ) : null}
+
+         {isOperatorFocusedView ? (
+           <LiveActionCard
+@@ -5891,6 +6017,21 @@ const styles = StyleSheet.create({
+   liveButtonGrid: {
+     marginTop: 8,
+   },
++  liveRefreshCard: {
++    marginBottom: 10,
++  },
++  liveRefreshRow: {
++    alignItems: 'center',
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 10,
++    justifyContent: 'space-between',
++  },
++  liveRefreshText: {
++    flex: 1,
++    gap: 3,
++    minWidth: 180,
++  },
+   livePulse: {
+     height: 9,
+     width: 9,
+diff --git a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+index 0715f84..2187ec4 100644
+--- a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
++++ b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+@@ -468,3 +468,7 @@ LIVE-Z9F agrega un patron de dialogo accionable para validaciones bloqueantes de
+ # Nota LIVE-Z9F.1 - Panel contextual operativo
+
+ LIVE-Z9F.1 extiende el patron para que LIVE use paneles contextuales accionables en bloqueos de apartado. El operador permanece en la seccion de captura, ve que informacion falta y puede ejecutar la accion siguiente sin pasar por un modal centrado.
++
++# Nota LIVE-Z9H - Refresh vendedor/supervisor
++
++LIVE-Z9H agrega boton `Actualizar`, indicador de ultima actualizacion, refresh al volver a foco y polling controlado de 15 segundos para `SELLER` y `SUPERVISOR`. No implementa WebSocket/SSE, no toca backend y no consulta pagos/caja durante el polling.
+diff --git a/docs/LIVE_Z9G_SELLER_CAPABILITIES.md b/docs/LIVE_Z9G_SELLER_CAPABILITIES.md
+index 1a081cd..89407c1 100644
+--- a/docs/LIVE_Z9G_SELLER_CAPABILITIES.md
++++ b/docs/LIVE_Z9G_SELLER_CAPABILITIES.md
+@@ -72,6 +72,10 @@ No se modificaron:
+ 11. Entrar con `qa.sinpermisos@local.test` y confirmar bloqueo.
+ 12. Validar light/dark y mobile/tablet.
+
++## Continuidad LIVE-Z9H
++
++LIVE-Z9H agrega refresh controlado para que el vendedor con flujo de apartados no tenga que salir y volver a entrar cuando Admin cambia el estado del live o la prenda al aire. El vendedor conserva sus capacidades reales, con boton `Actualizar`, ultima actualizacion visible, refresh al foco y polling de 15 segundos sin consultar pagos/caja.
++
+ ## GO/NO-GO
+
+ GO tecnico si pasan lint, TypeScript, export web, Maven test/package y `git diff --check`.
+diff --git a/docs/LIVE_Z9H_VIEW_REFRESH.md b/docs/LIVE_Z9H_VIEW_REFRESH.md
+new file mode 100644
+index 0000000..b5b0e73
+--- /dev/null
++++ b/docs/LIVE_Z9H_VIEW_REFRESH.md
+@@ -0,0 +1,77 @@
++# LIVE-Z9H - Refresh vendedor/supervisor
++
++## Objetivo
++
++Evitar que Vendedor o Supervisor tengan que salir y volver a entrar a `/live` para ver cambios hechos por Admin/Operador, sin implementar WebSocket ni SSE todavia.
++
++## Problema detectado
++
++Durante QA visual, si Admin iniciaba o cambiaba el LIVE mientras Supervisor o Vendedor ya estaban en la pantalla, esas vistas podian conservar informacion anterior:
++
++- estado anterior del live;
++- prenda al aire anterior;
++- precio anterior;
++- apartados/eventos recientes sin actualizar.
++
++## Alcance aplicado
++
++- Se agrega boton `Actualizar` / `Refresh` en `/live`.
++- Se muestra indicador `Ultima actualizacion: HH:mm:ss` / `Last updated: HH:mm:ss`.
++- Se muestra `Sin actualizacion reciente` / `No recent update` antes de una carga exitosa.
++- Se agrega refresh al volver a foco mediante `AppState`.
++- Se agrega polling controlado cada 15 segundos para actores `SELLER` y `SUPERVISOR`.
++- Se pausa el polling cuando `AppState` no esta activo.
++- Se evita duplicar requests si ya hay un refresh en curso.
++
++## Datos refrescados
++
++El refresh liviano actualiza:
++
++- lives de la sucursal;
++- seleccion del live activo/abierto cuando aplica;
++- estado del live;
++- prenda al aire;
++- precio de la prenda al aire;
++- apartados recientes del live seleccionado;
++- eventos del live seleccionado o ultimo cerrado visible.
++
++No recarga catalogos completos de clientes ni prendas. No consulta pagos en polling.
++
++## Reglas por actor
++
++| Actor | Refresh manual | Polling | Notas |
++|---|---|---|---|
++| Admin / Operador | Si | No automatico nuevo | Evita sobrescribir flujo operativo con polling agresivo. |
++| Vendedor | Si | Cada 15s | Refresca estado, prenda al aire, precio y apartados recientes. |
++| Supervisor | Si | Cada 15s | Refresca estado, dashboard, apartados y eventos. |
++| NO_ACCESS | No util | No | Mantiene bloqueo. |
++
++## Por que no WebSocket/SSE
++
++LIVE-Z9H es una fase de refresh controlado. WebSocket/SSE queda fuera porque requiere contrato backend, estrategia de reconexion, seguridad por tenant/sucursal y pruebas adicionales. Esta fase mantiene endpoints existentes.
++
++## Limitaciones
++
++- No hay tiempo real instantaneo; el polling es de 15 segundos.
++- Si la ventana esta oculta, el polling se pausa y se refresca al volver a foco.
++- El refresh liviano no consulta pagos ni caja.
++- Mobile nativo depende de `AppState`; web tambien usa el mismo mecanismo disponible en Expo/React Native.
++
++## Validacion manual esperada
++
++1. Entrar con Admin y abrir `/live`.
++2. Entrar con Vendedor en otra ventana o equipo y dejarlo en `/live`.
++3. Admin inicia LIVE o cambia la prenda al aire.
++4. Confirmar que Vendedor puede presionar `Actualizar`.
++5. Confirmar que Vendedor ve `Ultima actualizacion`.
++6. Confirmar que Vendedor recibe el cambio por polling sin salir/entrar.
++7. Repetir con Supervisor.
++8. Ocultar/mostrar la ventana y confirmar refresh al volver a foco.
++9. Confirmar que NO_ACCESS no hace polling util.
++10. Validar light/dark y mobile/tablet.
++
++## GO/NO-GO
++
++GO tecnico si pasan lint, TypeScript, export web, Maven test/package y `git diff --check`.
++
++GO visual pendiente de corrida manual multiusuario.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index e9bb380..6231e0d 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -196,3 +196,16 @@ Agregar a la corrida manual de LIVE con `qa.vendedor.centro@local.test`:
+ - confirmar que no ve cancelar apartado si no tiene `CANCEL_RESERVATION`;
+ - confirmar que `Cerrar como venta LIVE` solo aparece si conserva permiso real de venta operativa;
+ - repetir validacion en light/dark y mobile/tablet.
++
++## Nota LIVE-Z9H
++
++Agregar a la corrida manual de LIVE:
++
++- dejar `qa.vendedor.centro@local.test` dentro de `/live` mientras Admin inicia o cambia el LIVE;
++- confirmar boton `Actualizar`;
++- confirmar indicador `Ultima actualizacion`;
++- confirmar que prenda al aire, precio y apartados recientes se refrescan sin salir/entrar;
++- repetir con `qa.supervisor.centro@local.test`;
++- ocultar y volver a enfocar la ventana para confirmar refresh al foco;
++- confirmar que no hay polling util para `qa.sinpermisos@local.test`;
++- confirmar light/dark y mobile/tablet.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index ba1938d..c84a5f8 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -72,6 +72,14 @@
+     "actorSupervisorSubtitle": "Monitoring and control",
+     "actorNoAccessLabel": "NO LIVE ACCESS",
+     "actorNoAccessSubtitle": "You do not have permission to operate Live",
++    "refresh": "Refresh",
++    "refreshing": "Refreshing...",
++    "lastUpdatedAt": "Last updated: {{time}}",
++    "noRecentUpdate": "No recent update",
++    "liveRefreshErrorTitle": "Could not refresh",
++    "liveRefreshError": "Could not refresh live information.",
++    "liveRefreshSuccessTitle": "Information updated",
++    "liveRefreshSuccessMessage": "Live information is up to date.",
+     "supportViewTitle": "Support view",
+     "supportViewHelp": "Support view: shows the item on air and follow-up data. It does not operate holds like the operator view.",
+     "operatorReservationTracking": "Holds and follow-up",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index aec8ccb..94dbefa 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -72,6 +72,14 @@
+     "actorSupervisorSubtitle": "Monitoreo y control",
+     "actorNoAccessLabel": "SIN ACCESO LIVE",
+     "actorNoAccessSubtitle": "No tienes permisos para operar En vivo",
++    "refresh": "Actualizar",
++    "refreshing": "Actualizando...",
++    "lastUpdatedAt": "Ultima actualizacion: {{time}}",
++    "noRecentUpdate": "Sin actualizacion reciente",
++    "liveRefreshErrorTitle": "No se pudo actualizar",
++    "liveRefreshError": "No se pudo actualizar la informacion del en vivo.",
++    "liveRefreshSuccessTitle": "Informacion actualizada",
++    "liveRefreshSuccessMessage": "La informacion del en vivo esta al dia.",
+     "supportViewTitle": "Vista de apoyo",
+     "supportViewHelp": "Vista de apoyo: muestra la prenda al aire y datos para seguimiento. No opera apartados como operador.",
+     "operatorReservationTracking": "Apartados y seguimiento",
+diff --git a/qa-reports/LIVE-Z9H-view-refresh-report-20260606-213135.md b/qa-reports/LIVE-Z9H-view-refresh-report-20260606-213135.md
+new file mode 100644
+index 0000000..971c519
+--- /dev/null
++++ b/qa-reports/LIVE-Z9H-view-refresh-report-20260606-213135.md
+@@ -0,0 +1,72 @@
++# LIVE-Z9H - Reporte refresh vendedor/supervisor
++
++## Objetivo
++
++Agregar actualizacion controlada en `/live` para que Vendedor y Supervisor vean cambios hechos por Admin/Operador sin salir y volver a entrar, sin implementar WebSocket/SSE ni tocar backend.
++
++## Datos refrescados
++
++El refresh liviano actualiza:
++
++- live activo/abierto de la sucursal;
++- estado del live;
++- prenda al aire;
++- precio de prenda al aire;
++- apartados recientes;
++- eventos/actividad del live visible;
++- resumen supervisor derivado de apartados/eventos.
++
++No recarga clientes/prendas completas y no consulta pagos/caja durante polling.
++
++## Reglas por actor
++
++| Actor | Refresh manual | Refresh al foco | Polling |
++|---|---|---|---|
++| Admin / Operador | Si | Por foco de ruta existente | No automatico nuevo |
++| Vendedor | Si | Si | Cada 15 segundos |
++| Supervisor | Si | Si | Cada 15 segundos |
++| NO_ACCESS | No util | No | No |
++
++## Cambios aplicados
++
++- Boton `Actualizar` / `Refresh` en `/live`.
++- Indicador `Ultima actualizacion: HH:mm:ss` / `Last updated: HH:mm:ss`.
++- Mensaje `Sin actualizacion reciente` / `No recent update`.
++- Refresh liviano con proteccion contra requests duplicados.
++- Polling cada 15 segundos para `SELLER` y `SUPERVISOR`.
++- Refresh al volver a `AppState` activo.
++- Polling pausado cuando `AppState` no esta activo.
++- i18n ES/EN para los textos nuevos.
++
++## Validaciones tecnicas
++
++- `npm.cmd run lint`: OK, 0 errores, 53 warnings preexistentes.
++- `npx.cmd tsc --noEmit`: OK.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
++- `backend/control-ropa/./mvnw.cmd test`: OK, 73 tests, 0 failures, 0 errors.
++- `backend/control-ropa/./mvnw.cmd -q -DskipTests package`: OK.
++- `git --no-pager diff --check`: OK.
++
++## Limitaciones
++
++- No es tiempo real instantaneo; la frecuencia es de 15 segundos.
++- WebSocket/SSE queda pendiente para fase futura porque requiere contrato backend.
++- El refresh automatico no consulta pagos/caja.
++- La validacion visual multiusuario sigue pendiente.
++
++## Validacion manual esperada
++
++1. Admin inicia o cambia LIVE.
++2. Vendedor ya esta en `/live`.
++3. Confirmar boton `Actualizar`.
++4. Confirmar indicador de ultima actualizacion.
++5. Confirmar refresh por polling sin salir/entrar.
++6. Repetir con Supervisor.
++7. Ocultar y volver a enfocar la ventana.
++8. Confirmar que NO_ACCESS no hace polling util.
++9. Validar light/dark y mobile/tablet.
++
++## GO/NO-GO
++
++- GO tecnico: SI.
++- GO visual: pendiente de corrida manual multiusuario.

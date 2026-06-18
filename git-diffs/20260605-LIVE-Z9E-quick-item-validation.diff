@@ -1,0 +1,532 @@
+﻿diff --git a/app/items-create.tsx b/app/items-create.tsx
+index e188db5..db03fcc 100644
+--- a/app/items-create.tsx
++++ b/app/items-create.tsx
+@@ -28,6 +28,7 @@ import { getSession } from '@/services/sessionStorage';
+
+ import { useLocalSearchParams, useRouter } from 'expo-router';
+ import { useEffect, useState } from 'react';
++import { useTranslation } from 'react-i18next';
+ import { Alert, FlatList, StyleSheet, View } from 'react-native';
+
+ type CatalogOption = {
+@@ -44,6 +45,10 @@ type SelectorConfig = {
+   allowClear?: boolean;
+ };
+
++type FormErrors = Partial<
++  Record<'productType' | 'size' | 'price' | 'quantity', string>
++>;
++
+ const mapBatchToOption = (batch: Batch): CatalogOption => ({
+   id: batch.id,
+   code: batch.folio,
+@@ -77,6 +82,7 @@ export default function ItemsCreateScreen() {
+   const router = useRouter();
+   const { returnTo, batchId, batchFolio } = useLocalSearchParams();
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+
+   const returnRoute = typeof returnTo === 'string' ? returnTo : '/items';
+   const preselectedBatchId = typeof batchId === 'string' ? Number(batchId) : null;
+@@ -111,6 +117,8 @@ export default function ItemsCreateScreen() {
+
+   const [isSaving, setIsSaving] = useState(false);
+   const [successMessage, setSuccessMessage] = useState('');
++  const [formErrors, setFormErrors] = useState<FormErrors>({});
++  const [validationSummary, setValidationSummary] = useState<string[]>([]);
+
+   const [selector, setSelector] = useState<SelectorConfig | null>(null);
+   const [selectorSearch, setSelectorSearch] = useState('');
+@@ -177,6 +185,8 @@ export default function ItemsCreateScreen() {
+     setPrice('');
+     setQuantity('1');
+     setComments('');
++    setFormErrors({});
++    setValidationSummary([]);
+   };
+
+   const openSelector = (config: SelectorConfig) => {
+@@ -189,7 +199,53 @@ export default function ItemsCreateScreen() {
+     setSelectorSearch('');
+   };
+
++  const validateForm = () => {
++    const nextErrors: FormErrors = {};
++
++    if (!selectedProductType) {
++      nextErrors.productType = t('itemsCreate.requiredField');
++    }
++
++    if (!selectedSize) {
++      nextErrors.size = t('itemsCreate.selectSize');
++    }
++
++    const qty = Number(quantity);
++    if (!qty || qty <= 0 || !Number.isInteger(qty)) {
++      nextErrors.quantity = t('itemsCreate.validQuantity');
++    }
++
++    const parsedPrice = price.trim() ? Number(price) : null;
++    if (requiresPrice && !price.trim()) {
++      nextErrors.price = t('itemsCreate.validPrice');
++    } else if (parsedPrice !== null && (Number.isNaN(parsedPrice) || parsedPrice < 0)) {
++      nextErrors.price = t('itemsCreate.validPrice');
++    } else if (requiresPrice && (!parsedPrice || parsedPrice <= 0)) {
++      nextErrors.price = t('itemsCreate.validPrice');
++    }
++
++    const details = Object.values(nextErrors).filter((message): message is string => !!message);
++    setFormErrors(nextErrors);
++    setValidationSummary(details);
++
++    if (details.length > 0) {
++      Alert.alert(
++        t('itemsCreate.validationTitle'),
++        `${t('itemsCreate.validationMessage')}\n\n${details
++          .map((detail) => `- ${detail}`)
++          .join('\n')}`
++      );
++      return false;
++    }
++
++    return true;
++  };
++
+   const handleCreate = async () => {
++    if (!validateForm()) {
++      return;
++    }
++
+     if (!selectedProductType) {
+       Alert.alert('Validación', 'Selecciona el tipo de prenda.');
+       return;
+@@ -230,6 +286,8 @@ export default function ItemsCreateScreen() {
+     try {
+       setIsSaving(true);
+       setSuccessMessage('');
++      setFormErrors({});
++      setValidationSummary([]);
+
+       const createdItemIds: number[] = [];
+
+@@ -304,6 +362,30 @@ export default function ItemsCreateScreen() {
+           </View>
+         ) : null}
+
++        {quickItemTarget === 'live' ? (
++          <AppCard variant="info">
++            <AppText variant="caption" color={theme.colors.textSecondary}>
++              {t('itemsCreate.liveReturnHelp')}
++            </AppText>
++          </AppCard>
++        ) : null}
++
++        {validationSummary.length > 0 ? (
++          <AppCard variant="danger" style={styles.validationCard}>
++            <AppText bold>{t('itemsCreate.validationTitle')}</AppText>
++            <AppText color={theme.colors.textSecondary}>
++              {t('itemsCreate.validationMessage')}
++            </AppText>
++            <View style={styles.validationList}>
++              {validationSummary.map((message) => (
++                <AppText key={message} variant="caption" color={theme.colors.danger}>
++                  - {message}
++                </AppText>
++              ))}
++            </View>
++          </AppCard>
++        ) : null}
++
+         <AppCard>
+           <AppResponsiveGrid>
+           <AppSelectorField
+@@ -328,11 +410,16 @@ export default function ItemsCreateScreen() {
+             label="Tipo de prenda *"
+             value={selectedProductType?.name}
+             placeholder="Seleccionar tipo"
++            error={formErrors.productType}
+             onPress={() =>
+               openSelector({
+                 title: 'Seleccionar tipo de prenda',
+                 options: productTypes,
+-                onSelect: setSelectedProductType,
++                onSelect: (option) => {
++                  setSelectedProductType(option);
++                  setFormErrors((current) => ({ ...current, productType: undefined }));
++                  setValidationSummary([]);
++                },
+               })
+             }
+           />
+@@ -355,11 +442,16 @@ export default function ItemsCreateScreen() {
+             label="Talla *"
+             value={selectedSize?.name}
+             placeholder="Seleccionar talla"
++            error={formErrors.size}
+             onPress={() =>
+               openSelector({
+                 title: 'Seleccionar talla',
+                 options: sizes,
+-                onSelect: setSelectedSize,
++                onSelect: (option) => {
++                  setSelectedSize(option);
++                  setFormErrors((current) => ({ ...current, size: undefined }));
++                  setValidationSummary([]);
++                },
+               })
+             }
+           />
+@@ -385,17 +477,27 @@ export default function ItemsCreateScreen() {
+           <AppInput
+             label={requiresPrice ? 'Precio *' : 'Precio sugerido'}
+             value={price}
+-            onChangeText={setPrice}
++            onChangeText={(value) => {
++              setPrice(value);
++              setFormErrors((current) => ({ ...current, price: undefined }));
++              setValidationSummary([]);
++            }}
+             keyboardType="numeric"
+             placeholder={requiresPrice ? 'Obligatorio' : 'Opcional'}
++            error={formErrors.price}
+           />
+
+           <AppInput
+             label="Cantidad *"
+             value={quantity}
+-            onChangeText={setQuantity}
++            onChangeText={(value) => {
++              setQuantity(value);
++              setFormErrors((current) => ({ ...current, quantity: undefined }));
++              setValidationSummary([]);
++            }}
+             keyboardType="numeric"
+             placeholder="Ej. 1"
++            error={formErrors.quantity}
+           />
+
+           <AppInput
+@@ -470,6 +572,13 @@ const styles = StyleSheet.create({
+     padding: 12,
+     marginBottom: 10,
+   },
++  validationCard: {
++    gap: 8,
++  },
++  validationList: {
++    gap: 4,
++    marginTop: 4,
++  },
+   selectorList: {
+     maxHeight: 360,
+   },
+diff --git a/components/ui/AppInput.tsx b/components/ui/AppInput.tsx
+index 7545f9d..75e02c4 100644
+--- a/components/ui/AppInput.tsx
++++ b/components/ui/AppInput.tsx
+@@ -4,9 +4,10 @@ import AppText from './AppText';
+
+ type Props = TextInputProps & {
+   label?: string;
++  error?: string;
+ };
+
+-export default function AppInput({ label, style, ...rest }: Props) {
++export default function AppInput({ label, error, style, ...rest }: Props) {
+   const { theme } = useAppTheme();
+   const isReadonly = rest.editable === false;
+
+@@ -22,7 +23,7 @@ export default function AppInput({ label, style, ...rest }: Props) {
+         style={[
+           styles.input,
+           {
+-            borderColor: theme.colors.inputBorder,
++            borderColor: error ? theme.colors.danger : theme.colors.inputBorder,
+             borderRadius: theme.radius.md,
+             padding: theme.spacing.md,
+             minHeight: theme.density === 'COMPACT' ? 46 : 54,
+@@ -39,6 +40,11 @@ export default function AppInput({ label, style, ...rest }: Props) {
+         selectionColor={theme.colors.accent}
+         {...rest}
+       />
++      {error ? (
++        <AppText variant="caption" color={theme.colors.danger} style={styles.errorText}>
++          {error}
++        </AppText>
++      ) : null}
+     </View>
+   );
+ }
+@@ -53,4 +59,7 @@ const styles = StyleSheet.create({
+     shadowOffset: { width: 0, height: 4 },
+     shadowRadius: 10,
+   },
++  errorText: {
++    marginTop: 6,
++  },
+ });
+diff --git a/components/ui/AppSelectorField.tsx b/components/ui/AppSelectorField.tsx
+index 8da4da2..1a1a89d 100644
+--- a/components/ui/AppSelectorField.tsx
++++ b/components/ui/AppSelectorField.tsx
+@@ -8,6 +8,7 @@ type Props = {
+   placeholder: string;
+   onPress: () => void;
+   disabled?: boolean;
++  error?: string;
+ };
+
+ export default function AppSelectorField({
+@@ -16,6 +17,7 @@ export default function AppSelectorField({
+   placeholder,
+   onPress,
+   disabled = false,
++  error,
+ }: Props) {
+   const { theme } = useAppTheme();
+
+@@ -30,7 +32,7 @@ export default function AppSelectorField({
+         style={({ pressed }) => [
+           styles.button,
+           {
+-            borderColor: theme.colors.inputBorder,
++            borderColor: error ? theme.colors.danger : theme.colors.inputBorder,
+             borderRadius: theme.radius.md,
+             padding: theme.spacing.md,
+             minHeight: theme.density === 'COMPACT' ? 46 : 54,
+@@ -46,6 +48,11 @@ export default function AppSelectorField({
+           {value || placeholder}
+         </AppText>
+       </Pressable>
++      {error ? (
++        <AppText variant="caption" color={theme.colors.danger} style={styles.errorText}>
++          {error}
++        </AppText>
++      ) : null}
+     </View>
+   );
+ }
+@@ -57,4 +64,7 @@ const styles = StyleSheet.create({
+   button: {
+     borderWidth: 1,
+   },
++  errorText: {
++    marginTop: 6,
++  },
+ });
+diff --git a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+index 33015e2..29d53a4 100644
+--- a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
++++ b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+@@ -3,6 +3,8 @@
+ > Nota LIVE-Z9D: `Cambiar por prenda preparada` usa directamente la prenda preparada visible y no abre el selector.
+ > `Quitar prenda preparada` limpia solo la preparacion local, sin afectar prenda al aire, precio, cliente ni apartado.
+
++> Nota LIVE-Z9E: `Crear prenda rapida` mantiene `returnTo=/live` y ahora muestra validacion visible por campo cuando faltan datos obligatorios antes de generar prendas.
++
+ ## Objetivo
+
+ Integrar `/live` al layout profesional del producto usando `AppShell`, sidebar, TopBar y navegacion lateral responsive, sin cambiar reglas operativas profundas ni backend.
+diff --git a/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md b/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md
+index 03aabb5..91c7e19 100644
+--- a/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md
++++ b/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md
+@@ -78,3 +78,7 @@ Si el operador selecciona en el modal la misma prenda que ya esta al aire:
+ ## GO/NO-GO
+
+ GO si las validaciones tecnicas pasan y el flujo manual confirma que el boton de cambio ya no abre selector cuando existe prenda preparada.
++
++## Continuidad LIVE-Z9E
++
++LIVE-Z9E mejora la validacion de `Crear prenda rapida` cuando abre `/items-create?returnTo=/live`, mostrando errores visibles por campo antes de volver al flujo LIVE para preparar o poner al aire la prenda creada.
+diff --git a/docs/LIVE_Z9E_QUICK_ITEM_VALIDATION.md b/docs/LIVE_Z9E_QUICK_ITEM_VALIDATION.md
+new file mode 100644
+index 0000000..19bba43
+--- /dev/null
++++ b/docs/LIVE_Z9E_QUICK_ITEM_VALIDATION.md
+@@ -0,0 +1,69 @@
++# LIVE-Z9E - Validacion UX de crear prenda rapida desde LIVE
++
++## Objetivo
++
++Mejorar la validacion visual de `Alta masiva de prendas` cuando se usa desde LIVE mediante `Crear prenda rapida`.
++
++El problema detectado fue que, al presionar `Generar prendas` con campos obligatorios incompletos, el usuario podia percibir que no pasaba nada porque solo existian alertas aisladas y no habia marcas persistentes por campo.
++
++## Campos validados
++
++La pantalla conserva la regla actual y valida visualmente:
++
++- Tipo de prenda.
++- Talla.
++- Precio, cuando el flujo lo requiere, por ejemplo `returnTo=/live`.
++- Cantidad.
++
++Tambien se mantiene la validacion previa:
++
++- Precio numerico valido.
++- Precio mayor a cero cuando el flujo requiere precio.
++- Cantidad numerica, entera y mayor a cero.
++
++## Cambios de UX
++
++Si faltan campos o hay valores invalidos:
++
++- Se muestra un resumen visible con titulo `No se pudo generar la prenda`.
++- El mensaje indica `Completa los campos obligatorios para continuar`.
++- Cada campo con error marca su borde en peligro y muestra helper debajo.
++- No se limpian los valores ya capturados.
++- La validacion existente queda como respaldo, pero la primera experiencia muestra todos los errores juntos.
++
++## Flujo desde LIVE
++
++Cuando la pantalla se abre con `returnTo=/live`:
++
++- Se mantiene el regreso a LIVE.
++- Se muestra una ayuda breve: `Al generar la prenda, podras volver al LIVE para prepararla o ponerla al aire.`
++- La creacion correcta conserva el flujo actual de `pendingQuickItems` y `router.replace(returnRoute)`.
++
++## Sin cambios fuera de alcance
++
++No se modifico:
++
++- backend;
++- endpoints;
++- contratos de API;
++- AUTH/RBAC;
++- pagos/caja/reportes/billing/IA;
++- reglas operativas LIVE;
++- persistencia backend.
++
++## Validacion manual esperada
++
++1. Entrar a `/live`.
++2. Presionar `Crear prenda rapida`.
++3. Llegar a `/items-create?returnTo=%2Flive`.
++4. Dejar `Talla` vacia.
++5. Presionar `Generar prendas`.
++6. Confirmar que aparece el resumen `No se pudo generar la prenda`.
++7. Confirmar que `Talla` muestra error debajo.
++8. Completar `Talla`.
++9. Confirmar que se puede generar la prenda si los demas campos requeridos son validos.
++10. Confirmar que el regreso a LIVE se mantiene.
++
++## GO/NO-GO
++
++GO si pasan validaciones tecnicas y la corrida manual confirma que los errores son visibles, persistentes y especificos por campo.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index ec77ad0..ba27ce3 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -109,3 +109,14 @@ La validacion manual posterior debe revisar tambien:
+ - `Mantener apartado`;
+ - diferencia entre `Retirar prenda del aire`, `Cambiar por prenda preparada` y `Finalizar en vivo`;
+ - que apartar la prenda al aire no oculte la prenda preparada para cambio.
++
++## Nota LIVE-Z9E
++
++La corrida manual desde LIVE debe agregar el caso `Crear prenda rapida`:
++
++- abrir `/items-create?returnTo=/live`;
++- dejar un campo obligatorio vacio, especialmente `Talla`;
++- presionar `Generar prendas`;
++- confirmar que aparece resumen de validacion y error visible por campo;
++- completar datos validos;
++- confirmar que la creacion correcta mantiene el regreso a LIVE.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index 486facb..a85e920 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -595,5 +595,14 @@
+     "channelDoorSale": "Counter sale",
+     "channelMixed": "Mixed",
+     "reservationSettledHelp": "Reservation settled. New regular payments are no longer allowed from this screen."
++  },
++  "itemsCreate": {
++    "validationTitle": "Could not create item",
++    "validationMessage": "Complete the required fields to continue.",
++    "requiredField": "This field is required.",
++    "selectSize": "Select a size.",
++    "validPrice": "Enter a valid price.",
++    "validQuantity": "Enter a valid quantity.",
++    "liveReturnHelp": "After creating the item, you can return to LIVE to prepare it or put it on air."
+   }
+ }
+diff --git a/locales/es/common.json b/locales/es/common.json
+index 47c72d4..679e8d5 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -595,5 +595,14 @@
+     "channelDoorSale": "Venta de mostrador",
+     "channelMixed": "Mixto",
+     "reservationSettledHelp": "Reserva liquidada. Ya no se permiten nuevos abonos normales desde esta pantalla."
++  },
++  "itemsCreate": {
++    "validationTitle": "No se pudo generar la prenda",
++    "validationMessage": "Completa los campos obligatorios para continuar.",
++    "requiredField": "Este campo es obligatorio.",
++    "selectSize": "Selecciona una talla.",
++    "validPrice": "Ingresa un precio valido.",
++    "validQuantity": "Ingresa una cantidad valida.",
++    "liveReturnHelp": "Al generar la prenda, podras volver al LIVE para prepararla o ponerla al aire."
+   }
+ }
+diff --git a/qa-reports/LIVE-Z9E-quick-item-validation-report-20260605-152657.md b/qa-reports/LIVE-Z9E-quick-item-validation-report-20260605-152657.md
+new file mode 100644
+index 0000000..e373654
+--- /dev/null
++++ b/qa-reports/LIVE-Z9E-quick-item-validation-report-20260605-152657.md
+@@ -0,0 +1,52 @@
++# LIVE-Z9E - Reporte de validacion de alta rapida de prendas
++
++## Objetivo
++
++Mejorar la validacion visual de `/items-create?returnTo=/live` para que el usuario vea claramente que campos obligatorios faltan antes de generar prendas.
++
++## Cambios implementados
++
++- Se agrego validacion frontend previa que acumula errores por campo.
++- Se muestra resumen visible `No se pudo generar la prenda`.
++- Se marcan campos con error usando borde danger y helper debajo.
++- Se agrego soporte opcional de `error` a `AppInput` y `AppSelectorField`.
++- Se mantiene la validacion anterior como respaldo.
++- Se conserva `returnTo=/live` y el flujo actual de `pendingQuickItems`.
++- Se agrego ayuda contextual cuando la pantalla viene desde LIVE.
++
++## Campos validados
++
++- Tipo de prenda.
++- Talla.
++- Precio cuando `returnTo` exige flujo rapido.
++- Cantidad.
++
++## Alcance
++
++- Frontend, locales, documentacion y evidencia.
++- Sin cambios backend, AUTH/RBAC, pagos, caja, reportes, billing, IA, endpoints ni contratos API.
++
++## Validaciones tecnicas
++
++Ejecutadas el 2026-06-05:
++
++- OK - `npm.cmd run lint` (sin errores; 60 warnings preexistentes).
++- OK - `npx.cmd tsc --noEmit`.
++- OK - `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export` (73 rutas exportadas).
++- OK - `cd backend/control-ropa; ./mvnw.cmd test` (73 tests, 0 fallas, 0 errores).
++- OK - `cd backend/control-ropa; ./mvnw.cmd -q -DskipTests package`.
++- Pendiente de cierre - `git diff --check`.
++
++Warnings observados:
++
++- Lint conserva 60 warnings ya existentes; el warning de `items-create.tsx` sobre dependencia de hook ya existia en la pantalla.
++- Maven test muestra warnings de entorno conocidos: MySQL 5.7 fuera de soporte comunitario, Mockito dynamic agent y password generado por Spring Security en contexto de test.
++
++## Riesgos
++
++- No se ejecuto validacion manual en navegador en esta fase.
++- El scroll/foco automatico al primer campo con error queda pendiente; la pantalla ya muestra resumen y error persistente por campo.
++
++## GO/NO-GO
++
++GO tecnico condicionado a `git diff --check` final.

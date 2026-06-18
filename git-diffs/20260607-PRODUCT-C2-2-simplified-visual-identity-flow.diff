@@ -1,0 +1,979 @@
+diff --git a/app/ui-kit.tsx b/app/ui-kit.tsx
+index e698db5..937166e 100644
+--- a/app/ui-kit.tsx
++++ b/app/ui-kit.tsx
+@@ -66,6 +66,7 @@ export default function UiKitPreview() {
+   const [editorDensity, setEditorDensity] = useState<'NORMAL' | 'COMPACT'>('NORMAL');
+   const [paletteBaseColor, setPaletteBaseColor] = useState('#2563EB');
+   const [paletteHarmony, setPaletteHarmony] = useState<HarmonyType>('complementary');
++  const [showAdvancedDetails, setShowAdvancedDetails] = useState(false);
+   const [identityFeedback, setIdentityFeedback] = useState<string | null>(null);
+   const { t } = useTranslation();
+
+@@ -185,7 +186,7 @@ export default function UiKitPreview() {
+
+   const applyVisualIdentityChanges = async () => {
+     if (hasEditorErrors) {
+-      setIdentityFeedback('Corrige los colores invalidos antes de aplicar.');
++      setIdentityFeedback(t('paletteGenerator.invalidColorsFeedback'));
+       return;
+     }
+
+@@ -198,12 +199,12 @@ export default function UiKitPreview() {
+       radius: editorRadius,
+       density: editorDensity,
+     });
+-    setIdentityFeedback('Personalizacion aplicada localmente.');
++    setIdentityFeedback(t('paletteGenerator.manualAppliedFeedback'));
+   };
+
+   const restoreActivePreset = async () => {
+     await resetCustomVisualIdentity();
+-    setIdentityFeedback('Plantilla restaurada a sus tokens base.');
++    setIdentityFeedback(t('paletteGenerator.restoreFeedback'));
+   };
+
+   if (loading) {
+@@ -250,20 +251,44 @@ export default function UiKitPreview() {
+       navSections={navSections}
+     >
+       <SectionHeader
+-        title="Datos de ejemplo para preview visual"
+-        subtitle="Estos datos solo viven en /ui-kit; no se usan en pantallas reales."
++        title={t('paletteGenerator.flowTitle')}
++        subtitle={t('paletteGenerator.flowSubtitle')}
+       />
++      <AppCard variant="info" style={styles.guidedFlowCard}>
++        {[
++          t('paletteGenerator.flowSteps.template'),
++          t('paletteGenerator.flowSteps.baseColor'),
++          t('paletteGenerator.flowSteps.palette'),
++          t('paletteGenerator.flowSteps.contrast'),
++          t('paletteGenerator.flowSteps.preview'),
++          t('paletteGenerator.flowSteps.apply'),
++        ].map((step, index) => (
++          <View key={step} style={styles.flowStep}>
++            <View
++              style={[
++                styles.flowStepIndex,
++                {
++                  backgroundColor: theme.colors.primaryButtonBackground,
++                },
++              ]}
++            >
++              <AppText variant="caption" bold color={theme.colors.primaryButtonText}>
++                {String(index + 1)}
++              </AppText>
++            </View>
++            <AppText variant="caption" bold>
++              {step}
++            </AppText>
++          </View>
++        ))}
++      </AppCard>
+
+-      <SectionHeader
+-        title="Identidad visual"
+-        subtitle="Selector local de plantilla visual. Persistencia por cliente/tenant queda pendiente."
+-      />
+       <View style={styles.previewCard}>
+         <View style={styles.themePreviewHeader}>
+           <View style={styles.previewTextBlock}>
+-            <AppText bold>Plantilla visual activa</AppText>
++            <AppText bold>{t('paletteGenerator.activeTemplate')}</AppText>
+             <AppText variant="caption" color={theme.colors.mutedText}>
+-              Esta configuracion se guarda localmente en esta fase.
++              {t('paletteGenerator.localConfigHelp')}
+             </AppText>
+           </View>
+           <StatusBadge
+@@ -287,11 +312,17 @@ export default function UiKitPreview() {
+                       {preset.description}
+                     </AppText>
+                   </View>
+-                  {preset.id === visualPresetId ? <StatusBadge label="Activo" tone="success" /> : null}
++                  {preset.id === visualPresetId ? (
++                    <StatusBadge label={t('paletteGenerator.templateActive')} tone="success" />
++                  ) : null}
+                 </View>
+                 <PresetMiniPreview colors={preset.colors[theme.isDark ? 'dark' : 'light']} />
+                 <AppButton
+-                  title={preset.id === visualPresetId ? 'Plantilla activa' : 'Usar plantilla'}
++                  title={
++                    preset.id === visualPresetId
++                      ? t('paletteGenerator.activeTemplateButton')
++                      : t('paletteGenerator.useTemplate')
++                  }
+                   variant={preset.id === visualPresetId ? 'neutral' : 'secondary'}
+                   onPress={() => setVisualPresetId(preset.id)}
+                 />
+@@ -306,6 +337,7 @@ export default function UiKitPreview() {
+       />
+       <PaletteGeneratorCard
+         activeScheme={activeScheme}
++        advancedMode={showAdvancedDetails}
+         baseColor={paletteBaseColor}
+         harmony={paletteHarmony}
+         onApplyPalette={applyGeneratedPalette}
+@@ -317,6 +349,33 @@ export default function UiKitPreview() {
+         onTokenChange={updateEditorToken}
+       />
+
++      {identityFeedback ? (
++        <AppCard variant={hasEditorErrors ? 'danger' : 'info'} style={styles.compactNotice}>
++          <AppText color={hasEditorErrors ? theme.colors.danger : theme.colors.info}>
++            {identityFeedback}
++          </AppText>
++        </AppCard>
++      ) : null}
++
++      <View style={styles.buttonRow}>
++        <AppButton
++          title={t('paletteGenerator.restoreTemplate')}
++          variant="neutral"
++          onPress={restoreActivePreset}
++        />
++        <AppButton
++          title={
++            showAdvancedDetails
++              ? t('paletteGenerator.hideTechnicalDetails')
++              : t('paletteGenerator.showTechnicalDetails')
++          }
++          variant="secondary"
++          onPress={() => setShowAdvancedDetails((current) => !current)}
++        />
++      </View>
++
++      {showAdvancedDetails ? (
++        <>
+       <SectionHeader
+         title={t('paletteGenerator.controlledEditorTitle')}
+         subtitle={t('paletteGenerator.controlledEditorSubtitle')}
+@@ -418,14 +477,6 @@ export default function UiKitPreview() {
+           </AppCard>
+         ) : null}
+
+-        {identityFeedback ? (
+-          <AppCard variant={hasEditorErrors ? 'danger' : 'info'} style={styles.compactNotice}>
+-            <AppText color={hasEditorErrors ? theme.colors.danger : theme.colors.info}>
+-              {identityFeedback}
+-            </AppText>
+-          </AppCard>
+-        ) : null}
+-
+         <View style={styles.buttonRow}>
+           <AppButton
+             title="Aplicar cambios localmente"
+@@ -434,7 +485,6 @@ export default function UiKitPreview() {
+             disabledReason="Corrige los colores invalidos antes de aplicar."
+             onPress={applyVisualIdentityChanges}
+           />
+-          <AppButton title="Restaurar plantilla" variant="neutral" onPress={restoreActivePreset} />
+         </View>
+
+         <AppText variant="caption" color={theme.colors.mutedText}>
+@@ -829,6 +879,8 @@ export default function UiKitPreview() {
+           />
+         ))}
+       </AppResponsiveGrid>
++        </>
++      ) : null}
+     </AppShell>
+   );
+ }
+@@ -892,6 +944,24 @@ const styles = StyleSheet.create({
+     height: 18,
+     width: 18,
+   },
++  flowStep: {
++    alignItems: 'center',
++    flexDirection: 'row',
++    gap: designTokens.spacing.xs,
++  },
++  flowStepIndex: {
++    alignItems: 'center',
++    borderRadius: designTokens.radius.full,
++    height: 24,
++    justifyContent: 'center',
++    width: 24,
++  },
++  guidedFlowCard: {
++    alignItems: 'center',
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: designTokens.spacing.sm,
++  },
+   inlineList: {
+     alignItems: 'flex-start',
+     gap: designTokens.spacing.sm,
+diff --git a/components/ui/PaletteGeneratorCard.tsx b/components/ui/PaletteGeneratorCard.tsx
+index 0122350..2584513 100644
+--- a/components/ui/PaletteGeneratorCard.tsx
++++ b/components/ui/PaletteGeneratorCard.tsx
+@@ -26,6 +26,7 @@ import AppText from './AppText';
+
+ type Props = {
+   activeScheme: 'light' | 'dark';
++  advancedMode?: boolean;
+   baseColor: string;
+   harmony: HarmonyType;
+   onApplyPalette: (palette: SemanticPalette) => void;
+@@ -43,6 +44,7 @@ const DARK_TEXT = '#0F172A';
+
+ export default function PaletteGeneratorCard({
+   activeScheme,
++  advancedMode = false,
+   baseColor,
+   harmony,
+   onApplyPalette,
+@@ -127,6 +129,9 @@ export default function PaletteGeneratorCard({
+   }, [activeScheme, palette, t]);
+
+   const hasLowContrast = contrastRows.some((row) => row.status === 'low');
++  const visibleContrastRows = advancedMode
++    ? contrastRows
++    : contrastRows.filter((row) => ['button', 'background', 'danger'].includes(row.key));
+   const tokenEntries = Object.entries(palette) as [EditableVisualTokenKey, string][];
+
+   const webColorInput =
+@@ -188,32 +193,36 @@ export default function PaletteGeneratorCard({
+             />
+           </View>
+
+-          <View style={styles.colorMetaRow}>
+-            <MetaPill label="HEX" value={normalizedBase} />
+-            <MetaPill
+-              label="RGB"
+-              value={baseRgb ? `${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}` : '-'}
+-            />
+-            <MetaPill
+-              label="HSL"
+-              value={baseHsl ? `${Math.round(baseHsl.h)}, ${baseHsl.s}%, ${baseHsl.l}%` : '-'}
+-            />
+-          </View>
++          {advancedMode ? (
++            <>
++              <View style={styles.colorMetaRow}>
++                <MetaPill label="HEX" value={normalizedBase} />
++                <MetaPill
++                  label="RGB"
++                  value={baseRgb ? `${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}` : '-'}
++                />
++                <MetaPill
++                  label="HSL"
++                  value={baseHsl ? `${Math.round(baseHsl.h)}, ${baseHsl.s}%, ${baseHsl.l}%` : '-'}
++                />
++              </View>
+
+-          <AppText variant="caption" color={theme.colors.mutedText}>
+-            {t('paletteGenerator.quickSwatches')}
+-          </AppText>
+-          <View style={styles.swatchRow}>
+-            {QUICK_SWATCHES.map((color) => (
+-              <ColorSwatch
+-                key={color}
+-                color={color}
+-                label={color}
+-                onPress={() => onBaseColorChange(color)}
+-                selected={normalizedBase === color}
+-              />
+-            ))}
+-          </View>
++              <AppText variant="caption" color={theme.colors.mutedText}>
++                {t('paletteGenerator.quickSwatches')}
++              </AppText>
++              <View style={styles.swatchRow}>
++                {QUICK_SWATCHES.map((color) => (
++                  <ColorSwatch
++                    key={color}
++                    color={color}
++                    label={color}
++                    onPress={() => onBaseColorChange(color)}
++                    selected={normalizedBase === color}
++                  />
++                ))}
++              </View>
++            </>
++          ) : null}
+         </View>
+
+         <View style={styles.controlColumn}>
+@@ -229,20 +238,28 @@ export default function PaletteGeneratorCard({
+               />
+             ))}
+           </View>
+-          <AppText variant="caption" color={theme.colors.mutedText}>
+-            {t('paletteGenerator.harmonyHelp')}
+-          </AppText>
+-          <View style={styles.swatchRow}>
+-            {harmonyColors.map((color) => (
+-              <ColorSwatch key={color} color={color} label={color} onPress={() => onBaseColorChange(color)} />
+-            ))}
+-          </View>
++          {advancedMode ? (
++            <>
++              <AppText variant="caption" color={theme.colors.mutedText}>
++                {t('paletteGenerator.harmonyHelp')}
++              </AppText>
++              <View style={styles.swatchRow}>
++                {harmonyColors.map((color) => (
++                  <ColorSwatch key={color} color={color} label={color} onPress={() => onBaseColorChange(color)} />
++                ))}
++              </View>
++            </>
++          ) : null}
+         </View>
+       </View>
+
+-      <VariationBlock title={t('paletteGenerator.tints')} colors={tints} onPick={onBaseColorChange} />
+-      <VariationBlock title={t('paletteGenerator.shades')} colors={shades} onPick={onBaseColorChange} />
+-      <VariationBlock title={t('paletteGenerator.tones')} colors={tones} onPick={onBaseColorChange} />
++      {advancedMode ? (
++        <>
++          <VariationBlock title={t('paletteGenerator.tints')} colors={tints} onPick={onBaseColorChange} />
++          <VariationBlock title={t('paletteGenerator.shades')} colors={shades} onPick={onBaseColorChange} />
++          <VariationBlock title={t('paletteGenerator.tones')} colors={tones} onPick={onBaseColorChange} />
++        </>
++      ) : null}
+
+       <View style={styles.sectionBlock}>
+         <View style={styles.headerRow}>
+@@ -283,9 +300,11 @@ export default function PaletteGeneratorCard({
+
+       <View style={styles.generatorGrid}>
+         <View style={styles.controlColumn}>
+-          <AppText bold>{t('paletteGenerator.contrastTitle')}</AppText>
++          <AppText bold>
++            {advancedMode ? t('paletteGenerator.contrastTitle') : t('paletteGenerator.mainContrast')}
++          </AppText>
+           <AppText variant="caption" color={theme.colors.mutedText}>
+-            {t('paletteGenerator.contrastHelp')}
++            {advancedMode ? t('paletteGenerator.contrastHelp') : t('paletteGenerator.mainContrastHelp')}
+           </AppText>
+           {hasLowContrast ? (
+             <View
+@@ -306,7 +325,7 @@ export default function PaletteGeneratorCard({
+             </View>
+           ) : null}
+           <View style={styles.contrastList}>
+-            {contrastRows.map((row) => (
++            {visibleContrastRows.map((row) => (
+               <ContrastRow
+                 key={row.key}
+                 label={row.label}
+diff --git a/docs/PRODUCT_C2_1_PALETTE_CONTRAST_GENERATOR.md b/docs/PRODUCT_C2_1_PALETTE_CONTRAST_GENERATOR.md
+index 518559c..9729026 100644
+--- a/docs/PRODUCT_C2_1_PALETTE_CONTRAST_GENERATOR.md
++++ b/docs/PRODUCT_C2_1_PALETTE_CONTRAST_GENERATOR.md
+@@ -188,3 +188,20 @@ No se instalaron dependencias externas.
+ - No se incluyen fuentes externas.
+ - La revision de contraste es basica, no reemplaza auditoria completa de accesibilidad.
+ - Las traducciones nuevas requieren revision nativa.
++
++---
++
++## Continuidad PRODUCT-C2.2 - Flujo simplificado
++
++Fecha: 2026-06-06
++
++PRODUCT-C2.2 conserva el generador de paletas, armonias, contraste y preview de PRODUCT-C2.1, pero reorganiza `/ui-kit` como un flujo guiado:
++
++1. Plantilla visual.
++2. Color base.
++3. Paleta sugerida.
++4. Contraste principal.
++5. Vista previa.
++6. Aplicar o restaurar.
++
++Las secciones largas de tokens, escalas completas, componentes, templates, variantes y ratios tecnicos quedan disponibles en detalles avanzados. El cambio no elimina capacidades; reduce la carga visual inicial para QA y clientes.
+diff --git a/docs/PRODUCT_C2_2_SIMPLIFIED_VISUAL_IDENTITY_FLOW.md b/docs/PRODUCT_C2_2_SIMPLIFIED_VISUAL_IDENTITY_FLOW.md
+new file mode 100644
+index 0000000..c0f7fac
+--- /dev/null
++++ b/docs/PRODUCT_C2_2_SIMPLIFIED_VISUAL_IDENTITY_FLOW.md
+@@ -0,0 +1,164 @@
++# PRODUCT-C2.2 - Simplified visual identity flow
++
++Fecha: 2026-06-06
++
++## Objetivo
++
++PRODUCT-C2.2 simplifica `/ui-kit` despues de PRODUCT-C2.1. El generador de paletas, contraste y preview se conserva, pero la pantalla deja de mostrar por defecto todos los tokens, escalas, componentes y detalles tecnicos al mismo tiempo.
++
++La meta es que un usuario pueda seguir un flujo claro:
++
++1. Plantilla visual.
++2. Color base.
++3. Paleta sugerida.
++4. Contraste.
++5. Vista previa.
++6. Aplicar o restaurar.
++
++## Problema detectado
++
++PRODUCT-C2.1 dejo una herramienta tecnicamente completa, pero muy larga para QA visual y clientes:
++
++- presets visuales;
++- generador de color;
++- swatches;
++- armonias;
++- contraste tecnico;
++- editor HEX;
++- tokens completos;
++- componentes;
++- templates;
++- variantes;
++- previews.
++
++La pantalla mezclaba decision visual, auditoria tecnica y catalogo de componentes en un solo primer plano.
++
++## Nuevo flujo guiado
++
++Se agrego una tarjeta de flujo de identidad visual al inicio de `/ui-kit`.
++
++Visible por defecto:
++
++- plantilla activa;
++- selector compacto de presets;
++- color base y armonia;
++- paleta sugerida;
++- contraste principal;
++- preview real de UI;
++- aplicar paleta localmente;
++- restaurar plantilla;
++- boton para abrir detalles tecnicos.
++
++## Modo avanzado
++
++El contenido tecnico queda disponible al activar detalles avanzados:
++
++- valores RGB/HSL;
++- swatches rapidos;
++- armonias completas;
++- escalas largas de tints, shades y tones;
++- editor manual de tokens HEX;
++- radius y density;
++- detalles tecnicos de contraste;
++- design tokens;
++- semantic tokens;
++- componentes UI;
++- panel LIVE;
++- templates;
++- variantes visuales.
++
++No se elimino capacidad tecnica; se redujo la carga visual inicial.
++
++## Presets
++
++Las plantillas siguen visibles como tarjetas compactas con:
++
++- nombre;
++- descripcion;
++- mini preview real;
++- estado activo;
++- accion para usar plantilla.
++
++La accion activa ahora usa copy especifica para la plantilla activa y no compite con el flujo de paleta.
++
++## Contraste
++
++El resumen visible se reduce a los contrastes que QA necesita primero:
++
++- boton principal;
++- texto sobre fondo;
++- estado reservado.
++
++Los ratios completos quedan en modo avanzado.
++
++## Preview
++
++La preview real se mantiene como pieza principal del flujo:
++
++- mini sidebar;
++- card;
++- boton primario;
++- boton secundario;
++- input;
++- badge activo;
++- estado reservado;
++- aviso.
++
++La preview se actualiza con la paleta propuesta antes de aplicar cambios locales.
++
++## /appearance
++
++`/appearance` se mantiene como pantalla de branding y acceso al editor avanzado. No se duplica el generador para evitar una segunda superficie de configuracion visual.
++
++## I18N
++
++Se agregaron claves `paletteGenerator.*` para el flujo simplificado en:
++
++- `es`;
++- `en`;
++- `pt-BR`;
++- `fr`;
++- `ja`;
++- `zh`;
++- `ko`.
++
++Auditoria local de estructura:
++
++```text
++es: leaves=1168 missing=0 extra=0
++en: leaves=1168 missing=0 extra=0
++pt-BR: leaves=1168 missing=0 extra=0
++fr: leaves=1168 missing=0 extra=0
++ja: leaves=1168 missing=0 extra=0
++zh: leaves=1168 missing=0 extra=0
++ko: leaves=1168 missing=0 extra=0
++```
++
++Las traducciones nuevas son base tecnica y requieren revision humana/nativa antes de release internacional.
++
++## Validacion manual esperada
++
++1. Entrar con `qa.admin`.
++2. Abrir `/ui-kit`.
++3. Confirmar que el flujo inicia con identidad visual guiada.
++4. Elegir plantilla.
++5. Elegir color base.
++6. Cambiar armonia.
++7. Ver paleta sugerida.
++8. Revisar contraste principal.
++9. Ver preview real.
++10. Aplicar paleta localmente.
++11. Abrir `/live` o `/customers` y confirmar que la identidad local se refleja.
++12. Volver a `/ui-kit`.
++13. Restaurar plantilla.
++14. Abrir detalles avanzados.
++15. Confirmar que tokens, componentes, templates y variantes siguen disponibles.
++
++## Limitaciones
++
++- No hay persistencia backend ni por tenant.
++- No se agrega configuracion libre por componente.
++- No se instalan librerias externas.
++- No se agregan fuentes externas.
++- La validacion de contraste sigue siendo basica.
++- Las traducciones nuevas requieren revision nativa.
+diff --git a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+index 49f8b5b..4603a54 100644
+--- a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
++++ b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+@@ -345,3 +345,13 @@ Fecha: 2026-06-06
+ PRODUCT-C2.1 agrega en `/ui-kit` un generador visual de paletas con color base, armonias, tints, shades, tones, contraste basico y mini preview real de UI. La aplicacion sigue sin persistencia backend por tenant: las paletas se aplican localmente usando los overrides de PRODUCT-C2.
+
+ La validacion visual debe revisar que las paletas aplicadas conserven legibilidad en AppShell, LIVE, clientes, light/dark y responsive. Si el panel marca bajo contraste, QA debe tratarlo como advertencia antes de aceptar la combinacion.
++
++---
++
++## Continuidad PRODUCT-C2.2 - Identidad visual guiada
++
++Fecha: 2026-06-06
++
++PRODUCT-C2.2 simplifica `/ui-kit` para que el usuario vea primero un flujo de identidad visual guiado: plantilla activa, color base, paleta sugerida, contraste principal, preview real y acciones de aplicar/restaurar. El contenido avanzado del laboratorio visual queda colapsado por defecto.
++
++La validacion visual debe confirmar que la simplificacion no elimina el generador, no rompe los overrides locales, no oculta la restauracion de plantilla y mantiene disponible el modo avanzado para tokens, componentes, templates, variantes y detalles tecnicos.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index 5fb1574..8ecb937 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -261,3 +261,16 @@ Agregar a la corrida manual de sistema visual:
+ - cambiar light/dark y revisar contraste;
+ - volver a `/ui-kit` y restaurar plantilla;
+ - abrir `/appearance` y confirmar que aparece acceso al generador avanzado sin romper campos de branding.
++
++## Nota PRODUCT-C2.2
++
++Agregar a la corrida manual de sistema visual:
++
++- abrir `/ui-kit`;
++- confirmar que la primera vista es un flujo guiado y no un listado largo de laboratorio;
++- confirmar plantilla activa, color base, paleta sugerida, contraste principal y preview real;
++- aplicar paleta localmente y abrir `/live` o `/customers` para validar efecto visual;
++- restaurar plantilla;
++- abrir detalles avanzados;
++- confirmar que tokens, componentes, templates y variantes siguen disponibles, pero no saturan la vista inicial;
++- repetir en light/dark y mobile/tablet.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index bdeb98e..a7fe10a 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -1085,6 +1085,21 @@
+   "paletteGenerator": {
+     "sectionTitle": "Visual palette generator",
+     "sectionSubtitle": "Choose a base color and review harmonies, variations, contrast, and preview before applying.",
++    "flowTitle": "Visual identity flow",
++    "flowSubtitle": "Follow these steps: template, base color, palette, contrast, preview, and local application.",
++    "flowSteps": {
++      "template": "Visual template",
++      "baseColor": "Base color",
++      "palette": "Suggested palette",
++      "contrast": "Contrast",
++      "preview": "Preview",
++      "apply": "Apply / restore"
++    },
++    "activeTemplate": "Active visual template",
++    "localConfigHelp": "This configuration is saved locally in this phase.",
++    "templateActive": "Active",
++    "activeTemplateButton": "Active template",
++    "useTemplate": "Use template",
+     "controlledEditorTitle": "Controlled editor",
+     "controlledEditorSubtitle": "Customize the main semantic tokens of the active template.",
+     "title": "Palette generator",
+@@ -1108,8 +1123,16 @@
+     "suggestedPaletteHelp": "Tap a token to load it into the editor or apply the full palette locally.",
+     "applyLocal": "Apply palette locally",
+     "appliedFeedback": "Palette applied locally.",
++    "manualAppliedFeedback": "Customization applied locally.",
++    "invalidColorsFeedback": "Fix invalid colors before applying.",
++    "restoreFeedback": "Template restored to its base tokens.",
++    "restoreTemplate": "Restore template",
++    "showTechnicalDetails": "View technical details",
++    "hideTechnicalDetails": "Hide technical details",
+     "contrastTitle": "Basic contrast",
+     "contrastHelp": "Approximate WCAG contrast review for text, buttons, and surfaces.",
++    "mainContrast": "Main contrast",
++    "mainContrastHelp": "Summary of the contrasts that most affect buttons, background, and reserved status.",
+     "lowContrast": "Low contrast",
+     "reviewBeforeApply": "Review this color before applying it.",
+     "recommendedText": "Recommended text:",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index f90107d..fcb5c75 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -1085,6 +1085,21 @@
+   "paletteGenerator": {
+     "sectionTitle": "Generador visual de paletas",
+     "sectionSubtitle": "Elige un color base y revisa armonias, variaciones, contraste y preview antes de aplicar.",
++    "flowTitle": "Flujo de identidad visual",
++    "flowSubtitle": "Sigue estos pasos: plantilla, color base, paleta, contraste, vista previa y aplicacion local.",
++    "flowSteps": {
++      "template": "Plantilla visual",
++      "baseColor": "Color base",
++      "palette": "Paleta sugerida",
++      "contrast": "Contraste",
++      "preview": "Vista previa",
++      "apply": "Aplicar / restaurar"
++    },
++    "activeTemplate": "Plantilla visual activa",
++    "localConfigHelp": "Esta configuracion se guarda localmente en esta fase.",
++    "templateActive": "Activa",
++    "activeTemplateButton": "Plantilla activa",
++    "useTemplate": "Usar plantilla",
+     "controlledEditorTitle": "Editor controlado",
+     "controlledEditorSubtitle": "Personaliza tokens semanticos principales de la plantilla activa.",
+     "title": "Generador de paleta",
+@@ -1108,8 +1123,16 @@
+     "suggestedPaletteHelp": "Toca un token para cargarlo en el editor o aplica toda la paleta localmente.",
+     "applyLocal": "Aplicar paleta localmente",
+     "appliedFeedback": "Paleta aplicada localmente.",
++    "manualAppliedFeedback": "Personalizacion aplicada localmente.",
++    "invalidColorsFeedback": "Corrige los colores invalidos antes de aplicar.",
++    "restoreFeedback": "Plantilla restaurada a sus tokens base.",
++    "restoreTemplate": "Restaurar plantilla",
++    "showTechnicalDetails": "Ver detalles tecnicos",
++    "hideTechnicalDetails": "Ocultar detalles tecnicos",
+     "contrastTitle": "Contraste basico",
+     "contrastHelp": "Revision aproximada de contraste WCAG para texto, botones y superficies.",
++    "mainContrast": "Contraste principal",
++    "mainContrastHelp": "Resumen de los contrastes que mas afectan botones, fondo y estado reservado.",
+     "lowContrast": "Contraste bajo",
+     "reviewBeforeApply": "Revisa este color antes de aplicarlo.",
+     "recommendedText": "Texto recomendado:",
+diff --git a/locales/fr/common.json b/locales/fr/common.json
+index 058104d..0c6c3b8 100644
+--- a/locales/fr/common.json
++++ b/locales/fr/common.json
+@@ -1085,6 +1085,21 @@
+   "paletteGenerator": {
+     "sectionTitle": "Générateur visuel de palettes",
+     "sectionSubtitle": "Choisissez une couleur de base et vérifiez les harmonies, variations, contrastes et aperçu avant application.",
++    "flowTitle": "Flux d'identité visuelle",
++    "flowSubtitle": "Suivez ces étapes : modèle, couleur de base, palette, contraste, aperçu et application locale.",
++    "flowSteps": {
++      "template": "Modèle visuel",
++      "baseColor": "Couleur de base",
++      "palette": "Palette suggérée",
++      "contrast": "Contraste",
++      "preview": "Aperçu",
++      "apply": "Appliquer / restaurer"
++    },
++    "activeTemplate": "Modèle visuel actif",
++    "localConfigHelp": "Cette configuration est enregistrée localement dans cette phase.",
++    "templateActive": "Actif",
++    "activeTemplateButton": "Modèle actif",
++    "useTemplate": "Utiliser le modèle",
+     "controlledEditorTitle": "Éditeur contrôlé",
+     "controlledEditorSubtitle": "Personnalisez les principaux tokens sémantiques du modèle actif.",
+     "title": "Générateur de palette",
+@@ -1108,8 +1123,16 @@
+     "suggestedPaletteHelp": "Touchez un token pour le charger dans l'éditeur ou appliquez toute la palette localement.",
+     "applyLocal": "Appliquer la palette localement",
+     "appliedFeedback": "Palette appliquée localement.",
++    "manualAppliedFeedback": "Personnalisation appliquée localement.",
++    "invalidColorsFeedback": "Corrigez les couleurs invalides avant d'appliquer.",
++    "restoreFeedback": "Modèle restauré à ses tokens de base.",
++    "restoreTemplate": "Restaurer le modèle",
++    "showTechnicalDetails": "Voir les détails techniques",
++    "hideTechnicalDetails": "Masquer les détails techniques",
+     "contrastTitle": "Contraste de base",
+     "contrastHelp": "Vérification approximative WCAG du contraste pour textes, boutons et surfaces.",
++    "mainContrast": "Contraste principal",
++    "mainContrastHelp": "Résumé des contrastes qui affectent surtout les boutons, le fond et l'état réservé.",
+     "lowContrast": "Contraste faible",
+     "reviewBeforeApply": "Vérifiez cette couleur avant de l'appliquer.",
+     "recommendedText": "Texte recommandé :",
+diff --git a/locales/ja/common.json b/locales/ja/common.json
+index 79315a9..7c4703c 100644
+--- a/locales/ja/common.json
++++ b/locales/ja/common.json
+@@ -1085,6 +1085,21 @@
+   "paletteGenerator": {
+     "sectionTitle": "ビジュアルパレット生成",
+     "sectionSubtitle": "ベースカラーを選び、適用前に配色、バリエーション、コントラスト、プレビューを確認します。",
++    "flowTitle": "ビジュアルIDフロー",
++    "flowSubtitle": "テンプレート、ベースカラー、パレット、コントラスト、プレビュー、適用の順で進めます。",
++    "flowSteps": {
++      "template": "テンプレート",
++      "baseColor": "ベースカラー",
++      "palette": "おすすめパレット",
++      "contrast": "コントラスト",
++      "preview": "プレビュー",
++      "apply": "適用 / 復元"
++    },
++    "activeTemplate": "有効なテンプレート",
++    "localConfigHelp": "この設定はこの段階ではローカルに保存されます。",
++    "templateActive": "有効",
++    "activeTemplateButton": "有効なテンプレート",
++    "useTemplate": "テンプレートを使用",
+     "controlledEditorTitle": "制御エディター",
+     "controlledEditorSubtitle": "有効なテンプレートの主要な意味トークンを調整します。",
+     "title": "パレット生成",
+@@ -1108,8 +1123,16 @@
+     "suggestedPaletteHelp": "トークンをタップしてエディターに読み込むか、パレット全体をローカルに適用します。",
+     "applyLocal": "パレットをローカル適用",
+     "appliedFeedback": "パレットをローカルに適用しました。",
++    "manualAppliedFeedback": "カスタマイズをローカルに適用しました。",
++    "invalidColorsFeedback": "適用前に無効な色を修正してください。",
++    "restoreFeedback": "テンプレートを基本トークンに戻しました。",
++    "restoreTemplate": "テンプレートを復元",
++    "showTechnicalDetails": "技術詳細を表示",
++    "hideTechnicalDetails": "技術詳細を非表示",
+     "contrastTitle": "基本コントラスト",
+     "contrastHelp": "テキスト、ボタン、サーフェスのWCAG近似コントラストを確認します。",
++    "mainContrast": "主要コントラスト",
++    "mainContrastHelp": "ボタン、背景、予約済み状態に影響する主要コントラストの概要です。",
+     "lowContrast": "低コントラスト",
+     "reviewBeforeApply": "適用前にこの色を確認してください。",
+     "recommendedText": "推奨テキスト:",
+diff --git a/locales/ko/common.json b/locales/ko/common.json
+index 1cdaf86..3ee70f6 100644
+--- a/locales/ko/common.json
++++ b/locales/ko/common.json
+@@ -1085,6 +1085,21 @@
+   "paletteGenerator": {
+     "sectionTitle": "시각적 팔레트 생성기",
+     "sectionSubtitle": "기본 색상을 선택하고 적용 전에 조화, 변형, 대비, 미리보기를 확인합니다.",
++    "flowTitle": "시각 아이덴티티 흐름",
++    "flowSubtitle": "템플릿, 기본 색상, 팔레트, 대비, 미리보기, 로컬 적용 순서로 진행합니다.",
++    "flowSteps": {
++      "template": "시각 템플릿",
++      "baseColor": "기본 색상",
++      "palette": "추천 팔레트",
++      "contrast": "대비",
++      "preview": "미리보기",
++      "apply": "적용 / 복원"
++    },
++    "activeTemplate": "활성 시각 템플릿",
++    "localConfigHelp": "이 설정은 이 단계에서 로컬로 저장됩니다.",
++    "templateActive": "활성",
++    "activeTemplateButton": "활성 템플릿",
++    "useTemplate": "템플릿 사용",
+     "controlledEditorTitle": "제어 편집기",
+     "controlledEditorSubtitle": "활성 템플릿의 주요 의미 색상 토큰을 조정합니다.",
+     "title": "팔레트 생성기",
+@@ -1108,8 +1123,16 @@
+     "suggestedPaletteHelp": "토큰을 눌러 편집기에 넣거나 전체 팔레트를 로컬에 적용합니다.",
+     "applyLocal": "팔레트 로컬 적용",
+     "appliedFeedback": "팔레트가 로컬에 적용되었습니다.",
++    "manualAppliedFeedback": "사용자 지정이 로컬에 적용되었습니다.",
++    "invalidColorsFeedback": "적용하기 전에 잘못된 색상을 수정하세요.",
++    "restoreFeedback": "템플릿이 기본 토큰으로 복원되었습니다.",
++    "restoreTemplate": "템플릿 복원",
++    "showTechnicalDetails": "기술 세부 정보 보기",
++    "hideTechnicalDetails": "기술 세부 정보 숨기기",
+     "contrastTitle": "기본 대비",
+     "contrastHelp": "텍스트, 버튼, 표면의 WCAG 대비를 근사치로 확인합니다.",
++    "mainContrast": "주요 대비",
++    "mainContrastHelp": "버튼, 배경, 예약 상태에 가장 영향을 주는 대비 요약입니다.",
+     "lowContrast": "낮은 대비",
+     "reviewBeforeApply": "적용 전에 이 색상을 확인하세요.",
+     "recommendedText": "추천 텍스트:",
+diff --git a/locales/pt-BR/common.json b/locales/pt-BR/common.json
+index 23652d3..0b8669f 100644
+--- a/locales/pt-BR/common.json
++++ b/locales/pt-BR/common.json
+@@ -1085,6 +1085,21 @@
+   "paletteGenerator": {
+     "sectionTitle": "Gerador visual de paletas",
+     "sectionSubtitle": "Escolha uma cor base e revise harmonias, variações, contraste e prévia antes de aplicar.",
++    "flowTitle": "Fluxo de identidade visual",
++    "flowSubtitle": "Siga estes passos: modelo, cor base, paleta, contraste, prévia e aplicação local.",
++    "flowSteps": {
++      "template": "Modelo visual",
++      "baseColor": "Cor base",
++      "palette": "Paleta sugerida",
++      "contrast": "Contraste",
++      "preview": "Prévia",
++      "apply": "Aplicar / restaurar"
++    },
++    "activeTemplate": "Modelo visual ativo",
++    "localConfigHelp": "Esta configuração é salva localmente nesta fase.",
++    "templateActive": "Ativa",
++    "activeTemplateButton": "Modelo ativo",
++    "useTemplate": "Usar modelo",
+     "controlledEditorTitle": "Editor controlado",
+     "controlledEditorSubtitle": "Personalize os principais tokens semânticos do modelo ativo.",
+     "title": "Gerador de paleta",
+@@ -1108,8 +1123,16 @@
+     "suggestedPaletteHelp": "Toque em um token para carregá-lo no editor ou aplique toda a paleta localmente.",
+     "applyLocal": "Aplicar paleta localmente",
+     "appliedFeedback": "Paleta aplicada localmente.",
++    "manualAppliedFeedback": "Personalização aplicada localmente.",
++    "invalidColorsFeedback": "Corrija as cores inválidas antes de aplicar.",
++    "restoreFeedback": "Modelo restaurado para os tokens base.",
++    "restoreTemplate": "Restaurar modelo",
++    "showTechnicalDetails": "Ver detalhes técnicos",
++    "hideTechnicalDetails": "Ocultar detalhes técnicos",
+     "contrastTitle": "Contraste básico",
+     "contrastHelp": "Revisão aproximada de contraste WCAG para texto, botões e superfícies.",
++    "mainContrast": "Contraste principal",
++    "mainContrastHelp": "Resumo dos contrastes que mais afetam botões, fundo e status reservado.",
+     "lowContrast": "Baixo contraste",
+     "reviewBeforeApply": "Revise esta cor antes de aplicá-la.",
+     "recommendedText": "Texto recomendado:",
+diff --git a/locales/zh/common.json b/locales/zh/common.json
+index 914ad08..39c1181 100644
+--- a/locales/zh/common.json
++++ b/locales/zh/common.json
+@@ -1085,6 +1085,21 @@
+   "paletteGenerator": {
+     "sectionTitle": "可视化调色板生成器",
+     "sectionSubtitle": "选择基础色，并在应用前查看配色、变化、对比度和预览。",
++    "flowTitle": "视觉身份流程",
++    "flowSubtitle": "按模板、基础色、调色板、对比度、预览和本地应用的顺序操作。",
++    "flowSteps": {
++      "template": "视觉模板",
++      "baseColor": "基础色",
++      "palette": "建议调色板",
++      "contrast": "对比度",
++      "preview": "预览",
++      "apply": "应用 / 恢复"
++    },
++    "activeTemplate": "当前视觉模板",
++    "localConfigHelp": "此配置在本阶段仅本地保存。",
++    "templateActive": "当前",
++    "activeTemplateButton": "当前模板",
++    "useTemplate": "使用模板",
+     "controlledEditorTitle": "受控编辑器",
+     "controlledEditorSubtitle": "自定义当前模板的主要语义颜色。",
+     "title": "调色板生成器",
+@@ -1108,8 +1123,16 @@
+     "suggestedPaletteHelp": "点击颜色令牌加载到编辑器，或将整套调色板应用到本地。",
+     "applyLocal": "本地应用调色板",
+     "appliedFeedback": "调色板已本地应用。",
++    "manualAppliedFeedback": "自定义已本地应用。",
++    "invalidColorsFeedback": "应用前请修正无效颜色。",
++    "restoreFeedback": "模板已恢复为基础颜色。",
++    "restoreTemplate": "恢复模板",
++    "showTechnicalDetails": "查看技术细节",
++    "hideTechnicalDetails": "隐藏技术细节",
+     "contrastTitle": "基础对比度",
+     "contrastHelp": "近似检查文本、按钮和表面的WCAG对比度。",
++    "mainContrast": "主要对比度",
++    "mainContrastHelp": "汇总最影响按钮、背景和预留状态的对比度。",
+     "lowContrast": "低对比度",
+     "reviewBeforeApply": "应用前请检查此颜色。",
+     "recommendedText": "推荐文本：",
+diff --git a/qa-reports/PRODUCT-C2-2-simplified-visual-identity-flow-report-20260607-000123.md b/qa-reports/PRODUCT-C2-2-simplified-visual-identity-flow-report-20260607-000123.md
+new file mode 100644
+index 0000000..c77593d
+--- /dev/null
++++ b/qa-reports/PRODUCT-C2-2-simplified-visual-identity-flow-report-20260607-000123.md
+@@ -0,0 +1,75 @@
++# PRODUCT-C2.2 - Simplified visual identity flow report
++
++Fecha: 2026-06-07 00:01:23
++
++## Resumen
++
++PRODUCT-C2.2 simplifica `/ui-kit` para que el editor de identidad visual funcione como un flujo guiado. Se conserva el generador de paletas de PRODUCT-C2.1, pero se ocultan por defecto los detalles tecnicos que saturaban la pantalla.
++
++## Cambios principales
++
++- Se agrego una tarjeta inicial de flujo de identidad visual.
++- Se dejo visible por defecto la plantilla activa, presets compactos, color base, armonia, paleta sugerida, contraste principal, preview real y acciones de aplicar/restaurar.
++- Se agrego un toggle de detalles tecnicos para mostrar tokens, escalas completas, componentes, templates, variantes y contraste detallado.
++- Se redujo el panel de contraste por defecto a los checks principales.
++- Se mantuvo la preview real de UI como pieza central del flujo.
++- Se mantuvo `/appearance` como acceso/resumen sin duplicar el generador.
++
++## I18N
++
++Se agregaron claves `paletteGenerator.*` en:
++
++- `locales/es/common.json`
++- `locales/en/common.json`
++- `locales/pt-BR/common.json`
++- `locales/fr/common.json`
++- `locales/ja/common.json`
++- `locales/zh/common.json`
++- `locales/ko/common.json`
++
++Auditoria de estructura:
++
++```text
++es: leaves=1168 missing=0 extra=0
++en: leaves=1168 missing=0 extra=0
++pt-BR: leaves=1168 missing=0 extra=0
++fr: leaves=1168 missing=0 extra=0
++ja: leaves=1168 missing=0 extra=0
++zh: leaves=1168 missing=0 extra=0
++ko: leaves=1168 missing=0 extra=0
++```
++
++## Validaciones ejecutadas
++
++- `npm.cmd run lint` - PASS con 53 warnings existentes.
++- `npx.cmd tsc --noEmit` - PASS.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export` - PASS.
++- `backend/control-ropa/.mvnw.cmd test` - PASS, 73 tests.
++- `backend/control-ropa/.mvnw.cmd -q -DskipTests package` - PASS.
++- `git --no-pager diff --check` - PASS.
++
++## Validacion manual esperada
++
++1. Abrir `/ui-kit`.
++2. Confirmar que la primera vista es un flujo guiado.
++3. Elegir plantilla.
++4. Elegir color base.
++5. Ver paleta sugerida.
++6. Ver contraste principal.
++7. Ver preview real.
++8. Aplicar paleta localmente.
++9. Restaurar plantilla.
++10. Abrir detalles avanzados.
++11. Confirmar que tokens/componentes/templates siguen disponibles sin saturar la vista inicial.
++12. Repetir en light/dark y mobile/tablet.
++
++## Riesgos y pendientes
++
++- No hay persistencia backend por tenant.
++- Las traducciones nuevas requieren revision humana/nativa.
++- La validacion de contraste sigue siendo basica.
++- La validacion visual final debe hacerse en navegador con presets reales.
++
++## Resultado
++
++GO tecnico para QA visual/manual.

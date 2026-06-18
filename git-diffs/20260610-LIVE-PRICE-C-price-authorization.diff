@@ -1,0 +1,1018 @@
+diff --git a/app/operational-authorizations.tsx b/app/operational-authorizations.tsx
+index a4db68d..51616c8 100644
+--- a/app/operational-authorizations.tsx
++++ b/app/operational-authorizations.tsx
+@@ -30,6 +30,7 @@ import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, View } from
+
+ const OPERATION_OPTIONS: OperationalAuthorizationType[] = [
+   'UNDO_LIVE_OPERATIONAL_SALE',
++  'LIVE_PRICE_CHANGE',
+   'CANCEL_RESERVATION_WITH_PAYMENT',
+   'RELEASE_RESERVED_ITEM',
+   'REASSIGN_RESERVATION',
+@@ -48,6 +49,7 @@ const OPERATION_PERMISSION: Record<OperationalAuthorizationType, string> = {
+   CANCEL_RESERVATION_WITH_PAYMENT: 'CANCEL_RESERVATION_WITH_PAYMENT',
+   RELEASE_RESERVED_ITEM: 'RELEASE_RESERVED_ITEM',
+   UNDO_LIVE_OPERATIONAL_SALE: 'UNDO_LIVE_OPERATIONAL_SALE',
++  LIVE_PRICE_CHANGE: 'REQUEST_LIVE_PRICE_CHANGE',
+   REASSIGN_RESERVATION: 'REASSIGN_RESERVATION',
+   EDIT_LOCKED_ITEM: 'EDIT_LOCKED_ITEM',
+ };
+@@ -58,6 +60,7 @@ type CreateForm = {
+   operationType: OperationalAuthorizationType;
+   targetType: OperationalAuthorizationTargetType;
+   targetId: string;
++  requestedPrice: string;
+   reason: string;
+ };
+
+@@ -109,6 +112,7 @@ export default function OperationalAuthorizationsScreen() {
+     operationType: 'UNDO_LIVE_OPERATIONAL_SALE',
+     targetType: 'RESERVATION',
+     targetId: '',
++    requestedPrice: '',
+     reason: '',
+   });
+   const navSections = useMemo(() => buildMainNavSections(session), [session]);
+@@ -116,6 +120,7 @@ export default function OperationalAuthorizationsScreen() {
+   const canRequest = hasPermission(session, 'REQUEST_LIVE_OPERATION_AUTHORIZATION');
+   const canApprove = hasPermission(session, 'APPROVE_LIVE_OPERATION_AUTHORIZATION');
+   const canApply = hasPermission(session, 'APPLY_LIVE_OPERATION_AUTHORIZATION');
++  const canApplyPrice = hasPermission(session, 'APPLY_APPROVED_LIVE_PRICE_CHANGE');
+   const availableOperationOptions = useMemo(
+     () =>
+       OPERATION_OPTIONS.filter((operationType) =>
+@@ -174,24 +179,51 @@ export default function OperationalAuthorizationsScreen() {
+     if (!session?.branchId) return;
+
+     const targetId = Number(form.targetId);
++    const requestedPrice = Number(form.requestedPrice);
+     if (!Number.isFinite(targetId) || targetId <= 0 || !form.reason.trim()) {
+       Alert.alert(t('liveAuth.validationTitle'), t('liveAuth.validationMessage'));
+       return;
+     }
++    if (
++      form.operationType === 'LIVE_PRICE_CHANGE' &&
++      (!Number.isFinite(requestedPrice) || requestedPrice <= 0)
++    ) {
++      Alert.alert(t('liveAuth.validationTitle'), t('liveAuth.priceValidationMessage'));
++      return;
++    }
+
+     try {
+       setIsSubmitting(true);
+       const created = await createOperationalAuthorization({
+         operationType: form.operationType,
+-        targetType: form.targetType,
++        targetType: form.operationType === 'LIVE_PRICE_CHANGE' ? 'RESERVATION' : form.targetType,
+         targetId,
+         branchId: session.branchId,
+         reason: form.reason.trim(),
+-        liveId: form.targetType === 'LIVE' ? targetId : undefined,
+-        reservationId: form.targetType === 'RESERVATION' ? targetId : undefined,
+-        itemId: form.targetType === 'ITEM' ? targetId : undefined,
+-        paymentId: form.targetType === 'PAYMENT' ? targetId : undefined,
+-        saleId: form.targetType === 'SALE' ? targetId : undefined,
++        liveId:
++          form.operationType !== 'LIVE_PRICE_CHANGE' && form.targetType === 'LIVE'
++            ? targetId
++            : undefined,
++        reservationId:
++          form.operationType === 'LIVE_PRICE_CHANGE' || form.targetType === 'RESERVATION'
++            ? targetId
++            : undefined,
++        itemId:
++          form.operationType !== 'LIVE_PRICE_CHANGE' && form.targetType === 'ITEM'
++            ? targetId
++            : undefined,
++        paymentId:
++          form.operationType !== 'LIVE_PRICE_CHANGE' && form.targetType === 'PAYMENT'
++            ? targetId
++            : undefined,
++        saleId:
++          form.operationType !== 'LIVE_PRICE_CHANGE' && form.targetType === 'SALE'
++            ? targetId
++            : undefined,
++        payloadJson:
++          form.operationType === 'LIVE_PRICE_CHANGE'
++            ? JSON.stringify({ requestedPrice })
++            : undefined,
+       });
+       setCreateVisible(false);
+       setSelected(created);
+@@ -199,6 +231,7 @@ export default function OperationalAuthorizationsScreen() {
+         operationType: 'UNDO_LIVE_OPERATIONAL_SALE',
+         targetType: 'RESERVATION',
+         targetId: '',
++        requestedPrice: '',
+         reason: '',
+       });
+       await load(true);
+@@ -347,6 +380,7 @@ export default function OperationalAuthorizationsScreen() {
+         item={selected}
+         canApprove={canApprove}
+         canApply={canApply}
++        canApplyPrice={canApplyPrice}
+         onClose={() => setSelected(null)}
+         onDecision={(action) => {
+           setDecisionAction(action);
+@@ -415,19 +449,35 @@ function CreateRequestModal({
+         labelPrefix="liveAuth.operations"
+         onSelect={(operationType) => onChange({ ...form, operationType })}
+       />
+-      <OptionGroup
+-        title={t('liveAuth.targetType')}
+-        options={TARGET_OPTIONS}
+-        value={form.targetType}
+-        labelPrefix="liveAuth.targets"
+-        onSelect={(targetType) => onChange({ ...form, targetType })}
+-      />
++      {form.operationType === 'LIVE_PRICE_CHANGE' ? (
++        <AppText variant="caption">{t('liveAuth.priceReservationOnly')}</AppText>
++      ) : (
++        <OptionGroup
++          title={t('liveAuth.targetType')}
++          options={TARGET_OPTIONS}
++          value={form.targetType}
++          labelPrefix="liveAuth.targets"
++          onSelect={(targetType) => onChange({ ...form, targetType })}
++        />
++      )}
+       <AppInput
+-        label={t('liveAuth.targetId')}
++        label={
++          form.operationType === 'LIVE_PRICE_CHANGE'
++            ? t('liveAuth.reservationId')
++            : t('liveAuth.targetId')
++        }
+         keyboardType="numeric"
+         value={form.targetId}
+         onChangeText={(targetId) => onChange({ ...form, targetId })}
+       />
++      {form.operationType === 'LIVE_PRICE_CHANGE' ? (
++        <AppInput
++          label={t('liveAuth.requestedPrice')}
++          keyboardType="decimal-pad"
++          value={form.requestedPrice}
++          onChangeText={(requestedPrice) => onChange({ ...form, requestedPrice })}
++        />
++      ) : null}
+       <AppInput
+         label={t('liveAuth.reason')}
+         multiline
+@@ -443,12 +493,14 @@ function DetailModal({
+   item,
+   canApprove,
+   canApply,
++  canApplyPrice,
+   onClose,
+   onDecision,
+ }: {
+   item: OperationalAuthorization | null;
+   canApprove: boolean;
+   canApply: boolean;
++  canApplyPrice: boolean;
+   onClose: () => void;
+   onDecision: (action: DecisionAction) => void;
+ }) {
+@@ -461,9 +513,12 @@ function DetailModal({
+   const canApplySupported =
+     item.status === 'APPROVED' &&
+     canApply &&
+-    item.operationType === 'UNDO_LIVE_OPERATIONAL_SALE';
++    (item.operationType === 'UNDO_LIVE_OPERATIONAL_SALE' ||
++      (item.operationType === 'LIVE_PRICE_CHANGE' && canApplyPrice));
+   const applyPending =
+-    item.status === 'APPROVED' && item.operationType !== 'UNDO_LIVE_OPERATIONAL_SALE';
++    item.status === 'APPROVED' &&
++    item.operationType !== 'UNDO_LIVE_OPERATIONAL_SALE' &&
++    item.operationType !== 'LIVE_PRICE_CHANGE';
+
+   return (
+     <AppBottomModal visible title={t('liveAuth.detailTitle')} onClose={onClose}>
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveEventType.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveEventType.java
+index c972f05..66bb671 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveEventType.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveEventType.java
+@@ -8,5 +8,6 @@ public enum LiveEventType {
+     LIVE_RESERVATION_STATUS_CHANGED,
+     LIVE_OPERATIONAL_SOLD,
+     LIVE_OPERATIONAL_SOLD_UNDONE,
++    LIVE_PRICE_CHANGE_APPLIED,
+     LIVE_RESERVATION_CANCELLED
+ }
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationService.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationService.java
+index 3f603e0..e6fe1a5 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationService.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationService.java
+@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+
+ import java.math.BigDecimal;
++import java.math.RoundingMode;
+ import java.nio.charset.StandardCharsets;
+ import java.security.MessageDigest;
+ import java.security.NoSuchAlgorithmException;
+@@ -163,6 +164,7 @@ public class OperationalAuthorizationService {
+         Long userId = currentUser.getUserId();
+         accessService.assertCan(userId, PermissionCode.APPROVE_LIVE_OPERATION_AUTHORIZATION);
+         OperationalAuthorizationRequest entity = findScoped(id);
++        assertCanDecideOperation(userId, entity.getOperationType());
+         ensureRequested(entity);
+         ensureNotExpired(entity);
+         if (userId.equals(entity.getRequestedByUserId())) {
+@@ -179,6 +181,7 @@ public class OperationalAuthorizationService {
+         Long userId = currentUser.getUserId();
+         accessService.assertCan(userId, PermissionCode.APPROVE_LIVE_OPERATION_AUTHORIZATION);
+         OperationalAuthorizationRequest entity = findScoped(id);
++        assertCanDecideOperation(userId, entity.getOperationType());
+         ensureRequested(entity);
+         entity.setStatus(OperationalAuthorizationStatus.REJECTED);
+         entity.setDecidedByUserId(userId);
+@@ -215,11 +218,16 @@ public class OperationalAuthorizationService {
+         }
+         ensureNotExpired(entity);
+
+-        if (entity.getOperationType() != OperationalAuthorizationType.UNDO_LIVE_OPERATIONAL_SALE) {
++        if (entity.getOperationType() != OperationalAuthorizationType.UNDO_LIVE_OPERATIONAL_SALE
++                && entity.getOperationType() != OperationalAuthorizationType.LIVE_PRICE_CHANGE) {
+             throw new IllegalArgumentException("La aplicacion de esta accion queda pendiente de contrato funcional");
+         }
+
+-        applyUndoLiveOperationalSale(entity, userId, request != null ? request.getReason() : null);
++        if (entity.getOperationType() == OperationalAuthorizationType.UNDO_LIVE_OPERATIONAL_SALE) {
++            applyUndoLiveOperationalSale(entity, userId, request != null ? request.getReason() : null);
++        } else {
++            applyLivePriceChange(entity, userId, request != null ? request.getReason() : null);
++        }
+         entity.setStatus(OperationalAuthorizationStatus.APPLIED);
+         entity.setAppliedByUserId(userId);
+         entity.setAppliedAt(LocalDateTime.now());
+@@ -282,6 +290,42 @@ public class OperationalAuthorizationService {
+         );
+     }
+
++    private void applyLivePriceChange(OperationalAuthorizationRequest entity, Long userId, String reason) {
++        accessService.assertCan(userId, PermissionCode.APPLY_APPROVED_LIVE_PRICE_CHANGE);
++        Reservation reservation = reservationRepository.findById(entity.getReservationId())
++                .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada"));
++        tenantAccessGuard.requireBranch(reservation.getBranch().getId(), "La reserva no pertenece a la sucursal activa");
++
++        validateLivePriceChangeReservation(reservation);
++        if (calculateActiveAppliedToReservation(reservation.getId()).compareTo(BigDecimal.ZERO) > 0) {
++            throw new IllegalArgumentException("No se puede cambiar precio LIVE si la reserva tiene pago activo");
++        }
++
++        String currentSnapshot = reservationSnapshot(reservation);
++        if (!sha256(currentSnapshot).equals(entity.getCurrentStateHash())) {
++            throw new ConflictException("El estado de la reserva cambio desde la aprobacion");
++        }
++
++        BigDecimal requestedPrice = requestedPrice(entity.getPayloadJson());
++        BigDecimal previousPrice = reservation.getPrice();
++        reservation.setPrice(requestedPrice);
++        Reservation saved = reservationRepository.save(reservation);
++
++        String payload = "{\"reservationId\":" + saved.getId()
++                + ",\"previousPrice\":" + money(previousPrice)
++                + ",\"newPrice\":" + money(requestedPrice)
++                + ",\"authorizationId\":" + entity.getId()
++                + ",\"reason\":\"" + escapeJson(cleanOptionalText(reason)) + "\"}";
++        liveEventService.record(
++                saved.getLive(),
++                LiveEventType.LIVE_PRICE_CHANGE_APPLIED,
++                userId,
++                "RESERVATION",
++                saved.getId(),
++                payload
++        );
++    }
++
+     private TargetSnapshot resolveTarget(OperationalAuthorizationCreateRequest request) {
+         if (request.getTargetType() == OperationalAuthorizationTargetType.RESERVATION || request.getReservationId() != null) {
+             Long reservationId = request.getReservationId() != null ? request.getReservationId() : request.getTargetId();
+@@ -292,6 +336,9 @@ public class OperationalAuthorizationService {
+                 throw new AccessDeniedException("La reserva no pertenece a la sucursal solicitada");
+             }
+             validateReservationOperation(request.getOperationType(), reservation);
++            if (request.getOperationType() == OperationalAuthorizationType.LIVE_PRICE_CHANGE) {
++                requestedPrice(request.getPayloadJson());
++            }
+             return new TargetSnapshot(
+                     branchId,
+                     reservation.getLive() != null ? reservation.getLive().getId() : request.getLiveId(),
+@@ -333,6 +380,27 @@ public class OperationalAuthorizationService {
+                 && calculateActiveAppliedToReservation(reservation.getId()).compareTo(BigDecimal.ZERO) <= 0) {
+             throw new IllegalArgumentException("La reserva no tiene pago activo aplicado");
+         }
++        if (operationType == OperationalAuthorizationType.LIVE_PRICE_CHANGE) {
++            validateLivePriceChangeReservation(reservation);
++            if (calculateActiveAppliedToReservation(reservation.getId()).compareTo(BigDecimal.ZERO) > 0) {
++                throw new IllegalArgumentException("No se puede solicitar cambio de precio LIVE con pago activo");
++            }
++        }
++    }
++
++    private void validateLivePriceChangeReservation(Reservation reservation) {
++        if (reservation.getLive() == null) {
++            throw new IllegalArgumentException("La reserva no pertenece a LIVE");
++        }
++        if (reservation.getStatus() != ReservationStatus.ACTIVE) {
++            throw new IllegalArgumentException("Solo una reserva LIVE activa puede cambiar precio");
++        }
++        if (reservation.getLiveOperationalStatus() == LiveReservationOperationalStatus.OPERATIONAL_SOLD) {
++            throw new IllegalArgumentException("No se puede cambiar precio de una reserva cerrada como vendido operativo");
++        }
++        if (reservation.getItem() == null || reservation.getItem().getStatus() != ItemStatus.RESERVED) {
++            throw new IllegalArgumentException("La prenda debe seguir reservada para cambiar precio LIVE");
++        }
+     }
+
+     private BigDecimal calculateActiveAppliedToReservation(Long reservationId) {
+@@ -383,11 +451,18 @@ public class OperationalAuthorizationService {
+                     accessService.assertCan(userId, PermissionCode.CANCEL_RESERVATION_WITH_PAYMENT);
+             case RELEASE_RESERVED_ITEM -> accessService.assertCan(userId, PermissionCode.RELEASE_RESERVED_ITEM);
+             case UNDO_LIVE_OPERATIONAL_SALE -> accessService.assertCan(userId, PermissionCode.UNDO_LIVE_OPERATIONAL_SALE);
++            case LIVE_PRICE_CHANGE -> accessService.assertCan(userId, PermissionCode.REQUEST_LIVE_PRICE_CHANGE);
+             case REASSIGN_RESERVATION -> accessService.assertCan(userId, PermissionCode.REASSIGN_RESERVATION);
+             case EDIT_LOCKED_ITEM -> accessService.assertCan(userId, PermissionCode.EDIT_LOCKED_ITEM);
+         }
+     }
+
++    private void assertCanDecideOperation(Long userId, OperationalAuthorizationType operationType) {
++        if (operationType == OperationalAuthorizationType.LIVE_PRICE_CHANGE) {
++            accessService.assertCan(userId, PermissionCode.APPROVE_LIVE_PRICE_CHANGE);
++        }
++    }
++
+     private void ensureRequested(OperationalAuthorizationRequest entity) {
+         if (entity.getStatus() != OperationalAuthorizationStatus.REQUESTED) {
+             throw new IllegalArgumentException("Solo se puede decidir una solicitud pendiente");
+@@ -438,7 +513,8 @@ public class OperationalAuthorizationService {
+                 + ",\"liveId\":" + nullableNumber(reservation.getLive() != null ? reservation.getLive().getId() : null)
+                 + ",\"itemId\":" + nullableNumber(reservation.getItem() != null ? reservation.getItem().getId() : null)
+                 + ",\"itemStatus\":\"" + (reservation.getItem() != null ? reservation.getItem().getStatus().name() : "null")
+-                + "\"}";
++                + "\",\"price\":" + money(reservation.getPrice())
++                + "}";
+     }
+
+     private String itemSnapshot(Item item) {
+@@ -455,6 +531,38 @@ public class OperationalAuthorizationService {
+         return value == null ? "null" : value.toString();
+     }
+
++    private BigDecimal requestedPrice(String payloadJson) {
++        String cleaned = cleanOptionalText(payloadJson);
++        if (cleaned == null) {
++            throw new IllegalArgumentException("payloadJson con requestedPrice es obligatorio");
++        }
++        java.util.regex.Matcher matcher = java.util.regex.Pattern
++                .compile("\"requestedPrice\"\\s*:\\s*([0-9]+(?:\\.[0-9]{1,2})?)")
++                .matcher(cleaned);
++        if (!matcher.find()) {
++            throw new IllegalArgumentException("requestedPrice es obligatorio para cambio de precio LIVE");
++        }
++        BigDecimal value = new BigDecimal(matcher.group(1)).setScale(2, RoundingMode.HALF_UP);
++        if (value.signum() <= 0) {
++            throw new IllegalArgumentException("requestedPrice debe ser mayor a 0");
++        }
++        return value;
++    }
++
++    private String money(BigDecimal value) {
++        if (value == null) {
++            return "null";
++        }
++        return value.setScale(2, RoundingMode.HALF_UP).toPlainString();
++    }
++
++    private String escapeJson(String value) {
++        if (value == null) {
++            return "";
++        }
++        return value.replace("\\", "\\\\").replace("\"", "\\\"");
++    }
++
+     private String sha256(String value) {
+         try {
+             byte[] hash = MessageDigest
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationType.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationType.java
+index 9f8625d..5074d73 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationType.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationType.java
+@@ -4,6 +4,7 @@ public enum OperationalAuthorizationType {
+     CANCEL_RESERVATION_WITH_PAYMENT,
+     RELEASE_RESERVED_ITEM,
+     UNDO_LIVE_OPERATIONAL_SALE,
++    LIVE_PRICE_CHANGE,
+     REASSIGN_RESERVATION,
+     EDIT_LOCKED_ITEM
+ }
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/security/access/PermissionCode.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/security/access/PermissionCode.java
+index b4e29ea..34dc25b 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/security/access/PermissionCode.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/security/access/PermissionCode.java
+@@ -26,6 +26,11 @@ public final class PermissionCode {
+     public static final String CHANGE_LIVE_ACTIVE_ITEM = "CHANGE_LIVE_ACTIVE_ITEM";
+     public static final String REMOVE_LIVE_ACTIVE_ITEM = "REMOVE_LIVE_ACTIVE_ITEM";
+     public static final String DO_LIVE_RESERVATION = "DO_LIVE_RESERVATION";
++    public static final String REQUEST_LIVE_PRICE_CHANGE = "REQUEST_LIVE_PRICE_CHANGE";
++    public static final String APPROVE_LIVE_PRICE_CHANGE = "APPROVE_LIVE_PRICE_CHANGE";
++    public static final String APPLY_APPROVED_LIVE_PRICE_CHANGE = "APPLY_APPROVED_LIVE_PRICE_CHANGE";
++    public static final String VIEW_LIVE_PRICE_AUTHORIZATIONS = "VIEW_LIVE_PRICE_AUTHORIZATIONS";
++    public static final String CHANGE_LIVE_PRICE = "CHANGE_LIVE_PRICE";
+     public static final String REQUEST_LIVE_OPERATION_AUTHORIZATION = "REQUEST_LIVE_OPERATION_AUTHORIZATION";
+     public static final String APPROVE_LIVE_OPERATION_AUTHORIZATION = "APPROVE_LIVE_OPERATION_AUTHORIZATION";
+     public static final String VIEW_LIVE_OPERATION_AUTHORIZATIONS = "VIEW_LIVE_OPERATION_AUTHORIZATIONS";
+diff --git a/backend/control-ropa/src/main/resources/db/migration/V57__live_price_authorization_permissions.sql b/backend/control-ropa/src/main/resources/db/migration/V57__live_price_authorization_permissions.sql
+new file mode 100644
+index 0000000..5218edc
+--- /dev/null
++++ b/backend/control-ropa/src/main/resources/db/migration/V57__live_price_authorization_permissions.sql
+@@ -0,0 +1,34 @@
++-- LIVE-PRICE-C: permisos de autorizacion de cambio de precio LIVE.
++-- Aditiva e idempotente: no toca pagos, caja, devoluciones ni venta financiera.
++
++SET NAMES utf8mb4;
++START TRANSACTION;
++
++INSERT IGNORE INTO permissions (code, name) VALUES
++  ('REQUEST_LIVE_PRICE_CHANGE', 'Solicitar cambio de precio LIVE'),
++  ('APPROVE_LIVE_PRICE_CHANGE', 'Aprobar cambio de precio LIVE'),
++  ('APPLY_APPROVED_LIVE_PRICE_CHANGE', 'Aplicar precio LIVE aprobado'),
++  ('VIEW_LIVE_PRICE_AUTHORIZATIONS', 'Ver autorizaciones de precio LIVE'),
++  ('CHANGE_LIVE_PRICE', 'Cambiar precio LIVE');
++
++-- ADMIN y SUPERVISOR pueden solicitar, ver, aprobar y aplicar cambios de precio LIVE.
++INSERT IGNORE INTO role_permissions (role_id, permission_id)
++SELECT r.id, p.id
++FROM roles r
++JOIN permissions p ON p.code IN (
++  'REQUEST_LIVE_PRICE_CHANGE',
++  'APPROVE_LIVE_PRICE_CHANGE',
++  'APPLY_APPROVED_LIVE_PRICE_CHANGE',
++  'VIEW_LIVE_PRICE_AUTHORIZATIONS',
++  'CHANGE_LIVE_PRICE'
++)
++WHERE r.code IN ('ADMIN', 'SUPERVISOR');
++
++-- SELLER puede solicitar cambios de precio LIVE, pero no aprobar ni aplicar.
++INSERT IGNORE INTO role_permissions (role_id, permission_id)
++SELECT r.id, p.id
++FROM roles r
++JOIN permissions p ON p.code = 'REQUEST_LIVE_PRICE_CHANGE'
++WHERE r.code = 'SELLER';
++
++COMMIT;
+diff --git a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationServiceTests.java b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationServiceTests.java
+index 9f563d7..78adc63 100644
+--- a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationServiceTests.java
++++ b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/operationauth/OperationalAuthorizationServiceTests.java
+@@ -166,6 +166,79 @@ class OperationalAuthorizationServiceTests {
+         );
+     }
+
++    @Test
++    void createLivePriceChangeRequiresPricePermissionAndPayload() {
++        Reservation reservation = liveReservation(10L, 6L);
++        reservation.setLiveOperationalStatus(LiveReservationOperationalStatus.RESERVED);
++        when(currentUser.getUserId()).thenReturn(99L);
++        when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
++        when(paymentAllocationRepository.findByReservationIdOrderByCreatedAtAsc(10L)).thenReturn(List.of());
++        when(tenantAccessGuard.requireBranch(6L, "El target de autorizacion no pertenece a la sucursal activa"))
++                .thenReturn(tenant());
++        when(repository.save(any(OperationalAuthorizationRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
++
++        OperationalAuthorizationResponse response = service.create(priceChangeRequest("249.50"));
++
++        assertEquals("LIVE_PRICE_CHANGE", response.getOperationType());
++        assertEquals("REQUESTED", response.getStatus());
++        assertEquals(10L, response.getReservationId());
++        verify(accessService).assertCan(99L, PermissionCode.REQUEST_LIVE_OPERATION_AUTHORIZATION);
++        verify(accessService).assertCan(99L, PermissionCode.REQUEST_LIVE_PRICE_CHANGE);
++    }
++
++    @Test
++    void applyLivePriceChangeUpdatesReservationPriceAndRecordsEvent() {
++        Reservation reservation = liveReservation(10L, 6L);
++        reservation.setLiveOperationalStatus(LiveReservationOperationalStatus.RESERVED);
++        OperationalAuthorizationCreateRequest createRequest = priceChangeRequest("249.50");
++        when(currentUser.getUserId()).thenReturn(99L, 100L, 100L);
++        when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
++        when(paymentAllocationRepository.findByReservationIdOrderByCreatedAtAsc(10L)).thenReturn(List.of());
++        when(tenantAccessGuard.requireBranch(6L, "El target de autorizacion no pertenece a la sucursal activa"))
++                .thenReturn(tenant());
++        when(tenantAccessGuard.requireBranch(6L, "La autorizacion no pertenece a la sucursal activa"))
++                .thenReturn(tenant());
++        when(tenantAccessGuard.requireBranch(6L, "La reserva no pertenece a la sucursal activa"))
++                .thenReturn(tenant());
++        when(repository.save(any(OperationalAuthorizationRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
++        when(reservationRepository.save(any(Reservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
++
++        service.create(createRequest);
++        OperationalAuthorizationRequest entity = captureCreatedEntity();
++        ReflectionTestUtils.setField(entity, "id", 51L);
++        entity.setStatus(OperationalAuthorizationStatus.APPROVED);
++        entity.setDecidedByUserId(100L);
++        entity.setDecidedAt(LocalDateTime.now());
++        when(repository.findById(51L)).thenReturn(Optional.of(entity));
++
++        OperationalAuthorizationResponse applied = service.apply(51L, decision("Aplicar precio autorizado"));
++
++        assertEquals("APPLIED", applied.getStatus());
++        assertEquals(BigDecimal.valueOf(249.50).setScale(2), reservation.getPrice());
++        verify(accessService).assertCan(100L, PermissionCode.APPLY_LIVE_OPERATION_AUTHORIZATION);
++        verify(accessService).assertCan(100L, PermissionCode.APPLY_APPROVED_LIVE_PRICE_CHANGE);
++        verify(liveEventService).record(
++                reservation.getLive(),
++                LiveEventType.LIVE_PRICE_CHANGE_APPLIED,
++                100L,
++                "RESERVATION",
++                10L,
++                "{\"reservationId\":10,\"previousPrice\":300.00,\"newPrice\":249.50,\"authorizationId\":51,\"reason\":\"Aplicar precio autorizado\"}"
++        );
++    }
++
++    @Test
++    void livePriceChangeRejectsOperationalSoldReservation() {
++        Reservation reservation = liveReservation(10L, 6L);
++        when(currentUser.getUserId()).thenReturn(99L);
++        when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
++
++        assertThrows(
++                IllegalArgumentException.class,
++                () -> service.create(priceChangeRequest("249.50"))
++        );
++    }
++
+     private OperationalAuthorizationRequest captureCreatedEntity() {
+         org.mockito.ArgumentCaptor<OperationalAuthorizationRequest> captor =
+                 org.mockito.ArgumentCaptor.forClass(OperationalAuthorizationRequest.class);
+@@ -183,6 +256,17 @@ class OperationalAuthorizationServiceTests {
+         return request;
+     }
+
++    private static OperationalAuthorizationCreateRequest priceChangeRequest(String requestedPrice) {
++        OperationalAuthorizationCreateRequest request = new OperationalAuthorizationCreateRequest();
++        request.setOperationType(OperationalAuthorizationType.LIVE_PRICE_CHANGE);
++        request.setTargetType(OperationalAuthorizationTargetType.RESERVATION);
++        request.setTargetId(10L);
++        request.setReservationId(10L);
++        request.setReason("Ajuste autorizado de precio LIVE");
++        request.setPayloadJson("{\"requestedPrice\":" + requestedPrice + "}");
++        return request;
++    }
++
+     private static OperationalAuthorizationDecisionRequest decision(String reason) {
+         OperationalAuthorizationDecisionRequest request = new OperationalAuthorizationDecisionRequest();
+         request.setReason(reason);
+diff --git a/docs/AUTH_F_RBAC_PERMISSION_MATRIX.md b/docs/AUTH_F_RBAC_PERMISSION_MATRIX.md
+index b9e1e90..6cd2992 100644
+--- a/docs/AUTH_F_RBAC_PERMISSION_MATRIX.md
++++ b/docs/AUTH_F_RBAC_PERMISSION_MATRIX.md
+@@ -315,3 +315,22 @@ Asignacion inicial:
+
+ Nota: B1 no toca pagos/caja/precio/devoluciones ni venta financiera.
+
++## Actualizacion 2026-06-10 - LIVE-PRICE-C
++
++Permisos de autorizacion de precio LIVE agregados por `V57__live_price_authorization_permissions.sql`:
++
++| Permiso | Estado | Uso |
++|---|---|---|
++| `REQUEST_LIVE_PRICE_CHANGE` | Existe desde LIVE-PRICE-C | Solicitar cambio de precio sobre apartado LIVE seguro |
++| `VIEW_LIVE_PRICE_AUTHORIZATIONS` | Existe desde LIVE-PRICE-C | Ver autorizaciones de precio LIVE |
++| `APPROVE_LIVE_PRICE_CHANGE` | Existe desde LIVE-PRICE-C | Aprobar/rechazar cambios de precio LIVE |
++| `APPLY_APPROVED_LIVE_PRICE_CHANGE` | Existe desde LIVE-PRICE-C | Aplicar precio aprobado |
++| `CHANGE_LIVE_PRICE` | Existe desde LIVE-PRICE-C | Permiso fino de cambio directo/auditable para politica futura |
++
++Asignacion inicial:
++
++- `ADMIN` y `SUPERVISOR`: solicitud, vista, aprobacion, aplicacion y cambio.
++- `SELLER`: solicitud solamente.
++
++Nota: LIVE-PRICE-C aplica solo sobre `reservations.price` de apartado LIVE activo sin pago. No toca `sales.price`, pagos, caja, devoluciones ni venta financiera.
++
+diff --git a/docs/ERP_BITACORA_CAMBIOS.md b/docs/ERP_BITACORA_CAMBIOS.md
+index b22359c..e220a16 100644
+--- a/docs/ERP_BITACORA_CAMBIOS.md
++++ b/docs/ERP_BITACORA_CAMBIOS.md
+@@ -1,5 +1,33 @@
+ # ERP - Bitacora de cambios
+
++## 2026-06-10 - LIVE-PRICE-C autorizacion cambio de precio LIVE
++
++Tipo: backend, frontend minimo, permisos, migracion, autorizaciones LIVE, documentacion.
++
++Objetivo:
++
++- Implementar un MVP seguro para solicitar, aprobar y aplicar cambio de precio LIVE sin tocar pagos, caja, devoluciones ni venta financiera.
++
++Cambios realizados:
++
++- Se reutiliza `operational_authorization_requests` con `LIVE_PRICE_CHANGE`.
++- Se agrega migracion `V57__live_price_authorization_permissions.sql`.
++- Se agregan permisos `REQUEST_LIVE_PRICE_CHANGE`, `APPROVE_LIVE_PRICE_CHANGE`, `APPLY_APPROVED_LIVE_PRICE_CHANGE`, `VIEW_LIVE_PRICE_AUTHORIZATIONS` y `CHANGE_LIVE_PRICE`.
++- La aplicacion cambia solo `reservations.price` de apartado LIVE activo sin pago y con prenda `RESERVED`.
++- Se agrega evento `LIVE_PRICE_CHANGE_APPLIED`.
++- La UI minima de `/operational-authorizations` permite crear solicitud de precio con ID de apartado y precio solicitado.
++
++Restricciones respetadas:
++
++- No se tocaron pagos, caja, devoluciones, venta financiera ni precio historico de ventas cerradas.
++- No se invento precio LIVE temporal; queda pendiente hasta que exista modelo.
++
++Pendientes:
++
++- Smoke API real con dataset desechable.
++- QA visual con screenshots por rol.
++- UI contextual desde LIVE/reservas.
++
+ ## 2026-06-10 - LIVE-AUTH-B2 UI autorizaciones operativas LIVE
+
+ Tipo: frontend, autorizaciones operativas LIVE, documentacion, evidencia.
+diff --git a/docs/ERP_RIESGOS_OPERATIVOS.md b/docs/ERP_RIESGOS_OPERATIVOS.md
+index 69a510e..137eb1e 100644
+--- a/docs/ERP_RIESGOS_OPERATIVOS.md
++++ b/docs/ERP_RIESGOS_OPERATIVOS.md
+@@ -38,6 +38,7 @@ Probabilidad:
+ | Artefactos no rastreados en Git | MEDIO | ALTA | Release con archivos no controlados o ruido en diff. | Limpiar/ignorar antes de release; checklist Git. | No incluir artefactos; restaurar working tree limpio. |
+ | Auditoria insuficiente | ALTO | ALTA | No se puede explicar quien hizo una accion sensible. | Fase de auditoria, eventos de negocio, revision de logs. | No aplica rollback completo; se mitiga hacia adelante. |
+ | UI de autorizaciones LIVE sin QA visual real | MEDIO | MEDIA despues de LIVE-AUTH-B2 | La pantalla permite operar solicitudes, pero falta evidencia con navegador y usuarios reales por rol. | LIVE-AUTH-B2 deja `PENDING_QA_VISUAL`; ejecutar smoke visual con admin/supervisor/seller/sin permisos antes de liberar operacion formal. | Ocultar navegacion de autorizaciones o revertir UI manteniendo backend MVP. |
++| Cambio de precio LIVE sin modelo temporal | ALTO | BAJA despues de LIVE-PRICE-C | No existe columna de precio LIVE temporal previa al apartado; inventarla podria romper reserva/venta. | LIVE-PRICE-C limita aplicacion a `reservations.price` de apartado LIVE activo sin pago; precio pre-reserva queda pendiente de modelo. | Revertir UI/servicio de precio y mantener autorizaciones como trazabilidad sin aplicar. |
+ | Aplicacion de autorizaciones sensibles incompleta | ALTO | MEDIA despues de LIVE-AUTH-B2 | Operaciones como cancelar con pago, reasignar o editar bloqueado pueden solicitarse/aprobarse, pero su aplicacion queda pendiente de contrato funcional. | UI muestra aplicacion pendiente salvo `UNDO_LIVE_OPERATIONAL_SALE`; no tocar pagos/caja/devoluciones hasta fase dedicada. | Mantener solicitudes en modo trazabilidad y bloquear boton aplicar para operaciones sin contrato. |
+ | Consistencia LIVE/inventario/reservas sin smoke real | MEDIO | MEDIA despues de ITEM-Z8 | La auditoria tecnica confirma reglas, pero falta ejecutar flujo completo con dataset LIVE desechable. | ITEM-Z8 consolida matriz de consistencia y deja checklist API/visual; no avanzar a venta financiera sin QA real. | Mantener cierre operativo LIVE limitado y bloquear conversion financiera hasta completar smoke. |
+ | Retiro de prenda al aire sin permiso dedicado | ALTO | BAJA despues de LIVE-PERM-FIX-A1 | Un usuario con permiso de apartado LIVE podia retirar `activeItem` por API directa aunque la UI ocultara la accion. | LIVE-PERM-FIX-A1 exige `REMOVE_LIVE_ACTIVE_ITEM` en backend y elimina fallback `DO_LIVE_RESERVATION` para retiro manual; queda pendiente smoke API real por rol. | Revertir A1 solo si bloquea operacion critica y deshabilitar temporalmente retiro manual hasta corregir permisos. |
+diff --git a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+index 2c9d017..9203d4a 100644
+--- a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
++++ b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+@@ -9,6 +9,24 @@ Tipo: backlog documental, sin implementacion
+
+ Convertir el analisis de Fase 2A/2B en un backlog tecnico ordenado para implementar multi-compania con bajo riesgo, evitando fuga de datos entre clientes y manteniendo trazabilidad HPSQ-SOFT.
+
++## Actualizacion LIVE-PRICE-C - Autorizacion precio LIVE
++
++Fecha: 2026-06-10
++Estado: implementado tecnico condicionado.
++
++Alcance ejecutado:
++
++- Permisos y migracion `V57` para autorizacion de precio LIVE.
++- Reuso de `operational_authorization_requests` con `LIVE_PRICE_CHANGE`.
++- Aplicacion segura solo sobre `reservations.price` de apartado LIVE activo sin pago.
++- UI minima en `/operational-authorizations`.
++
++Pendiente:
++
++- Smoke API mutante real con dataset desechable.
++- QA visual por rol.
++- Modelo futuro para precio LIVE temporal antes de crear apartado.
++
+ ## Actualizacion LIVE-AUTH-B2 - UI autorizaciones operativas LIVE
+
+ Fecha: 2026-06-10
+diff --git a/docs/LIVE_PRICE_C_PRICE_AUTHORIZATION.md b/docs/LIVE_PRICE_C_PRICE_AUTHORIZATION.md
+new file mode 100644
+index 0000000..0766141
+--- /dev/null
++++ b/docs/LIVE_PRICE_C_PRICE_AUTHORIZATION.md
+@@ -0,0 +1,154 @@
++# LIVE-PRICE-C - Cambio de precio LIVE con autorizacion
++
++Fecha: 2026-06-10
++Rama: `feature/live-price-c-price-authorization`
++
++## Resumen ejecutivo
++
++LIVE-PRICE-C implementa un MVP seguro de autorizacion para cambio de precio LIVE usando el flujo generico de `operational_authorization_requests`.
++
++Decision tomada:
++
++- No existe un campo de precio LIVE temporal independiente.
++- `items.price` es precio sugerido/base de inventario.
++- `reservations.price` es el precio confirmado del apartado.
++- El MVP aplica exclusivamente sobre `reservations.price` de una reserva LIVE activa, sin pago activo, sin vendido operativo y con prenda todavia `RESERVED`.
++
++No se toca pago, caja, devolucion ni venta financiera.
++
++Resultado esperado: `GO_TECNICO` con `PENDING_QA_VISUAL`.
++
++## Modelo de precio encontrado
++
++| Entidad | Campo | Uso |
++|---|---|---|
++| `items` | `price` | Precio sugerido/base de la prenda. Se muestra como referencia en LIVE. |
++| `reservations` | `price` | Precio confirmado del apartado. Es el objetivo seguro del MVP. |
++| `sales` | `price` | Precio historico de venta. No se modifica en esta fase. |
++
++En `/live`, el precio editable antes de reservar vive en UI y se persiste al crear el apartado. No hay columna backend para precio temporal LIVE de prenda al aire sin apartado.
++
++## Alcance implementado
++
++- Nuevo tipo de autorizacion operativa: `LIVE_PRICE_CHANGE`.
++- Nuevos permisos:
++  - `REQUEST_LIVE_PRICE_CHANGE`
++  - `APPROVE_LIVE_PRICE_CHANGE`
++  - `APPLY_APPROVED_LIVE_PRICE_CHANGE`
++  - `VIEW_LIVE_PRICE_AUTHORIZATIONS`
++  - `CHANGE_LIVE_PRICE`
++- Migracion Flyway `V57__live_price_authorization_permissions.sql`.
++- Validacion de solicitud con `requestedPrice` en `payloadJson`.
++- Aprobacion/rechazo exige permiso fino `APPROVE_LIVE_PRICE_CHANGE`.
++- Aplicacion exige `APPLY_LIVE_OPERATION_AUTHORIZATION` y `APPLY_APPROVED_LIVE_PRICE_CHANGE`.
++- Aplicacion cambia `reservations.price` solo si el snapshot sigue consistente.
++- Evento LIVE `LIVE_PRICE_CHANGE_APPLIED`.
++- UI minima en `/operational-authorizations` para crear solicitudes de precio por ID de apartado.
++
++## Endpoints usados
++
++Se reutilizan endpoints existentes:
++
++- `POST /api/operational-authorizations`
++- `GET /api/operational-authorizations/branch/{branchId}`
++- `GET /api/operational-authorizations/mine/branch/{branchId}`
++- `PATCH /api/operational-authorizations/{id}/approve`
++- `PATCH /api/operational-authorizations/{id}/reject`
++- `POST /api/operational-authorizations/{id}/apply`
++
++No se crearon endpoints nuevos.
++
++## Contrato de solicitud
++
++Para `LIVE_PRICE_CHANGE`:
++
++- `operationType`: `LIVE_PRICE_CHANGE`
++- `targetType`: `RESERVATION`
++- `targetId`: ID del apartado LIVE
++- `reservationId`: mismo ID del apartado
++- `payloadJson`: `{"requestedPrice": 249.50}`
++- `reason`: obligatorio
++
++## Reglas de aplicacion
++
++La aplicacion solo procede si:
++
++- la solicitud esta `APPROVED`;
++- no esta expirada;
++- la reserva pertenece al branch/company activo;
++- la reserva pertenece a LIVE;
++- `reservations.status = ACTIVE`;
++- `live_operational_status` no es `OPERATIONAL_SOLD`;
++- la prenda sigue `RESERVED`;
++- no hay pago activo aplicado a la reserva;
++- el snapshot de reserva coincide.
++
++Si cualquiera de esas condiciones falla, no se aplica el cambio.
++
++## Lo que no afecta
++
++- No modifica `items.price`.
++- No modifica `sales.price`.
++- No crea ventas.
++- No crea pagos.
++- No modifica caja.
++- No procesa devoluciones.
++- No recalcula saldos financieros.
++- No cambia precio historico de ventas cerradas.
++
++## UI
++
++La pantalla `/operational-authorizations` ahora permite crear `LIVE_PRICE_CHANGE`.
++
++Para esta operacion:
++
++- fuerza objetivo `RESERVATION`;
++- solicita ID del apartado LIVE;
++- solicita precio requerido;
++- envia `requestedPrice` en `payloadJson`;
++- permite aplicar si backend y permisos lo autorizan.
++
++Queda pendiente una UI contextual desde `/live` o detalle de apartado para prellenar el ID y el precio actual.
++
++## RBAC
++
++Asignacion inicial por migracion:
++
++- `ADMIN` y `SUPERVISOR`: solicitar, ver, aprobar, aplicar y cambiar precio LIVE.
++- `SELLER`: solicitar cambio de precio LIVE.
++
++`SELLER` no recibe aprobacion ni aplicacion.
++
++## Rollback
++
++Si se requiere revertir:
++
++1. Revertir el commit de LIVE-PRICE-C.
++2. Si `V57` ya fue aplicada, no editar ni borrar la migracion aplicada.
++3. Crear una migracion posterior para revocar asignaciones si negocio lo requiere.
++4. Las solicitudes existentes en `operational_authorization_requests` deben conservarse como auditoria o migrarse con plan DBA.
++
++## Riesgos y mitigacion
++
++| Riesgo | Mitigacion |
++|---|---|
++| Cambiar precio con pago activo | Bloqueado por `PaymentAllocation` + `PaymentStatus.ACTIVE`. |
++| Cambiar venta cerrada | No se toca `sales.price`. |
++| Cambiar apartado ya vendido operativamente | Bloqueado si `OPERATIONAL_SOLD`. |
++| Aplicar sobre estado cambiado | Snapshot hash provoca conflicto. |
++| Simular precio temporal LIVE inexistente | No se implementa; queda pendiente de modelo. |
++
++## QA
++
++Cubierto por tests backend:
++
++- seller/usuario solicitante requiere permisos de solicitud;
++- aprobacion requiere permiso fino;
++- aplicacion cambia precio de reserva LIVE segura;
++- reserva `OPERATIONAL_SOLD` queda bloqueada.
++
++Pendientes:
++
++- smoke API real con dataset desechable;
++- QA visual con screenshots por rol;
++- UI contextual desde LIVE/reservas.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index 0fc4c67..311c753 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -874,11 +874,15 @@
+     "branchMissing": "No active branch was found in the session.",
+     "validationTitle": "Missing data",
+     "validationMessage": "Enter action type, target, identifier, and reason.",
++    "priceValidationMessage": "Enter a requested price greater than zero.",
+     "createTitle": "Request authorization",
+     "createHelp": "Create a request for an existing operational record. It does not run payments, cash, or refunds.",
+     "operationType": "Action type",
+     "targetType": "Target",
+     "targetId": "Target ID",
++    "reservationId": "LIVE hold ID",
++    "requestedPrice": "Requested price",
++    "priceReservationOnly": "LIVE price changes apply only to active LIVE holds without payment.",
+     "reason": "Reason",
+     "submitRequest": "Submit request",
+     "detailTitle": "Authorization detail",
+@@ -908,6 +912,7 @@
+       "CANCEL_RESERVATION_WITH_PAYMENT": "Cancel hold with payment",
+       "RELEASE_RESERVED_ITEM": "Release held item",
+       "UNDO_LIVE_OPERATIONAL_SALE": "Undo LIVE operational sale",
++      "LIVE_PRICE_CHANGE": "Change LIVE price",
+       "REASSIGN_RESERVATION": "Reassign hold",
+       "EDIT_LOCKED_ITEM": "Edit locked item"
+     },
+diff --git a/locales/es/common.json b/locales/es/common.json
+index 8e622c6..4975c17 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -874,11 +874,15 @@
+     "branchMissing": "No se encontro sucursal activa en la sesion.",
+     "validationTitle": "Datos incompletos",
+     "validationMessage": "Captura tipo de accion, objetivo, identificador y motivo.",
++    "priceValidationMessage": "Captura un precio solicitado mayor a cero.",
+     "createTitle": "Solicitar autorizacion",
+     "createHelp": "Crea una solicitud sobre un dato operativo existente. No ejecuta pagos, caja ni devoluciones.",
+     "operationType": "Tipo de accion",
+     "targetType": "Objetivo",
+     "targetId": "ID del objetivo",
++    "reservationId": "ID del apartado LIVE",
++    "requestedPrice": "Precio solicitado",
++    "priceReservationOnly": "El cambio de precio LIVE aplica solo a apartados LIVE activos sin pago.",
+     "reason": "Motivo",
+     "submitRequest": "Enviar solicitud",
+     "detailTitle": "Detalle de autorizacion",
+@@ -908,6 +912,7 @@
+       "CANCEL_RESERVATION_WITH_PAYMENT": "Cancelar apartado con pago",
+       "RELEASE_RESERVED_ITEM": "Liberar prenda apartada",
+       "UNDO_LIVE_OPERATIONAL_SALE": "Deshacer vendido operativo LIVE",
++      "LIVE_PRICE_CHANGE": "Cambiar precio LIVE",
+       "REASSIGN_RESERVATION": "Reasignar apartado",
+       "EDIT_LOCKED_ITEM": "Editar prenda bloqueada"
+     },
+diff --git a/qa-reports/LIVE-PRICE-C-price-authorization-report-20260610-153828.md b/qa-reports/LIVE-PRICE-C-price-authorization-report-20260610-153828.md
+new file mode 100644
+index 0000000..23c589e
+--- /dev/null
++++ b/qa-reports/LIVE-PRICE-C-price-authorization-report-20260610-153828.md
+@@ -0,0 +1,110 @@
++# LIVE-PRICE-C price authorization report
++
++Fecha: 2026-06-10 15:38:28
++Rama: `feature/live-price-c-price-authorization`
++
++## Resultado ejecutivo
++
++Se implemento MVP seguro de autorizacion de cambio de precio LIVE sobre `reservations.price`, reutilizando `operational_authorization_requests`.
++
++Resultado esperado:
++
++- `GO_TECNICO`
++- `PENDING_QA_VISUAL`
++- `PENDING_QA_API_MUTATION`
++
++No se marca `QA_PASS` porque no hubo evidencia visual ni smoke API mutante real de esta fase.
++
++## Comandos ejecutados
++
++- `git branch --show-current`
++- `git status`
++- `git log --oneline -140`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-AUTH-B3"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-AUTH-B2"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-AUTH-B1"`
++- `git --no-pager log --oneline --all --decorate --grep="RELEASE-LIVE-BASE-RC1"`
++- `git --no-pager log --oneline --all --decorate --grep="LIVE-Z10B"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z8"`
++- auditorias `git grep` de precio, autorizaciones operativas, LIVE/items/reservas y permisos
++- lectura no interactiva de entidades `Item`, `Reservation`, `Sale`, `PermissionCode`, `OperationalAuthorizationService` y diseno `LIVE_Z10B`
++
++## Historial validado
++
++- `9121fe2 LIVE-AUTH-B3 valida autorizaciones operativas`
++- `385c1b9 LIVE-AUTH-B2 agrega UI autorizaciones operativas`
++- `290369c LIVE-AUTH-B1 implementa autorizaciones operativas`
++- `7f77e80 RELEASE-LIVE-BASE-RC1 documenta release candidate live base`
++- `72235e8 LIVE-Z10B diseña autorizacion de precio live`
++- `90ab2eb ITEM-Z8 valida consistencia live inventario reservas`
++
++## Modelo de precio encontrado
++
++- `items.price`: precio sugerido/base.
++- `reservations.price`: precio confirmado del apartado.
++- `sales.price`: precio historico de venta.
++
++No se encontro precio LIVE temporal independiente. Por eso el MVP aplica solo sobre reserva LIVE activa sin pago.
++
++## Implementacion
++
++Backend:
++
++- `LIVE_PRICE_CHANGE` en `OperationalAuthorizationType`.
++- `PermissionCode` agrega permisos de precio LIVE.
++- `OperationalAuthorizationService` valida solicitud, aprobacion y aplicacion.
++- `V57__live_price_authorization_permissions.sql` agrega permisos/asignaciones idempotentes.
++- `LiveEventType.LIVE_PRICE_CHANGE_APPLIED`.
++- Tests focalizados en `OperationalAuthorizationServiceTests`.
++
++Frontend:
++
++- `/operational-authorizations` incluye `LIVE_PRICE_CHANGE`.
++- Formulario exige ID de apartado LIVE y precio solicitado.
++- UI envia `payloadJson` con `requestedPrice`.
++- Aplicacion soportada cuando backend y permisos lo permiten.
++
++## Permisos / migraciones / endpoints
++
++Permisos creados:
++
++- `REQUEST_LIVE_PRICE_CHANGE`
++- `APPROVE_LIVE_PRICE_CHANGE`
++- `APPLY_APPROVED_LIVE_PRICE_CHANGE`
++- `VIEW_LIVE_PRICE_AUTHORIZATIONS`
++- `CHANGE_LIVE_PRICE`
++
++Migracion:
++
++- `V57__live_price_authorization_permissions.sql`
++
++Endpoints nuevos:
++
++- Ninguno. Se reutilizan `/api/operational-authorizations`.
++
++## Validaciones
++
++- `./mvnw.cmd -Dtest=OperationalAuthorizationServiceTests test`: PASS, 8 tests.
++- `./mvnw.cmd test`: PASS, 122 tests, Flyway valido 57 migraciones.
++- `npm.cmd run lint`: PASS sin errores; 53 warnings preexistentes.
++- `npx.cmd tsc --noEmit`: PASS.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: PASS, incluye `/operational-authorizations`.
++- `git --no-pager diff --check`: PASS.
++- `git --no-pager diff --cached --check`: PASS.
++- `git status`: staged esperado previo al commit; limpieza final se valida despues del commit.
++
++## Alcance excluido
++
++- pagos;
++- caja;
++- devoluciones;
++- venta financiera;
++- ventas cerradas;
++- precio temporal LIVE sin apartado;
++- cambio de `items.price` base.
++
++## Resultado
++
++- `GO_TECNICO`
++- `PENDING_QA_VISUAL`
++- `PENDING_QA_API_MUTATION`
+diff --git a/services/operationalAuthorizationService.ts b/services/operationalAuthorizationService.ts
+index 5d049db..3788c51 100644
+--- a/services/operationalAuthorizationService.ts
++++ b/services/operationalAuthorizationService.ts
+@@ -12,6 +12,7 @@ export type OperationalAuthorizationType =
+   | 'CANCEL_RESERVATION_WITH_PAYMENT'
+   | 'RELEASE_RESERVED_ITEM'
+   | 'UNDO_LIVE_OPERATIONAL_SALE'
++  | 'LIVE_PRICE_CHANGE'
+   | 'REASSIGN_RESERVATION'
+   | 'EDIT_LOCKED_ITEM';

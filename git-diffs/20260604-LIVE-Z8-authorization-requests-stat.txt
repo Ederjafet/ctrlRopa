@@ -1,0 +1,6 @@
+ app/live.tsx                                | 132 +++++++++++++++++++++++-----
+ docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md |   7 ++
+ docs/LIVE_Z7_PERMISSIONS_PRICE_APPROVAL.md  |  12 +++
+ locales/en/common.json                      |  17 +++-
+ locales/es/common.json                      |  17 +++-
+ 5 files changed, 160 insertions(+), 25 deletions(-)

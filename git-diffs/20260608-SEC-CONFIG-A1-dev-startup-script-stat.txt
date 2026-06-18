@@ -1,0 +1,11 @@
+﻿ .env.example                                       |   6 +-
+ docs/CODEX_AUTONOMOUS_CLOSURE_RUNBOOK.md           |  11 ++
+ docs/PROJECT_BACKLOG_PRIORITIZED.md                |   1 +
+ docs/PROJECT_MASTER_STATUS.md                      |   8 +-
+ docs/QA_TODO_HANDOFF.md                            |   1 +
+ docs/SEC_CONFIG_A1_DEV_STARTUP.md                  | 113 +++++++++++++++++++++
+ docs/SEC_CONFIG_A_CONFIGURATION_SECRETS.md         |   9 ++
+ ...A1-dev-startup-script-report-20260608-105828.md |  49 +++++++++
+ scripts/dev-backend.cmd                            |  66 ++++++++++++
+ scripts/dev-backend.sh                             |  33 ++++++
+ 10 files changed, 291 insertions(+), 6 deletions(-)

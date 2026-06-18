@@ -1,0 +1,1141 @@
+﻿diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
+index 9ac50c3..79d7d8d 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
+@@ -252,7 +252,7 @@ public class ReservationService {
+             entity.setLiveOperationalStatusUpdatedByUserId(userId);
+         }
+
+-        Reservation saved = repository.save(entity);
++        Reservation saved = saveCreatedReservation(entity);
+
+         CustomerOrder order = customerOrderService.addReservationToOpenOrder(saved);
+         customerOrderService.refreshStatus(order.getId());
+@@ -361,6 +361,29 @@ public class ReservationService {
+         idempotencyRepository.save(record);
+     }
+
++    private Reservation saveCreatedReservation(Reservation entity) {
++        try {
++            return repository.saveAndFlush(entity);
++        } catch (DataIntegrityViolationException ex) {
++            if (isActiveReservationConstraintViolation(ex)) {
++                throw new ConflictException("El item ya tiene una reserva activa");
++            }
++            throw ex;
++        }
++    }
++
++    private boolean isActiveReservationConstraintViolation(Throwable ex) {
++        Throwable current = ex;
++        while (current != null) {
++            String message = current.getMessage();
++            if (message != null && message.contains("uq_reservations_active_item")) {
++                return true;
++            }
++            current = current.getCause();
++        }
++        return false;
++    }
++
+     private String normalizeIdempotencyKey(String idempotencyKey) {
+         if (idempotencyKey == null || idempotencyKey.isBlank()) {
+             return null;
+diff --git a/backend/control-ropa/src/main/resources/db/migration/V53__active_reservation_item_constraint.sql b/backend/control-ropa/src/main/resources/db/migration/V53__active_reservation_item_constraint.sql
+new file mode 100644
+index 0000000..0d52568
+--- /dev/null
++++ b/backend/control-ropa/src/main/resources/db/migration/V53__active_reservation_item_constraint.sql
+@@ -0,0 +1,47 @@
++-- ITEM-Z5C: proteccion estructural para una sola reserva ACTIVE por item.
++-- No toca pagos, caja, precio LIVE, devoluciones, autorizaciones, permisos ni RBAC.
++--
++-- Prevalidacion recomendada antes de aplicar en ambientes con datos legacy:
++-- SELECT branch_id, item_id, COUNT(*) AS active_count
++-- FROM reservations
++-- WHERE status = 'ACTIVE'
++-- GROUP BY branch_id, item_id
++-- HAVING COUNT(*) > 1;
++--
++-- MySQL 5.7 no soporta indices parciales tipo WHERE status = 'ACTIVE'.
++-- Se usa columna generada nullable: solo contiene item_id cuando status = ACTIVE.
++-- Los status historicos CANCELLED/CONVERTED_TO_SALE quedan en NULL y no colisionan.
++
++SET @column_exists := (
++  SELECT COUNT(*)
++  FROM information_schema.COLUMNS
++  WHERE TABLE_SCHEMA = DATABASE()
++    AND TABLE_NAME = 'reservations'
++    AND COLUMN_NAME = 'active_reservation_item_id'
++);
++
++SET @sql := IF(
++  @column_exists = 0,
++  'ALTER TABLE reservations ADD COLUMN active_reservation_item_id BIGINT UNSIGNED GENERATED ALWAYS AS (CASE WHEN status = ''ACTIVE'' THEN item_id ELSE NULL END) STORED AFTER item_id',
++  'SELECT 1'
++);
++PREPARE stmt FROM @sql;
++EXECUTE stmt;
++DEALLOCATE PREPARE stmt;
++
++SET @index_exists := (
++  SELECT COUNT(*)
++  FROM information_schema.STATISTICS
++  WHERE TABLE_SCHEMA = DATABASE()
++    AND TABLE_NAME = 'reservations'
++    AND INDEX_NAME = 'uq_reservations_active_item'
++);
++
++SET @sql := IF(
++  @index_exists = 0,
++  'ALTER TABLE reservations ADD UNIQUE KEY uq_reservations_active_item (branch_id, active_reservation_item_id)',
++  'SELECT 1'
++);
++PREPARE stmt FROM @sql;
++EXECUTE stmt;
++DEALLOCATE PREPARE stmt;
+diff --git a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java
+index 93fe876..9e620f8 100644
+--- a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java
++++ b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java
+@@ -26,6 +26,7 @@ import com.hpsqsoft.ctrlropa.web.error.ConflictException;
+ import org.junit.jupiter.api.Test;
+ import org.junit.jupiter.params.ParameterizedTest;
+ import org.junit.jupiter.params.provider.EnumSource;
++import org.springframework.dao.DataIntegrityViolationException;
+ import org.springframework.jdbc.core.JdbcTemplate;
+ import org.springframework.jdbc.core.RowMapper;
+ import org.springframework.test.util.ReflectionTestUtils;
+@@ -96,7 +97,7 @@ class ReservationServiceTests {
+         when(itemRepository.reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED))
+                 .thenReturn(1);
+         when(repository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE)).thenReturn(Optional.empty());
+-        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> {
++        when(repository.saveAndFlush(any(Reservation.class))).thenAnswer(invocation -> {
+             Reservation reservation = invocation.getArgument(0);
+             ReflectionTestUtils.setField(reservation, "id", 10L);
+             return reservation;
+@@ -113,7 +114,7 @@ class ReservationServiceTests {
+         verify(itemRepository).reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED);
+         verify(idempotencyRepository, never()).saveAndFlush(any(ReservationIdempotencyRecord.class));
+         verify(itemRepository, never()).save(any(Item.class));
+-        verify(repository).save(any(Reservation.class));
++        verify(repository).saveAndFlush(any(Reservation.class));
+         verify(customerOrderService).refreshStatus(55L);
+         verify(accessService).assertCan(
+                 99L,
+@@ -148,7 +149,7 @@ class ReservationServiceTests {
+                 any(),
+                 any()
+         );
+-        verify(repository, never()).save(any(Reservation.class));
++        verify(repository, never()).saveAndFlush(any(Reservation.class));
+     }
+
+     @Test
+@@ -170,7 +171,7 @@ class ReservationServiceTests {
+         );
+
+         assertEquals("La prenda ya no esta disponible para apartar", exception.getMessage());
+-        verify(repository, never()).save(any(Reservation.class));
++        verify(repository, never()).saveAndFlush(any(Reservation.class));
+         verify(customerOrderService, never()).addReservationToOpenOrder(any(Reservation.class));
+         verify(itemRepository, never()).save(any(Item.class));
+     }
+@@ -199,7 +200,7 @@ class ReservationServiceTests {
+         when(itemRepository.reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED))
+                 .thenReturn(1);
+         when(repository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE)).thenReturn(Optional.empty());
+-        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> {
++        when(repository.saveAndFlush(any(Reservation.class))).thenAnswer(invocation -> {
+             Reservation reservation = invocation.getArgument(0);
+             ReflectionTestUtils.setField(reservation, "id", 10L);
+             return reservation;
+@@ -217,6 +218,31 @@ class ReservationServiceTests {
+         verify(idempotencyRepository).save(pendingRecord);
+     }
+
++    @Test
++    void createTranslatesActiveReservationConstraintViolation() {
++        Branch branch = branch();
++        Item item = item(ItemStatus.AVAILABLE, branch);
++        Customer customer = customer(branch);
++        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
++        ReservationService.CreateReservationRequest request = request(channel.getId(), null);
++
++        stubCommonCreateFlow(branch, item, customer, channel);
++        when(repository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE)).thenReturn(Optional.empty());
++        when(itemRepository.reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED))
++                .thenReturn(1);
++        when(repository.saveAndFlush(any(Reservation.class)))
++                .thenThrow(new DataIntegrityViolationException("Duplicate entry for uq_reservations_active_item"));
++
++        ConflictException exception = assertThrows(
++                ConflictException.class,
++                () -> service.create(request)
++        );
++
++        assertTrue(exception.getMessage().contains("reserva activa"));
++        verify(itemRepository).reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED);
++        verify(customerOrderService, never()).addReservationToOpenOrder(any(Reservation.class));
++    }
++
+     @Test
+     void createWithSameIdempotencyKeyAndPayloadReturnsExistingReservation() {
+         Branch branch = branch();
+@@ -248,7 +274,7 @@ class ReservationServiceTests {
+
+         assertEquals(10L, response.getId());
+         verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
+-        verify(repository, never()).save(any(Reservation.class));
++        verify(repository, never()).saveAndFlush(any(Reservation.class));
+         verify(idempotencyRepository, never()).saveAndFlush(any(ReservationIdempotencyRecord.class));
+     }
+
+@@ -283,7 +309,7 @@ class ReservationServiceTests {
+
+         assertTrue(exception.getMessage().contains("datos distintos"));
+         verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
+-        verify(repository, never()).save(any(Reservation.class));
++        verify(repository, never()).saveAndFlush(any(Reservation.class));
+     }
+
+     @Test
+@@ -315,7 +341,7 @@ class ReservationServiceTests {
+
+         assertTrue(exception.getMessage().contains("sigue en proceso"));
+         verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
+-        verify(repository, never()).save(any(Reservation.class));
++        verify(repository, never()).saveAndFlush(any(Reservation.class));
+     }
+
+     @Test
+@@ -333,7 +359,7 @@ class ReservationServiceTests {
+         when(repository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE)).thenReturn(Optional.empty());
+         when(itemRepository.reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED))
+                 .thenReturn(1);
+-        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> {
++        when(repository.saveAndFlush(any(Reservation.class))).thenAnswer(invocation -> {
+             Reservation reservation = invocation.getArgument(0);
+             ReflectionTestUtils.setField(reservation, "id", 10L);
+             return reservation;
+@@ -382,7 +408,7 @@ class ReservationServiceTests {
+         when(repository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE)).thenReturn(Optional.empty());
+         when(itemRepository.reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED))
+                 .thenReturn(1);
+-        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> {
++        when(repository.saveAndFlush(any(Reservation.class))).thenAnswer(invocation -> {
+             Reservation reservation = invocation.getArgument(0);
+             ReflectionTestUtils.setField(reservation, "id", 10L);
+             return reservation;
+diff --git a/docs/ERP_BITACORA_CAMBIOS.md b/docs/ERP_BITACORA_CAMBIOS.md
+index ff7dff1..cfb1695 100644
+--- a/docs/ERP_BITACORA_CAMBIOS.md
++++ b/docs/ERP_BITACORA_CAMBIOS.md
+@@ -1,5 +1,34 @@
+ # ERP - Bitacora de cambios
+
++## 2026-06-09 - ITEM-Z5C constraint de reserva activa por item
++
++Tipo: migracion de consistencia, backend defensivo, pruebas, evidencia operativa.
++
++Objetivo:
++
++- Impedir multiples reservas `ACTIVE` para el mismo item sin bloquear historicos cancelados o convertidos.
++
++Cambios realizados:
++
++- Se creo `V53__active_reservation_item_constraint.sql`.
++- Se agrego columna generada `active_reservation_item_id` en `reservations`.
++- Se agrego unique `uq_reservations_active_item`.
++- `ReservationService.create` detecta la violacion del unique y devuelve error de negocio claro.
++- Se ajustaron pruebas para usar `saveAndFlush` en la creacion de reserva.
++
++Restricciones respetadas:
++
++- No se tocaron pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC ni permisos.
++- No se crearon endpoints nuevos.
++- No se cambio venta financiera.
++- No se modifico idempotencia ITEM-Z5B.
++
++Pendientes:
++
++- Resolver duplicados activos legacy si existen antes de aplicar en ambientes compartidos.
++- QA API/visual real con usuarios operativos.
++- ITEM-Z5D para trazabilidad de intentos rechazados.
++
+ ## 2026-06-09 - ITEM-Z5B idempotencia backend de reservas
+
+ Tipo: backend transaccional, migracion minima, frontend tecnico, evidencia operativa.
+diff --git a/docs/ERP_RIESGOS_OPERATIVOS.md b/docs/ERP_RIESGOS_OPERATIVOS.md
+index bca2c81..957b7a4 100644
+--- a/docs/ERP_RIESGOS_OPERATIVOS.md
++++ b/docs/ERP_RIESGOS_OPERATIVOS.md
+@@ -214,6 +214,7 @@ Probabilidad:
+ - ITEM-Z3B mitiga doble reserva con update atomico `AVAILABLE -> RESERVED` filtrado por company, branch e item; siguen pendientes idempotency key, constraint de reserva activa por item, QA API/visual real y flujos financieros/reversas.
+ - ITEM-Z4 aclara en UI cuando una prenda `AVAILABLE` ya esta al aire; no cambia inventario, por lo que QA debe confirmar que el selector no la muestra solo como `Libre` ni permite prepararla como reemplazo de si misma.
+ - ITEM-Z5B agrega idempotencia backend para creacion de reservas con `X-Idempotency-Key`; siguen pendientes constraint de reserva activa por item, limpieza TTL, trazabilidad de intentos rechazados y QA API/visual real.
++- ITEM-Z5C agrega constraint estructural de una reserva `ACTIVE` por item usando columna generada compatible con MySQL 5.7; ambientes con duplicados activos legacy deben resolverse antes de aplicar la migracion.
+ - PRODUCT-ERR-A agrega mapper frontend de errores accionables; modulos fuera de las rutas criticas aun deben migrarse por dominio para evitar que `err.message` exponga mensajes genericos o tecnicos.
+ - Pagos/ventas sin regresion automatizada suficiente.
+ - Auditoria de negocio todavia parcial.
+diff --git a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+index b01ccd2..3afe833 100644
+--- a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
++++ b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+@@ -9,6 +9,25 @@ Tipo: backlog documental, sin implementacion
+
+ Convertir el analisis de Fase 2A/2B en un backlog tecnico ordenado para implementar multi-compania con bajo riesgo, evitando fuga de datos entre clientes y manteniendo trazabilidad HPSQ-SOFT.
+
++## Actualizacion ITEM-Z5C - Constraint de reserva activa por item
++
++Fecha: 2026-06-09
++Estado: implementado tecnico condicionado.
++
++Alcance ejecutado:
++
++- Migracion `V53__active_reservation_item_constraint.sql`.
++- Columna generada `active_reservation_item_id` en `reservations`.
++- Unique `uq_reservations_active_item` por `branch_id` y item activo.
++- Traduccion backend de violacion del unique a error de negocio claro.
++- Conservacion de idempotencia ITEM-Z5B y update atomico ITEM-Z3B.
++
++Pendiente:
++
++- Ejecutar prevalidacion de duplicados activos en ambientes legacy antes de aplicar.
++- QA API/visual real con usuarios operativos.
++- ITEM-Z5D para trazabilidad de intentos rechazados y limpieza TTL.
++
+ ## Actualizacion ITEM-Z5B - Idempotencia backend de reservas
+
+ Fecha: 2026-06-09
+diff --git a/docs/ITEM_Z5C_ACTIVE_RESERVATION_CONSTRAINT.md b/docs/ITEM_Z5C_ACTIVE_RESERVATION_CONSTRAINT.md
+new file mode 100644
+index 0000000..8e25c34
+--- /dev/null
++++ b/docs/ITEM_Z5C_ACTIVE_RESERVATION_CONSTRAINT.md
+@@ -0,0 +1,175 @@
++# ITEM-Z5C - Constraint de reserva activa por item
++
++Fecha: 2026-06-09
++Rama: `feature/item-z5c-active-reservation-constraint`
++Tipo: migracion minima, backend defensivo, pruebas, documentacion y evidencia.
++
++## Resumen ejecutivo
++
++ITEM-Z5C agrega una proteccion estructural para impedir multiples reservas activas sobre el mismo item. La proteccion complementa:
++
++- ITEM-Z3B: update atomico `AVAILABLE -> RESERVED`;
++- ITEM-Z5B: idempotencia por `X-Idempotency-Key`.
++
++Esta fase no toca pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC, permisos, endpoints nuevos ni venta financiera.
++
++## Estado previo validado
++
++Hallazgos confirmados:
++
++- La tabla real es `reservations`.
++- `reservations` contiene `item_id`, `branch_id` y `status`.
++- `reservations` no contiene `company_id`; el scope de company se deriva por `branch_id`/item.
++- `ReservationStatus` real contiene:
++  - `ACTIVE`;
++  - `CANCELLED`;
++  - `CONVERTED_TO_SALE`.
++- El unico status que cuenta como reserva activa para esta fase es `ACTIVE`.
++- `CANCELLED` y `CONVERTED_TO_SALE` son historicos/no activos y no deben bloquear nuevas reservas futuras del mismo item.
++- `ReservationService.create` sigue usando `ItemRepository.reserveIfAvailable(...)`.
++- ITEM-Z5B sigue usando `X-Idempotency-Key` opcional.
++
++## Problema
++
++El servicio ya valida `findByItemIdAndStatus(itemId, ACTIVE)` y el item cambia de `AVAILABLE` a `RESERVED` de forma atomica. Aun asi, sin proteccion estructural, una ruta futura, un bug o una carrera no prevista podria insertar mas de una reserva `ACTIVE` para el mismo item.
++
++## Diseno elegido
++
++MySQL 5.7 no soporta indices parciales simples tipo:
++
++```sql
++CREATE UNIQUE INDEX ... WHERE status = 'ACTIVE'
++```
++
++Por eso se usa una columna generada nullable:
++
++```sql
++active_reservation_item_id =
++  CASE WHEN status = 'ACTIVE' THEN item_id ELSE NULL END
++```
++
++Luego se crea un indice unico:
++
++```sql
++UNIQUE KEY uq_reservations_active_item (
++  branch_id,
++  active_reservation_item_id
++)
++```
++
++Efecto:
++
++- Si la reserva esta `ACTIVE`, `active_reservation_item_id = item_id` y el unique bloquea otra activa del mismo item en la misma sucursal.
++- Si la reserva esta `CANCELLED` o `CONVERTED_TO_SALE`, `active_reservation_item_id = NULL`.
++- MySQL permite multiples `NULL` en un unique, por lo que no bloquea historicos.
++
++## Migracion
++
++Migracion creada:
++
++```text
++V53__active_reservation_item_constraint.sql
++```
++
++La migracion:
++
++1. Agrega `active_reservation_item_id` como columna generada `STORED` si no existe.
++2. Agrega `uq_reservations_active_item` si no existe.
++3. No borra datos.
++4. No modifica reservas existentes.
++5. No cambia statuses.
++
++## Prevalidacion legacy
++
++Antes de aplicar en ambientes con datos legacy, ejecutar:
++
++```sql
++SELECT branch_id, item_id, COUNT(*) AS active_count
++FROM reservations
++WHERE status = 'ACTIVE'
++GROUP BY branch_id, item_id
++HAVING COUNT(*) > 1;
++```
++
++Si devuelve filas, no se debe borrar nada automaticamente. Hay que resolver esas duplicidades con decision operativa antes de aplicar la migracion.
++
++## Backend
++
++`ReservationService.create` ahora guarda la reserva con `saveAndFlush(...)` para detectar una posible violacion del unique dentro del flujo transaccional.
++
++Si la excepcion corresponde a `uq_reservations_active_item`, se traduce a:
++
++```text
++El item ya tiene una reserva activa
++```
++
++Otros errores de integridad se relanzan sin enmascararlos.
++
++## Relacion con idempotencia ITEM-Z5B
++
++ITEM-Z5B se conserva:
++
++- sin `X-Idempotency-Key`, el flujo legacy sigue funcionando;
++- con la misma key y mismo payload, se devuelve la reserva existente;
++- con misma key y payload distinto, se rechaza;
++- V53 no cambia la tabla `reservation_idempotency_keys`.
++
++## Tests
++
++Se agrego/ajusto cobertura para:
++
++- reserva exitosa con `saveAndFlush`;
++- flujo sin idempotency key;
++- flujo con idempotency key;
++- flujo LIVE con `DO_LIVE_RESERVATION`;
++- traduccion de violacion `uq_reservations_active_item` a error de negocio;
++- conservacion del update atomico `AVAILABLE -> RESERVED`.
++
++La migracion fue validada por Flyway durante `./mvnw.cmd test` en MySQL 5.7 local.
++
++## No alcance
++
++No se implementa:
++
++- auditoria de intentos rechazados;
++- limpieza TTL de idempotency keys;
++- pagos;
++- caja;
++- precio LIVE;
++- devoluciones;
++- autorizaciones;
++- nuevos permisos;
++- cambios RBAC;
++- endpoints nuevos;
++- venta financiera.
++
++## Rollback
++
++Rollback tecnico sugerido:
++
++1. Revertir commit de ITEM-Z5C.
++2. En ambientes donde V53 ya fue aplicada, planear rollback DBA controlado:
++   - retirar unique `uq_reservations_active_item`;
++   - retirar columna generada `active_reservation_item_id` si se decide volver completamente.
++3. Validar que ITEM-Z3B e ITEM-Z5B sigan activos.
++4. Ejecutar `./mvnw.cmd test` y smoke de reserva normal/LIVE.
++
++## Riesgos pendientes
++
++- Ambientes con duplicados `ACTIVE` legacy deben resolverse antes de aplicar V53.
++- No existe aun auditoria especifica de intentos rechazados.
++- No existe limpieza automatica de llaves de idempotencia expiradas.
++- Falta QA visual/API real con usuarios operativos.
++
++## GO/NO-GO
++
++GO tecnico condicionado a:
++
++- Maven test PASS;
++- lint PASS;
++- TypeScript PASS;
++- expo export PASS;
++- `git diff --check` PASS;
++- no cambios fuera de alcance.
++
++Resultado QA visual/API real queda `PENDING_QA_VISUAL` si no hay navegador o smoke autenticado.
+diff --git a/git-diffs/20260609-ITEM-Z5C-active-reservation-constraint-stat.txt b/git-diffs/20260609-ITEM-Z5C-active-reservation-constraint-stat.txt
+new file mode 100644
+index 0000000..d635033
+--- /dev/null
++++ b/git-diffs/20260609-ITEM-Z5C-active-reservation-constraint-stat.txt
+@@ -0,0 +1,8 @@
++﻿ .../ctrlropa/reservation/ReservationService.java   |  25 ++-
++ .../V53__active_reservation_item_constraint.sql    |  47 ++++++
++ .../reservation/ReservationServiceTests.java       |  46 ++++--
++ docs/ERP_BITACORA_CAMBIOS.md                       |  29 ++++
++ docs/ERP_RIESGOS_OPERATIVOS.md                     |   1 +
++ docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md          |  19 +++
++ docs/ITEM_Z5C_ACTIVE_RESERVATION_CONSTRAINT.md     | 175 +++++++++++++++++++++
++ 7 files changed, 331 insertions(+), 11 deletions(-)
+diff --git a/git-diffs/20260609-ITEM-Z5C-active-reservation-constraint.diff b/git-diffs/20260609-ITEM-Z5C-active-reservation-constraint.diff
+new file mode 100644
+index 0000000..47dc155
+--- /dev/null
++++ b/git-diffs/20260609-ITEM-Z5C-active-reservation-constraint.diff
+@@ -0,0 +1,492 @@
++﻿diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
++index 9ac50c3..79d7d8d 100644
++--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
+++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
++@@ -252,7 +252,7 @@ public class ReservationService {
++             entity.setLiveOperationalStatusUpdatedByUserId(userId);
++         }
++
++-        Reservation saved = repository.save(entity);
+++        Reservation saved = saveCreatedReservation(entity);
++
++         CustomerOrder order = customerOrderService.addReservationToOpenOrder(saved);
++         customerOrderService.refreshStatus(order.getId());
++@@ -361,6 +361,29 @@ public class ReservationService {
++         idempotencyRepository.save(record);
++     }
++
+++    private Reservation saveCreatedReservation(Reservation entity) {
+++        try {
+++            return repository.saveAndFlush(entity);
+++        } catch (DataIntegrityViolationException ex) {
+++            if (isActiveReservationConstraintViolation(ex)) {
+++                throw new ConflictException("El item ya tiene una reserva activa");
+++            }
+++            throw ex;
+++        }
+++    }
+++
+++    private boolean isActiveReservationConstraintViolation(Throwable ex) {
+++        Throwable current = ex;
+++        while (current != null) {
+++            String message = current.getMessage();
+++            if (message != null && message.contains("uq_reservations_active_item")) {
+++                return true;
+++            }
+++            current = current.getCause();
+++        }
+++        return false;
+++    }
+++
++     private String normalizeIdempotencyKey(String idempotencyKey) {
++         if (idempotencyKey == null || idempotencyKey.isBlank()) {
++             return null;
++diff --git a/backend/control-ropa/src/main/resources/db/migration/V53__active_reservation_item_constraint.sql b/backend/control-ropa/src/main/resources/db/migration/V53__active_reservation_item_constraint.sql
++new file mode 100644
++index 0000000..0d52568
++--- /dev/null
+++++ b/backend/control-ropa/src/main/resources/db/migration/V53__active_reservation_item_constraint.sql
++@@ -0,0 +1,47 @@
+++-- ITEM-Z5C: proteccion estructural para una sola reserva ACTIVE por item.
+++-- No toca pagos, caja, precio LIVE, devoluciones, autorizaciones, permisos ni RBAC.
+++--
+++-- Prevalidacion recomendada antes de aplicar en ambientes con datos legacy:
+++-- SELECT branch_id, item_id, COUNT(*) AS active_count
+++-- FROM reservations
+++-- WHERE status = 'ACTIVE'
+++-- GROUP BY branch_id, item_id
+++-- HAVING COUNT(*) > 1;
+++--
+++-- MySQL 5.7 no soporta indices parciales tipo WHERE status = 'ACTIVE'.
+++-- Se usa columna generada nullable: solo contiene item_id cuando status = ACTIVE.
+++-- Los status historicos CANCELLED/CONVERTED_TO_SALE quedan en NULL y no colisionan.
+++
+++SET @column_exists := (
+++  SELECT COUNT(*)
+++  FROM information_schema.COLUMNS
+++  WHERE TABLE_SCHEMA = DATABASE()
+++    AND TABLE_NAME = 'reservations'
+++    AND COLUMN_NAME = 'active_reservation_item_id'
+++);
+++
+++SET @sql := IF(
+++  @column_exists = 0,
+++  'ALTER TABLE reservations ADD COLUMN active_reservation_item_id BIGINT UNSIGNED GENERATED ALWAYS AS (CASE WHEN status = ''ACTIVE'' THEN item_id ELSE NULL END) STORED AFTER item_id',
+++  'SELECT 1'
+++);
+++PREPARE stmt FROM @sql;
+++EXECUTE stmt;
+++DEALLOCATE PREPARE stmt;
+++
+++SET @index_exists := (
+++  SELECT COUNT(*)
+++  FROM information_schema.STATISTICS
+++  WHERE TABLE_SCHEMA = DATABASE()
+++    AND TABLE_NAME = 'reservations'
+++    AND INDEX_NAME = 'uq_reservations_active_item'
+++);
+++
+++SET @sql := IF(
+++  @index_exists = 0,
+++  'ALTER TABLE reservations ADD UNIQUE KEY uq_reservations_active_item (branch_id, active_reservation_item_id)',
+++  'SELECT 1'
+++);
+++PREPARE stmt FROM @sql;
+++EXECUTE stmt;
+++DEALLOCATE PREPARE stmt;
++diff --git a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java
++index 93fe876..9e620f8 100644
++--- a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java
+++++ b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java
++@@ -26,6 +26,7 @@ import com.hpsqsoft.ctrlropa.web.error.ConflictException;
++ import org.junit.jupiter.api.Test;
++ import org.junit.jupiter.params.ParameterizedTest;
++ import org.junit.jupiter.params.provider.EnumSource;
+++import org.springframework.dao.DataIntegrityViolationException;
++ import org.springframework.jdbc.core.JdbcTemplate;
++ import org.springframework.jdbc.core.RowMapper;
++ import org.springframework.test.util.ReflectionTestUtils;
++@@ -96,7 +97,7 @@ class ReservationServiceTests {
++         when(itemRepository.reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED))
++                 .thenReturn(1);
++         when(repository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE)).thenReturn(Optional.empty());
++-        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> {
+++        when(repository.saveAndFlush(any(Reservation.class))).thenAnswer(invocation -> {
++             Reservation reservation = invocation.getArgument(0);
++             ReflectionTestUtils.setField(reservation, "id", 10L);
++             return reservation;
++@@ -113,7 +114,7 @@ class ReservationServiceTests {
++         verify(itemRepository).reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED);
++         verify(idempotencyRepository, never()).saveAndFlush(any(ReservationIdempotencyRecord.class));
++         verify(itemRepository, never()).save(any(Item.class));
++-        verify(repository).save(any(Reservation.class));
+++        verify(repository).saveAndFlush(any(Reservation.class));
++         verify(customerOrderService).refreshStatus(55L);
++         verify(accessService).assertCan(
++                 99L,
++@@ -148,7 +149,7 @@ class ReservationServiceTests {
++                 any(),
++                 any()
++         );
++-        verify(repository, never()).save(any(Reservation.class));
+++        verify(repository, never()).saveAndFlush(any(Reservation.class));
++     }
++
++     @Test
++@@ -170,7 +171,7 @@ class ReservationServiceTests {
++         );
++
++         assertEquals("La prenda ya no esta disponible para apartar", exception.getMessage());
++-        verify(repository, never()).save(any(Reservation.class));
+++        verify(repository, never()).saveAndFlush(any(Reservation.class));
++         verify(customerOrderService, never()).addReservationToOpenOrder(any(Reservation.class));
++         verify(itemRepository, never()).save(any(Item.class));
++     }
++@@ -199,7 +200,7 @@ class ReservationServiceTests {
++         when(itemRepository.reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED))
++                 .thenReturn(1);
++         when(repository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE)).thenReturn(Optional.empty());
++-        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> {
+++        when(repository.saveAndFlush(any(Reservation.class))).thenAnswer(invocation -> {
++             Reservation reservation = invocation.getArgument(0);
++             ReflectionTestUtils.setField(reservation, "id", 10L);
++             return reservation;
++@@ -217,6 +218,31 @@ class ReservationServiceTests {
++         verify(idempotencyRepository).save(pendingRecord);
++     }
++
+++    @Test
+++    void createTranslatesActiveReservationConstraintViolation() {
+++        Branch branch = branch();
+++        Item item = item(ItemStatus.AVAILABLE, branch);
+++        Customer customer = customer(branch);
+++        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
+++        ReservationService.CreateReservationRequest request = request(channel.getId(), null);
+++
+++        stubCommonCreateFlow(branch, item, customer, channel);
+++        when(repository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE)).thenReturn(Optional.empty());
+++        when(itemRepository.reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED))
+++                .thenReturn(1);
+++        when(repository.saveAndFlush(any(Reservation.class)))
+++                .thenThrow(new DataIntegrityViolationException("Duplicate entry for uq_reservations_active_item"));
+++
+++        ConflictException exception = assertThrows(
+++                ConflictException.class,
+++                () -> service.create(request)
+++        );
+++
+++        assertTrue(exception.getMessage().contains("reserva activa"));
+++        verify(itemRepository).reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED);
+++        verify(customerOrderService, never()).addReservationToOpenOrder(any(Reservation.class));
+++    }
+++
++     @Test
++     void createWithSameIdempotencyKeyAndPayloadReturnsExistingReservation() {
++         Branch branch = branch();
++@@ -248,7 +274,7 @@ class ReservationServiceTests {
++
++         assertEquals(10L, response.getId());
++         verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
++-        verify(repository, never()).save(any(Reservation.class));
+++        verify(repository, never()).saveAndFlush(any(Reservation.class));
++         verify(idempotencyRepository, never()).saveAndFlush(any(ReservationIdempotencyRecord.class));
++     }
++
++@@ -283,7 +309,7 @@ class ReservationServiceTests {
++
++         assertTrue(exception.getMessage().contains("datos distintos"));
++         verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
++-        verify(repository, never()).save(any(Reservation.class));
+++        verify(repository, never()).saveAndFlush(any(Reservation.class));
++     }
++
++     @Test
++@@ -315,7 +341,7 @@ class ReservationServiceTests {
++
++         assertTrue(exception.getMessage().contains("sigue en proceso"));
++         verify(itemRepository, never()).reserveIfAvailable(any(), any(), any(), any(), any());
++-        verify(repository, never()).save(any(Reservation.class));
+++        verify(repository, never()).saveAndFlush(any(Reservation.class));
++     }
++
++     @Test
++@@ -333,7 +359,7 @@ class ReservationServiceTests {
++         when(repository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE)).thenReturn(Optional.empty());
++         when(itemRepository.reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED))
++                 .thenReturn(1);
++-        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> {
+++        when(repository.saveAndFlush(any(Reservation.class))).thenAnswer(invocation -> {
++             Reservation reservation = invocation.getArgument(0);
++             ReflectionTestUtils.setField(reservation, "id", 10L);
++             return reservation;
++@@ -382,7 +408,7 @@ class ReservationServiceTests {
++         when(repository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE)).thenReturn(Optional.empty());
++         when(itemRepository.reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED))
++                 .thenReturn(1);
++-        when(repository.save(any(Reservation.class))).thenAnswer(invocation -> {
+++        when(repository.saveAndFlush(any(Reservation.class))).thenAnswer(invocation -> {
++             Reservation reservation = invocation.getArgument(0);
++             ReflectionTestUtils.setField(reservation, "id", 10L);
++             return reservation;
++diff --git a/docs/ERP_BITACORA_CAMBIOS.md b/docs/ERP_BITACORA_CAMBIOS.md
++index ff7dff1..cfb1695 100644
++--- a/docs/ERP_BITACORA_CAMBIOS.md
+++++ b/docs/ERP_BITACORA_CAMBIOS.md
++@@ -1,5 +1,34 @@
++ # ERP - Bitacora de cambios
++
+++## 2026-06-09 - ITEM-Z5C constraint de reserva activa por item
+++
+++Tipo: migracion de consistencia, backend defensivo, pruebas, evidencia operativa.
+++
+++Objetivo:
+++
+++- Impedir multiples reservas `ACTIVE` para el mismo item sin bloquear historicos cancelados o convertidos.
+++
+++Cambios realizados:
+++
+++- Se creo `V53__active_reservation_item_constraint.sql`.
+++- Se agrego columna generada `active_reservation_item_id` en `reservations`.
+++- Se agrego unique `uq_reservations_active_item`.
+++- `ReservationService.create` detecta la violacion del unique y devuelve error de negocio claro.
+++- Se ajustaron pruebas para usar `saveAndFlush` en la creacion de reserva.
+++
+++Restricciones respetadas:
+++
+++- No se tocaron pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC ni permisos.
+++- No se crearon endpoints nuevos.
+++- No se cambio venta financiera.
+++- No se modifico idempotencia ITEM-Z5B.
+++
+++Pendientes:
+++
+++- Resolver duplicados activos legacy si existen antes de aplicar en ambientes compartidos.
+++- QA API/visual real con usuarios operativos.
+++- ITEM-Z5D para trazabilidad de intentos rechazados.
+++
++ ## 2026-06-09 - ITEM-Z5B idempotencia backend de reservas
++
++ Tipo: backend transaccional, migracion minima, frontend tecnico, evidencia operativa.
++diff --git a/docs/ERP_RIESGOS_OPERATIVOS.md b/docs/ERP_RIESGOS_OPERATIVOS.md
++index bca2c81..957b7a4 100644
++--- a/docs/ERP_RIESGOS_OPERATIVOS.md
+++++ b/docs/ERP_RIESGOS_OPERATIVOS.md
++@@ -214,6 +214,7 @@ Probabilidad:
++ - ITEM-Z3B mitiga doble reserva con update atomico `AVAILABLE -> RESERVED` filtrado por company, branch e item; siguen pendientes idempotency key, constraint de reserva activa por item, QA API/visual real y flujos financieros/reversas.
++ - ITEM-Z4 aclara en UI cuando una prenda `AVAILABLE` ya esta al aire; no cambia inventario, por lo que QA debe confirmar que el selector no la muestra solo como `Libre` ni permite prepararla como reemplazo de si misma.
++ - ITEM-Z5B agrega idempotencia backend para creacion de reservas con `X-Idempotency-Key`; siguen pendientes constraint de reserva activa por item, limpieza TTL, trazabilidad de intentos rechazados y QA API/visual real.
+++- ITEM-Z5C agrega constraint estructural de una reserva `ACTIVE` por item usando columna generada compatible con MySQL 5.7; ambientes con duplicados activos legacy deben resolverse antes de aplicar la migracion.
++ - PRODUCT-ERR-A agrega mapper frontend de errores accionables; modulos fuera de las rutas criticas aun deben migrarse por dominio para evitar que `err.message` exponga mensajes genericos o tecnicos.
++ - Pagos/ventas sin regresion automatizada suficiente.
++ - Auditoria de negocio todavia parcial.
++diff --git a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
++index b01ccd2..3afe833 100644
++--- a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+++++ b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
++@@ -9,6 +9,25 @@ Tipo: backlog documental, sin implementacion
++
++ Convertir el analisis de Fase 2A/2B en un backlog tecnico ordenado para implementar multi-compania con bajo riesgo, evitando fuga de datos entre clientes y manteniendo trazabilidad HPSQ-SOFT.
++
+++## Actualizacion ITEM-Z5C - Constraint de reserva activa por item
+++
+++Fecha: 2026-06-09
+++Estado: implementado tecnico condicionado.
+++
+++Alcance ejecutado:
+++
+++- Migracion `V53__active_reservation_item_constraint.sql`.
+++- Columna generada `active_reservation_item_id` en `reservations`.
+++- Unique `uq_reservations_active_item` por `branch_id` y item activo.
+++- Traduccion backend de violacion del unique a error de negocio claro.
+++- Conservacion de idempotencia ITEM-Z5B y update atomico ITEM-Z3B.
+++
+++Pendiente:
+++
+++- Ejecutar prevalidacion de duplicados activos en ambientes legacy antes de aplicar.
+++- QA API/visual real con usuarios operativos.
+++- ITEM-Z5D para trazabilidad de intentos rechazados y limpieza TTL.
+++
++ ## Actualizacion ITEM-Z5B - Idempotencia backend de reservas
++
++ Fecha: 2026-06-09
++diff --git a/docs/ITEM_Z5C_ACTIVE_RESERVATION_CONSTRAINT.md b/docs/ITEM_Z5C_ACTIVE_RESERVATION_CONSTRAINT.md
++new file mode 100644
++index 0000000..8e25c34
++--- /dev/null
+++++ b/docs/ITEM_Z5C_ACTIVE_RESERVATION_CONSTRAINT.md
++@@ -0,0 +1,175 @@
+++# ITEM-Z5C - Constraint de reserva activa por item
+++
+++Fecha: 2026-06-09
+++Rama: `feature/item-z5c-active-reservation-constraint`
+++Tipo: migracion minima, backend defensivo, pruebas, documentacion y evidencia.
+++
+++## Resumen ejecutivo
+++
+++ITEM-Z5C agrega una proteccion estructural para impedir multiples reservas activas sobre el mismo item. La proteccion complementa:
+++
+++- ITEM-Z3B: update atomico `AVAILABLE -> RESERVED`;
+++- ITEM-Z5B: idempotencia por `X-Idempotency-Key`.
+++
+++Esta fase no toca pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC, permisos, endpoints nuevos ni venta financiera.
+++
+++## Estado previo validado
+++
+++Hallazgos confirmados:
+++
+++- La tabla real es `reservations`.
+++- `reservations` contiene `item_id`, `branch_id` y `status`.
+++- `reservations` no contiene `company_id`; el scope de company se deriva por `branch_id`/item.
+++- `ReservationStatus` real contiene:
+++  - `ACTIVE`;
+++  - `CANCELLED`;
+++  - `CONVERTED_TO_SALE`.
+++- El unico status que cuenta como reserva activa para esta fase es `ACTIVE`.
+++- `CANCELLED` y `CONVERTED_TO_SALE` son historicos/no activos y no deben bloquear nuevas reservas futuras del mismo item.
+++- `ReservationService.create` sigue usando `ItemRepository.reserveIfAvailable(...)`.
+++- ITEM-Z5B sigue usando `X-Idempotency-Key` opcional.
+++
+++## Problema
+++
+++El servicio ya valida `findByItemIdAndStatus(itemId, ACTIVE)` y el item cambia de `AVAILABLE` a `RESERVED` de forma atomica. Aun asi, sin proteccion estructural, una ruta futura, un bug o una carrera no prevista podria insertar mas de una reserva `ACTIVE` para el mismo item.
+++
+++## Diseno elegido
+++
+++MySQL 5.7 no soporta indices parciales simples tipo:
+++
+++```sql
+++CREATE UNIQUE INDEX ... WHERE status = 'ACTIVE'
+++```
+++
+++Por eso se usa una columna generada nullable:
+++
+++```sql
+++active_reservation_item_id =
+++  CASE WHEN status = 'ACTIVE' THEN item_id ELSE NULL END
+++```
+++
+++Luego se crea un indice unico:
+++
+++```sql
+++UNIQUE KEY uq_reservations_active_item (
+++  branch_id,
+++  active_reservation_item_id
+++)
+++```
+++
+++Efecto:
+++
+++- Si la reserva esta `ACTIVE`, `active_reservation_item_id = item_id` y el unique bloquea otra activa del mismo item en la misma sucursal.
+++- Si la reserva esta `CANCELLED` o `CONVERTED_TO_SALE`, `active_reservation_item_id = NULL`.
+++- MySQL permite multiples `NULL` en un unique, por lo que no bloquea historicos.
+++
+++## Migracion
+++
+++Migracion creada:
+++
+++```text
+++V53__active_reservation_item_constraint.sql
+++```
+++
+++La migracion:
+++
+++1. Agrega `active_reservation_item_id` como columna generada `STORED` si no existe.
+++2. Agrega `uq_reservations_active_item` si no existe.
+++3. No borra datos.
+++4. No modifica reservas existentes.
+++5. No cambia statuses.
+++
+++## Prevalidacion legacy
+++
+++Antes de aplicar en ambientes con datos legacy, ejecutar:
+++
+++```sql
+++SELECT branch_id, item_id, COUNT(*) AS active_count
+++FROM reservations
+++WHERE status = 'ACTIVE'
+++GROUP BY branch_id, item_id
+++HAVING COUNT(*) > 1;
+++```
+++
+++Si devuelve filas, no se debe borrar nada automaticamente. Hay que resolver esas duplicidades con decision operativa antes de aplicar la migracion.
+++
+++## Backend
+++
+++`ReservationService.create` ahora guarda la reserva con `saveAndFlush(...)` para detectar una posible violacion del unique dentro del flujo transaccional.
+++
+++Si la excepcion corresponde a `uq_reservations_active_item`, se traduce a:
+++
+++```text
+++El item ya tiene una reserva activa
+++```
+++
+++Otros errores de integridad se relanzan sin enmascararlos.
+++
+++## Relacion con idempotencia ITEM-Z5B
+++
+++ITEM-Z5B se conserva:
+++
+++- sin `X-Idempotency-Key`, el flujo legacy sigue funcionando;
+++- con la misma key y mismo payload, se devuelve la reserva existente;
+++- con misma key y payload distinto, se rechaza;
+++- V53 no cambia la tabla `reservation_idempotency_keys`.
+++
+++## Tests
+++
+++Se agrego/ajusto cobertura para:
+++
+++- reserva exitosa con `saveAndFlush`;
+++- flujo sin idempotency key;
+++- flujo con idempotency key;
+++- flujo LIVE con `DO_LIVE_RESERVATION`;
+++- traduccion de violacion `uq_reservations_active_item` a error de negocio;
+++- conservacion del update atomico `AVAILABLE -> RESERVED`.
+++
+++La migracion fue validada por Flyway durante `./mvnw.cmd test` en MySQL 5.7 local.
+++
+++## No alcance
+++
+++No se implementa:
+++
+++- auditoria de intentos rechazados;
+++- limpieza TTL de idempotency keys;
+++- pagos;
+++- caja;
+++- precio LIVE;
+++- devoluciones;
+++- autorizaciones;
+++- nuevos permisos;
+++- cambios RBAC;
+++- endpoints nuevos;
+++- venta financiera.
+++
+++## Rollback
+++
+++Rollback tecnico sugerido:
+++
+++1. Revertir commit de ITEM-Z5C.
+++2. En ambientes donde V53 ya fue aplicada, planear rollback DBA controlado:
+++   - retirar unique `uq_reservations_active_item`;
+++   - retirar columna generada `active_reservation_item_id` si se decide volver completamente.
+++3. Validar que ITEM-Z3B e ITEM-Z5B sigan activos.
+++4. Ejecutar `./mvnw.cmd test` y smoke de reserva normal/LIVE.
+++
+++## Riesgos pendientes
+++
+++- Ambientes con duplicados `ACTIVE` legacy deben resolverse antes de aplicar V53.
+++- No existe aun auditoria especifica de intentos rechazados.
+++- No existe limpieza automatica de llaves de idempotencia expiradas.
+++- Falta QA visual/API real con usuarios operativos.
+++
+++## GO/NO-GO
+++
+++GO tecnico condicionado a:
+++
+++- Maven test PASS;
+++- lint PASS;
+++- TypeScript PASS;
+++- expo export PASS;
+++- `git diff --check` PASS;
+++- no cambios fuera de alcance.
+++
+++Resultado QA visual/API real queda `PENDING_QA_VISUAL` si no hay navegador o smoke autenticado.
+diff --git a/qa-reports/ITEM-Z5C-active-reservation-constraint-report-20260609-191854.md b/qa-reports/ITEM-Z5C-active-reservation-constraint-report-20260609-191854.md
+new file mode 100644
+index 0000000..a3baa51
+--- /dev/null
++++ b/qa-reports/ITEM-Z5C-active-reservation-constraint-report-20260609-191854.md
+@@ -0,0 +1,131 @@
++# ITEM-Z5C - Reporte tecnico de constraint de reserva activa por item
++
++Fecha: 2026-06-09 19:18
++Rama: `feature/item-z5c-active-reservation-constraint`
++Resultado: `GO_TECNICO` / `PENDING_QA_VISUAL`
++
++## Resumen
++
++Se implemento una proteccion estructural para impedir multiples reservas `ACTIVE` sobre el mismo item sin bloquear historicos `CANCELLED` o `CONVERTED_TO_SALE`.
++
++## Historial previo validado
++
++Commits encontrados:
++
++- `92e937a ITEM-Z3B protege reserva atomica`
++- `ce0e2b5 ITEM-Z4 distingue prenda al aire en selector live`
++- `78065c3 ITEM-Z5 documenta handoff idempotencia reservas`
++- `6f1ee15 ITEM-Z5B agrega idempotencia de reservas`
++
++## Auditoria previa
++
++Tabla real:
++
++- `reservations`
++
++Columnas reales relevantes:
++
++- `item_id`
++- `branch_id`
++- `status`
++
++No existe `company_id` directo en `reservations`; el scope de company se deriva por branch/item segun el modelo actual.
++
++Estados reales de `ReservationStatus`:
++
++- `ACTIVE`
++- `CANCELLED`
++- `CONVERTED_TO_SALE`
++
++Status considerado activo:
++
++- `ACTIVE`
++
++Status historicos/no activos:
++
++- `CANCELLED`
++- `CONVERTED_TO_SALE`
++
++## Implementacion realizada
++
++Migracion:
++
++- `backend/control-ropa/src/main/resources/db/migration/V53__active_reservation_item_constraint.sql`
++
++Detalle:
++
++- Agrega columna generada `active_reservation_item_id`.
++- La columna toma `item_id` solo cuando `status = 'ACTIVE'`.
++- Para status no activos queda `NULL`.
++- Agrega unique `uq_reservations_active_item (branch_id, active_reservation_item_id)`.
++
++Backend:
++
++- `ReservationService.create` guarda la reserva con `saveAndFlush`.
++- Si la base reporta `uq_reservations_active_item`, el servicio devuelve error de negocio:
++  `El item ya tiene una reserva activa`.
++- Otros errores de integridad no se enmascaran.
++
++## Tests agregados/ajustados
++
++Archivo:
++
++- `backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceTests.java`
++
++Cobertura:
++
++- Creacion exitosa conserva update atomico `AVAILABLE -> RESERVED`.
++- Flujo sin idempotency key sigue funcionando.
++- Flujo con idempotency key sigue funcionando.
++- Flujo LIVE conserva `DO_LIVE_RESERVATION`.
++- Violacion `uq_reservations_active_item` se traduce a conflicto de negocio.
++
++## Validaciones ejecutadas
++
++Backend:
++
++- `./mvnw.cmd test` cargando `.env` local sin imprimir secretos: PASS.
++- Flyway valido 53 migraciones en MySQL 5.7 local.
++
++Frontend:
++
++- `npm.cmd run lint`: PASS, 0 errores, 53 warnings historicos.
++- `npx.cmd tsc --noEmit`: PASS.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: PASS.
++
++Git:
++
++- `git --no-pager diff --check`: PASS, solo warnings LF/CRLF.
++- `git --no-pager diff --cached --check`: pendiente de ejecutar despues de staging final.
++
++## Restricciones respetadas
++
++Confirmado:
++
++- No se tocaron pagos.
++- No se toco caja.
++- No se toco precio LIVE.
++- No se tocaron devoluciones.
++- No se tocaron autorizaciones.
++- No se modifico RBAC.
++- No se crearon permisos.
++- No se crearon endpoints.
++- No se cambio venta financiera.
++- No se rompio idempotencia ITEM-Z5B.
++
++## Riesgos pendientes
++
++- Si un ambiente tiene duplicados `ACTIVE` legacy por `branch_id/item_id`, V53 debe fallar hasta resolverlos con decision operativa.
++- No existe aun auditoria especifica de intentos rechazados.
++- No existe limpieza automatica de llaves de idempotencia expiradas.
++- No hubo navegador/screenshots reales.
++
++## GO/NO-GO
++
++Resultado tecnico: `GO_TECNICO`.
++
++Resultado visual/API real: `PENDING_QA_VISUAL`.
++
++Siguiente fase recomendada:
++
++- ITEM-Z5D: trazabilidad de intentos rechazados y limpieza/retencion de idempotency keys si arquitectura lo aprueba.

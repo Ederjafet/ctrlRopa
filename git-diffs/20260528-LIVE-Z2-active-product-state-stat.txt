@@ -1,0 +1,17 @@
+ app/live.tsx                                       | 108 +++++++++++++-
+ .../main/java/com/hpsqsoft/ctrlropa/live/Live.java |   9 +-
+ .../com/hpsqsoft/ctrlropa/live/LiveController.java |  15 +-
+ .../com/hpsqsoft/ctrlropa/live/LiveResponse.java   |  41 +++++-
+ .../com/hpsqsoft/ctrlropa/live/LiveService.java    | 158 +++++++++++++++++----
+ locales/en/common.json                             |  11 ++
+ locales/es/common.json                             |  11 ++
+ services/liveService.ts                            |  19 +++
+ 8 files changed, 341 insertions(+), 31 deletions(-)
+app/live.tsx
+backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/Live.java
+backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveController.java
+backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveResponse.java
+backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveService.java
+locales/en/common.json
+locales/es/common.json
+services/liveService.ts

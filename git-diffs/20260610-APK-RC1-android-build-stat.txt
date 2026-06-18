@@ -1,0 +1,7 @@
+﻿ app.json                                           |   4 +-
+ docs/APK_RC1_ANDROID_BUILD.md                      | 127 +++
+ eas.json                                           |   6 +
+ package-lock.json                                  | 973 +++++++++++----------
+ package.json                                       |   8 +-
+ ...APK-RC1-android-build-report-20260610-190254.md | 106 +++
+ 6 files changed, 772 insertions(+), 452 deletions(-)

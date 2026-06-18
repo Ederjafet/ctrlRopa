@@ -1,0 +1,17 @@
+test_name,module,expected,received,result,notes
+TypeScript,Frontend,tsc OK,OK,PASS,npx.cmd tsc --noEmit
+Backend tests,Backend,mvn test OK,OK,PASS,73 tests OK
+Lint,Frontend,0 errors,0 errors 60 warnings,PASS,Warnings preexistentes del repo
+Expo export,Frontend,Export web OK,OK,PASS,C:/tmp/control-ropa-web-export
+Backend package,Backend,package -DskipTests OK,OK,PASS,Sin errores
+AUTH-Z regression,Security,PASS=6 FAIL=0 SKIP=0,PASS=6 FAIL=0 SKIP=0,PASS,Reporte qa-reports/AUTH-Z-final-security-report-20260529-135700.md
+Manual AUTH login,Security,login OK,login OK,PASS,qa.admin@local.test obtuvo sessionToken
+Manual AUTH summary,Security,200 autorizado o 403 esperado,403,PASS,qa.admin no tiene VIEW_SECURITY_AUDIT
+Git diff check,Git,Sin whitespace errors,OK,PASS,Solo warnings CRLF del entorno
+Live events migration,Backend,V49 aditiva,Creada,PASS,CREATE TABLE IF NOT EXISTS live_events sin DROP ni DELETE
+Security audit separation,Security,No usar security_audit_events,OK,PASS,Eventos operativos usan live_events
+Visual qa.admin,LIVE,Genera eventos al operar,No ejecutado,SKIP,Requiere navegador/tablet manual
+Visual qa.vendedor,LIVE,Genera eventos si tiene permiso,No ejecutado,SKIP,Requiere navegador/tablet manual
+Visual qa.supervisor,LIVE,Consulta eventos segun permisos,No ejecutado,SKIP,Requiere navegador/tablet manual
+Visual qa.sinpermisos,LIVE,Bloqueado,Validado indirectamente por AUTH-Z,PASS,NO_ACCESS cubierto por smoke AUTH
+Tenant QA_A/QA_B,Security,Aislamiento tenant,Validado indirectamente por AUTH-Z/F6,PASS,No asumir permiso LIVE

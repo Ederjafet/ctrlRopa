@@ -1,0 +1,13 @@
+﻿ app/live.tsx                                       | 126 ++++++++++++++++++---
+ docs/LIVE_FIX_A_ACTIONABLE_LIVE_BUTTONS.md         |  83 ++++++++++++++
+ docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md        |   2 +
+ docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md              |   2 +
+ locales/en/common.json                             |   8 ++
+ locales/es/common.json                             |   8 ++
+ locales/fr/common.json                             |   8 ++
+ locales/ja/common.json                             |   8 ++
+ locales/ko/common.json                             |   8 ++
+ locales/pt-BR/common.json                          |   8 ++
+ locales/zh/common.json                             |   8 ++
+ ...tionable-live-buttons-report-20260608-165246.md |  59 ++++++++++
+ 12 files changed, 315 insertions(+), 13 deletions(-)

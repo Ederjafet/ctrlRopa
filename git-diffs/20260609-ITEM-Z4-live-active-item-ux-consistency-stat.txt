@@ -1,0 +1,15 @@
+﻿ app/live.tsx                                       |  32 ++++++-
+ components/ui/AppOptionRow.tsx                     |  10 +-
+ docs/ERP_BITACORA_CAMBIOS.md                       |  23 +++++
+ docs/ERP_RIESGOS_OPERATIVOS.md                     |   1 +
+ docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md          |   3 +-
+ docs/ITEM_Z4_LIVE_ACTIVE_ITEM_UX_CONSISTENCY.md    |  61 ++++++++++++
+ locales/en/common.json                             |   2 +
+ locales/es/common.json                             |   2 +
+ locales/fr/common.json                             |   2 +
+ locales/ja/common.json                             |   2 +
+ locales/ko/common.json                             |   2 +
+ locales/pt-BR/common.json                          |   2 +
+ locales/zh/common.json                             |   2 +
+ ...e-item-ux-consistency-report-20260609-135404.md | 104 +++++++++++++++++++++
+ 14 files changed, 244 insertions(+), 4 deletions(-)

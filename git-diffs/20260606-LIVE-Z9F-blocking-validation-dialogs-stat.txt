@@ -1,0 +1,11 @@
+﻿ app/items-create.tsx                         | 167 +++++++++++++++----------
+ components/ui/AppActionDialog.tsx            | 180 +++++++++++++++++++++++++++
+ components/ui/AppInput.tsx                   |   6 +-
+ docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md  |   4 +
+ docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md    |   4 +
+ docs/LIVE_Z9E_QUICK_ITEM_VALIDATION.md       |  11 ++
+ docs/LIVE_Z9F_BLOCKING_VALIDATION_DIALOGS.md |  80 ++++++++++++
+ docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md        |  13 +-
+ locales/en/common.json                       |   4 +-
+ locales/es/common.json                       |   4 +-
+ 10 files changed, 403 insertions(+), 70 deletions(-)

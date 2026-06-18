@@ -1,0 +1,693 @@
+diff --git a/app/live.tsx b/app/live.tsx
+index f6f7c03..ad8d2ab 100644
+--- a/app/live.tsx
++++ b/app/live.tsx
+@@ -32,10 +32,12 @@ import {
+   activateLive,
+   closeLive,
+   createLive,
++  getLiveEvents,
+   getLivesByBranch,
+   getLiveStatusLabel,
+   isLiveOperable,
+   Live,
++  LiveEvent,
+   setLiveActiveItem,
+ } from '@/services/liveService';
+ import {
+@@ -92,6 +94,13 @@ type LiveNotice = {
+   tone: 'success' | 'warning' | 'danger';
+ };
+
++type ActivityFeedEvent = {
++  badge: string;
++  label: string;
++  time: string;
++  tone: 'success' | 'neutral' | 'info' | 'accent';
++};
++
+ type LiveNoticeModalProps = {
+   notice: LiveNotice | null;
+   onClose: () => void;
+@@ -121,6 +130,18 @@ function formatMoney(value: number) {
+   return `$${value.toFixed(2)}`;
+ }
+
++function formatLiveEventTime(value?: string | null) {
++  if (!value) return '';
++
++  const date = new Date(value);
++  if (Number.isNaN(date.getTime())) return '';
++
++  return date.toLocaleTimeString([], {
++    hour: '2-digit',
++    minute: '2-digit',
++  });
++}
++
+ function normalize(value?: string | null) {
+   return (value ?? '').toLowerCase().trim();
+ }
+@@ -236,6 +257,44 @@ function getLiveReservationOperationalStatusLabel(
+   }
+ }
+
++function getLiveEventLabel(
++  event: LiveEvent,
++  t: (key: string, options?: Record<string, unknown>) => string
++) {
++  switch (event.eventType) {
++    case 'LIVE_STARTED':
++      return t('live.eventLiveStarted');
++    case 'LIVE_CLOSED':
++      return t('live.eventLiveClosed');
++    case 'ACTIVE_ITEM_CHANGED':
++      return t('live.eventActiveItemChanged', { id: event.entityId || '-' });
++    case 'LIVE_RESERVATION_CREATED':
++      return t('live.eventReservationCreated', { id: event.entityId || '-' });
++    case 'LIVE_RESERVATION_STATUS_CHANGED':
++      return t('live.eventReservationStatusChanged', { id: event.entityId || '-' });
++    case 'LIVE_OPERATIONAL_SOLD':
++      return t('live.eventOperationalSold', { id: event.entityId || '-' });
++    case 'LIVE_RESERVATION_CANCELLED':
++      return t('live.eventReservationCancelled', { id: event.entityId || '-' });
++    default:
++      return event.eventType;
++  }
++}
++
++function getLiveEventBadge(eventType: string, t: (key: string) => string) {
++  if (eventType.includes('RESERVATION')) return t('live.activityBadgeReservation');
++  if (eventType.includes('ITEM')) return t('live.activityBadgeProduct');
++  if (eventType.includes('SOLD')) return t('live.activityBadgeSold');
++  return t('live.activityBadgeLive');
++}
++
++function getLiveEventTone(eventType: string): ActivityFeedEvent['tone'] {
++  if (eventType.includes('SOLD')) return 'success';
++  if (eventType.includes('ITEM')) return 'accent';
++  if (eventType.includes('CANCELLED') || eventType.includes('CLOSED')) return 'neutral';
++  return 'info';
++}
++
+ function LiveNoticeModal({ notice, onClose }: LiveNoticeModalProps) {
+   const { theme } = useAppTheme();
+   const { t } = useTranslation('common');
+@@ -311,6 +370,7 @@ export default function LiveScreen() {
+   const [recentReservations, setRecentReservations] = useState<
+     RecentLiveReservation[]
+   >([]);
++  const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
+   const [branchReservations, setBranchReservations] = useState<Reservation[]>([]);
+   const [paidByReservationId, setPaidByReservationId] = useState<Record<number, number>>({});
+   const [updatingOperationalReservationId, setUpdatingOperationalReservationId] =
+@@ -482,6 +542,7 @@ export default function LiveScreen() {
+       setSelectedLive(nextSelectedLive);
+       setActiveItem(activeItemFromLive(nextSelectedLive));
+       await updateRecentReservations(reservationData, nextSelectedLive?.id);
++      await updateLiveEvents(nextSelectedLive?.id);
+
+       const pendingItemIds = await consumePendingQuickItems('live');
+       const createdItems = pendingItemIds
+@@ -765,39 +826,14 @@ export default function LiveScreen() {
+         ? t('live.presenterReadyActive')
+         : t('live.presenterReadyOpen');
+   const shouldShowDemoMetrics = showAnalyticsWidget && showDemoMetrics;
+-  const activityFeed = [
+-    ...recentReservations.slice(0, 3).map(({ customerName, itemCode }, index) => ({
+-      badge: t('live.activityBadgeReservation'),
+-      label: t('live.activityReservation', {
+-        customer: customerName,
+-        item: itemCode,
+-      }),
+-      time: t('live.activityMinutesAgo', { count: index + 1 }),
+-      tone: 'success' as const,
+-    })),
+-    {
+-      badge: t('live.activityBadgeComment'),
+-      label: t('live.activityComment', { customer: 'Carla', text: 'Tienes M?' }),
+-      time: t('live.activityNow'),
+-      tone: 'neutral' as const,
+-    },
+-    {
+-      badge: t('live.activityBadgeViewer'),
+-      label: t('live.activityViewersOnProduct', { count: 14 }),
+-      time: t('live.activityNow'),
+-      tone: 'info' as const,
+-    },
+-    ...(hasActiveProduct
+-      ? [
+-          {
+-            badge: t('live.activityBadgeProduct'),
+-            label: t('live.activityProductPinned', { item: featuredProductName }),
+-            time: t('live.activityMinutesAgo', { count: 4 }),
+-            tone: 'accent' as const,
+-          },
+-        ]
+-      : []),
+-  ].slice(0, isTablet ? 4 : isDesktop ? 6 : 3);
++  const activityFeed: ActivityFeedEvent[] = liveEvents
++    .map((event) => ({
++      badge: getLiveEventBadge(event.eventType, t),
++      label: getLiveEventLabel(event, t),
++      time: formatLiveEventTime(event.createdAt) || t('live.activityNow'),
++      tone: getLiveEventTone(event.eventType),
++    }))
++    .slice(0, isTablet ? 4 : isDesktop ? 6 : 3);
+   const createLiveBlockedReason = !newLiveNotes.trim()
+     ? t('live.createLiveMissingNotes')
+     : isSavingLive
+@@ -821,6 +857,7 @@ export default function LiveScreen() {
+     setSelectedLive(live);
+     setActiveItem(activeItemFromLive(live));
+     updateRecentReservations(branchReservations, live.id);
++    void updateLiveEvents(live.id);
+     if (session && live.status !== 'CLOSED') {
+       void saveSelectedLiveId(session.branchId, session.userId, live.id);
+     }
+@@ -851,6 +888,19 @@ export default function LiveScreen() {
+     setPaidByReservationId(Object.fromEntries(entries));
+   };
+
++  const updateLiveEvents = async (liveId?: number | null) => {
++    if (!liveId) {
++      setLiveEvents([]);
++      return;
++    }
++
++    try {
++      setLiveEvents(await getLiveEvents(liveId));
++    } catch {
++      setLiveEvents([]);
++    }
++  };
++
+   const handleUpdateReservationOperationalStatus = async (
+     reservationId: number,
+     status: LiveReservationOperationalStatus
+@@ -883,6 +933,7 @@ export default function LiveScreen() {
+             : entry
+         )
+       );
++      await updateLiveEvents(selectedLive.id);
+
+       setLiveNotice({
+         title:
+@@ -1120,6 +1171,7 @@ export default function LiveScreen() {
+         current.map((live) => (live.id === updated.id ? updated : live))
+       );
+       setActiveItem(activeItemFromLive(updated));
++      await updateLiveEvents(updated.id);
+       setLiveNotice({
+         title: t('live.activeProductUpdatedTitle'),
+         message: t('live.activeProductUpdatedMessage', {
+@@ -1751,7 +1803,11 @@ export default function LiveScreen() {
+                 ]}
+               >
+                 <AppText bold>{t('live.activityFeedTitle')}</AppText>
+-                {activityFeed.map((event, index) => (
++                {activityFeed.length === 0 ? (
++                  <AppText color={theme.colors.mutedText}>
++                    {t('live.noLiveEvents')}
++                  </AppText>
++                ) : activityFeed.map((event, index) => (
+                   <View
+                     key={`${event.label}-${index}`}
+                     style={[
+@@ -1814,7 +1870,11 @@ export default function LiveScreen() {
+                   ]}
+                 >
+                   <AppText bold>{t('live.activityFeedTitle')}</AppText>
+-                  {activityFeed.map((event, index) => (
++                  {activityFeed.length === 0 ? (
++                    <AppText color={theme.colors.mutedText}>
++                      {t('live.noLiveEvents')}
++                    </AppText>
++                  ) : activityFeed.map((event, index) => (
+                     <View
+                       key={`${event.label}-${index}`}
+                       style={[
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveController.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveController.java
+index c0e58d0..f3fe245 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveController.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveController.java
+@@ -51,4 +51,9 @@ public class LiveController {
+     public LiveResponse setActiveItem(@PathVariable Long id, @RequestBody LiveActiveItemRequest request) {
+         return service.setActiveItem(id, request);
+     }
++
++    @GetMapping("/{id}/events")
++    public List<LiveEventResponse> findEvents(@PathVariable Long id) {
++        return service.findEvents(id);
++    }
+ }
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveService.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveService.java
+index b178c1f..b1a16dc 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveService.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/live/LiveService.java
+@@ -28,19 +28,22 @@ public class LiveService {
+     private final AccessService accessService;
+     private final CurrentUser currentUser;
+     private final TenantResolver tenantResolver;
++    private final LiveEventService liveEventService;
+
+     public LiveService(LiveRepository repository,
+                        BranchRepository branchRepository,
+                        ItemRepository itemRepository,
+                        AccessService accessService,
+                        CurrentUser currentUser,
+-                       TenantResolver tenantResolver) {
++                       TenantResolver tenantResolver,
++                       LiveEventService liveEventService) {
+         this.repository = repository;
+         this.branchRepository = branchRepository;
+         this.itemRepository = itemRepository;
+         this.accessService = accessService;
+         this.currentUser = currentUser;
+         this.tenantResolver = tenantResolver;
++        this.liveEventService = liveEventService;
+     }
+
+     @Transactional(readOnly = true)
+@@ -91,7 +94,16 @@ public class LiveService {
+             existing.setStartedAt(LocalDateTime.now());
+         }
+
+-        return toResponse(repository.save(existing));
++        Live saved = repository.save(existing);
++        liveEventService.record(
++                saved,
++                LiveEventType.LIVE_STARTED,
++                currentUser.getUserId(),
++                "LIVE",
++                saved.getId(),
++                "{\"status\":\"" + saved.getStatus().name() + "\"}"
++        );
++        return toResponse(saved);
+     }
+
+     public LiveResponse close(Long id) {
+@@ -104,7 +116,16 @@ public class LiveService {
+         existing.setEndedAt(LocalDateTime.now());
+         existing.setActiveItem(null);
+
+-        return toResponse(repository.save(existing));
++        Live saved = repository.save(existing);
++        liveEventService.record(
++                saved,
++                LiveEventType.LIVE_CLOSED,
++                currentUser.getUserId(),
++                "LIVE",
++                saved.getId(),
++                "{\"status\":\"" + saved.getStatus().name() + "\"}"
++        );
++        return toResponse(saved);
+     }
+
+     @Transactional(readOnly = true)
+@@ -123,9 +144,13 @@ public class LiveService {
+             throw new IllegalArgumentException("No se puede cambiar producto activo de un En vivo cerrado");
+         }
+
++        Long previousItemId = live.getActiveItem() != null ? live.getActiveItem().getId() : null;
++
+         if (request == null || request.getItemId() == null) {
+             live.setActiveItem(null);
+-            return toResponse(repository.save(live));
++            Live saved = repository.save(live);
++            recordActiveItemChanged(saved, previousItemId, null);
++            return toResponse(saved);
+         }
+
+         CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+@@ -137,7 +162,30 @@ public class LiveService {
+         }
+
+         live.setActiveItem(item);
+-        return toResponse(repository.save(live));
++        Live saved = repository.save(live);
++        recordActiveItemChanged(saved, previousItemId, item.getId());
++        return toResponse(saved);
++    }
++
++    @Transactional(readOnly = true)
++    public List<LiveEventResponse> findEvents(Long id) {
++        return liveEventService.findByLive(id);
++    }
++
++    private void recordActiveItemChanged(Live live, Long previousItemId, Long nextItemId) {
++        liveEventService.record(
++                live,
++                LiveEventType.ACTIVE_ITEM_CHANGED,
++                currentUser.getUserId(),
++                "ITEM",
++                nextItemId,
++                "{\"previousItemId\":" + nullableNumber(previousItemId)
++                        + ",\"activeItemId\":" + nullableNumber(nextItemId) + "}"
++        );
++    }
++
++    private String nullableNumber(Long value) {
++        return value == null ? "null" : value.toString();
+     }
+
+     private Live findEntityById(Long id) {
+diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
+index 1e373f7..a405c32 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
+@@ -12,6 +12,8 @@ import com.hpsqsoft.ctrlropa.item.Item;
+ import com.hpsqsoft.ctrlropa.item.ItemRepository;
+ import com.hpsqsoft.ctrlropa.item.ItemStatus;
+ import com.hpsqsoft.ctrlropa.live.Live;
++import com.hpsqsoft.ctrlropa.live.LiveEventService;
++import com.hpsqsoft.ctrlropa.live.LiveEventType;
+ import com.hpsqsoft.ctrlropa.live.LiveRepository;
+ import com.hpsqsoft.ctrlropa.live.LiveStatus;
+ import com.hpsqsoft.ctrlropa.order.CustomerOrder;
+@@ -45,6 +47,7 @@ public class ReservationService {
+     private final CustomerOrderService customerOrderService;
+     private final JdbcTemplate jdbcTemplate;
+     private final TenantAccessGuard tenantAccessGuard;
++    private final LiveEventService liveEventService;
+
+     public ReservationService(ReservationRepository repository,
+                               ItemRepository itemRepository,
+@@ -57,7 +60,8 @@ public class ReservationService {
+                               CurrentUser currentUser,
+                               CustomerOrderService customerOrderService,
+                               JdbcTemplate jdbcTemplate,
+-                              TenantAccessGuard tenantAccessGuard) {
++                              TenantAccessGuard tenantAccessGuard,
++                              LiveEventService liveEventService) {
+         this.repository = repository;
+         this.itemRepository = itemRepository;
+         this.customerRepository = customerRepository;
+@@ -70,6 +74,7 @@ public class ReservationService {
+         this.customerOrderService = customerOrderService;
+         this.jdbcTemplate = jdbcTemplate;
+         this.tenantAccessGuard = tenantAccessGuard;
++        this.liveEventService = liveEventService;
+     }
+
+     @Transactional(readOnly = true)
+@@ -206,6 +211,20 @@ public class ReservationService {
+         CustomerOrder order = customerOrderService.addReservationToOpenOrder(saved);
+         customerOrderService.refreshStatus(order.getId());
+
++        if (saved.getLive() != null) {
++            liveEventService.record(
++                    saved.getLive(),
++                    LiveEventType.LIVE_RESERVATION_CREATED,
++                    userId,
++                    "RESERVATION",
++                    saved.getId(),
++                    "{\"reservationId\":" + saved.getId()
++                            + ",\"itemId\":" + saved.getItem().getId()
++                            + ",\"customerId\":" + saved.getCustomer().getId()
++                            + ",\"operationalStatus\":\"" + saved.getLiveOperationalStatus().name() + "\"}"
++            );
++        }
++
+         return toResponse(saved);
+     }
+
+@@ -255,17 +274,25 @@ public class ReservationService {
+         existing.setCancelReason(reason);
+         existing.setCancelledByUserId(userId);
+         if (existing.getLive() != null) {
++            LiveReservationOperationalStatus previousOperationalStatus = existing.getLiveOperationalStatus();
+             existing.setLiveOperationalStatus(LiveReservationOperationalStatus.CANCELLED);
+             existing.setLiveOperationalStatusUpdatedAt(LocalDateTime.now());
+             existing.setLiveOperationalStatusUpdatedByUserId(userId);
+             existing.setLiveOperationalStatusReason(reason);
++            recordLiveReservationStatusChange(
++                    existing,
++                    userId,
++                    previousOperationalStatus,
++                    LiveReservationOperationalStatus.CANCELLED
++            );
+         }
+
+         Item item = existing.getItem();
+         item.setStatus(ItemStatus.AVAILABLE);
+         itemRepository.save(item);
+
+-        return toResponse(repository.save(existing));
++        Reservation saved = repository.save(existing);
++        return toResponse(saved);
+     }
+
+     public ReservationResponse updateLiveOperationalStatus(
+@@ -286,12 +313,63 @@ public class ReservationService {
+             throw new IllegalArgumentException("Estado operativo requerido");
+         }
+
++        LiveReservationOperationalStatus previousStatus = existing.getLiveOperationalStatus();
+         existing.setLiveOperationalStatus(nextStatus);
+         existing.setLiveOperationalStatusUpdatedAt(LocalDateTime.now());
+         existing.setLiveOperationalStatusUpdatedByUserId(userId);
+         existing.setLiveOperationalStatusReason(request.getReason());
+
+-        return toResponse(repository.save(existing));
++        Reservation saved = repository.save(existing);
++        recordLiveReservationStatusChange(saved, userId, previousStatus, nextStatus);
++        return toResponse(saved);
++    }
++
++    private void recordLiveReservationStatusChange(Reservation reservation,
++                                                   Long actorUserId,
++                                                   LiveReservationOperationalStatus previousStatus,
++                                                   LiveReservationOperationalStatus nextStatus) {
++        if (reservation.getLive() == null || nextStatus == null) {
++            return;
++        }
++
++        String payload = "{\"reservationId\":" + reservation.getId()
++                + ",\"previousStatus\":\"" + statusName(previousStatus)
++                + "\",\"newStatus\":\"" + nextStatus.name() + "\"}";
++
++        liveEventService.record(
++                reservation.getLive(),
++                LiveEventType.LIVE_RESERVATION_STATUS_CHANGED,
++                actorUserId,
++                "RESERVATION",
++                reservation.getId(),
++                payload
++        );
++
++        if (nextStatus == LiveReservationOperationalStatus.OPERATIONAL_SOLD) {
++            liveEventService.record(
++                    reservation.getLive(),
++                    LiveEventType.LIVE_OPERATIONAL_SOLD,
++                    actorUserId,
++                    "RESERVATION",
++                    reservation.getId(),
++                    payload
++            );
++        }
++
++        if (nextStatus == LiveReservationOperationalStatus.CANCELLED) {
++            liveEventService.record(
++                    reservation.getLive(),
++                    LiveEventType.LIVE_RESERVATION_CANCELLED,
++                    actorUserId,
++                    "RESERVATION",
++                    reservation.getId(),
++                    payload
++            );
++        }
++    }
++
++    private String statusName(LiveReservationOperationalStatus status) {
++        return status == null ? "null" : status.name();
+     }
+
+     private void validateReservationCreateAccess(Long userId, String salesChannelCode, Long branchId) {
+diff --git a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/live/LiveServiceTests.java b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/live/LiveServiceTests.java
+index 443e1e8..92a0eab 100644
+--- a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/live/LiveServiceTests.java
++++ b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/live/LiveServiceTests.java
+@@ -33,6 +33,7 @@ class LiveServiceTests {
+     private final AccessService accessService = mock(AccessService.class);
+     private final CurrentUser currentUser = mock(CurrentUser.class);
+     private final TenantResolver tenantResolver = mock(TenantResolver.class);
++    private final LiveEventService liveEventService = mock(LiveEventService.class);
+
+     private final LiveService service = new LiveService(
+             liveRepository,
+@@ -40,7 +41,8 @@ class LiveServiceTests {
+             itemRepository,
+             accessService,
+             currentUser,
+-            tenantResolver
++            tenantResolver,
++            liveEventService
+     );
+
+     @Test
+@@ -71,6 +73,14 @@ class LiveServiceTests {
+         assertEquals("QA-CTR-005", response.getActiveItemCode());
+         assertEquals("Blusa Verde", response.getActiveItemProductTypeName());
+         verify(tenantResolver).assertBranchBelongsToCompany(6L, 2L);
++        verify(liveEventService).record(
++                live,
++                LiveEventType.ACTIVE_ITEM_CHANGED,
++                10L,
++                "ITEM",
++                8L,
++                "{\"previousItemId\":null,\"activeItemId\":8}"
++        );
+     }
+
+     @Test
+@@ -102,6 +112,14 @@ class LiveServiceTests {
+
+         assertEquals("CLOSED", response.getStatus());
+         assertEquals(null, response.getActiveItemId());
++        verify(liveEventService).record(
++                live,
++                LiveEventType.LIVE_CLOSED,
++                10L,
++                "LIVE",
++                4L,
++                "{\"status\":\"CLOSED\"}"
++        );
+     }
+
+     private CurrentTenantContext tenant() {
+diff --git a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java
+index d097fd4..5747496 100644
+--- a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java
++++ b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java
+@@ -10,6 +10,8 @@ import com.hpsqsoft.ctrlropa.item.Item;
+ import com.hpsqsoft.ctrlropa.item.ItemRepository;
+ import com.hpsqsoft.ctrlropa.item.ItemStatus;
+ import com.hpsqsoft.ctrlropa.live.Live;
++import com.hpsqsoft.ctrlropa.live.LiveEventService;
++import com.hpsqsoft.ctrlropa.live.LiveEventType;
+ import com.hpsqsoft.ctrlropa.live.LiveRepository;
+ import com.hpsqsoft.ctrlropa.live.LiveStatus;
+ import com.hpsqsoft.ctrlropa.order.CustomerOrderService;
+@@ -48,6 +50,7 @@ class ReservationServiceLiveOperationalStatusTests {
+     private final CustomerOrderService customerOrderService = mock(CustomerOrderService.class);
+     private final JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+     private final TenantAccessGuard tenantAccessGuard = mock(TenantAccessGuard.class);
++    private final LiveEventService liveEventService = mock(LiveEventService.class);
+
+     private final ReservationService service = new ReservationService(
+             repository,
+@@ -61,7 +64,8 @@ class ReservationServiceLiveOperationalStatusTests {
+             currentUser,
+             customerOrderService,
+             jdbcTemplate,
+-            tenantAccessGuard
++            tenantAccessGuard,
++            liveEventService
+     );
+
+     @Test
+@@ -88,6 +92,22 @@ class ReservationServiceLiveOperationalStatusTests {
+                 ChannelCode.LIVE,
+                 6L
+         );
++        verify(liveEventService).record(
++                reservation.getLive(),
++                LiveEventType.LIVE_RESERVATION_STATUS_CHANGED,
++                99L,
++                "RESERVATION",
++                10L,
++                "{\"reservationId\":10,\"previousStatus\":\"RESERVED\",\"newStatus\":\"OPERATIONAL_SOLD\"}"
++        );
++        verify(liveEventService).record(
++                reservation.getLive(),
++                LiveEventType.LIVE_OPERATIONAL_SOLD,
++                99L,
++                "RESERVATION",
++                10L,
++                "{\"reservationId\":10,\"previousStatus\":\"RESERVED\",\"newStatus\":\"OPERATIONAL_SOLD\"}"
++        );
+     }
+
+     @Test
+diff --git a/locales/en/common.json b/locales/en/common.json
+index 211e77c..691d20d 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -155,8 +155,18 @@
+     "activityBadgeComment": "Chat",
+     "activityBadgeViewer": "Audience",
+     "activityBadgeProduct": "Product",
++    "activityBadgeSold": "Sold",
++    "activityBadgeLive": "Live",
+     "activityNow": "Now",
+     "activityMinutesAgo": "{{count}} min ago",
++    "noLiveEvents": "No operational events have been recorded yet.",
++    "eventLiveStarted": "Live started",
++    "eventLiveClosed": "Live closed",
++    "eventActiveItemChanged": "Product on air updated: #{{id}}",
++    "eventReservationCreated": "Live reservation created: #{{id}}",
++    "eventReservationStatusChanged": "Reservation status updated: #{{id}}",
++    "eventOperationalSold": "Operational sold recorded: #{{id}}",
++    "eventReservationCancelled": "Reservation operationally cancelled: #{{id}}",
+     "presenterRoleTitle": "Presenter",
+     "presenterRoleValue": "Show and connect",
+     "presenterRoleHelp": "Product and key signals.",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index cab32b4..f924036 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -155,8 +155,18 @@
+     "activityBadgeComment": "Chat",
+     "activityBadgeViewer": "Audiencia",
+     "activityBadgeProduct": "Producto",
++    "activityBadgeSold": "Vendido",
++    "activityBadgeLive": "En vivo",
+     "activityNow": "Ahora",
+     "activityMinutesAgo": "Hace {{count}} min",
++    "noLiveEvents": "Aún no hay eventos operativos registrados.",
++    "eventLiveStarted": "Transmisión iniciada",
++    "eventLiveClosed": "Transmisión cerrada",
++    "eventActiveItemChanged": "Producto al aire actualizado: #{{id}}",
++    "eventReservationCreated": "Reserva En vivo creada: #{{id}}",
++    "eventReservationStatusChanged": "Estado de reserva actualizado: #{{id}}",
++    "eventOperationalSold": "Vendido operativo registrado: #{{id}}",
++    "eventReservationCancelled": "Reserva cancelada operativamente: #{{id}}",
+     "presenterRoleTitle": "Presentadora",
+     "presenterRoleValue": "Muestra y conecta",
+     "presenterRoleHelp": "Producto y señales clave.",
+diff --git a/services/liveService.ts b/services/liveService.ts
+index 6104259..30cec72 100644
+--- a/services/liveService.ts
++++ b/services/liveService.ts
+@@ -29,6 +29,19 @@ export type CreateLiveRequest = {
+   status?: LiveStatus;
+ };
+
++export type LiveEvent = {
++  id: number;
++  companyId: number;
++  branchId: number;
++  liveId: number;
++  actorUserId?: number | null;
++  eventType: string;
++  entityType?: string | null;
++  entityId?: number | null;
++  payloadJson?: string | null;
++  createdAt?: string;
++};
++
+ export async function getLivesByBranch(branchId: number): Promise<Live[]> {
+   return apiRequest<Live[]>(`/api/lives/branch/${branchId}`);
+ }
+@@ -69,6 +82,10 @@ export async function setLiveActiveItem(
+   });
+ }
+
++export async function getLiveEvents(liveId: number): Promise<LiveEvent[]> {
++  return apiRequest<LiveEvent[]>(`/api/lives/${liveId}/events`);
++}
++
+ export function isLiveOperable(live: Live | null): boolean {
+   return !!live && (live.status === 'OPEN' || live.status === 'ACTIVE');
+ }

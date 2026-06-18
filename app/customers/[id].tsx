@@ -1,8 +1,7 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 
 import {
@@ -18,6 +17,8 @@ import {
     updateCustomerAddress,
 } from '@/services/customerAddressService';
 
+import { canAccessByPermission } from '@/services/accessControl';
+import { getSession } from '@/services/sessionStorage';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, StyleSheet, View } from 'react-native';
@@ -45,6 +46,7 @@ export default function CustomerDetailScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [isChangingStatus, setIsChangingStatus] = useState(false);
   const [defaultAddressId, setDefaultAddressId] = useState<number | null>(null);
+  const [canEditCustomer, setCanEditCustomer] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -55,6 +57,14 @@ export default function CustomerDetailScreen() {
   const loadData = async () => {
     try {
       setIsLoading(true);
+
+      const session = await getSession();
+      if (!session || !canAccessByPermission(session, 'VIEW_CUSTOMERS')) {
+        router.replace('/access-denied' as any);
+        return;
+      }
+
+      setCanEditCustomer(canAccessByPermission(session, 'EDIT_CUSTOMER'));
 
       const customerId = Number(id);
 
@@ -107,6 +117,10 @@ export default function CustomerDetailScreen() {
 
   const handleSave = async () => {
     if (!customer) return;
+    if (!canEditCustomer) {
+      router.replace('/access-denied' as any);
+      return;
+    }
     if (!validateForm()) return;
 
     const payload = buildPayload();
@@ -136,6 +150,10 @@ export default function CustomerDetailScreen() {
 
   const handleToggleStatus = async () => {
     if (!customer) return;
+    if (!canEditCustomer) {
+      router.replace('/access-denied' as any);
+      return;
+    }
     if (!validateForm()) return;
 
     const nextStatus: CustomerStatus =
@@ -171,6 +189,10 @@ export default function CustomerDetailScreen() {
 
   const handleSetDefaultAddress = async (address: CustomerAddress) => {
     if (address.isDefault) return;
+    if (!canEditCustomer) {
+      router.replace('/access-denied' as any);
+      return;
+    }
 
     try {
       setDefaultAddressId(address.id);
@@ -198,22 +220,31 @@ export default function CustomerDetailScreen() {
 
   if (isLoading || !customer) {
     return (
-      <AppScreen>
+      <AppShellPage
+        title="Cliente"
+        subtitle="Detalle comercial y direcciones"
+        activeRoute="customers"
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   const isInactive = customer.status === 'INACTIVE';
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute="/customers" preferHistory={false} />
-
-      <AppText variant="title" bold>
-        Cliente
-      </AppText>
-
+    <AppShellPage
+      title="Cliente"
+      subtitle="Detalle comercial y direcciones"
+      activeRoute="customers"
+      rightContent={
+        <AppButton
+          title="Volver"
+          variant="secondary"
+          onPress={() => router.replace('/customers' as any)}
+        />
+      }
+    >
       <AppCard>
         <View style={styles.statusRow}>
           <AppText bold>Estado</AppText>
@@ -224,13 +255,19 @@ export default function CustomerDetailScreen() {
       </AppCard>
 
       <AppCard>
-        <AppInput label="Nombre" value={name} onChangeText={setName} />
+        <AppInput
+          label="Nombre"
+          value={name}
+          onChangeText={setName}
+          editable={canEditCustomer}
+        />
 
         <AppInput
           label="Teléfono"
           value={phone}
           onChangeText={setPhone}
           keyboardType="phone-pad"
+          editable={canEditCustomer}
         />
 
         <AppInput
@@ -239,13 +276,16 @@ export default function CustomerDetailScreen() {
           onChangeText={setEmail}
           keyboardType="email-address"
           autoCapitalize="none"
+          editable={canEditCustomer}
         />
 
-        <AppButton
-          title="Guardar cambios"
-          onPress={handleSave}
-          loading={isSaving}
-        />
+        {canEditCustomer ? (
+          <AppButton
+            title="Guardar cambios"
+            onPress={handleSave}
+            loading={isSaving}
+          />
+        ) : null}
       </AppCard>
 
       <AppCard>
@@ -300,6 +340,7 @@ export default function CustomerDetailScreen() {
 
               <AppText>{addr.postalCode || 'Sin código postal'}</AppText>
 
+              {canEditCustomer ? (
               <View style={styles.addressAction}>
                 <AppButton
                     title="Editar"
@@ -311,8 +352,9 @@ export default function CustomerDetailScreen() {
                     }
                 />
                 </View>
+              ) : null}
 
-              {!addr.isDefault ? (
+              {canEditCustomer && !addr.isDefault ? (
                 <View style={styles.addressAction}>
                   <AppButton
                     title="Marcar como principal"
@@ -326,6 +368,7 @@ export default function CustomerDetailScreen() {
           ))
         )}
 
+        {canEditCustomer ? (
         <AppButton
           title="Nueva dirección"
           variant="secondary"
@@ -333,15 +376,18 @@ export default function CustomerDetailScreen() {
             router.push(`/customer-addresses-create?customerId=${customer.id}` as any)
           }
         />
+        ) : null}
       </AppCard>
 
+      {canEditCustomer ? (
       <AppButton
         title={isInactive ? 'Activar cliente' : 'Desactivar cliente'}
         variant={isInactive ? 'primary' : 'danger'}
         onPress={handleToggleStatus}
         loading={isChangingStatus}
       />
-    </AppScreen>
+      ) : null}
+    </AppShellPage>
   );
 }
 

@@ -23,6 +23,9 @@ import com.hpsqsoft.ctrlropa.security.access.AccessService;
 import com.hpsqsoft.ctrlropa.security.access.ChannelCode;
 import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
 import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
+import com.hpsqsoft.ctrlropa.tenant.CurrentTenantContext;
+import com.hpsqsoft.ctrlropa.tenant.TenantResolver;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +48,7 @@ public class SaleService {
     private final AccessService accessService;
     private final CurrentUser currentUser;
     private final CustomerOrderService customerOrderService;
+    private final TenantResolver tenantResolver;
 
     public SaleService(SaleRepository repository,
                        ItemRepository itemRepository,
@@ -56,7 +60,8 @@ public class SaleService {
                        PaymentRepository paymentRepository,
                        AccessService accessService,
                        CurrentUser currentUser,
-                       CustomerOrderService customerOrderService) {
+                       CustomerOrderService customerOrderService,
+                       TenantResolver tenantResolver) {
         this.repository = repository;
         this.itemRepository = itemRepository;
         this.customerRepository = customerRepository;
@@ -68,10 +73,13 @@ public class SaleService {
         this.accessService = accessService;
         this.currentUser = currentUser;
         this.customerOrderService = customerOrderService;
+        this.tenantResolver = tenantResolver;
     }
 
     @Transactional(readOnly = true)
     public List<SaleResponse> findByBranch(Long branchId) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_SALES);
+        assertBranchBelongsToCurrentTenant(branchId);
         return repository.findByBranchIdOrderByCreatedAtDesc(branchId)
                 .stream()
                 .map(this::toResponse)
@@ -80,7 +88,10 @@ public class SaleService {
 
     @Transactional(readOnly = true)
     public SaleResponse findById(Long id) {
-        return toResponse(findEntityById(id));
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_SALES);
+        Sale sale = findEntityById(id);
+        assertSaleBelongsToCurrentTenant(sale);
+        return toResponse(sale);
     }
 
     public SaleResponse create(CreateSaleRequest request) {
@@ -96,6 +107,9 @@ public class SaleService {
 
         Branch branch = branchRepository.findById(request.getBranchId())
                 .orElseThrow(() -> new IllegalArgumentException("Sucursal no encontrada"));
+        assertBranchBelongsToCurrentTenant(branch.getId());
+        assertBranchBelongsToCurrentTenant(item.getBranch().getId());
+        assertBranchBelongsToCurrentTenant(customer.getBranch().getId());
 
         SalesChannel salesChannel = salesChannelRepository.findById(request.getSalesChannelId())
                 .orElseThrow(() -> new IllegalArgumentException("Canal no encontrado"));
@@ -300,6 +314,18 @@ public class SaleService {
     private Sale findEntityById(Long id) {
         return repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Venta no encontrada con id: " + id));
+    }
+
+    private void assertSaleBelongsToCurrentTenant(Sale sale) {
+        assertBranchBelongsToCurrentTenant(sale.getBranch().getId());
+    }
+
+    private void assertBranchBelongsToCurrentTenant(Long branchId) {
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        tenantResolver.assertBranchBelongsToCompany(branchId, tenant.getCompanyId());
+        if (tenant.getBranchId() != null && !tenant.getBranchId().equals(branchId)) {
+            throw new AccessDeniedException("La venta no pertenece a la sucursal activa");
+        }
     }
 
     private SaleResponse toResponse(Sale sale) {

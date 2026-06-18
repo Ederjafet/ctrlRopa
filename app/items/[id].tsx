@@ -1,11 +1,10 @@
 import ItemLabel from '@/components/items/ItemLabel';
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
-import AppScreen from '@/components/ui/AppScreen';
 import AppSelectorField from '@/components/ui/AppSelectorField';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
@@ -31,7 +30,7 @@ import { getItemStatusLabel } from '@/services/itemLabels';
 import { printItemLabel } from '@/services/printService';
 import { getSession } from '@/services/sessionStorage';
 
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -53,6 +52,7 @@ type SelectorConfig = {
 };
 
 export default function ItemDetailScreen() {
+  const router = useRouter();
   const { id, returnTo } = useLocalSearchParams<{
     id?: string | string[];
     returnTo?: string | string[];
@@ -229,18 +229,29 @@ export default function ItemDetailScreen() {
 
   if (isLoading || !item) {
     return (
-      <AppScreen scroll={false}>
+      <AppShellPage
+        title="Detalle de prenda"
+        subtitle="Inventario y etiqueta QR"
+        activeRoute="items"
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute={returnRoute || '/items'} />
-      <AppText variant="title" bold>
-        Detalle de prenda
-      </AppText>
+    <AppShellPage
+      title="Detalle de prenda"
+      subtitle="Inventario y etiqueta QR"
+      activeRoute="items"
+      rightContent={
+        <AppButton
+          title="Volver"
+          variant="secondary"
+          onPress={() => router.replace((returnRoute || '/items') as any)}
+        />
+      }
+    >
 
       <AppCard>
         <AppText bold>Código</AppText>
@@ -419,7 +430,7 @@ export default function ItemDetailScreen() {
           />
         </View>
       </AppBottomModal>
-    </AppScreen>
+    </AppShellPage>
   );
 }
 

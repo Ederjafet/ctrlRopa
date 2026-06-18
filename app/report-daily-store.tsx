@@ -1,10 +1,9 @@
 
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppDateField from '@/components/ui/AppDateField';
 import AppInput from '@/components/ui/AppInput';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { Branch, getActiveBranches } from '@/services/branchAdminService';
@@ -15,6 +14,7 @@ import {
 } from '@/services/reportService';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 
 function todayIsoDate() {
@@ -31,7 +31,7 @@ function formatMoney(value?: number | null) {
 }
 
 function formatDateTime(value?: string | null) {
-  if (!value) return '—';
+  if (!value) return 'â€”';
   return new Date(value).toLocaleString();
 }
 
@@ -139,6 +139,7 @@ const sharedStyles = StyleSheet.create({
 
 export default function ReportDailyStoreScreen() {
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
 
   const [session, setSession] = useState<UserSession | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -228,34 +229,38 @@ export default function ReportDailyStoreScreen() {
 
   if (initialLoading) {
     return (
-      <AppScreen>
+      <AppShellPage
+        title={t('reports.dailyStoreTitle')}
+        subtitle={t('reports.dailyStoreDescription')}
+        activeRoute="report-daily-store"
+        session={session}
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute="/reports" />
-
-      <AppText variant="title" bold>
-        Reporte diario tienda
-      </AppText>
-
+    <AppShellPage
+      title={t('reports.dailyStoreTitle')}
+      subtitle={t('reports.dailyStoreDescription')}
+      activeRoute="report-daily-store"
+      session={session}
+    >
       <AppCard>
         <AppText variant="subtitle" bold>
-          Filtros
+          {t('common.filters')}
         </AppText>
 
         <View style={sharedStyles.filters}>
           <AppDateField
-            label="Fecha"
+            label={t('common.date')}
             value={date}
             onChange={setDate}
           />
 
           <AppText variant="subtitle" bold>
-            Sucursal
+            {t('common.branch')}
           </AppText>
           <BranchSelector
             branches={branches}
@@ -265,7 +270,7 @@ export default function ReportDailyStoreScreen() {
         </View>
 
         <AppButton
-          title={loading ? 'Consultando...' : 'Consultar'}
+          title={loading ? t('reports.querying') : t('reports.query')}
           onPress={loadReport}
           loading={loading}
           disabled={loading}
@@ -276,10 +281,10 @@ export default function ReportDailyStoreScreen() {
         <>
           <AppCard>
             <AppText variant="subtitle" bold>
-              {report.branchName || report.branchCode || 'Sucursal'} · {report.date}
+              {report.branchName || report.branchCode || 'Sucursal'} Â· {report.date}
             </AppText>
             <AppText color={theme.colors.mutedText}>
-              Resumen de operación, pagos y caja.
+              Resumen de operaciÃ³n, pagos y caja.
             </AppText>
           </AppCard>
 
@@ -305,20 +310,20 @@ export default function ReportDailyStoreScreen() {
           <View style={sharedStyles.summaryGrid}>
             <SummaryValue
               label="Ventas activas"
-              value={`${report.operationSummary?.activeSalesCount ?? 0} · ${formatMoney(
+              value={`${report.operationSummary?.activeSalesCount ?? 0} Â· ${formatMoney(
                 report.operationSummary?.activeSalesTotal
               )}`}
             />
             <SummaryValue
               label="Apartados activos"
-              value={`${report.operationSummary?.activeReservationsCount ?? 0} · ${formatMoney(
+              value={`${report.operationSummary?.activeReservationsCount ?? 0} Â· ${formatMoney(
                 report.operationSummary?.activeReservationsTotal
               )}`}
             />
             <SummaryValue
               label="Cancelaciones"
               value={`${(report.operationSummary?.cancelledSalesCount ?? 0) +
-                (report.operationSummary?.cancelledReservationsCount ?? 0)} · ${formatMoney(
+                (report.operationSummary?.cancelledReservationsCount ?? 0)} Â· ${formatMoney(
                 Number(report.operationSummary?.cancelledSalesTotal ?? 0) +
                   Number(report.operationSummary?.cancelledReservationsTotal ?? 0)
               )}`}
@@ -326,7 +331,7 @@ export default function ReportDailyStoreScreen() {
             />
             <SummaryValue
               label="Refunds procesados"
-              value={`${report.operationSummary?.refundsCount ?? 0} · ${formatMoney(
+              value={`${report.operationSummary?.refundsCount ?? 0} Â· ${formatMoney(
                 report.operationSummary?.processedRefundsTotal
               )}`}
             />
@@ -350,7 +355,7 @@ export default function ReportDailyStoreScreen() {
           </View>
 
           <AppInput
-            label="Buscar en líneas"
+            label="Buscar en lÃ­neas"
             placeholder="Folio, cliente, canal, estado..."
             value={search}
             onChangeText={setSearch}
@@ -375,7 +380,7 @@ export default function ReportDailyStoreScreen() {
                         {line.folio || `${line.sourceType || 'Movimiento'} #${line.sourceId || index + 1}`}
                       </AppText>
                       <AppText color={theme.colors.mutedText}>
-                        {line.customerName || 'Sin cliente'} · {line.operationType || line.channelCode || 'Operación'}
+                        {line.customerName || 'Sin cliente'} Â· {line.operationType || line.channelCode || 'OperaciÃ³n'}
                       </AppText>
                     </View>
                     <AppText bold>{formatMoney(line.total)}</AppText>
@@ -383,13 +388,13 @@ export default function ReportDailyStoreScreen() {
 
                   <View style={sharedStyles.meta}>
                     <AppText color={theme.colors.mutedText}>
-                      Pagado {formatMoney(line.paid)} · Pendiente {formatMoney(line.pending)}
+                      Pagado {formatMoney(line.paid)} Â· Pendiente {formatMoney(line.pending)}
                     </AppText>
                     <AppText color={theme.colors.mutedText}>
-                      Efectivo {formatMoney(line.cash)} · Transf. {formatMoney(line.transfer)} · Tarjeta {formatMoney(line.card)}
+                      Efectivo {formatMoney(line.cash)} Â· Transf. {formatMoney(line.transfer)} Â· Tarjeta {formatMoney(line.card)}
                     </AppText>
                     <AppText variant="caption" color={theme.colors.mutedText}>
-                      Estado: {line.status || '—'} · Pago: {line.paymentStatus || '—'} · Atendió: {line.attendedBy || '—'}
+                      Estado: {line.status || 'â€”'} Â· Pago: {line.paymentStatus || 'â€”'} Â· AtendiÃ³: {line.attendedBy || 'â€”'}
                     </AppText>
                     <AppText variant="caption" color={theme.colors.mutedText}>
                       Fecha: {formatDateTime(line.createdAt)}
@@ -404,10 +409,10 @@ export default function ReportDailyStoreScreen() {
       ) : (
         <AppCard>
           <AppText color={theme.colors.mutedText}>
-            Selecciona fecha y sucursal para consultar el reporte.
+            {t('reports.selectDateBranchHint')}
           </AppText>
         </AppCard>
       )}
-    </AppScreen>
+    </AppShellPage>
   );
 }

@@ -1,25 +1,45 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
-import AppScreen from '@/components/ui/AppScreen';
-import AppText from '@/components/ui/AppText';
 
+import { canAccessByPermission } from '@/services/accessControl';
 import { createCustomer } from '@/services/customerService';
 import { getSession } from '@/services/sessionStorage';
 
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Alert } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert } from 'react-native';
 
 export default function CustomersCreateScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
+  const returnTo = Array.isArray(params.returnTo)
+    ? params.returnTo[0]
+    : params.returnTo;
+  const returnRoute = returnTo || '/customers';
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
+
+  useEffect(() => {
+    const checkAccess = async () => {
+      const session = await getSession();
+
+      if (!session || !canAccessByPermission(session, 'CREATE_CUSTOMER')) {
+        router.replace('/access-denied' as any);
+        return;
+      }
+
+      setIsCheckingAccess(false);
+    };
+
+    checkAccess();
+  }, [router]);
 
   const handleSave = async () => {
     const cleanName = name.trim();
@@ -43,6 +63,11 @@ export default function CustomersCreateScreen() {
       return;
     }
 
+    if (!canAccessByPermission(session, 'CREATE_CUSTOMER')) {
+      router.replace('/access-denied' as any);
+      return;
+    }
+
     try {
       setIsSaving(true);
 
@@ -58,7 +83,9 @@ export default function CustomersCreateScreen() {
       });
 
       Alert.alert('Cliente', 'Cliente creado correctamente.');
-      router.replace(`/customers/${customer.id}` as any);
+      router.replace(
+        returnTo ? (returnRoute as any) : (`/customers/${customer.id}` as any)
+      );
     } catch (e: any) {
       Alert.alert('Error', e.message || 'No se pudo crear el cliente.');
     } finally {
@@ -66,14 +93,31 @@ export default function CustomersCreateScreen() {
     }
   };
 
+  if (isCheckingAccess) {
+    return (
+      <AppShellPage
+        title="Nuevo cliente"
+        subtitle="Alta de cliente en la sucursal activa"
+        activeRoute="customers"
+      >
+        <ActivityIndicator />
+      </AppShellPage>
+    );
+  }
+
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute="/customers" preferHistory={false} />
-
-      <AppText variant="title" bold>
-        Nuevo cliente
-      </AppText>
-
+    <AppShellPage
+      title="Nuevo cliente"
+      subtitle="Alta de cliente en la sucursal activa"
+      activeRoute="customers"
+      rightContent={
+        <AppButton
+          title="Volver"
+          variant="secondary"
+          onPress={() => router.replace(returnRoute as any)}
+        />
+      }
+    >
       <AppCard>
         <AppResponsiveGrid tabletColumns={2} desktopColumns={2}>
         <AppInput
@@ -107,6 +151,6 @@ export default function CustomersCreateScreen() {
           loading={isSaving}
         />
       </AppCard>
-    </AppScreen>
+    </AppShellPage>
   );
 }

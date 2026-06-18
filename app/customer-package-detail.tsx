@@ -1,11 +1,10 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppNoticeDropdown from '@/components/ui/AppNoticeDropdown';
 import AppOptionRow from '@/components/ui/AppOptionRow';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import {
@@ -329,9 +328,13 @@ export default function CustomerPackageDetailScreen() {
 
   if (isLoading || !detail) {
     return (
-      <AppScreen>
+      <AppShellPage
+        title="Detalle de paquete"
+        subtitle="Preparacion, etiqueta y prendas"
+        activeRoute="customers"
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
@@ -339,13 +342,18 @@ export default function CustomerPackageDetailScreen() {
   const shipments = detail.shipments ?? [];
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute={fallbackRoute} />
-
-      <AppText variant="title" bold>
-        Paquete {detail.folio}
-      </AppText>
-
+    <AppShellPage
+      title={`Paquete ${detail.folio}`}
+      subtitle="Preparacion, etiqueta y prendas"
+      activeRoute="customers"
+      rightContent={
+        <AppButton
+          title="Volver"
+          variant="secondary"
+          onPress={() => router.replace(fallbackRoute as any)}
+        />
+      }
+    >
       {notice ? (
         <AppNoticeDropdown
           title={notice.title}
@@ -569,7 +577,7 @@ export default function CustomerPackageDetailScreen() {
           disabled={isWorking}
         />
       </AppBottomModal>
-    </AppScreen>
+    </AppShellPage>
   );
 }
 

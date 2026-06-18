@@ -1,0 +1,9 @@
+﻿ app/system-roles.tsx                |   4 +-
+ app/system.tsx                      |  28 ++++----
+ app/users-form.tsx                  |   8 ++-
+ components/layout/appNavigation.ts  | 123 ++++++++++++++++++++++++++++++++----
+ components/ui/RestrictedSection.tsx |   3 +-
+ locales/en/common.json              |  16 ++++-
+ locales/es/common.json              |  16 ++++-
+ services/permissionDependencies.ts  |  52 ++++++++++++++-
+ 8 files changed, 212 insertions(+), 38 deletions(-)

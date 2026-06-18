@@ -1,0 +1,8 @@
+﻿ app/live.tsx                                       | 101 ++++++++++++---------
+ docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md        |   4 +
+ docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md          |   4 +
+ docs/LIVE_Z9I_1_CARD_ACTION_LAYOUT.md              |  95 +++++++++++++++++++
+ .../LIVE_Z9I_ITEM_SELECTOR_AVAILABILITY_FILTERS.md |   4 +
+ docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md              |  14 +++
+ ...-1-card-action-layout-report-20260607-133536.md |  39 ++++++++
+ 7 files changed, 220 insertions(+), 41 deletions(-)

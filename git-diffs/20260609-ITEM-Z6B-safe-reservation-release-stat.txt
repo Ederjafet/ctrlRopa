@@ -1,0 +1,10 @@
+﻿ .../com/hpsqsoft/ctrlropa/item/ItemRepository.java |  15 ++
+ .../ctrlropa/reservation/ReservationService.java   | 116 ++++++++-
+ ...servationServiceLiveOperationalStatusTests.java |   8 +-
+ .../reservation/ReservationServiceTests.java       | 265 ++++++++++++++++++++-
+ docs/ERP_BITACORA_CAMBIOS.md                       |  28 +++
+ docs/ERP_RIESGOS_OPERATIVOS.md                     |   1 +
+ docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md          |  19 ++
+ docs/ITEM_Z6B_SAFE_RESERVATION_RELEASE.md          | 129 ++++++++++
+ ...e-reservation-release-report-20260609-215428.md | 133 +++++++++++
+ 9 files changed, 707 insertions(+), 7 deletions(-)

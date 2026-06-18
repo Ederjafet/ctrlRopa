@@ -1,0 +1,6 @@
+﻿ docs/PRODUCT_UX_B2_READABLE_DIRECT_PERMISSIONS.md  | 48 +++++++++++-----------
+ locales/es/common.json                             | 10 ++---
+ ...X-B2-final-validation-report-20260609-002342.md | 36 ++++++++++++++++
+ ...le-direct-permissions-report-20260609-000238.md | 20 ++++-----
+ services/permissionDependencies.ts                 | 24 +++++------
+ 5 files changed, 87 insertions(+), 51 deletions(-)

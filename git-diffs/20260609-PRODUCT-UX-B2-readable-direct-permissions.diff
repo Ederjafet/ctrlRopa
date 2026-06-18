@@ -1,0 +1,817 @@
+﻿diff --git a/app/system-roles.tsx b/app/system-roles.tsx
+index c95397d..e626044 100644
+--- a/app/system-roles.tsx
++++ b/app/system-roles.tsx
+@@ -48,7 +48,7 @@ function toggleId(ids: number[], id: number) {
+
+ export default function SystemRolesScreen() {
+   const { theme } = useAppTheme();
+-  const { t } = useTranslation('common');
++  const { t, i18n } = useTranslation('common');
+
+   const [roles, setRoles] = useState<AdminRole[]>([]);
+   const [permissions, setPermissions] = useState<AdminPermission[]>([]);
+@@ -58,6 +58,7 @@ export default function SystemRolesScreen() {
+   const [modalVisible, setModalVisible] = useState(false);
+   const [search, setSearch] = useState('');
+   const [loadError, setLoadError] = useState('');
++  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
+
+   useFocusEffect(
+     useCallback(() => {
+@@ -86,9 +87,10 @@ export default function SystemRolesScreen() {
+
+   const filteredPermissions = useMemo(() => {
+     return groupPermissionsForDisplay(
+-      permissions.filter((permission) => matchesPermissionSearch(permission, search))
++      permissions.filter((permission) => matchesPermissionSearch(permission, search, i18n.language)),
++      i18n.language
+     );
+-  }, [permissions, search]);
++  }, [i18n.language, permissions, search]);
+
+   const selectedPermissionCodes = useMemo(
+     () =>
+@@ -101,6 +103,7 @@ export default function SystemRolesScreen() {
+   const openNew = () => {
+     setForm(emptyForm);
+     setSearch('');
++    setShowTechnicalDetails(false);
+     setModalVisible(true);
+   };
+
+@@ -112,6 +115,7 @@ export default function SystemRolesScreen() {
+       permissionIds: permissionIds(role),
+     });
+     setSearch('');
++    setShowTechnicalDetails(false);
+     setModalVisible(true);
+   };
+
+@@ -190,7 +194,7 @@ export default function SystemRolesScreen() {
+                 <View style={styles.roleText}>
+                   <AppText bold>{role.name}</AppText>
+                   <AppText variant="caption" color={theme.colors.mutedText}>
+-                    {formatPermissionCode(role.code)}
++                    {formatPermissionCode(role.code, i18n.language)}
+                   </AppText>
+                   <AppText variant="caption" color={theme.colors.mutedText}>
+                     {t('systemRoles.includedPermissions', { count: permissionIds(role).length })}
+@@ -251,6 +255,18 @@ export default function SystemRolesScreen() {
+             onChangeText={setSearch}
+           />
+
++          <View style={styles.technicalToggle}>
++            <AppButton
++              title={
++                showTechnicalDetails
++                  ? t('systemRoles.hideTechnicalDetails')
++                  : t('systemRoles.showTechnicalDetails')
++              }
++              variant="secondary"
++              onPress={() => setShowTechnicalDetails((current) => !current)}
++            />
++          </View>
++
+           {filteredPermissions.length === 0 ? (
+             <AppText color={theme.colors.mutedText} style={styles.emptyPermissions}>
+               {t('systemRoles.noPermissionsFound')}
+@@ -265,7 +281,12 @@ export default function SystemRolesScreen() {
+                 {group.permissions.map((permission) => {
+                   const selected = form.permissionIds.includes(permission.id);
+                   const dependencyWarnings = selected
+-                    ? getSuggestedDependencyWarnings(permission.code, selectedPermissionCodes, permissions)
++                    ? getSuggestedDependencyWarnings(
++                        permission.code,
++                        selectedPermissionCodes,
++                        permissions,
++                        i18n.language
++                      )
+                     : [];
+                   return (
+                     <Pressable
+@@ -282,10 +303,12 @@ export default function SystemRolesScreen() {
+                       ]}
+                     >
+                       <View style={styles.permissionText}>
+-                        <AppText bold={selected}>{formatPermissionCode(permission.code)}</AppText>
+-                        <AppText variant="caption" color={theme.colors.mutedText}>
+-                          {t('systemRoles.internalCode', { code: permission.code })}
+-                        </AppText>
++                        <AppText bold={selected}>{formatPermissionCode(permission.code, i18n.language)}</AppText>
++                        {showTechnicalDetails ? (
++                          <AppText variant="caption" color={theme.colors.mutedText}>
++                            {t('systemRoles.internalCode', { code: permission.code })}
++                          </AppText>
++                        ) : null}
+                         <AppText color={selected ? theme.colors.accent : theme.colors.mutedText} bold={selected}>
+                           {selected ? t('systemRoles.included') : t('systemRoles.add')}
+                         </AppText>
+@@ -337,6 +360,10 @@ const styles = StyleSheet.create({
+   permissionGroup: {
+     marginTop: 14,
+   },
++  technicalToggle: {
++    alignItems: 'flex-start',
++    marginTop: 10,
++  },
+   roleAction: {
+     minWidth: 110,
+   },
+diff --git a/app/users-form.tsx b/app/users-form.tsx
+index caf7d90..3990ebf 100644
+--- a/app/users-form.tsx
++++ b/app/users-form.tsx
+@@ -74,13 +74,14 @@ function parseId(value: string | string[] | undefined): number | null {
+ function selectedNames<T extends { id: number; code?: string; name: string }>(
+   items: T[],
+   ids: number[],
+-  emptyText: string
++  emptyText: string,
++  language = 'es'
+ ) {
+   if (ids.length === 0) return emptyText;
+   const selected = items.filter((item) => ids.includes(item.id));
+   if (selected.length === 0) return emptyText;
+   return selected
+-    .map((item) => (item.code ? formatPermissionCode(item.code) : item.name))
++    .map((item) => (item.code ? formatPermissionCode(item.code, language) : item.name))
+     .join(', ');
+ }
+
+@@ -103,7 +104,7 @@ export default function UsersFormScreen() {
+   const userId = parseId(id);
+   const isEdit = userId !== null;
+   const { theme } = useAppTheme();
+-  const { t } = useTranslation('common');
++  const { t, i18n } = useTranslation('common');
+
+   const [form, setForm] = useState<FormState>(initialForm);
+   const [branches, setBranches] = useState<AdminBranch[]>([]);
+@@ -118,6 +119,7 @@ export default function UsersFormScreen() {
+   const [draftRoleIds, setDraftRoleIds] = useState<number[]>([]);
+   const [draftPermissionIds, setDraftPermissionIds] = useState<number[]>([]);
+   const [permissionSearch, setPermissionSearch] = useState('');
++  const [showPermissionTechnicalDetails, setShowPermissionTechnicalDetails] = useState(false);
+
+   const loadData = useCallback(async () => {
+     try {
+@@ -175,8 +177,14 @@ export default function UsersFormScreen() {
+   );
+
+   const selectedAssignedBranches = useMemo(
+-    () => selectedNames(branches, mergeIds(form.branchIds, form.branchId), t('usersForm.selectBranches')),
+-    [branches, form.branchId, form.branchIds, t]
++    () =>
++      selectedNames(
++        branches,
++        mergeIds(form.branchIds, form.branchId),
++        t('usersForm.selectBranches'),
++        i18n.language
++      ),
++    [branches, form.branchId, form.branchIds, i18n.language, t]
+   );
+
+   const draftPermissionCodes = useMemo(
+@@ -190,9 +198,10 @@ export default function UsersFormScreen() {
+   const groupedPermissionOptions = useMemo(
+     () =>
+       groupPermissionsForDisplay(
+-        permissions.filter((permission) => matchesPermissionSearch(permission, permissionSearch))
++        permissions.filter((permission) => matchesPermissionSearch(permission, permissionSearch, i18n.language)),
++        i18n.language
+       ),
+-    [permissionSearch, permissions]
++    [i18n.language, permissionSearch, permissions]
+   );
+
+   const openRolesModal = () => {
+@@ -213,6 +222,7 @@ export default function UsersFormScreen() {
+   const openPermissionsModal = () => {
+     setDraftPermissionIds(form.permissionIds);
+     setPermissionSearch('');
++    setShowPermissionTechnicalDetails(false);
+     setPermissionsModalVisible(true);
+   };
+
+@@ -389,14 +399,19 @@ export default function UsersFormScreen() {
+
+           <AppSelectorField
+             label={t('usersForm.roles')}
+-            value={selectedNames(roles, form.roleIds, t('usersForm.selectRoles'))}
++            value={selectedNames(roles, form.roleIds, t('usersForm.selectRoles'), i18n.language)}
+             placeholder={t('usersForm.selectRoles')}
+             onPress={openRolesModal}
+           />
+
+           <AppSelectorField
+             label={t('usersForm.directPermissions')}
+-            value={selectedNames(permissions, form.permissionIds, t('usersForm.noDirectPermissions'))}
++            value={selectedNames(
++              permissions,
++              form.permissionIds,
++              t('usersForm.noDirectPermissions'),
++              i18n.language
++            )}
+             placeholder={t('usersForm.selectDirectPermissions')}
+             onPress={openPermissionsModal}
+           />
+@@ -532,7 +547,7 @@ export default function UsersFormScreen() {
+             <AppOptionRow
+               key={role.id}
+               title={role.name}
+-              subtitle={formatPermissionCode(role.code)}
++              subtitle={formatPermissionCode(role.code, i18n.language)}
+               onPress={() =>
+                 setDraftRoleIds((current) => toggleId(current, role.id))
+               }
+@@ -573,6 +588,18 @@ export default function UsersFormScreen() {
+           onChangeText={setPermissionSearch}
+         />
+
++        <View style={styles.technicalToggle}>
++          <AppButton
++            title={
++              showPermissionTechnicalDetails
++                ? t('systemRoles.hideTechnicalDetails')
++                : t('systemRoles.showTechnicalDetails')
++            }
++            variant="secondary"
++            onPress={() => setShowPermissionTechnicalDetails((current) => !current)}
++          />
++        </View>
++
+         {groupedPermissionOptions.length === 0 ? (
+           <AppText color={theme.colors.mutedText} style={styles.emptyPermissions}>
+             {t('usersForm.noPermissionsFound')}
+@@ -587,13 +614,22 @@ export default function UsersFormScreen() {
+               {group.permissions.map((permission) => {
+                 const selected = draftPermissionIds.includes(permission.id);
+                 const dependencyWarnings = selected
+-                  ? getSuggestedDependencyWarnings(permission.code, draftPermissionCodes, permissions)
++                  ? getSuggestedDependencyWarnings(
++                      permission.code,
++                      draftPermissionCodes,
++                      permissions,
++                      i18n.language
++                    )
+                   : [];
+                 return (
+                   <AppOptionRow
+                     key={permission.id}
+-                    title={formatPermissionCode(permission.code)}
+-                    subtitle={t('systemRoles.internalCode', { code: permission.code })}
++                    title={formatPermissionCode(permission.code, i18n.language)}
++                    subtitle={
++                      showPermissionTechnicalDetails
++                        ? t('systemRoles.internalCode', { code: permission.code })
++                        : undefined
++                    }
+                     onPress={() =>
+                       setDraftPermissionIds((current) => toggleId(current, permission.id))
+                     }
+@@ -653,6 +689,11 @@ const styles = StyleSheet.create({
+   permissionGroup: {
+     marginTop: 14,
+   },
++  technicalToggle: {
++    alignItems: 'flex-start',
++    marginBottom: 4,
++    marginTop: 10,
++  },
+   permissionStatusRow: {
+     alignItems: 'flex-start',
+   },
+diff --git a/components/ui/RestrictedSection.tsx b/components/ui/RestrictedSection.tsx
+index c7c9661..7e35531 100644
+--- a/components/ui/RestrictedSection.tsx
++++ b/components/ui/RestrictedSection.tsx
+@@ -3,6 +3,7 @@ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import { NormalizedApiError } from '@/services/apiError';
+ import { formatPermissionCode } from '@/services/permissionDependencies';
++import { useTranslation } from 'react-i18next';
+
+ type Props = {
+   error: NormalizedApiError;
+@@ -11,6 +12,7 @@ type Props = {
+
+ export default function RestrictedSection({ error, title = 'Acceso restringido' }: Props) {
+   const { theme } = useAppTheme();
++  const { i18n } = useTranslation('common');
+
+   return (
+     <AppCard variant="warning">
+@@ -20,7 +22,7 @@ export default function RestrictedSection({ error, title = 'Acceso restringido'
+       <AppText>No tienes permiso para consultar esta informacion.</AppText>
+       {error.requiredPermission ? (
+         <AppText color={theme.colors.mutedText}>
+-          Permiso requerido: {formatPermissionCode(error.requiredPermission)}
++          Permiso requerido: {formatPermissionCode(error.requiredPermission, i18n.language)}
+         </AppText>
+       ) : null}
+       <AppText variant="caption" color={theme.colors.mutedText}>
+diff --git a/docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md b/docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md
+index 59590e3..98cb84f 100644
+--- a/docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md
++++ b/docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md
+@@ -55,3 +55,4 @@
+ | D4R-023 | Errores accionables | `qa.admin@local.test` | `/live` | Error refresh LIVE accionable | LIVE abierto | Interrumpir backend durante refresh | Error limpio, sin stacktrace ni detalles sensibles | Pendiente | PENDING_QA | S2 | Pendiente | Pendiente |
+ | D4R-024 | Navegacion / permisos | `qa.admin@local.test` | `/customers`, `/users`, `/reports` | Rutas principales con AppShell | Admin logueado | Abrir rutas principales | AppShell visible, sin menu legacy, light/dark correcto | Pendiente | PENDING_QA | S2 | Pendiente | Pendiente |
+ | D4R-025 | UI Kit / diseno visual | `qa.admin@local.test` | `/live`, `/ui-kit` | Validacion mobile/tablet | Viewport responsive | Revisar LIVE y UI Kit en mobile/tablet | Acciones no se cortan; botones y textos no se enciman | Pendiente | PENDING_QA | S2 | Pendiente | Pendiente |
++| D4R-052 | Roles / permisos | `qa.admin@local.test` | `/users-form` | Permisos directos adicionales legibles | Admin logueado y catalogo de permisos cargado | En espanol abrir permisos directos, revisar lista y detalles tecnicos; cambiar a ingles y repetir | En espanol no hay mezcla de permisos en ingles; codigos internos ocultos por defecto; detalles tecnicos muestran codigo; ingles muestra etiquetas legibles; RBAC no cambia | Pendiente | PENDING_QA | S2 | Pendiente | Pendiente |
+diff --git a/docs/PRODUCT_UX_B2_READABLE_DIRECT_PERMISSIONS.md b/docs/PRODUCT_UX_B2_READABLE_DIRECT_PERMISSIONS.md
+new file mode 100644
+index 0000000..ce53cde
+--- /dev/null
++++ b/docs/PRODUCT_UX_B2_READABLE_DIRECT_PERMISSIONS.md
+@@ -0,0 +1,86 @@
++# PRODUCT-UX-B2 - Permisos directos legibles sin mezcla de idioma
++
++## Problema
++
++QA confirmo que la seccion `Permisos directos adicionales` podia mezclar etiquetas en espanol con nombres crudos en ingles devueltos por el catalogo backend.
++
++Ejemplos detectados:
++
++- `Approve Refund`
++- `Cancel Consignments`
++- `Cancel Refund`
++- `Cancel Transfers`
++- `Manage Branding`
++- `Manage Customer Packages`
++- `Process Refund`
++- `Receive Transfers`
++- `Request Refund`
++- `Send Transfers`
++- `Settle Consignments`
++- `View Deposit Reports`
++
++## Decision UX
++
++La UI debe usar el mapper visible de permisos como fuente de etiqueta principal:
++
++- En espanol, mostrar etiquetas en espanol.
++- En ingles, mostrar etiquetas en ingles.
++- En pt-BR/fr/ja/zh/ko, usar etiqueta basica legible cuando no exista traduccion nativa completa.
++- Ocultar `Codigo interno` por defecto.
++- Mostrar codigos solo al abrir `Ver detalles tecnicos`.
++
++## Cambios realizados
++
++- `services/permissionDependencies.ts` ahora soporta etiquetas por idioma para permisos visibles.
++- `app/users-form.tsx` usa el idioma activo al mostrar `Permisos directos adicionales`.
++- `app/system-roles.tsx` usa el idioma activo al mostrar permisos de rol.
++- `components/ui/RestrictedSection.tsx` usa el idioma activo para el permiso requerido.
++- `systemRoles.showTechnicalDetails` y `systemRoles.hideTechnicalDetails` quedaron agregados a todos los locales.
++
++## Traducciones ES agregadas/corregidas
++
++| Codigo | Etiqueta ES |
++| --- | --- |
++| `APPROVE_REFUND` | Aprobar devolucion |
++| `CANCEL_CONSIGNMENTS` | Cancelar consignaciones |
++| `CANCEL_REFUND` | Cancelar devolucion |
++| `CANCEL_TRANSFERS` | Cancelar transferencias |
++| `MANAGE_BRANDING` | Administrar apariencia y marca |
++| `MANAGE_CUSTOMER_PACKAGES` | Administrar paquetes de cliente |
++| `PROCESS_REFUND` | Procesar devolucion |
++| `RECEIVE_TRANSFERS` | Recibir transferencias |
++| `REQUEST_REFUND` | Solicitar devolucion |
++| `SEND_TRANSFERS` | Enviar transferencias |
++| `SETTLE_CONSIGNMENTS` | Liquidar consignaciones |
++| `VIEW_DEPOSIT_REPORTS` | Ver reporte de depositos |
++
++Tambien se normalizaron alias/codigos relacionados como `EXECUTE_REFUND`, `MANAGE_CHANNELS`, `MANAGE_CASH_CUTS`, `ADMIN_ROLES`, `ADMIN_SECURITY`, `ADMIN_SHIPMENTS`, `ADMIN_TRANSFERS`, `ADMIN_USERS` y permisos LIVE futuros propuestos.
++
++## Que no cambio
++
++- No se modifico backend.
++- No se modifico RBAC.
++- No se crearon permisos reales.
++- No se cambiaron roles ni asignaciones.
++- No se habilitaron capacidades nuevas.
++
++## QA requerido
++
++1. Entrar como `qa.admin@local.test`.
++2. Abrir editar/crear usuario.
++3. Revisar `Permisos directos adicionales`.
++4. Confirmar que en espanol no aparecen permisos mezclados en ingles.
++5. Confirmar que no se ven codigos internos por defecto.
++6. Abrir `Ver detalles tecnicos` y confirmar que ahi si aparece el codigo interno.
++7. Cambiar a ingles y confirmar etiquetas principales en ingles.
++8. Confirmar que RBAC no cambio y que solo se pueden asignar permisos existentes devueltos por backend.
++
++## Nota i18n
++
++pt-BR, fr, ja, zh y ko conservan textos basicos para el toggle tecnico. Las etiquetas de permisos usan fallback ingles legible si no existe mapa nativo completo. Requieren revision humana/nativa futura para una localizacion comercial perfecta.
++
++## GO/NO-GO
++
++GO para presentacion legible y defensa contra nombres crudos del catalogo.
++
++NO-GO para crear permisos, modificar RBAC, tocar backend o habilitar capacidades no existentes.
+diff --git a/docs/QA_TODO_HANDOFF.md b/docs/QA_TODO_HANDOFF.md
+index d1e42b5..329732d 100644
+--- a/docs/QA_TODO_HANDOFF.md
++++ b/docs/QA_TODO_HANDOFF.md
+@@ -115,6 +115,7 @@ Usar `docs/QA_RESULTS_LOG.md` y la plantilla `qa-reports/manual-evidence/PRODUCT
+ | NAV-002 | `qa.vendedor.centro@local.test` | `/door-sale` | Venta puerta por permisos | Abrir ruta o menu | Visible solo si permiso/canal aplica | Permisos QA | PENDING_QA | Pendiente | Pendiente | S1 |
+ | NAV-003 | `qa.admin@local.test` | `/system-security`, `/system-sessions` | Sin layout legacy | Abrir rutas | AppShell/sidebar, sin Menu principal legacy | N/A | PENDING_QA | Pendiente | Pendiente | S2 |
+ | NAV-004 | `qa.admin@local.test` | `/customers`, `/reservations`, `/users` | Rutas operativas migradas | Abrir rutas principales | AppShell, idioma activo, light/dark | N/A | PENDING_QA | Pendiente | Pendiente | S2 |
++| UX-B2-001 | `qa.admin@local.test` | `/users-form` | Permisos directos legibles por idioma | En espanol abrir `Permisos directos adicionales`; revisar lista; abrir detalles tecnicos; cambiar a ingles y repetir | En espanol no mezcla ingles; codigos internos ocultos por defecto; detalles tecnicos muestran codigo; ingles muestra etiquetas principales en ingles; RBAC no cambia | Usuario admin y catalogo de permisos existente | PENDING_QA | Pendiente | Pendiente | S2 |
+ | SEC-001 | DBA/DevOps | Backend local/QA | Variables backend seguras | Definir `CONTROL_ROPA_DB_PASSWORD`; iniciar backend; ejecutar health/login smoke | Backend arranca sin password versionado; DB conecta por env var | Secret configurado fuera del repo | PENDING_QA | Pendiente | Pendiente | S1 |
+ | SEC-002 | DBA/DevOps | Git workspace | `.env` no versionado | Crear `.env` local con valores reales; ejecutar `git status --short` | `.env` no aparece; `.env.example` queda versionado como plantilla | `.env` local temporal | PENDING_QA | Pendiente | Pendiente | S1 |
+ | SEC-003 | Dev/QA tecnico | Backend local DEV | Script DEV seguro | Copiar `.env.example` a `.env`; configurar password local; ejecutar `./scripts/dev-backend.sh` en Git Bash o `scripts\dev-backend.cmd` en CMD | Backend arranca cargando `.env`; password no se imprime; `.env` no queda staged | `.env` local no versionado | PENDING_QA | Pendiente | Pendiente | S1 |
+diff --git a/locales/en/common.json b/locales/en/common.json
+index 9203fe2..2866dac 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -892,6 +892,8 @@
+     "searchPermission": "Search permission",
+     "noPermissionsFound": "No permissions found with that filter.",
+     "internalCode": "Internal code: {{code}}",
++    "showTechnicalDetails": "View technical details",
++    "hideTechnicalDetails": "Hide technical details",
+     "included": "Included",
+     "add": "Add"
+   },
+diff --git a/locales/es/common.json b/locales/es/common.json
+index e819397..8dedeb6 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -892,6 +892,8 @@
+     "searchPermission": "Buscar permiso",
+     "noPermissionsFound": "No se encontraron permisos con ese filtro.",
+     "internalCode": "Codigo interno: {{code}}",
++    "showTechnicalDetails": "Ver detalles tecnicos",
++    "hideTechnicalDetails": "Ocultar detalles tecnicos",
+     "included": "Incluido",
+     "add": "Agregar"
+   },
+diff --git a/locales/fr/common.json b/locales/fr/common.json
+index dcb831a..da07489 100644
+--- a/locales/fr/common.json
++++ b/locales/fr/common.json
+@@ -892,6 +892,8 @@
+     "searchPermission": "Rechercher permission",
+     "noPermissionsFound": "Sans permissions trouvé",
+     "internalCode": "Interne code {{code}}",
++    "showTechnicalDetails": "Voir les détails techniques",
++    "hideTechnicalDetails": "Masquer les détails techniques",
+     "included": "Inclus",
+     "add": "Ajouter"
+   },
+diff --git a/locales/ja/common.json b/locales/ja/common.json
+index 6c5e5f8..3146432 100644
+--- a/locales/ja/common.json
++++ b/locales/ja/common.json
+@@ -892,6 +892,8 @@
+     "searchPermission": "検索 権限",
+     "noPermissionsFound": "なし 権限 項目",
+     "internalCode": "内部 コード {{code}}",
++    "showTechnicalDetails": "技術詳細を表示",
++    "hideTechnicalDetails": "技術詳細を非表示",
+     "included": "含む",
+     "add": "追加"
+   },
+diff --git a/locales/ko/common.json b/locales/ko/common.json
+index 267630c..f9e6f63 100644
+--- a/locales/ko/common.json
++++ b/locales/ko/common.json
+@@ -892,6 +892,8 @@
+     "searchPermission": "검색 권한",
+     "noPermissionsFound": "없음 권한 항목",
+     "internalCode": "내부 코드 {{code}}",
++    "showTechnicalDetails": "기술 세부 정보 보기",
++    "hideTechnicalDetails": "기술 세부 정보 숨기기",
+     "included": "포함",
+     "add": "추가"
+   },
+diff --git a/locales/pt-BR/common.json b/locales/pt-BR/common.json
+index d1c091c..29bd9da 100644
+--- a/locales/pt-BR/common.json
++++ b/locales/pt-BR/common.json
+@@ -892,6 +892,8 @@
+     "searchPermission": "Buscar permissão",
+     "noPermissionsFound": "Sem permissões encontrado",
+     "internalCode": "Interno código {{code}}",
++    "showTechnicalDetails": "Ver detalhes técnicos",
++    "hideTechnicalDetails": "Ocultar detalhes técnicos",
+     "included": "Incluído",
+     "add": "Adicionar"
+   },
+diff --git a/locales/zh/common.json b/locales/zh/common.json
+index ca673fd..e81de44 100644
+--- a/locales/zh/common.json
++++ b/locales/zh/common.json
+@@ -892,6 +892,8 @@
+     "searchPermission": "搜索权限",
+     "noPermissionsFound": "无权限项目",
+     "internalCode": "内部代码{{code}}",
++    "showTechnicalDetails": "查看技术细节",
++    "hideTechnicalDetails": "隐藏技术细节",
+     "included": "包含",
+     "add": "添加"
+   },
+diff --git a/qa-reports/PRODUCT-UX-B2-readable-direct-permissions-report-20260609-000238.md b/qa-reports/PRODUCT-UX-B2-readable-direct-permissions-report-20260609-000238.md
+new file mode 100644
+index 0000000..ce63832
+--- /dev/null
++++ b/qa-reports/PRODUCT-UX-B2-readable-direct-permissions-report-20260609-000238.md
+@@ -0,0 +1,54 @@
++# PRODUCT-UX-B2 - Reporte permisos directos legibles
++
++## Datos
++
++- Fecha: 2026-06-09 00:02:38 America/Mexico_City.
++- Rama: `feature/product-ux-b2-hide-visible-internal-codes`.
++- Alcance: presentacion legible de permisos directos adicionales y ocultamiento de codigo interno por defecto.
++
++## Permisos que se veian en ingles
++
++- `APPROVE_REFUND`
++- `CANCEL_CONSIGNMENTS`
++- `CANCEL_REFUND`
++- `CANCEL_TRANSFERS`
++- `MANAGE_BRANDING`
++- `MANAGE_CUSTOMER_PACKAGES`
++- `PROCESS_REFUND`
++- `RECEIVE_TRANSFERS`
++- `REQUEST_REFUND`
++- `SEND_TRANSFERS`
++- `SETTLE_CONSIGNMENTS`
++- `VIEW_DEPOSIT_REPORTS`
++
++## Cambios realizados
++
++- El mapper visible de permisos ahora acepta idioma activo.
++- En espanol, `Permisos directos adicionales` usa etiquetas en espanol y no mezcla ingles devuelto por backend.
++- En ingles, la lista usa etiquetas principales en ingles.
++- `Codigo interno` queda oculto por defecto en roles y permisos directos.
++- Se agrego el toggle `Ver detalles tecnicos` / `Ocultar detalles tecnicos`.
++- Se agregaron claves i18n del toggle a ES/EN/PT-BR/FR/JA/ZH/KO.
++- Se actualizo QA handoff y matriz PRODUCT-D4 REAL con el caso de validacion.
++
++## Restricciones respetadas
++
++- No se modifico backend.
++- No se modifico RBAC.
++- No se crearon permisos reales.
++- No se cambiaron asignaciones de roles/permisos.
++- No se habilitaron capacidades frontend nuevas.
++
++## Validaciones ejecutadas
++
++- JSON parse de `locales/es/en/pt-BR/fr/ja/zh/ko/common.json`: PASS.
++- `npm.cmd run lint`: PASS con warnings preexistentes, 0 errores.
++- `npx.cmd tsc --noEmit`: PASS.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: PASS.
++- `git --no-pager diff --check`: PASS.
++
++## GO/NO-GO
++
++GO tecnico para la presentacion legible de permisos.
++
++NO-GO para cambios backend/RBAC/permisos reales en esta fase.
+diff --git a/services/permissionDependencies.ts b/services/permissionDependencies.ts
+index 5636d22..d91c91e 100644
+--- a/services/permissionDependencies.ts
++++ b/services/permissionDependencies.ts
+@@ -29,28 +29,43 @@ const PERMISSION_LABELS_ES: Record<string, string> = {
+   APPLY_CUSTOMER_BALANCE: 'Aplicar saldo de cliente',
+   APPLY_APPROVED_LIVE_PRICE_CHANGE: 'Aplicar precio LIVE aprobado',
+   APPLY_LIVE_OPERATION_AUTHORIZATION: 'Aplicar autorizacion operativa LIVE',
++  APPROVE_REFUND: 'Aprobar devolucion',
+   APPROVE_LIVE_OPERATION_AUTHORIZATION: 'Aprobar autorizacion operativa LIVE',
+   APPROVE_LIVE_PRICE_CHANGE: 'Aprobar cambio de precio LIVE',
++  CANCEL_CONSIGNMENTS: 'Cancelar consignaciones',
++  CANCEL_REFUND: 'Cancelar devolucion',
+   CANCEL_RESERVATION: 'Cancelar apartado',
+   CANCEL_RESERVATION_WITH_PAYMENT: 'Cancelar apartado con pago',
+   CANCEL_SALE: 'Cancelar venta',
++  CANCEL_TRANSFERS: 'Cancelar transferencias',
+   CHANGE_LIVE_ACTIVE_ITEM: 'Cambiar prenda al aire',
+   CHANGE_LIVE_PRICE: 'Cambiar precio LIVE directamente',
+   CLOSE_LIVE_OPERATIONAL_SALE: 'Cerrar venta operativa LIVE',
+   CREATE_CLOSE_CUSTOMER_PACKAGE: 'Crear cierre de paquete de cliente',
+   CREATE_CUSTOMER: 'Crear cliente',
++  CREATE_CUSTOMER_PACKAGES: 'Crear cierre de paquete de cliente',
+   CREATE_ITEM: 'Crear prenda',
+   DO_DOOR_RESERVATION: 'Apartar en puerta',
+   DO_DOOR_SALE: 'Venta puerta',
+   DO_LIVE_RESERVATION: 'Apartar en LIVE',
++  EXECUTE_REFUND: 'Ejecutar devolucion',
+   EDIT_CUSTOMER: 'Editar cliente',
+   EDIT_ITEM: 'Editar prenda',
+   EDIT_LOCKED_ITEM: 'Editar prenda bloqueada',
++  ADMIN_ROLES: 'Administrar roles',
++  ADMIN_SECURITY: 'Administrar seguridad',
++  ADMIN_SHIPMENTS: 'Administrar envios',
++  ADMIN_TRANSFERS: 'Administrar transferencias',
++  ADMIN_USERS: 'Administrar usuarios',
++  MANAGE_BRANDING: 'Administrar apariencia y marca',
+   MANAGE_BRANCH_CHANNELS: 'Administrar canales operativos',
+   MANAGE_BRANCHES: 'Administrar sucursales',
+   MANAGE_CASH_CLOSURES: 'Administrar cortes de caja',
++  MANAGE_CASH_CUTS: 'Administrar cortes de caja',
+   MANAGE_CATALOGS: 'Administrar catalogos',
+   MANAGE_CONSIGNMENTS: 'Administrar consignaciones',
++  MANAGE_CHANNELS: 'Administrar canales operativos',
++  MANAGE_CUSTOMER_PACKAGES: 'Administrar paquetes de cliente',
+   MANAGE_INCIDENTS: 'Administrar incidencias',
+   MANAGE_INVENTORY: 'Administrar inventario',
+   MANAGE_REFUNDS: 'Administrar devoluciones',
+@@ -62,16 +77,22 @@ const PERMISSION_LABELS_ES: Record<string, string> = {
+   MANAGE_USERS: 'Administrar usuarios',
+   OPERATE_LIVE: 'Operar LIVE',
+   PREPARE_LIVE_ITEM: 'Preparar prenda para LIVE',
++  PROCESS_REFUND: 'Procesar devolucion',
+   REASSIGN_CUSTOMERS: 'Reasignar clientes',
+   REASSIGN_RESERVATION: 'Reasignar apartado',
++  RECEIVE_TRANSFERS: 'Recibir transferencias',
+   REGISTER_PAYMENTS: 'Registrar pagos',
+   RELEASE_RESERVED_ITEM: 'Liberar prenda apartada',
+   REMOVE_LIVE_ACTIVE_ITEM: 'Retirar prenda del aire',
+   REQUEST_LIVE_OPERATION_AUTHORIZATION: 'Solicitar autorizacion operativa LIVE',
+   REQUEST_LIVE_PRICE_CHANGE: 'Solicitar cambio de precio LIVE',
++  REQUEST_REFUND: 'Solicitar devolucion',
++  SEND_TRANSFERS: 'Enviar transferencias',
++  SETTLE_CONSIGNMENTS: 'Liquidar consignaciones',
+   UNDO_LIVE_OPERATIONAL_SALE: 'Deshacer cierre de venta LIVE',
+   VIEW_CUSTOMER_ORDERS: 'Ver pedidos de cliente',
+   VIEW_CUSTOMERS: 'Ver clientes',
++  VIEW_DEPOSIT_REPORTS: 'Ver reporte de depositos',
+   VIEW_INVENTORY: 'Ver inventario',
+   VIEW_LIVE_OPERATION_AUTHORIZATIONS: 'Ver autorizaciones operativas LIVE',
+   VIEW_LIVE_PRICE_AUTHORIZATIONS: 'Ver autorizaciones de precio LIVE',
+@@ -83,9 +104,92 @@ const PERMISSION_LABELS_ES: Record<string, string> = {
+   VOID_PAYMENT: 'Anular pago',
+ };
+
+-export function formatPermissionCode(code: string): string {
++const PERMISSION_LABELS_EN: Record<string, string> = {
++  APPLY_CUSTOMER_BALANCE: 'Apply customer balance',
++  APPLY_APPROVED_LIVE_PRICE_CHANGE: 'Apply approved LIVE price',
++  APPLY_LIVE_OPERATION_AUTHORIZATION: 'Apply LIVE operational authorization',
++  APPROVE_REFUND: 'Approve refund',
++  APPROVE_LIVE_OPERATION_AUTHORIZATION: 'Approve LIVE operational authorization',
++  APPROVE_LIVE_PRICE_CHANGE: 'Approve LIVE price change',
++  CANCEL_CONSIGNMENTS: 'Cancel consignments',
++  CANCEL_REFUND: 'Cancel refund',
++  CANCEL_RESERVATION: 'Cancel hold',
++  CANCEL_RESERVATION_WITH_PAYMENT: 'Cancel hold with payment',
++  CANCEL_SALE: 'Cancel sale',
++  CANCEL_TRANSFERS: 'Cancel transfers',
++  CHANGE_LIVE_ACTIVE_ITEM: 'Change live item on air',
++  CHANGE_LIVE_PRICE: 'Change LIVE price directly',
++  CLOSE_LIVE_OPERATIONAL_SALE: 'Close LIVE operational sale',
++  CREATE_CLOSE_CUSTOMER_PACKAGE: 'Create customer package closing',
++  CREATE_CUSTOMER: 'Create customer',
++  CREATE_CUSTOMER_PACKAGES: 'Create customer package closing',
++  CREATE_ITEM: 'Create item',
++  DO_DOOR_RESERVATION: 'Door hold',
++  DO_DOOR_SALE: 'Door sale',
++  DO_LIVE_RESERVATION: 'LIVE hold',
++  EDIT_CUSTOMER: 'Edit customer',
++  EDIT_ITEM: 'Edit item',
++  EDIT_LOCKED_ITEM: 'Edit locked item',
++  EXECUTE_REFUND: 'Execute refund',
++  ADMIN_ROLES: 'Manage roles',
++  ADMIN_SECURITY: 'Manage security',
++  ADMIN_SHIPMENTS: 'Manage shipments',
++  ADMIN_TRANSFERS: 'Manage transfers',
++  ADMIN_USERS: 'Manage users',
++  MANAGE_BRANDING: 'Manage branding',
++  MANAGE_BRANCH_CHANNELS: 'Manage operational channels',
++  MANAGE_BRANCHES: 'Manage branches',
++  MANAGE_CASH_CLOSURES: 'Manage cash closures',
++  MANAGE_CASH_CUTS: 'Manage cash closures',
++  MANAGE_CATALOGS: 'Manage catalogs',
++  MANAGE_CHANNELS: 'Manage operational channels',
++  MANAGE_CONSIGNMENTS: 'Manage consignments',
++  MANAGE_CUSTOMER_PACKAGES: 'Manage customer packages',
++  MANAGE_INCIDENTS: 'Manage incidents',
++  MANAGE_INVENTORY: 'Manage inventory',
++  MANAGE_REFUNDS: 'Manage refunds',
++  MANAGE_RETURNS: 'Manage returns',
++  MANAGE_ROLES: 'Manage roles',
++  MANAGE_SECURITY_SETTINGS: 'Manage security',
++  MANAGE_SHIPMENTS: 'Manage shipments',
++  MANAGE_TRANSFERS: 'Manage transfers',
++  MANAGE_USERS: 'Manage users',
++  OPERATE_LIVE: 'Operate LIVE',
++  PREPARE_LIVE_ITEM: 'Prepare item for LIVE',
++  PROCESS_REFUND: 'Process refund',
++  REASSIGN_CUSTOMERS: 'Reassign customers',
++  REASSIGN_RESERVATION: 'Reassign hold',
++  RECEIVE_TRANSFERS: 'Receive transfers',
++  REGISTER_PAYMENTS: 'Register payments',
++  RELEASE_RESERVED_ITEM: 'Release held item',
++  REMOVE_LIVE_ACTIVE_ITEM: 'Remove item from air',
++  REQUEST_LIVE_OPERATION_AUTHORIZATION: 'Request LIVE operational authorization',
++  REQUEST_LIVE_PRICE_CHANGE: 'Request LIVE price change',
++  REQUEST_REFUND: 'Request refund',
++  SEND_TRANSFERS: 'Send transfers',
++  SETTLE_CONSIGNMENTS: 'Settle consignments',
++  UNDO_LIVE_OPERATIONAL_SALE: 'Undo LIVE sale closing',
++  VIEW_CUSTOMER_ORDERS: 'View customer orders',
++  VIEW_CUSTOMERS: 'View customers',
++  VIEW_DEPOSIT_REPORTS: 'View deposit reports',
++  VIEW_INVENTORY: 'View inventory',
++  VIEW_LIVE_OPERATION_AUTHORIZATIONS: 'View LIVE operational authorizations',
++  VIEW_LIVE_PRICE_AUTHORIZATIONS: 'View LIVE price authorizations',
++  VIEW_PAYMENT_STATUS: 'View payment status',
++  VIEW_PAYMENTS: 'View payments',
++  VIEW_REPORTS: 'View reports',
++  VIEW_SALES: 'View sales',
++  VIEW_SECURITY_AUDIT: 'View security audit',
++  VOID_PAYMENT: 'Void payment',
++};
++
++function permissionLabelsForLanguage(language = 'es'): Record<string, string> {
++  return language.toLowerCase().startsWith('es') ? PERMISSION_LABELS_ES : PERMISSION_LABELS_EN;
++}
++
++export function formatPermissionCode(code: string, language = 'es'): string {
+   const normalized = code.toUpperCase();
+-  const knownLabel = PERMISSION_LABELS_ES[normalized];
++  const knownLabel = permissionLabelsForLanguage(language)[normalized];
+   if (knownLabel) return knownLabel;
+
+   return normalized
+@@ -123,18 +227,20 @@ export function inferPermissionGroup(permissionCode: string, permissionName = ''
+
+ export function matchesPermissionSearch(
+   permission: { code: string; name: string },
+-  search: string
++  search: string,
++  language = 'es'
+ ): boolean {
+   const value = search.trim().toLowerCase();
+   if (!value) return true;
+
+-  return `${permission.name} ${permission.code} ${formatPermissionCode(permission.code)} ${inferPermissionGroup(permission.code, permission.name)}`
++  return `${permission.name} ${permission.code} ${formatPermissionCode(permission.code, language)} ${inferPermissionGroup(permission.code, permission.name)}`
+     .toLowerCase()
+     .includes(value);
+ }
+
+ export function sortPermissionsForDisplay<T extends { code: string; name: string }>(
+-  permissions: T[]
++  permissions: T[],
++  language = 'es'
+ ): T[] {
+   return [...permissions].sort((left, right) => {
+     const leftGroup = inferPermissionGroup(left.code, left.name);
+@@ -143,14 +249,15 @@ export function sortPermissionsForDisplay<T extends { code: string; name: string
+       PERMISSION_GROUP_ORDER.indexOf(leftGroup) - PERMISSION_GROUP_ORDER.indexOf(rightGroup);
+     if (groupComparison !== 0) return groupComparison;
+
+-    return formatPermissionCode(left.code).localeCompare(formatPermissionCode(right.code), 'es');
++    return formatPermissionCode(left.code, language).localeCompare(formatPermissionCode(right.code, language), language);
+   });
+ }
+
+ export function groupPermissionsForDisplay<T extends { code: string; name: string }>(
+-  permissions: T[]
++  permissions: T[],
++  language = 'es'
+ ): { group: string; permissions: T[] }[] {
+-  return sortPermissionsForDisplay(permissions).reduce<{ group: string; permissions: T[] }[]>(
++  return sortPermissionsForDisplay(permissions, language).reduce<{ group: string; permissions: T[] }[]>(
+     (groups, permission) => {
+       const group = inferPermissionGroup(permission.code, permission.name);
+       const existingGroup = groups.find((current) => current.group === group);
+@@ -192,8 +299,11 @@ export type PermissionDependencyWarning = {
+ export function getSuggestedDependencyWarnings(
+   permissionCode: string,
+   selectedPermissionCodes: string[],
+-  availablePermissions: { code: string; name: string }[]
++  availablePermissions: { code: string; name: string }[],
++  language = 'es'
+ ): PermissionDependencyWarning[] {
++  const isSpanish = language.toLowerCase().startsWith('es');
++
+   return getMissingSuggestedDependencies(permissionCode, selectedPermissionCodes).map((dependencyCode) => {
+     const dependency = availablePermissions.find(
+       (permission) => permission.code.toUpperCase() === dependencyCode.toUpperCase()
+@@ -202,11 +312,15 @@ export function getSuggestedDependencyWarnings(
+     return dependency
+       ? {
+           existsInCatalog: true,
+-          text: `Este permiso puede requerir: ${dependency.name} (${formatPermissionCode(dependency.code)})`,
++          text: isSpanish
++            ? `Este permiso puede requerir: ${formatPermissionCode(dependency.code, language)}`
++            : `This permission may require: ${formatPermissionCode(dependency.code, language)}`,
+         }
+       : {
+           existsInCatalog: false,
+-          text: `Dependencia pendiente de definir en catálogo: ${formatPermissionCode(dependencyCode)}`,
++          text: isSpanish
++            ? `Dependencia pendiente de definir en catalogo: ${formatPermissionCode(dependencyCode, language)}`
++            : `Pending catalog dependency: ${formatPermissionCode(dependencyCode, language)}`,
+         };
+   });
+ }

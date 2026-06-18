@@ -1,0 +1,14 @@
+﻿ app/batches.tsx                                    |  89 ++++++-------
+ app/door-reservation.tsx                           | 148 +++++++++++----------
+ app/door-sale.tsx                                  | 134 +++++++++++--------
+ app/items-create.tsx                               |  29 ++--
+ app/items.tsx                                      |  89 ++++++-------
+ docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md            |  16 +++
+ docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md              |  12 ++
+ docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md    |   4 +
+ docs/PRODUCT_D6_3_LEGACY_PREMIUM_MIGRATION.md      |  12 ++
+ docs/PRODUCT_D6_4_OPERATIONAL_LEGACY_APPSHELL.md   |  88 ++++++++++++
+ locales/en/common.json                             | 116 ++++++++++++++++
+ locales/es/common.json                             | 116 ++++++++++++++++
+ ...ional-legacy-appshell-report-20260606-182517.md |  99 ++++++++++++++
+ 13 files changed, 717 insertions(+), 235 deletions(-)

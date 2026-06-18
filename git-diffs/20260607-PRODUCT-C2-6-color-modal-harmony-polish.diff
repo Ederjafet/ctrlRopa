@@ -1,0 +1,870 @@
+﻿diff --git a/components/ui/AppColorPicker.tsx b/components/ui/AppColorPicker.tsx
+index 4cb9368..84753d0 100644
+--- a/components/ui/AppColorPicker.tsx
++++ b/components/ui/AppColorPicker.tsx
+@@ -14,6 +14,7 @@ import AppInput from './AppInput';
+ import AppText from './AppText';
+
+ type Props = {
++  colorName?: string;
+   visible: boolean;
+   title?: string;
+   value: string;
+@@ -23,6 +24,8 @@ type Props = {
+   onCancel: () => void;
+ };
+
++type PickerSection = 'swatches' | 'tints' | 'shades' | 'tones';
++
+ const DEFAULT_SWATCHES = [
+   '#2563EB',
+   '#0F766E',
+@@ -36,6 +39,7 @@ const DEFAULT_SWATCHES = [
+ ];
+
+ export default function AppColorPicker({
++  colorName,
+   visible,
+   title,
+   value,
+@@ -47,10 +51,12 @@ export default function AppColorPicker({
+   const { theme } = useAppTheme();
+   const { t } = useTranslation();
+   const [draftColor, setDraftColor] = useState(normalizeHexColor(value));
++  const [activeSection, setActiveSection] = useState<PickerSection>('swatches');
+
+   useEffect(() => {
+     if (visible) {
+       setDraftColor(normalizeHexColor(value));
++      setActiveSection('swatches');
+     }
+   }, [value, visible]);
+
+@@ -72,6 +78,22 @@ export default function AppColorPicker({
+     () => Array.from(new Set(suggestedColors.map((color) => normalizeHexColor(color)))),
+     [suggestedColors],
+   );
++  const colorSections = useMemo(
++    () => ({
++      swatches,
++      tints: dedupeColors(tints),
++      shades: dedupeColors(shades),
++      tones: dedupeColors(tones),
++    }),
++    [shades, swatches, tints, tones],
++  );
++  const activeColors = colorSections[activeSection];
++  const tabs: { key: PickerSection; label: string }[] = [
++    { key: 'swatches', label: t('paletteGenerator.swatchesTab') },
++    { key: 'tints', label: t('paletteGenerator.tints') },
++    { key: 'shades', label: t('paletteGenerator.shades') },
++    { key: 'tones', label: t('paletteGenerator.tones') },
++  ];
+
+   const apply = () => {
+     if (!draftIsValid) return;
+@@ -98,6 +120,11 @@ export default function AppColorPicker({
+               <AppText variant="subtitle" bold>
+                 {title ?? t('paletteGenerator.chooseColor')}
+               </AppText>
++              {colorName ? (
++                <AppText variant="caption" bold color={theme.colors.textSecondary}>
++                  {colorName}
++                </AppText>
++              ) : null}
+               <AppText variant="caption" color={theme.colors.mutedText}>
+                 {t('paletteGenerator.chooseColorHelp')}
+               </AppText>
+@@ -113,7 +140,7 @@ export default function AppColorPicker({
+             />
+           </View>
+
+-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent}>
++          <View style={styles.body}>
+             <AppInput
+               label="HEX"
+               value={draftColor}
+@@ -124,42 +151,46 @@ export default function AppColorPicker({
+               error={draftColor && !draftIsValid ? t('paletteGenerator.invalidHex') : undefined}
+             />
+
+-            <View style={styles.section}>
+-              <AppText bold>{t('paletteGenerator.suggestedSwatches')}</AppText>
++            <View style={styles.tabRow}>
++              {tabs.map((tab) => {
++                const selected = activeSection === tab.key;
++                return (
++                  <Pressable
++                    key={tab.key}
++                    onPress={() => setActiveSection(tab.key)}
++                    style={[
++                      styles.tab,
++                      {
++                        backgroundColor: selected ? theme.colors.primaryButtonBackground : theme.colors.surfaceMuted,
++                        borderColor: selected ? theme.colors.primaryButtonBackground : theme.colors.borderSubtle,
++                      },
++                    ]}
++                  >
++                    <AppText
++                      variant="caption"
++                      bold={selected}
++                      color={selected ? theme.colors.primaryButtonText : theme.colors.textSecondary}
++                    >
++                      {tab.label}
++                    </AppText>
++                  </Pressable>
++                );
++              })}
++            </View>
++
++            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.swatchScroll}>
+               <View style={styles.swatchGrid}>
+-                {swatches.map((color) => (
++                {activeColors.map((color, index) => (
+                   <ColorTile
+-                    key={color}
+-                    color={normalizeHexColor(color)}
+-                    selected={normalizeHexColor(color) === normalizedDraft}
+-                    onPress={() => setDraftColor(normalizeHexColor(color))}
++                    key={`${activeSection}-${color}-${index}`}
++                    color={color}
++                    selected={color === normalizedDraft}
++                    onPress={() => setDraftColor(color)}
+                   />
+                 ))}
+               </View>
+-            </View>
+-
+-            <View style={styles.section}>
+-              <AppText bold>{t('paletteGenerator.colorVariations')}</AppText>
+-              <VariationRow
+-                title={t('paletteGenerator.tints')}
+-                colors={tints}
+-                selectedColor={normalizedDraft}
+-                onPick={setDraftColor}
+-              />
+-              <VariationRow
+-                title={t('paletteGenerator.shades')}
+-                colors={shades}
+-                selectedColor={normalizedDraft}
+-                onPick={setDraftColor}
+-              />
+-              <VariationRow
+-                title={t('paletteGenerator.tones')}
+-                colors={tones}
+-                selectedColor={normalizedDraft}
+-                onPick={setDraftColor}
+-              />
+-            </View>
+-          </ScrollView>
++            </ScrollView>
++          </View>
+
+           <View style={styles.actions}>
+             {originalValue ? (
+@@ -218,36 +249,8 @@ function ColorTile({
+   );
+ }
+
+-function VariationRow({
+-  colors,
+-  onPick,
+-  selectedColor,
+-  title,
+-}: {
+-  colors: string[];
+-  onPick: (color: string) => void;
+-  selectedColor: string;
+-  title: string;
+-}) {
+-  const { theme } = useAppTheme();
+-
+-  return (
+-    <View style={styles.variationRow}>
+-      <AppText variant="caption" color={theme.colors.mutedText}>
+-        {title}
+-      </AppText>
+-      <View style={styles.swatchGrid}>
+-        {colors.map((color) => (
+-          <ColorTile
+-            key={color}
+-            color={color}
+-            selected={color === selectedColor}
+-            onPress={() => onPick(color)}
+-          />
+-        ))}
+-      </View>
+-    </View>
+-  );
++function dedupeColors(colors: string[]) {
++  return Array.from(new Set(colors.map((color) => normalizeHexColor(color))));
+ }
+
+ const styles = StyleSheet.create({
+@@ -267,6 +270,10 @@ const styles = StyleSheet.create({
+     justifyContent: 'center',
+     padding: 16,
+   },
++  body: {
++    gap: 12,
++    paddingTop: 14,
++  },
+   headerRow: {
+     alignItems: 'center',
+     flexDirection: 'row',
+@@ -277,27 +284,20 @@ const styles = StyleSheet.create({
+   largePreview: {
+     borderRadius: 18,
+     borderWidth: 1,
+-    height: 92,
+-    width: 140,
++    height: 76,
++    width: 112,
+   },
+   panel: {
+     borderWidth: 1,
+     elevation: 8,
+-    maxHeight: '88%',
+-    maxWidth: 620,
++    maxHeight: '86%',
++    maxWidth: 560,
+     padding: 18,
+     shadowOffset: { width: 0, height: 18 },
+     shadowOpacity: 0.18,
+     shadowRadius: 28,
+     width: '100%',
+   },
+-  scrollContent: {
+-    gap: 16,
+-    paddingTop: 16,
+-  },
+-  section: {
+-    gap: 10,
+-  },
+   swatch: {
+     borderRadius: 12,
+     height: 44,
+@@ -308,11 +308,22 @@ const styles = StyleSheet.create({
+     flexWrap: 'wrap',
+     gap: 10,
+   },
++  swatchScroll: {
++    paddingBottom: 2,
++  },
++  tab: {
++    borderRadius: 999,
++    borderWidth: 1,
++    paddingHorizontal: 12,
++    paddingVertical: 8,
++  },
++  tabRow: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 8,
++  },
+   textBlock: {
+     flex: 1,
+     minWidth: 0,
+   },
+-  variationRow: {
+-    gap: 8,
+-  },
+ });
+diff --git a/components/ui/PaletteGeneratorCard.tsx b/components/ui/PaletteGeneratorCard.tsx
+index 767ea11..d4e4a72 100644
+--- a/components/ui/PaletteGeneratorCard.tsx
++++ b/components/ui/PaletteGeneratorCard.tsx
+@@ -144,10 +144,15 @@ export default function PaletteGeneratorCard({
+     ? contrastRows
+     : contrastRows.filter((row) => ['button', 'background', 'danger'].includes(row.key));
+   const tokenEntries = Object.entries(palette) as [EditableVisualTokenKey, string][];
+-  const customBrandColorCount = [normalizedSecondary, normalizedAccent].filter(Boolean).length;
+-  const harmonyNoteKey = customBrandColorCount > 0
++  const hasSecondary = Boolean(normalizedSecondary);
++  const hasAccent = Boolean(normalizedAccent);
++  const harmonyNoteKey = hasSecondary && hasAccent
+     ? 'paletteGenerator.usingDefinedBrandColors'
+-    : 'paletteGenerator.harmonySuggestionHelp';
++    : hasSecondary
++      ? 'paletteGenerator.harmonyAccentHelp'
++      : hasAccent
++        ? 'paletteGenerator.harmonySecondaryHelp'
++        : 'paletteGenerator.harmonySecondaryAccentHelp';
+   const brandColorRows = [
+     {
+       key: 'primary' as const,
+@@ -269,9 +274,9 @@ export default function PaletteGeneratorCard({
+               {t('paletteGenerator.harmonyHelp')}
+             </AppText>
+             <View style={styles.swatchRow}>
+-              {harmonyColors.map((color) => (
++              {harmonyColors.map((color, index) => (
+                 <ColorSwatch
+-                  key={color}
++                  key={`harmony-${color}-${index}`}
+                   color={color}
+                   label={color}
+                   onPress={() => onBrandColorChange('primary', color)}
+@@ -365,8 +370,9 @@ export default function PaletteGeneratorCard({
+
+       {pickerRow ? (
+         <AppColorPicker
++          colorName={pickerRow.label}
+           visible={Boolean(activePicker)}
+-          title={t('paletteGenerator.chooseColor')}
++          title={t(`paletteGenerator.chooseBrandColor.${pickerRow.key}`)}
+           value={pickerRow.value || pickerRow.resolvedColor}
+           originalValue={pickerRow.resolvedColor}
+           suggestedColors={suggestedColors}
+diff --git a/docs/PRODUCT_C2_3_GUIDED_APP_DESIGN_FLOW.md b/docs/PRODUCT_C2_3_GUIDED_APP_DESIGN_FLOW.md
+index 88bfdc3..41bc764 100644
+--- a/docs/PRODUCT_C2_3_GUIDED_APP_DESIGN_FLOW.md
++++ b/docs/PRODUCT_C2_3_GUIDED_APP_DESIGN_FLOW.md
+@@ -157,3 +157,11 @@ Fecha: 2026-06-07
+ PRODUCT-C2.5 reduce aun mas la carga tecnica del flujo guiado. La vista principal queda centrada en plantilla, colores de marca, paleta sugerida, legibilidad, preview y acciones de aplicar/restaurar.
+
+ Las variaciones de color se muestran dentro del selector propio, la armonia queda como opcion avanzada y los tokens internos dejan de aparecer como una tarea esperada para usuario final.
++
++---
++
++## Continuidad PRODUCT-C2.6 - Colores faltantes
++
++Fecha: 2026-06-07
++
++PRODUCT-C2.6 ajusta la guia de colores para explicar que la armonia solo ayuda a completar colores faltantes. Si la marca ya tiene principal, secundario y acento, esos colores se respetan y el usuario ve `Usando colores de marca definidos`.
+diff --git a/docs/PRODUCT_C2_4_CUSTOM_BRAND_COLOR_PICKER.md b/docs/PRODUCT_C2_4_CUSTOM_BRAND_COLOR_PICKER.md
+index 98c79d4..a83a069 100644
+--- a/docs/PRODUCT_C2_4_CUSTOM_BRAND_COLOR_PICKER.md
++++ b/docs/PRODUCT_C2_4_CUSTOM_BRAND_COLOR_PICKER.md
+@@ -173,3 +173,16 @@ Cambios principales:
+ - `Identidad visual local` se renombra a `Editor avanzado de tokens locales`;
+ - `Design tokens` queda como diagnostico tecnico dentro de avanzado;
+ - el bloque visible de contraste se reduce a `Legibilidad`.
++
++---
++
++## Continuidad PRODUCT-C2.6 - Modal compacto
++
++Fecha: 2026-06-07
++
++PRODUCT-C2.6 mantiene el selector propio de PRODUCT-C2.4, pero reduce su peso visual:
++
++- el header muestra el color que se esta editando;
++- las variaciones se organizan en pestañas;
++- las acciones quedan visibles fuera del scroll;
++- las keys de swatches usan seccion, HEX e indice para evitar duplicados.
+diff --git a/docs/PRODUCT_C2_5_BRAND_EDITOR_SIMPLIFICATION.md b/docs/PRODUCT_C2_5_BRAND_EDITOR_SIMPLIFICATION.md
+index 1ee1f81..3fbf3ad 100644
+--- a/docs/PRODUCT_C2_5_BRAND_EDITOR_SIMPLIFICATION.md
++++ b/docs/PRODUCT_C2_5_BRAND_EDITOR_SIMPLIFICATION.md
+@@ -158,3 +158,16 @@ Las traducciones nuevas son base tecnica y requieren revision humana/nativa ante
+ - No se implementa ajuste automatico de contraste en esta fase.
+ - No se instalan dependencias externas.
+ - No se agregan fuentes externas.
++
++---
++
++## Continuidad PRODUCT-C2.6 - Armonia y modal
++
++Fecha: 2026-06-07
++
++PRODUCT-C2.6 conserva la simplificacion de PRODUCT-C2.5 y pule dos puntos visuales:
++
++- armonia se comunica como sugerencia segun los colores faltantes, no como limitante;
++- `AppColorPicker` se compacta con pestañas de muestras, claros, oscuros y desaturados.
++
++Tambien corrige keys duplicadas en listas de colores para evitar warnings de React en mobile.
+diff --git a/docs/PRODUCT_C2_6_COLOR_MODAL_HARMONY_POLISH.md b/docs/PRODUCT_C2_6_COLOR_MODAL_HARMONY_POLISH.md
+new file mode 100644
+index 0000000..0c10f29
+--- /dev/null
++++ b/docs/PRODUCT_C2_6_COLOR_MODAL_HARMONY_POLISH.md
+@@ -0,0 +1,140 @@
++# PRODUCT-C2.6 - Pulido de armonia y modal de seleccion de color
++
++Fecha: 2026-06-07
++Rama: `feature/product-c2-6-color-modal-harmony-polish`
++
++## Objetivo
++
++PRODUCT-C2.6 pule el flujo de colores de marca en `/ui-kit`: la armonia deja de percibirse como una restriccion y el modal `Elegir color` queda mas compacto, guiado y seguro en mobile/tablet.
++
++La fase conserva:
++
++- selector propio `AppColorPicker`;
++- tres colores de marca;
++- generacion de paleta;
++- contraste/legibilidad;
++- preview;
++- aplicar paleta localmente;
++- restaurar plantilla;
++- opciones avanzadas.
++
++## Problemas detectados
++
++QA visual detecto:
++
++- `Armonia de color` podia seguir sintiendose como una regla que reemplazaba colores de marca;
++- si principal, secundario y acento ya estaban definidos, armonia no debia parecer activa en el flujo principal;
++- el modal `Elegir color` mostraba demasiadas listas al mismo tiempo;
++- en mobile aparecio el warning de React por keys duplicadas, por ejemplo `#0F172A`;
++- el color de acento necesitaba explicarse como tercer color de marca.
++
++## Regla de armonia
++
++La armonia ahora se comunica como sugerencia:
++
++- solo principal: ayuda a sugerir secundario y acento;
++- principal + secundario: respeta secundario y sugiere acento;
++- principal + acento: respeta acento y sugiere secundario;
++- principal + secundario + acento: muestra `Usando colores de marca definidos`.
++
++Los controles completos de armonia quedan en opciones avanzadas.
++
++## Color de acento
++
++El color de acento se explica como tercer color de marca:
++
++- resalta detalles;
++- chips;
++- llamadas de atencion;
++- elementos destacados.
++
++No se mezcla con colores semanticos del sistema como `success`, `warning` o `danger`.
++
++## Modal de color
++
++`AppColorPicker` ahora muestra:
++
++- titulo especifico por color: principal, secundario o acento;
++- nombre del color editado;
++- muestra grande;
++- campo HEX;
++- pestañas compactas:
++  - muestras;
++  - claros;
++  - oscuros;
++  - desaturados;
++- acciones de restaurar, cancelar y aplicar siempre fuera del scroll.
++
++Esto evita listas largas y hace el modal mas util en mobile/tablet.
++
++## Variaciones por color
++
++Las variaciones dependen del color que se edita:
++
++- principal genera claros/oscuros/desaturados del principal;
++- secundario genera claros/oscuros/desaturados del secundario;
++- acento genera claros/oscuros/desaturados del acento.
++
++No se muestran variaciones en la pantalla principal.
++
++## Keys duplicadas
++
++Se corrigio el warning de React:
++
++```text
++Encountered two children with the same key, "#0F172A".
++```
++
++Las listas de colores ya no usan solo el HEX como key. Ahora usan keys compuestas por seccion, HEX normalizado e indice.
++
++Ademas, cada seccion del picker deduplica colores internamente.
++
++## I18N
++
++Se agregaron y ajustaron claves `paletteGenerator.*` en:
++
++- `es`;
++- `en`;
++- `pt-BR`;
++- `fr`;
++- `ja`;
++- `zh`;
++- `ko`.
++
++Auditoria local de estructura:
++
++```text
++es: leaves=1245 missing=0 extra=0
++en: leaves=1245 missing=0 extra=0
++pt-BR: leaves=1245 missing=0 extra=0
++fr: leaves=1245 missing=0 extra=0
++ja: leaves=1245 missing=0 extra=0
++zh: leaves=1245 missing=0 extra=0
++ko: leaves=1245 missing=0 extra=0
++```
++
++Las traducciones nuevas son base tecnica y requieren revision humana/nativa antes de release internacional.
++
++## Validacion manual esperada
++
++1. Entrar con `qa.admin`.
++2. Abrir `/ui-kit`.
++3. Definir solo color principal y confirmar que armonia se presenta como ayuda.
++4. Definir principal + secundario y confirmar que armonia solo sugiere acento.
++5. Definir principal + secundario + acento y confirmar `Usando colores de marca definidos`.
++6. Abrir `Cambiar color` en principal.
++7. Revisar tabs `Muestras`, `Claros`, `Oscuros`, `Desaturados`.
++8. Repetir para secundario y acento.
++9. Confirmar que no aparece warning de key duplicada.
++10. Aplicar color.
++11. Revisar paleta sugerida, legibilidad y preview.
++12. Aplicar paleta localmente.
++13. Restaurar plantilla.
++14. Validar light/dark y mobile/tablet.
++
++## Limitaciones
++
++- No hay persistencia backend ni por tenant.
++- No se implementa color wheel complejo.
++- No se instala ninguna dependencia externa.
++- No se agregan fuentes externas.
+diff --git a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+index 43bd916..dae4114 100644
+--- a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
++++ b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+@@ -385,3 +385,11 @@ Fecha: 2026-06-07
+ PRODUCT-C2.5 simplifica la superficie principal de `/ui-kit`: plantillas, colores de marca, paleta sugerida, legibilidad, preview y acciones finales. Las variaciones de color se abren desde el picker propio y los tokens quedan como diagnostico avanzado.
+
+ QA debe confirmar que la vista inicial ya no se perciba como laboratorio tecnico y que el modo avanzado conserve las herramientas internas.
++
++---
++
++## Continuidad PRODUCT-C2.6 - Selector compacto y armonia no limitante
++
++Fecha: 2026-06-07
++
++PRODUCT-C2.6 mejora el picker propio y la explicacion de armonia. El sistema visual respeta colores de marca definidos y usa armonia solo para sugerir faltantes. El modal de color usa pestañas compactas y keys compuestas para evitar duplicados.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index 95a7e47..90519a9 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -323,3 +323,18 @@ Agregar a la corrida manual de sistema visual:
+ - aplicar paleta localmente;
+ - restaurar plantilla;
+ - validar light/dark y mobile/tablet.
++
++## Nota PRODUCT-C2.6
++
++Agregar a la corrida manual de sistema visual:
++
++- abrir `/ui-kit`;
++- definir solo principal y confirmar que armonia se presenta como ayuda para sugerir secundario/acento;
++- definir principal + secundario y confirmar que armonia solo sugiere acento;
++- definir principal + secundario + acento y confirmar mensaje `Usando colores de marca definidos`;
++- abrir `Cambiar color` para principal, secundario y acento;
++- confirmar header especifico del color editado;
++- revisar tabs `Muestras`, `Claros`, `Oscuros`, `Desaturados`;
++- confirmar que no aparece warning `Encountered two children with the same key`;
++- aplicar color y confirmar que la paleta/preview se actualizan;
++- validar light/dark y mobile/tablet.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index d312a3f..059b079 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -1131,9 +1131,9 @@
+       "triadic": "Triadic",
+       "tetradic": "Tetradic"
+     },
+-    "tints": "Light variants",
+-    "shades": "Dark variants",
+-    "tones": "Desaturated variants",
++    "tints": "Light",
++    "shades": "Dark",
++    "tones": "Desaturated",
+     "suggestedPalette": "Suggested palette",
+     "suggestedPaletteHelp": "Tap a token to load it into the editor or apply the full palette locally.",
+     "appPaletteTitle": "Suggested palette for the application",
+@@ -1213,7 +1213,7 @@
+     "brandColorSecondary": "Secondary color",
+     "brandColorSecondaryHelp": "Used for contrast, strong backgrounds, or secondary buttons.",
+     "brandColorAccent": "Accent color",
+-    "brandColorAccentHelp": "Used to highlight elements, states, or calls to attention.",
++    "brandColorAccentHelp": "This is the third color of your brand. It is used to highlight details, chips, calls to attention, and featured elements.",
+     "changeColor": "Change color",
+     "chooseColor": "Choose color",
+     "chooseColorHelp": "Select a swatch, adjust the HEX value, or use a light, dark, or desaturated variation.",
+@@ -1243,7 +1243,16 @@
+     "designTokensTitle": "Design tokens",
+     "designTokensHelp": "Tokens are internal variables used by application components. They are shown for diagnostics and technical adjustments.",
+     "semanticTokensTitle": "Semantic tokens of the active theme",
+-    "semanticTokensHelp": "Surfaces, text, inputs, and states used by AppShell, LIVE, and detail screens."
++    "semanticTokensHelp": "Surfaces, text, inputs, and states used by AppShell, LIVE, and detail screens.",
++    "harmonySecondaryAccentHelp": "Harmony helps suggest secondary and accent colors.",
++    "harmonyAccentHelp": "Your secondary color is respected. Harmony only helps suggest the accent color.",
++    "swatchesTab": "Swatches",
++    "chooseBrandColor": {
++      "primary": "Choose main color",
++      "secondary": "Choose secondary color",
++      "accent": "Choose accent color"
++    },
++    "harmonySecondaryHelp": "Your accent color is respected. Harmony only helps suggest the secondary color."
+   },
+   "usersForm": {
+     "newTitle": "New user",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index aa964c4..ff59bff 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -1213,7 +1213,7 @@
+     "brandColorSecondary": "Color secundario",
+     "brandColorSecondaryHelp": "Se usa para contraste, fondos fuertes o botones secundarios.",
+     "brandColorAccent": "Color de acento",
+-    "brandColorAccentHelp": "Se usa para resaltar elementos, estados o llamadas de atencion.",
++    "brandColorAccentHelp": "Es el tercer color de tu marca. Se usa para resaltar detalles, chips, llamadas de atencion y elementos destacados.",
+     "changeColor": "Cambiar color",
+     "chooseColor": "Elegir color",
+     "chooseColorHelp": "Selecciona una muestra, ajusta el HEX o usa una variacion clara, oscura o desaturada.",
+@@ -1243,7 +1243,16 @@
+     "designTokensTitle": "Design tokens",
+     "designTokensHelp": "Los tokens son variables internas que usan los componentes de la aplicacion. Se muestran para diagnostico y ajustes tecnicos.",
+     "semanticTokensTitle": "Tokens semanticos del tema activo",
+-    "semanticTokensHelp": "Superficies, texto, inputs y estados usados por AppShell, LIVE y detalle."
++    "semanticTokensHelp": "Superficies, texto, inputs y estados usados por AppShell, LIVE y detalle.",
++    "harmonySecondaryAccentHelp": "La armonia ayuda a sugerir colores secundarios y de acento.",
++    "harmonyAccentHelp": "Se respeta tu color secundario. La armonia solo ayuda a sugerir el color de acento.",
++    "swatchesTab": "Muestras",
++    "chooseBrandColor": {
++      "primary": "Elegir color principal",
++      "secondary": "Elegir color secundario",
++      "accent": "Elegir color de acento"
++    },
++    "harmonySecondaryHelp": "Se respeta tu color de acento. La armonia solo ayuda a sugerir el color secundario."
+   },
+   "usersForm": {
+     "newTitle": "Nuevo usuario",
+diff --git a/locales/fr/common.json b/locales/fr/common.json
+index 25afaf5..ab61d08 100644
+--- a/locales/fr/common.json
++++ b/locales/fr/common.json
+@@ -1208,7 +1208,7 @@
+     "brandColorSecondary": "Couleur secondaire",
+     "brandColorSecondaryHelp": "Utilisee pour le contraste, les fonds forts ou les boutons secondaires.",
+     "brandColorAccent": "Couleur accent",
+-    "brandColorAccentHelp": "Utilisee pour mettre en valeur des elements, des etats ou des appels a l attention.",
++    "brandColorAccentHelp": "C est la troisieme couleur de votre marque. Elle sert a mettre en valeur les details, les chips, les appels a l attention et les elements importants.",
+     "changeColor": "Changer la couleur",
+     "chooseColor": "Choisir une couleur",
+     "chooseColorHelp": "Selectionnez une nuance, ajustez le HEX ou utilisez une variation claire, foncee ou desaturee.",
+@@ -1243,7 +1243,16 @@
+     "designTokensTitle": "Design tokens",
+     "designTokensHelp": "Les tokens sont des variables internes utilisees par les composants de l application. Ils sont affiches pour diagnostic et ajustements techniques.",
+     "semanticTokensTitle": "Tokens semantiques du theme actif",
+-    "semanticTokensHelp": "Surfaces, texte, champs et etats utilises par AppShell, LIVE et les ecrans de detail."
++    "semanticTokensHelp": "Surfaces, texte, champs et etats utilises par AppShell, LIVE et les ecrans de detail.",
++    "harmonySecondaryAccentHelp": "L harmonie aide a suggerer des couleurs secondaire et accent.",
++    "harmonyAccentHelp": "Votre couleur secondaire est respectee. L harmonie aide seulement a suggerer la couleur d accent.",
++    "swatchesTab": "Nuances",
++    "chooseBrandColor": {
++      "primary": "Choisir la couleur principale",
++      "secondary": "Choisir la couleur secondaire",
++      "accent": "Choisir la couleur d accent"
++    },
++    "harmonySecondaryHelp": "Votre couleur d accent est respectee. L harmonie aide seulement a suggerer la couleur secondaire."
+   },
+   "usersForm": {
+     "newTitle": "Nouveau",
+diff --git a/locales/ja/common.json b/locales/ja/common.json
+index d009cbd..3c0bd8e 100644
+--- a/locales/ja/common.json
++++ b/locales/ja/common.json
+@@ -1208,7 +1208,7 @@
+     "brandColorSecondary": "????????",
+     "brandColorSecondaryHelp": "??????????????????????????",
+     "brandColorAccent": "????????",
+-    "brandColorAccentHelp": "?????????????????????",
++    "brandColorAccentHelp": "ブランドの3つ目の色です。細部、チップ、注目要素、強調表示に使います。",
+     "changeColor": "????",
+     "chooseColor": "????",
+     "chooseColorHelp": "スウォッチ、HEX、または明るい/暗い/低彩度のバリエーションから選びます。",
+@@ -1243,7 +1243,16 @@
+     "designTokensTitle": "Design tokens",
+     "designTokensHelp": "トークンはアプリケーションコンポーネントが使う内部変数です。診断と技術調整のために表示します。",
+     "semanticTokensTitle": "有効テーマのセマンティックトークン",
+-    "semanticTokensHelp": "AppShell、LIVE、詳細画面で使うサーフェス、テキスト、入力、状態です。"
++    "semanticTokensHelp": "AppShell、LIVE、詳細画面で使うサーフェス、テキスト、入力、状態です。",
++    "harmonySecondaryAccentHelp": "ハーモニーはセカンダリカラーとアクセントカラーの提案に役立ちます。",
++    "harmonyAccentHelp": "セカンダリカラーはそのまま使われます。ハーモニーはアクセントカラーの提案だけに使われます。",
++    "swatchesTab": "スウォッチ",
++    "chooseBrandColor": {
++      "primary": "メインカラーを選択",
++      "secondary": "セカンダリカラーを選択",
++      "accent": "アクセントカラーを選択"
++    },
++    "harmonySecondaryHelp": "アクセントカラーはそのまま使われます。ハーモニーはセカンダリカラーの提案だけに使われます。"
+   },
+   "usersForm": {
+     "newTitle": "新規",
+diff --git a/locales/ko/common.json b/locales/ko/common.json
+index c3dbcdf..9aebcc8 100644
+--- a/locales/ko/common.json
++++ b/locales/ko/common.json
+@@ -1208,7 +1208,7 @@
+     "brandColorSecondary": "?? ??",
+     "brandColorSecondaryHelp": "??, ?? ?? ?? ?? ??? ?????.",
+     "brandColorAccent": "?? ??",
+-    "brandColorAccentHelp": "??, ?? ?? ?? ??? ???? ? ?????.",
++    "brandColorAccentHelp": "브랜드의 세 번째 색상입니다. 세부 요소, 칩, 주목 요소, 강조 요소에 사용됩니다.",
+     "changeColor": "?? ??",
+     "chooseColor": "?? ??",
+     "chooseColorHelp": "스와치, HEX 또는 밝은/어두운/저채도 변형을 선택합니다.",
+@@ -1243,7 +1243,16 @@
+     "designTokensTitle": "Design tokens",
+     "designTokensHelp": "토큰은 애플리케이션 컴포넌트가 사용하는 내부 변수입니다. 진단과 기술 조정을 위해 표시됩니다.",
+     "semanticTokensTitle": "활성 테마의 의미 토큰",
+-    "semanticTokensHelp": "AppShell, LIVE, 상세 화면에서 사용하는 표면, 텍스트, 입력, 상태입니다."
++    "semanticTokensHelp": "AppShell, LIVE, 상세 화면에서 사용하는 표면, 텍스트, 입력, 상태입니다.",
++    "harmonySecondaryAccentHelp": "색상 조화는 보조색과 강조색을 제안하는 데 도움을 줍니다.",
++    "harmonyAccentHelp": "보조색은 그대로 사용됩니다. 색상 조화는 강조색 제안에만 사용됩니다.",
++    "swatchesTab": "스와치",
++    "chooseBrandColor": {
++      "primary": "기본 색상 선택",
++      "secondary": "보조 색상 선택",
++      "accent": "강조 색상 선택"
++    },
++    "harmonySecondaryHelp": "강조색은 그대로 사용됩니다. 색상 조화는 보조색 제안에만 사용됩니다."
+   },
+   "usersForm": {
+     "newTitle": "새",
+diff --git a/locales/pt-BR/common.json b/locales/pt-BR/common.json
+index 53f94d0..64cf9ba 100644
+--- a/locales/pt-BR/common.json
++++ b/locales/pt-BR/common.json
+@@ -1208,7 +1208,7 @@
+     "brandColorSecondary": "Cor secundaria",
+     "brandColorSecondaryHelp": "Usada para contraste, fundos fortes ou botoes secundarios.",
+     "brandColorAccent": "Cor de acento",
+-    "brandColorAccentHelp": "Usada para destacar elementos, estados ou chamadas de atencao.",
++    "brandColorAccentHelp": "E a terceira cor da sua marca. Ela e usada para destacar detalhes, chips, chamadas de atencao e elementos em destaque.",
+     "changeColor": "Alterar cor",
+     "chooseColor": "Escolher cor",
+     "chooseColorHelp": "Selecione uma amostra, ajuste o HEX ou use uma variacao clara, escura ou dessaturada.",
+@@ -1243,7 +1243,16 @@
+     "designTokensTitle": "Design tokens",
+     "designTokensHelp": "Tokens sao variaveis internas usadas pelos componentes do aplicativo. Sao exibidos para diagnostico e ajustes tecnicos.",
+     "semanticTokensTitle": "Tokens semanticos do tema ativo",
+-    "semanticTokensHelp": "Superficies, texto, inputs e estados usados por AppShell, LIVE e telas de detalhe."
++    "semanticTokensHelp": "Superficies, texto, inputs e estados usados por AppShell, LIVE e telas de detalhe.",
++    "harmonySecondaryAccentHelp": "A harmonia ajuda a sugerir cores secundaria e de acento.",
++    "harmonyAccentHelp": "Sua cor secundaria e respeitada. A harmonia so ajuda a sugerir a cor de acento.",
++    "swatchesTab": "Amostras",
++    "chooseBrandColor": {
++      "primary": "Escolher cor principal",
++      "secondary": "Escolher cor secundaria",
++      "accent": "Escolher cor de acento"
++    },
++    "harmonySecondaryHelp": "Sua cor de acento e respeitada. A harmonia so ajuda a sugerir a cor secundaria."
+   },
+   "usersForm": {
+     "newTitle": "Novo",
+diff --git a/locales/zh/common.json b/locales/zh/common.json
+index e139399..3893c8d 100644
+--- a/locales/zh/common.json
++++ b/locales/zh/common.json
+@@ -1208,7 +1208,7 @@
+     "brandColorSecondary": "???",
+     "brandColorSecondaryHelp": "??????????????",
+     "brandColorAccent": "???",
+-    "brandColorAccentHelp": "?????????????",
++    "brandColorAccentHelp": "这是品牌的第三种颜色，用于突出细节、标签、提示和重点元素。",
+     "changeColor": "????",
+     "chooseColor": "????",
+     "chooseColorHelp": "选择色块、调整 HEX，或使用浅色、深色、低饱和变化。",
+@@ -1243,7 +1243,16 @@
+     "designTokensTitle": "Design tokens",
+     "designTokensHelp": "Token 是应用组件使用的内部变量，显示用于诊断和技术调整。",
+     "semanticTokensTitle": "当前主题的语义 token",
+-    "semanticTokensHelp": "AppShell、LIVE 和详情页使用的表面、文本、输入和状态。"
++    "semanticTokensHelp": "AppShell、LIVE 和详情页使用的表面、文本、输入和状态。",
++    "harmonySecondaryAccentHelp": "色彩和谐可帮助建议辅助色和强调色。",
++    "harmonyAccentHelp": "会保留你的辅助色。色彩和谐只用于建议强调色。",
++    "swatchesTab": "色块",
++    "chooseBrandColor": {
++      "primary": "选择主色",
++      "secondary": "选择辅助色",
++      "accent": "选择强调色"
++    },
++    "harmonySecondaryHelp": "会保留你的强调色。色彩和谐只用于建议辅助色。"
+   },
+   "usersForm": {
+     "newTitle": "新建",
+diff --git a/qa-reports/PRODUCT-C2-6-color-modal-harmony-polish-report-20260607-114939.md b/qa-reports/PRODUCT-C2-6-color-modal-harmony-polish-report-20260607-114939.md
+new file mode 100644
+index 0000000..0eca7b6
+--- /dev/null
++++ b/qa-reports/PRODUCT-C2-6-color-modal-harmony-polish-report-20260607-114939.md
+@@ -0,0 +1,73 @@
++# PRODUCT-C2.6 - QA report
++
++Fecha: 2026-06-07 11:49:39
++Rama: `feature/product-c2-6-color-modal-harmony-polish`
++
++## Alcance validado
++
++- Pulido de `AppColorPicker` para un modal mas compacto.
++- Tabs dentro del picker: muestras, claros, oscuros y desaturados.
++- Variaciones calculadas solo para el color en edicion: principal, secundario o acento.
++- Armonia comunicada como sugerencia, no como restriccion.
++- Mensaje `Usando colores de marca definidos` cuando principal, secundario y acento estan definidos.
++- Color de acento explicado como tercer color de marca.
++- Correccion de keys duplicadas en listas de colores.
++- Claves i18n agregadas en `es`, `en`, `pt-BR`, `fr`, `ja`, `zh` y `ko`.
++
++## Validaciones ejecutadas
++
++| Validacion | Resultado | Nota |
++| --- | --- | --- |
++| `npm.cmd run lint` | PASS | 0 errores, 53 warnings existentes del repo. |
++| `npx.cmd tsc --noEmit` | PASS | Sin errores TypeScript. |
++| `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export` | PASS | Export web generado con 73 rutas estaticas. |
++| `backend/control-ropa/.mvnw.cmd test` | PASS | 73 tests, 0 fallas, 0 errores. |
++| `backend/control-ropa/.mvnw.cmd -q -DskipTests package` | PASS | Package generado sin errores. |
++| `git --no-pager diff --check` | PASS | Sin whitespace errors. |
++
++## I18N
++
++Auditoria de estructura:
++
++```text
++es: leaves=1245 missing=0 extra=0
++en: leaves=1245 missing=0 extra=0
++pt-BR: leaves=1245 missing=0 extra=0
++fr: leaves=1245 missing=0 extra=0
++ja: leaves=1245 missing=0 extra=0
++zh: leaves=1245 missing=0 extra=0
++ko: leaves=1245 missing=0 extra=0
++```
++
++## Keys duplicadas
++
++Revision especifica:
++
++```text
++rg -n "key=\{color\}|key=\{normalizeHexColor|key=\{.*color.*\}" components/ui/AppColorPicker.tsx components/ui/PaletteGeneratorCard.tsx
++```
++
++Resultado relevante:
++
++- `AppColorPicker`: usa `key={`${activeSection}-${color}-${index}`}`.
++- `PaletteGeneratorCard`: armonias usan `key={`harmony-${color}-${index}`}`.
++- `PaletteGeneratorCard`: tokens usan `key={key}` con llave semantica del token, no HEX.
++
++No quedan listas de swatches usando solo el HEX como key.
++
++## Validacion manual esperada
++
++1. Abrir `/ui-kit`.
++2. Confirmar que la vista principal sigue compacta.
++3. Definir solo color principal y revisar que armonia ayude a sugerir secundario/acento.
++4. Definir principal + secundario y revisar que armonia solo sugiera acento.
++5. Definir principal + secundario + acento y revisar `Usando colores de marca definidos`.
++6. Abrir `Cambiar color` para principal, secundario y acento.
++7. Revisar tabs: muestras, claros, oscuros y desaturados.
++8. Confirmar que no aparece el warning `Encountered two children with the same key`.
++9. Confirmar que aplicar, cancelar y restaurar color funcionan.
++10. Validar light/dark y mobile/tablet.
++
++## Resultado
++
++GO tecnico para commit si el diff staged queda dentro de alcance.

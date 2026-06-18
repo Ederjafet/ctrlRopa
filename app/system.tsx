@@ -1,12 +1,23 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShell from '@/components/layout/AppShell';
+import { buildMainNavSections, getSessionScopeLabel } from '@/components/layout/appNavigation';
+import ActionTile from '@/components/ui/ActionTile';
+import AppButton from '@/components/ui/AppButton';
 import AppInfoCard from '@/components/ui/AppInfoCard';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
-import { hasRole } from '@/services/accessControl';
+import { hasPermission, hasRole } from '@/services/accessControl';
+import { changeAppLanguage, type SupportedLanguage } from '@/services/i18n';
+import { canConfigureSystem } from '@/services/livePermissionGuards';
+import {
+  DEFAULT_LIVE_LAYOUT_PREFERENCES,
+  getLiveLayoutPreferences,
+  LiveLayoutPreferences,
+  setLiveLayoutPreference,
+} from '@/services/liveLayoutPreferences';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 type SystemTileProps = {
@@ -15,92 +26,240 @@ type SystemTileProps = {
   onPress: () => void;
 };
 
+const LANGUAGE_OPTIONS: { code: SupportedLanguage; labelKey: string }[] = [
+  { code: 'es', labelKey: 'language.spanish' },
+  { code: 'en', labelKey: 'language.english' },
+  { code: 'pt-BR', labelKey: 'language.portugueseBrazil' },
+  { code: 'fr', labelKey: 'language.french' },
+  { code: 'ja', labelKey: 'language.japanese' },
+  { code: 'zh', labelKey: 'language.chineseSimplified' },
+  { code: 'ko', labelKey: 'language.korean' },
+];
+
+function isActiveLanguage(currentLanguage: string, optionLanguage: SupportedLanguage) {
+  return currentLanguage
+    .toLowerCase()
+    .replace('_', '-')
+    .startsWith(optionLanguage.toLowerCase());
+}
+
 export default function SystemScreen() {
   const router = useRouter();
+  const { theme } = useAppTheme();
+  const { i18n, t } = useTranslation('common');
   const [user, setUser] = useState<UserSession | null>(null);
+  const [livePreferences, setLivePreferences] = useState<LiveLayoutPreferences>(
+    DEFAULT_LIVE_LAYOUT_PREFERENCES
+  );
+  const navSections = useMemo(() => buildMainNavSections(user), [user]);
 
   useEffect(() => {
-    getSession().then(setUser);
-  }, []);
+    getSession().then((currentUser) => {
+      if (!canConfigureSystem(currentUser)) {
+        router.replace('/access-denied');
+        return;
+      }
+
+      setUser(currentUser);
+      getLiveLayoutPreferences(currentUser?.userId).then(setLivePreferences);
+    });
+  }, [router]);
+
+  const toggleLivePreference = async (key: keyof LiveLayoutPreferences) => {
+    const nextValue = !livePreferences[key];
+    const nextPreferences = await setLiveLayoutPreference(
+      key,
+      nextValue,
+      user?.userId
+    );
+    setLivePreferences(nextPreferences);
+  };
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute="/" />
+    <AppShell
+      title={t('system.title')}
+      subtitle={t('system.subtitle')}
+      contextTitle={t('system.contextTitle')}
+      contextSubtitle={getSessionScopeLabel(user)}
+      activeRoute="system"
+      session={user}
+      navSections={navSections}
+    >
+      <AppInfoCard title={t('system.sensitiveTitle')}>
+        <AppText>{t('system.sensitiveHelp')}</AppText>
+      </AppInfoCard>
 
-      <AppText variant="title" bold>
-        Sistema
-      </AppText>
+      <AppInfoCard title={t('system.languageTitle')}>
+        <AppText>{t('system.languageHelp')}</AppText>
+        <View style={styles.languageRow}>
+          {LANGUAGE_OPTIONS.map((languageOption) => {
+            const active = isActiveLanguage(i18n.language, languageOption.code);
 
-      <AppInfoCard title="Configuración sensible">
-        <AppText>
-          Se usa para roles, permisos asignables y parametros base. Los permisos no se crean desde la app.
-        </AppText>
+            return (
+              <Pressable
+                key={languageOption.code}
+                onPress={() => void changeAppLanguage(languageOption.code)}
+                style={({ pressed }) => [
+                  styles.languageOption,
+                  {
+                    backgroundColor: pressed
+                      ? theme.colors.optionPressedBackground
+                      : theme.colors.surface,
+                    borderColor: active ? theme.colors.accent : theme.colors.border,
+                    borderRadius: theme.radius.md,
+                  },
+                ]}
+              >
+                <AppText bold={active}>{t(languageOption.labelKey)}</AppText>
+              </Pressable>
+            );
+          })}
+        </View>
+      </AppInfoCard>
+
+      <AppInfoCard title={t('system.liveExperienceTitle')}>
+        <AppText>{t('system.liveExperienceHelp')}</AppText>
+        <LivePreferenceRow
+          title={t('system.liveWidgetProductSpotlight')}
+          enabled={livePreferences.showProductSpotlight}
+          onPress={() => void toggleLivePreference('showProductSpotlight')}
+        />
+        <LivePreferenceRow
+          title={t('system.liveWidgetPresenterView')}
+          enabled={livePreferences.showPresenterView}
+          onPress={() => void toggleLivePreference('showPresenterView')}
+        />
+        <LivePreferenceRow
+          title={t('system.liveWidgetOperationalState')}
+          enabled={livePreferences.showOperationalState}
+          onPress={() => void toggleLivePreference('showOperationalState')}
+        />
+        <LivePreferenceRow
+          title={t('system.liveWidgetRoles')}
+          enabled={livePreferences.showRoles}
+          onPress={() => void toggleLivePreference('showRoles')}
+        />
+        <LivePreferenceRow
+          title={t('system.liveWidgetAnalytics')}
+          enabled={livePreferences.showAnalytics}
+          onPress={() => void toggleLivePreference('showAnalytics')}
+        />
+        <LivePreferenceRow
+          title={t('system.liveWidgetActivity')}
+          enabled={livePreferences.showActivityFeed}
+          onPress={() => void toggleLivePreference('showActivityFeed')}
+        />
       </AppInfoCard>
 
       <View style={styles.grid}>
         <SystemTile
-          title="Roles"
-          description="Crea roles y define que permisos existentes incluye cada uno."
+          title={t('system.rolesTileTitle')}
+          description={t('system.rolesTileHelp')}
           onPress={() => router.push('/system-roles' as any)}
         />
         <SystemTile
-          title="Canales operativos"
-          description="Activa o apaga globalmente Live, Venta puerta, Apartado puerta y Consignacion."
+          title={t('system.channelsTileTitle')}
+          description={t('system.channelsTileHelp')}
           onPress={() => router.push('/system-channels' as any)}
         />
         {hasRole(user, 'SUPPORT_TECH') ? (
           <SystemTile
-            title="Logs de soporte"
-            description="Consulta bitacora tecnica de configuración, rutas, usuarios y respuestas HTTP."
+            title={t('system.supportLogsTileTitle')}
+            description={t('system.supportLogsTileHelp')}
             onPress={() => router.push('/system-logs' as any)}
           />
         ) : null}
         {hasRole(user, 'SUPPORT_TECH') ? (
           <SystemTile
-            title="Seguridad dev"
-            description="Parametriza cierre de sesión, intentos fallidos y bloqueo temporal."
+            title={t('system.securityTileTitle')}
+            description={t('system.securityTileHelp')}
             onPress={() => router.push('/system-security' as any)}
           />
         ) : null}
         {hasRole(user, 'SUPPORT_TECH') ? (
           <SystemTile
-            title="Sesiónes y bloqueos"
-            description="Desbloquea usuarios y cierra sesiónes activas desde soporte."
+            title={t('system.sessionsTileTitle')}
+            description={t('system.sessionsTileHelp')}
             onPress={() => router.push('/system-sessions' as any)}
           />
         ) : null}
+        {hasPermission(user, 'VIEW_SECURITY_AUDIT') ? (
+          <SystemTile
+            title={t('system.securityAuditTileTitle')}
+            description={t('system.securityAuditTileHelp')}
+            onPress={() => router.push('/system-security-audit' as any)}
+          />
+        ) : null}
       </View>
-    </AppScreen>
+    </AppShell>
+  );
+}
+
+function LivePreferenceRow({
+  title,
+  enabled,
+  onPress,
+}: {
+  title: string;
+  enabled: boolean;
+  onPress: () => void;
+}) {
+  const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
+
+  return (
+    <View style={styles.settingRow}>
+      <View style={styles.settingText}>
+        <AppText bold>{title}</AppText>
+        <AppText variant="caption" color={theme.colors.mutedText}>
+          {enabled ? t('system.liveWidgetVisible') : t('system.liveWidgetHidden')}
+        </AppText>
+      </View>
+      <AppButton
+        title={enabled ? t('system.liveWidgetHide') : t('system.liveWidgetShow')}
+        variant={enabled ? 'secondary' : 'operation'}
+        onPress={onPress}
+        style={styles.settingButton}
+      />
+    </View>
   );
 }
 
 function SystemTile({ title, description, onPress }: SystemTileProps) {
-  const { theme } = useAppTheme();
-
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.tile,
-        {
-          backgroundColor: pressed ? theme.colors.optionPressedBackground : theme.colors.surface,
-          borderColor: theme.colors.border,
-          borderRadius: theme.radius.md,
-          padding: theme.spacing.md,
-        },
-      ]}
-    >
-      <AppText bold>{title}</AppText>
-      <AppText variant="caption" color={theme.colors.mutedText}>
-        {description}
-      </AppText>
-    </Pressable>
+    <ActionTile title={title} subtitle={description} icon="settings" onPress={onPress} />
   );
 }
 
 const styles = StyleSheet.create({
   grid: {
     gap: 10,
+  },
+  languageOption: {
+    borderWidth: 1,
+    minWidth: 120,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  languageRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 12,
+  },
+  settingButton: {
+    minWidth: 180,
+  },
+  settingRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 12,
+  },
+  settingText: {
+    flex: 1,
+    minWidth: 220,
   },
   tile: {
     borderWidth: 1,

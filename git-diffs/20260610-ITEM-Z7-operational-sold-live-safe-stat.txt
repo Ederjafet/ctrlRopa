@@ -1,0 +1,8 @@
+﻿ .../ctrlropa/reservation/ReservationService.java   |  28 +++++
+ ...servationServiceLiveOperationalStatusTests.java |  75 ++++++++++++
+ docs/ERP_BITACORA_CAMBIOS.md                       |  28 +++++
+ docs/ERP_RIESGOS_OPERATIVOS.md                     |   1 +
+ docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md          |  19 +++
+ docs/ITEM_Z7_OPERATIONAL_SOLD_LIVE_SAFE.md         | 119 +++++++++++++++++++
+ ...tional-sold-live-safe-report-20260610-001059.md | 132 +++++++++++++++++++++
+ 7 files changed, 402 insertions(+)

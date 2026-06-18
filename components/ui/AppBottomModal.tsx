@@ -16,6 +16,7 @@ type Props = {
   visible: boolean;
   title: string;
   children: ReactNode;
+  footer?: ReactNode;
   onClose: () => void;
   maxHeight?: `${number}%`;
   showCancelButton?: boolean;
@@ -27,6 +28,7 @@ export default function AppBottomModal({
   visible,
   title,
   children,
+  footer,
   onClose,
   maxHeight = '85%',
   showCancelButton = true,
@@ -64,12 +66,20 @@ export default function AppBottomModal({
           </AppText>
 
           {scroll ? (
-            <ScrollView keyboardShouldPersistTaps="handled">{children}</ScrollView>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              style={styles.scrollContent}
+              contentContainerStyle={styles.scrollContentContainer}
+            >
+              {children}
+            </ScrollView>
           ) : (
             <View style={styles.nonScrollableContent}>{children}</View>
           )}
 
-          {showCancelButton ? (
+          {footer ? (
+            <View style={{ marginTop: theme.spacing.md }}>{footer}</View>
+          ) : showCancelButton ? (
             <View style={{ marginTop: theme.spacing.md }}>
               <AppButton title={cancelTitle} variant="cancel" onPress={onClose} />
             </View>
@@ -90,5 +100,11 @@ const styles = StyleSheet.create({
   },
   nonScrollableContent: {
     flexShrink: 1,
+  },
+  scrollContent: {
+    flexShrink: 1,
+  },
+  scrollContentContainer: {
+    paddingBottom: 4,
   },
 });

@@ -1,0 +1,3 @@
+ ...E_AUTH_B0_OPERATIONAL_AUTHORIZATIONS_HANDOFF.md | 346 +++++++++++++++++++++
+ ...uthorizations-handoff-report-20260610-130803.md | 137 ++++++++
+ 2 files changed, 483 insertions(+)

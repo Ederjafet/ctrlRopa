@@ -17,6 +17,7 @@ import com.hpsqsoft.ctrlropa.reservation.ReservationStatus;
 import com.hpsqsoft.ctrlropa.sale.Sale;
 import com.hpsqsoft.ctrlropa.sale.SaleRepository;
 import com.hpsqsoft.ctrlropa.sale.SaleStatus;
+import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +42,7 @@ public class CustomerPackageService {
     private final CustomerOrderService customerOrderService;
     private final CustomerOrderItemRepository customerOrderItemRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final TenantAccessGuard tenantAccessGuard;
 
     public CustomerPackageService(CustomerPackageRepository repository,
                                   CustomerPackageItemRepository itemRepository,
@@ -51,7 +53,8 @@ public class CustomerPackageService {
                                   ItemRepository itemEntityRepository,
                                   CustomerOrderService customerOrderService,
                                   CustomerOrderItemRepository customerOrderItemRepository,
-                                  JdbcTemplate jdbcTemplate) {
+                                  JdbcTemplate jdbcTemplate,
+                                  TenantAccessGuard tenantAccessGuard) {
         this.repository = repository;
         this.itemRepository = itemRepository;
         this.customerRepository = customerRepository;
@@ -62,6 +65,7 @@ public class CustomerPackageService {
         this.customerOrderService = customerOrderService;
         this.customerOrderItemRepository = customerOrderItemRepository;
         this.jdbcTemplate = jdbcTemplate;
+        this.tenantAccessGuard = tenantAccessGuard;
     }
 
     public CustomerPackageResponse create(CreateCustomerPackageRequest request) {
@@ -70,6 +74,11 @@ public class CustomerPackageService {
 
         Branch branch = branchRepository.findById(request.getBranchId())
                 .orElseThrow(() -> new IllegalArgumentException("Sucursal no encontrada"));
+        tenantAccessGuard.requireBranch(branch.getId(), "La sucursal del paquete no pertenece al tenant activo");
+        tenantAccessGuard.requireBranch(customer.getBranch().getId(), "El cliente no pertenece a la sucursal activa");
+        if (!customer.getBranch().getId().equals(branch.getId())) {
+            throw new IllegalArgumentException("El cliente no pertenece a la sucursal indicada");
+        }
 
         CustomerPackage customerPackage = new CustomerPackage();
         customerPackage.setFolio(generateUniqueFolio());
@@ -124,6 +133,7 @@ public class CustomerPackageService {
 
     @Transactional(readOnly = true)
     public List<CustomerPackageResponse> findByCustomer(Long customerId) {
+        validateCustomerInActiveTenant(customerId);
         return repository.findByCustomerIdOrderByCreatedAtDesc(customerId)
                 .stream()
                 .map(this::toResponse)
@@ -153,6 +163,10 @@ public class CustomerPackageService {
 
         Item item = itemEntityRepository.findById(request.getItemId())
                 .orElseThrow(() -> new IllegalArgumentException("Item no encontrado"));
+        tenantAccessGuard.requireBranch(item.getBranch().getId(), "El item no pertenece a la sucursal activa");
+        if (!item.getBranch().getId().equals(customerPackage.getBranch().getId())) {
+            throw new IllegalArgumentException("El item no pertenece a la sucursal del paquete");
+        }
 
         if (itemRepository.existsByCustomerPackageIdAndItemId(packageId, item.getId())) {
             throw new IllegalArgumentException("El item ya está en el paquete");
@@ -194,7 +208,9 @@ public class CustomerPackageService {
     public CustomerPackageDetailResponse addItemByItemCode(String packageFolio, String itemCode) {
         CustomerPackage customerPackage = findEntityByFolio(packageFolio);
 
-        Item item = itemEntityRepository.findByCode(itemCode)
+        Item item = itemEntityRepository.findByCompanyIdAndCode(
+                        tenantAccessGuard.requireCurrentTenant().getCompanyId(),
+                        itemCode)
                 .orElseThrow(() -> new IllegalArgumentException("Item no encontrado con código: " + itemCode));
 
         AddCustomerPackageItemRequest request = buildAddItemRequestFromItem(item);
@@ -204,7 +220,9 @@ public class CustomerPackageService {
     public CustomerPackageDetailResponse addItemByQrCode(String packageFolio, String qrCode) {
         CustomerPackage customerPackage = findEntityByFolio(packageFolio);
 
-        Item item = itemEntityRepository.findByQrCode(qrCode)
+        Item item = itemEntityRepository.findByCompanyIdAndQrCode(
+                        tenantAccessGuard.requireCurrentTenant().getCompanyId(),
+                        qrCode)
                 .orElseThrow(() -> new IllegalArgumentException("Item no encontrado con QR: " + qrCode));
 
         AddCustomerPackageItemRequest request = buildAddItemRequestFromItem(item);
@@ -309,13 +327,17 @@ public class CustomerPackageService {
     }
 
     private CustomerPackage findEntity(Long id) {
-        return repository.findById(id)
+        CustomerPackage customerPackage = repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Paquete no encontrado con id: " + id));
+        tenantAccessGuard.requireBranch(customerPackage.getBranch().getId(), "El paquete no pertenece a la sucursal activa");
+        return customerPackage;
     }
 
     private CustomerPackage findEntityByFolio(String folio) {
-        return repository.findByFolio(folio)
+        CustomerPackage customerPackage = repository.findByFolio(folio)
                 .orElseThrow(() -> new IllegalArgumentException("Paquete no encontrado con folio: " + folio));
+        tenantAccessGuard.requireBranch(customerPackage.getBranch().getId(), "El paquete no pertenece a la sucursal activa");
+        return customerPackage;
     }
 
     private AddCustomerPackageItemRequest buildAddItemRequestFromItem(Item item) {
@@ -437,6 +459,7 @@ public class CustomerPackageService {
     }
 
     private void validateSaleAgainstPackage(CustomerPackage customerPackage, Sale sale, Item item) {
+        tenantAccessGuard.requireBranch(sale.getBranch().getId(), "La venta no pertenece a la sucursal activa");
         if (!sale.getCustomer().getId().equals(customerPackage.getCustomer().getId())) {
             throw new IllegalArgumentException("La venta no pertenece al cliente del paquete");
         }
@@ -451,6 +474,7 @@ public class CustomerPackageService {
     }
 
     private void validateReservationAgainstPackage(CustomerPackage customerPackage, Reservation reservation, Item item) {
+        tenantAccessGuard.requireBranch(reservation.getBranch().getId(), "La reserva no pertenece a la sucursal activa");
         if (!reservation.getCustomer().getId().equals(customerPackage.getCustomer().getId())) {
             throw new IllegalArgumentException("La reserva no pertenece al cliente del paquete");
         }
@@ -577,6 +601,12 @@ public class CustomerPackageService {
 
     private BigDecimal safe(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private void validateCustomerInActiveTenant(Long customerId) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado"));
+        tenantAccessGuard.requireBranch(customer.getBranch().getId(), "El cliente no pertenece a la sucursal activa");
     }
 
     private LocalDateTime toLocalDateTime(Timestamp timestamp) {

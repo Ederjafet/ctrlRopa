@@ -1,0 +1,17 @@
+﻿ app/operational-authorizations.tsx                 |  87 +++++++++---
+ .../com/hpsqsoft/ctrlropa/live/LiveEventType.java  |   1 +
+ .../OperationalAuthorizationService.java           | 114 ++++++++++++++-
+ .../OperationalAuthorizationType.java              |   1 +
+ .../ctrlropa/security/access/PermissionCode.java   |   5 +
+ .../V57__live_price_authorization_permissions.sql  |  34 +++++
+ .../OperationalAuthorizationServiceTests.java      |  84 +++++++++++
+ docs/AUTH_F_RBAC_PERMISSION_MATRIX.md              |  19 +++
+ docs/ERP_BITACORA_CAMBIOS.md                       |  28 ++++
+ docs/ERP_RIESGOS_OPERATIVOS.md                     |   1 +
+ docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md          |  18 +++
+ docs/LIVE_PRICE_C_PRICE_AUTHORIZATION.md           | 154 +++++++++++++++++++++
+ locales/en/common.json                             |   5 +
+ locales/es/common.json                             |   5 +
+ ...C-price-authorization-report-20260610-153828.md | 110 +++++++++++++++
+ services/operationalAuthorizationService.ts        |   1 +
+ 16 files changed, 648 insertions(+), 19 deletions(-)

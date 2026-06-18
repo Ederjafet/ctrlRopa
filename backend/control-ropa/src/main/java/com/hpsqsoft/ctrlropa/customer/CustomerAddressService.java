@@ -1,6 +1,7 @@
 package com.hpsqsoft.ctrlropa.customer;
 
 import com.hpsqsoft.ctrlropa.common.Status;
+import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,15 +14,19 @@ public class CustomerAddressService {
 
     private final CustomerAddressRepository repository;
     private final CustomerRepository customerRepository;
+    private final TenantAccessGuard tenantAccessGuard;
 
     public CustomerAddressService(CustomerAddressRepository repository,
-                                  CustomerRepository customerRepository) {
+                                  CustomerRepository customerRepository,
+                                  TenantAccessGuard tenantAccessGuard) {
         this.repository = repository;
         this.customerRepository = customerRepository;
+        this.tenantAccessGuard = tenantAccessGuard;
     }
 
     @Transactional(readOnly = true)
     public List<CustomerAddressResponse> findByCustomer(Long customerId) {
+        findCustomerInActiveTenant(customerId);
         return repository.findByCustomerIdOrderByIsDefaultDescLabelAsc(customerId)
                 .stream()
                 .map(this::toResponse)
@@ -29,8 +34,7 @@ public class CustomerAddressService {
     }
 
     public CustomerAddressResponse create(Long customerId, CustomerAddress entity) {
-        Customer customer = customerRepository.findById(customerId)
-                .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado"));
+        Customer customer = findCustomerInActiveTenant(customerId);
 
         if (repository.existsByCustomerIdAndLabel(customerId, entity.getLabel())) {
             throw new IllegalArgumentException("Ya existe una dirección con esa etiqueta");
@@ -48,8 +52,7 @@ public class CustomerAddressService {
     }
 
     public CustomerAddressResponse update(Long id, CustomerAddress request) {
-        CustomerAddress existing = repository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Dirección no encontrada"));
+        CustomerAddress existing = findAddressInActiveTenant(id);
 
         if (!existing.getLabel().equals(request.getLabel())
                 && repository.existsByCustomerIdAndLabel(existing.getCustomer().getId(), request.getLabel())) {
@@ -75,14 +78,14 @@ public class CustomerAddressService {
     }
 
     public CustomerAddressResponse deactivate(Long id) {
-        CustomerAddress existing = repository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Dirección no encontrada"));
+        CustomerAddress existing = findAddressInActiveTenant(id);
 
         existing.setStatus(Status.INACTIVE);
         return toResponse(repository.save(existing));
     }
 
     private void clearDefault(Long customerId) {
+        findCustomerInActiveTenant(customerId);
         List<CustomerAddress> addresses = repository.findByCustomerIdAndStatusOrderByIsDefaultDescLabelAsc(customerId, Status.ACTIVE);
         for (CustomerAddress address : addresses) {
             if (Boolean.TRUE.equals(address.getIsDefault())) {
@@ -98,6 +101,20 @@ public class CustomerAddressService {
         } catch (DataIntegrityViolationException ex) {
             throw new IllegalArgumentException("No se pudo guardar la dirección por datos duplicados");
         }
+    }
+
+    private Customer findCustomerInActiveTenant(Long customerId) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado"));
+        tenantAccessGuard.requireBranch(customer.getBranch().getId(), "El cliente no pertenece a la sucursal activa");
+        return customer;
+    }
+
+    private CustomerAddress findAddressInActiveTenant(Long id) {
+        CustomerAddress address = repository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Direccion no encontrada"));
+        tenantAccessGuard.requireBranch(address.getCustomer().getBranch().getId(), "La direccion no pertenece a la sucursal activa");
+        return address;
     }
 
     private CustomerAddressResponse toResponse(CustomerAddress entity) {

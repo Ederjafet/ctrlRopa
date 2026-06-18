@@ -1,0 +1,14 @@
+﻿ app/live.tsx                                       | 14 +++++---
+ docs/LIVE_FIX_A_ACTIONABLE_LIVE_BUTTONS.md         | 25 +++++++++++--
+ docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md              |  2 ++
+ docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md             |  5 +++
+ docs/QA_TODO_HANDOFF.md                            |  5 +++
+ locales/en/common.json                             |  6 ++--
+ locales/es/common.json                             |  6 ++--
+ locales/fr/common.json                             |  6 ++--
+ locales/ja/common.json                             |  6 ++--
+ locales/ko/common.json                             |  6 ++--
+ locales/pt-BR/common.json                          |  6 ++--
+ locales/zh/common.json                             |  6 ++--
+ ...X-A-microcopy-actions-report-20260608-171556.md | 41 ++++++++++++++++++++++
+ 13 files changed, 114 insertions(+), 20 deletions(-)

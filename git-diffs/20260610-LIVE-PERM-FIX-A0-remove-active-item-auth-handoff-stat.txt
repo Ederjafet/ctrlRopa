@@ -1,0 +1,3 @@
+ ..._PERM_FIX_A0_REMOVE_ACTIVE_ITEM_AUTH_HANDOFF.md | 159 +++++++++++++++++++++
+ ...ive-item-auth-handoff-report-20260610-111624.md |  84 +++++++++++
+ 2 files changed, 243 insertions(+)

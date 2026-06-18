@@ -1,8 +1,7 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 
 import { createCustomerAddress } from '@/services/customerAddressService';
@@ -87,9 +86,18 @@ export default function CustomerAddressesCreateScreen() {
   };
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute={`/customers/${customerId}`} preferHistory={false} />
-
+    <AppShellPage
+      title="Nueva direccion"
+      subtitle="Datos de entrega del cliente"
+      activeRoute="customers"
+      rightContent={
+        <AppButton
+          title="Volver"
+          variant="secondary"
+          onPress={() => router.replace(`/customers/${customerId}` as any)}
+        />
+      }
+    >
       <AppText variant="title" bold>
         Nueva dirección
       </AppText>
@@ -150,6 +158,6 @@ export default function CustomerAddressesCreateScreen() {
           loading={isSaving}
         />
       </AppCard>
-    </AppScreen>
+    </AppShellPage>
   );
 }

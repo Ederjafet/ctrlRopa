@@ -1,0 +1,496 @@
+﻿diff --git a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
+index 975a2b9..c7c0797 100644
+--- a/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
++++ b/backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java
+@@ -858,6 +858,10 @@ public class ReservationService {
+         }
+
+         LiveReservationOperationalStatus previousStatus = existing.getLiveOperationalStatus();
++        if (nextStatus == LiveReservationOperationalStatus.OPERATIONAL_SOLD) {
++            validateOperationalSoldCandidate(existing, previousStatus);
++        }
++
+         existing.setLiveOperationalStatus(nextStatus);
+         existing.setLiveOperationalStatusUpdatedAt(LocalDateTime.now());
+         existing.setLiveOperationalStatusUpdatedByUserId(userId);
+@@ -868,6 +872,30 @@ public class ReservationService {
+         return toResponse(saved);
+     }
+
++    private void validateOperationalSoldCandidate(Reservation reservation,
++                                                  LiveReservationOperationalStatus currentOperationalStatus) {
++        if (reservation.getStatus() == ReservationStatus.CANCELLED) {
++            throw new IllegalArgumentException("No se puede cerrar como vendido operativo una reserva cancelada");
++        }
++
++        if (reservation.getStatus() == ReservationStatus.CONVERTED_TO_SALE) {
++            throw new IllegalArgumentException("No se puede cerrar como vendido operativo una reserva convertida a venta");
++        }
++
++        if (reservation.getStatus() != ReservationStatus.ACTIVE) {
++            throw new IllegalArgumentException("Solo una reserva activa puede cerrarse como vendido operativo");
++        }
++
++        if (currentOperationalStatus == LiveReservationOperationalStatus.CANCELLED) {
++            throw new IllegalArgumentException("No se puede cerrar como vendido operativo un apartado LIVE cancelado");
++        }
++
++        Item item = reservation.getItem();
++        if (item == null || item.getStatus() != ItemStatus.RESERVED) {
++            throw new IllegalArgumentException("La prenda debe seguir reservada para cerrar como vendido operativo LIVE");
++        }
++    }
++
+     private void recordLiveReservationStatusChange(Reservation reservation,
+                                                    Long actorUserId,
+                                                    LiveReservationOperationalStatus previousStatus,
+diff --git a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java
+index d9dc580..593f051 100644
+--- a/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java
++++ b/backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java
+@@ -23,6 +23,8 @@ import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
+ import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
+ import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
+ import org.junit.jupiter.api.Test;
++import org.junit.jupiter.params.ParameterizedTest;
++import org.junit.jupiter.params.provider.EnumSource;
+ import org.springframework.jdbc.core.JdbcTemplate;
+ import org.springframework.test.util.ReflectionTestUtils;
+
+@@ -35,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
+ import static org.junit.jupiter.api.Assertions.assertThrows;
+ import static org.mockito.ArgumentMatchers.any;
+ import static org.mockito.Mockito.mock;
++import static org.mockito.Mockito.never;
+ import static org.mockito.Mockito.verify;
+ import static org.mockito.Mockito.when;
+
+@@ -95,6 +98,7 @@ class ReservationServiceLiveOperationalStatusTests {
+         assertEquals("ACTIVE", response.getStatus());
+         assertEquals("OPERATIONAL_SOLD", response.getLiveOperationalStatus());
+         assertEquals(99L, response.getLiveOperationalStatusUpdatedByUserId());
++        assertEquals(ItemStatus.RESERVED, reservation.getItem().getStatus());
+         verify(tenantAccessGuard).requireBranch(6L, "La reserva no pertenece a la sucursal activa");
+         verify(accessService).assertCan(
+                 99L,
+@@ -120,6 +124,77 @@ class ReservationServiceLiveOperationalStatusTests {
+         );
+     }
+
++    @ParameterizedTest
++    @EnumSource(value = ReservationStatus.class, names = {"CANCELLED", "CONVERTED_TO_SALE"})
++    void updateLiveOperationalStatusRejectsOperationalSoldForHistoricalReservation(ReservationStatus status) {
++        Reservation reservation = liveReservation(10L, 6L);
++        reservation.setStatus(status);
++        when(currentUser.getUserId()).thenReturn(99L);
++        when(repository.findById(10L)).thenReturn(Optional.of(reservation));
++
++        ReservationService.UpdateLiveOperationalStatusRequest request =
++                new ReservationService.UpdateLiveOperationalStatusRequest();
++        request.setStatus(LiveReservationOperationalStatus.OPERATIONAL_SOLD);
++
++        assertThrows(
++                IllegalArgumentException.class,
++                () -> service.updateLiveOperationalStatus(10L, request)
++        );
++
++        assertEquals(status, reservation.getStatus());
++        assertEquals(LiveReservationOperationalStatus.RESERVED, reservation.getLiveOperationalStatus());
++        assertEquals(ItemStatus.RESERVED, reservation.getItem().getStatus());
++        verify(repository, never()).save(any(Reservation.class));
++        verify(liveEventService, never()).record(any(), any(), any(), any(), any(), any());
++    }
++
++    @Test
++    void updateLiveOperationalStatusRejectsOperationalSoldForOperationallyCancelledReservation() {
++        Reservation reservation = liveReservation(10L, 6L);
++        reservation.setLiveOperationalStatus(LiveReservationOperationalStatus.CANCELLED);
++        when(currentUser.getUserId()).thenReturn(99L);
++        when(repository.findById(10L)).thenReturn(Optional.of(reservation));
++
++        ReservationService.UpdateLiveOperationalStatusRequest request =
++                new ReservationService.UpdateLiveOperationalStatusRequest();
++        request.setStatus(LiveReservationOperationalStatus.OPERATIONAL_SOLD);
++
++        assertThrows(
++                IllegalArgumentException.class,
++                () -> service.updateLiveOperationalStatus(10L, request)
++        );
++
++        assertEquals(ReservationStatus.ACTIVE, reservation.getStatus());
++        assertEquals(LiveReservationOperationalStatus.CANCELLED, reservation.getLiveOperationalStatus());
++        assertEquals(ItemStatus.RESERVED, reservation.getItem().getStatus());
++        verify(repository, never()).save(any(Reservation.class));
++        verify(liveEventService, never()).record(any(), any(), any(), any(), any(), any());
++    }
++
++    @ParameterizedTest
++    @EnumSource(value = ItemStatus.class, names = {"AVAILABLE", "SOLD", "DISABLED", "ON_CONSIGNMENT"})
++    void updateLiveOperationalStatusRejectsOperationalSoldWhenItemIsNotReserved(ItemStatus itemStatus) {
++        Reservation reservation = liveReservation(10L, 6L);
++        reservation.getItem().setStatus(itemStatus);
++        when(currentUser.getUserId()).thenReturn(99L);
++        when(repository.findById(10L)).thenReturn(Optional.of(reservation));
++
++        ReservationService.UpdateLiveOperationalStatusRequest request =
++                new ReservationService.UpdateLiveOperationalStatusRequest();
++        request.setStatus(LiveReservationOperationalStatus.OPERATIONAL_SOLD);
++
++        assertThrows(
++                IllegalArgumentException.class,
++                () -> service.updateLiveOperationalStatus(10L, request)
++        );
++
++        assertEquals(ReservationStatus.ACTIVE, reservation.getStatus());
++        assertEquals(LiveReservationOperationalStatus.RESERVED, reservation.getLiveOperationalStatus());
++        assertEquals(itemStatus, reservation.getItem().getStatus());
++        verify(repository, never()).save(any(Reservation.class));
++        verify(liveEventService, never()).record(any(), any(), any(), any(), any(), any());
++    }
++
+     @Test
+     void updateLiveOperationalStatusRejectsNonLiveReservation() {
+         Reservation reservation = liveReservation(10L, 6L);
+diff --git a/docs/ERP_BITACORA_CAMBIOS.md b/docs/ERP_BITACORA_CAMBIOS.md
+index e7e3b4c..e6fd9c5 100644
+--- a/docs/ERP_BITACORA_CAMBIOS.md
++++ b/docs/ERP_BITACORA_CAMBIOS.md
+@@ -1,5 +1,33 @@
+ # ERP - Bitacora de cambios
+
++## 2026-06-10 - ITEM-Z7 vendido operativo LIVE seguro
++
++Tipo: backend defensivo, LIVE operativo, pruebas, evidencia.
++
++Objetivo:
++
++- Asegurar que `OPERATIONAL_SOLD` sea solo un cierre operativo LIVE seguro, sin convertirlo en venta financiera ni tocar inventario fuera del apartado.
++
++Cambios realizados:
++
++- `ReservationService.updateLiveOperationalStatus` valida que el cierre `OPERATIONAL_SOLD` solo aplique sobre reserva LIVE `ACTIVE`.
++- Se bloquea `CANCELLED`, `CONVERTED_TO_SALE` y apartado LIVE operativamente `CANCELLED`.
++- Se exige que el item asociado siga `RESERVED`.
++- Se conserva `item.status` sin cambiar a `SOLD` ni liberar a `AVAILABLE`.
++- Se conserva trazabilidad existente en `live_events` con `LIVE_OPERATIONAL_SOLD`.
++- Se agregaron pruebas de exito y rechazo para estados historicos y items no reservados.
++
++Restricciones respetadas:
++
++- No se tocaron pagos, caja, precio LIVE, devoluciones, autorizaciones, RBAC ni permisos.
++- No se crearon endpoints ni migraciones.
++- No se implemento venta financiera.
++
++Pendientes:
++
++- QA API/visual real con dataset LIVE desechable.
++- Flujo futuro de conversion financiera y reversas con autorizacion formal.
++
+ ## 2026-06-09 - ITEM-Z6B cancelacion y liberacion segura de apartados
+
+ Tipo: backend defensivo, inventario transaccional, pruebas, evidencia operativa.
+diff --git a/docs/ERP_RIESGOS_OPERATIVOS.md b/docs/ERP_RIESGOS_OPERATIVOS.md
+index 7a5c65b..4921804 100644
+--- a/docs/ERP_RIESGOS_OPERATIVOS.md
++++ b/docs/ERP_RIESGOS_OPERATIVOS.md
+@@ -37,6 +37,7 @@ Probabilidad:
+ | Codificacion rota en textos | MEDIO | MEDIA | Mala experiencia, mensajes poco confiables. | Barridos de mojibake, usar UTF-8, QA visual. | Revertir archivo o corregir texto. |
+ | Artefactos no rastreados en Git | MEDIO | ALTA | Release con archivos no controlados o ruido en diff. | Limpiar/ignorar antes de release; checklist Git. | No incluir artefactos; restaurar working tree limpio. |
+ | Auditoria insuficiente | ALTO | ALTA | No se puede explicar quien hizo una accion sensible. | Fase de auditoria, eventos de negocio, revision de logs. | No aplica rollback completo; se mitiga hacia adelante. |
++| Vendido operativo LIVE sobre reserva no segura | CRITICO | BAJA despues de ITEM-Z7 | Un apartado cancelado, convertido a venta o con item no reservado podria cerrarse operativamente y confundir inventario/caja. | ITEM-Z7 valida `ACTIVE`, bloquea `CANCELLED`/`CONVERTED_TO_SALE`, exige item `RESERVED` y conserva solo `live_operational_status` + `live_events`. | Revertir ITEM-Z7 y bloquear temporalmente la accion de cierre operativo LIVE. |
+ | Cancelacion de apartado libera inventario indebidamente | CRITICO | BAJA despues de ITEM-Z6B | Una reserva con pago, convertida a venta o con item no reservado podria liberar prenda de forma incorrecta. | ITEM-Z6B bloquea reservas `CANCELLED`/`CONVERTED_TO_SALE`, pagos `ACTIVE` por allocation y libera solo con update condicional `RESERVED -> AVAILABLE`. | Revertir ITEM-Z6B y bloquear cancelacion normal hasta revisar datos; no ejecutar reversas financieras sin procedimiento. |
+ | Rechazos de reserva sin trazabilidad operativa | ALTO | BAJA despues de ITEM-Z5D | Soporte no podria explicar por que se rechazo un apartado en doble click, concurrencia o idempotencia. | ITEM-Z5D registra `reservation_rejection_events` con motivo, usuario, item, branch, hashes seguros y fecha; queda pendiente consola/consulta operativa. | Revertir instrumentacion si bloquea operacion; conservar tabla como diagnostico o retirarla con DBA. |
+ | Auditoria de seguridad sin consola de consulta | MEDIO | MEDIA despues de AUTH-G | Los eventos quedan persistidos, pero soporte aun necesita SQL o herramienta tecnica para revisarlos. | AUTH-G crea `security_audit_events`; AUTH-G2 debe exponer consulta protegida con filtros. | Consultar tabla por SQL en soporte controlado hasta crear consola. |
+diff --git a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+index 965db62..29a150a 100644
+--- a/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
++++ b/docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md
+@@ -9,6 +9,25 @@ Tipo: backlog documental, sin implementacion
+
+ Convertir el analisis de Fase 2A/2B en un backlog tecnico ordenado para implementar multi-compania con bajo riesgo, evitando fuga de datos entre clientes y manteniendo trazabilidad HPSQ-SOFT.
+
++## Actualizacion ITEM-Z7 - Vendido operativo LIVE seguro
++
++Fecha: 2026-06-10
++Estado: implementado tecnico condicionado.
++
++Alcance ejecutado:
++
++- Cierre `OPERATIONAL_SOLD` limitado a reservas LIVE `ACTIVE`.
++- Bloqueo de reservas `CANCELLED` y `CONVERTED_TO_SALE`.
++- Bloqueo de apartado LIVE operativamente `CANCELLED`.
++- Validacion de item `RESERVED` antes de cerrar como vendido operativo.
++- Conservacion de `ReservationStatus`, `item.status`, pagos, caja y venta financiera sin cambios.
++- Evento operativo `LIVE_OPERATIONAL_SOLD` conserva el patron existente de `live_events`.
++
++Pendiente:
++
++- QA API/visual real con apartado LIVE desechable.
++- Definir fase futura para conversion financiera real, pagos/caja y reversas con autorizacion formal.
++
+ ## Actualizacion ITEM-Z6B - Cancelacion y liberacion segura de apartados
+
+ Fecha: 2026-06-09
+diff --git a/docs/ITEM_Z7_OPERATIONAL_SOLD_LIVE_SAFE.md b/docs/ITEM_Z7_OPERATIONAL_SOLD_LIVE_SAFE.md
+new file mode 100644
+index 0000000..fe1deb3
+--- /dev/null
++++ b/docs/ITEM_Z7_OPERATIONAL_SOLD_LIVE_SAFE.md
+@@ -0,0 +1,119 @@
++# ITEM-Z7 - Vendido operativo LIVE seguro
++
++Fecha: 2026-06-10
++Rama: `feature/item-z7-operational-sold-live-safe`
++Estado: `GO_TECNICO` / `PENDING_QA_VISUAL`
++
++## Resumen ejecutivo
++
++ITEM-Z7 endurece el cierre `OPERATIONAL_SOLD` de apartados LIVE para que sea un estado operativo seguro y no una venta financiera. La accion ya existia en backend mediante `ReservationService.updateLiveOperationalStatus(...)`, `reservations.live_operational_status` y eventos `live_events`.
++
++El ajuste implementado valida que "vendido operativo LIVE" solo se aplique sobre una reserva LIVE valida, activa y con la prenda todavia `RESERVED`. No crea ventas, no registra pagos, no toca caja, no modifica precio, no libera inventario y no cambia `item.status`.
++
++## Hallazgo real
++
++Antes de ITEM-Z7, el endpoint `PATCH /api/reservations/{reservationId}/live-operational-status` podia persistir `OPERATIONAL_SOLD` si la reserva era LIVE y el usuario tenia permiso, pero no validaba en backend:
++
++- que `reservation.status` siguiera `ACTIVE`;
++- que la reserva no estuviera `CANCELLED`;
++- que la reserva no estuviera `CONVERTED_TO_SALE`;
++- que el estado operativo LIVE no estuviera `CANCELLED`;
++- que el item siguiera `RESERVED`.
++
++La UI ya tenia varios guardrails, pero el backend necesitaba la misma proteccion porque es la fuente de verdad.
++
++## Reglas implementadas
++
++Al marcar `OPERATIONAL_SOLD`:
++
++- la reserva debe ser LIVE;
++- el usuario debe conservar acceso operativo LIVE por el flujo existente;
++- `reservation.status` debe ser `ACTIVE`;
++- `reservation.status = CANCELLED` se rechaza;
++- `reservation.status = CONVERTED_TO_SALE` se rechaza;
++- `live_operational_status = CANCELLED` se rechaza;
++- `item.status` debe ser `RESERVED`;
++- si el item esta `AVAILABLE`, `SOLD`, `DISABLED` u `ON_CONSIGNMENT`, se rechaza.
++
++## Que no significa vendido operativo
++
++`OPERATIONAL_SOLD` no es venta financiera:
++
++- no crea `Sale`;
++- no crea `Payment`;
++- no toca caja;
++- no registra devolucion;
++- no cambia precio;
++- no convierte `ReservationStatus` a `CONVERTED_TO_SALE`;
++- no cambia `item.status` a `SOLD`;
++- no libera el item a `AVAILABLE`.
++
++## Trazabilidad
++
++El flujo conserva el patron existente de `live_events`:
++
++- `LIVE_RESERVATION_STATUS_CHANGED`;
++- `LIVE_OPERATIONAL_SOLD` cuando el nuevo estado es `OPERATIONAL_SOLD`.
++
++Los rechazos se devuelven como errores de negocio claros. No se agrego tabla nueva ni auditoria pesada en esta fase.
++
++## Archivos principales
++
++- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java`
++- `backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java`
++
++## Migraciones
++
++No hubo migracion.
++
++El campo `live_operational_status` y `live_events` ya existian.
++
++## Pruebas agregadas/ajustadas
++
++Se amplio `ReservationServiceLiveOperationalStatusTests` para cubrir:
++
++- vendido operativo exitoso sobre reserva `ACTIVE` + item `RESERVED`;
++- rechazo de `CANCELLED`;
++- rechazo de `CONVERTED_TO_SALE`;
++- rechazo si el apartado LIVE ya estaba operativamente `CANCELLED`;
++- rechazo si el item no esta `RESERVED`;
++- confirmacion de que no se guarda la reserva ni se registra evento cuando se rechaza;
++- confirmacion de que el item se mantiene `RESERVED` en el caso exitoso.
++
++## Riesgos pendientes
++
++- Falta QA visual real en `/live`.
++- Falta smoke API con dataset desechable controlado.
++- Conversion financiera real de apartado a venta sigue fuera de alcance.
++- Reversa/autorizacion de vendido operativo con pago queda para una fase sensible posterior.
++
++## Rollback
++
++Rollback tecnico:
++
++1. Revertir el commit ITEM-Z7.
++2. Volver a ejecutar `./mvnw.cmd test`.
++3. Bloquear temporalmente la accion en UI si QA detecta riesgo operativo.
++
++No hay rollback de base de datos porque no se crearon migraciones ni datos nuevos.
++
++## QA requerido
++
++En ambiente controlado:
++
++1. Crear apartado LIVE `ACTIVE` con item `RESERVED`.
++2. Marcar como vendido operativo LIVE.
++3. Confirmar que queda `liveOperationalStatus = OPERATIONAL_SOLD`.
++4. Confirmar que `reservation.status` sigue `ACTIVE`.
++5. Confirmar que `item.status` sigue `RESERVED`.
++6. Confirmar evento `LIVE_OPERATIONAL_SOLD`.
++7. Intentar marcar como vendido operativo una reserva `CANCELLED`.
++8. Intentar marcar como vendido operativo una reserva `CONVERTED_TO_SALE`.
++9. Intentar marcar si el item ya no esta `RESERVED`.
++10. Confirmar que no se crea `Sale`, `Payment` ni movimiento de caja.
++
++## GO/NO-GO
++
++- `GO_TECNICO`: reglas backend y pruebas pasan.
++- `PENDING_QA_VISUAL`: no hubo navegador ni screenshots reales.
++- No se marca `QA_PASS`.
+diff --git a/qa-reports/ITEM-Z7-operational-sold-live-safe-report-20260610-001059.md b/qa-reports/ITEM-Z7-operational-sold-live-safe-report-20260610-001059.md
+new file mode 100644
+index 0000000..5f6058f
+--- /dev/null
++++ b/qa-reports/ITEM-Z7-operational-sold-live-safe-report-20260610-001059.md
+@@ -0,0 +1,132 @@
++# ITEM-Z7 - Operational sold LIVE safe report
++
++Fecha/hora: 2026-06-10 00:10:59
++Rama: `feature/item-z7-operational-sold-live-safe`
++Resultado: `GO_TECNICO` / `PENDING_QA_VISUAL`
++
++## Comandos ejecutados
++
++Iniciales:
++
++- `git branch --show-current`
++- `git status`
++- `git log --oneline -60`
++
++Historial:
++
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z5B"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z5C"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z5D"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z6A"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z6B"`
++- `git --no-pager log --oneline --all --decorate --grep="ITEM-Z6C"`
++
++Auditoria:
++
++- `git grep -n "OPERATIONAL_SOLD|operationalSold|operational sold|vendido operativo|VENDIDO OPERATIVO|mark.*sold|soldOperational|LiveReservation|live reservation|LIVE_RESERVATION" -- ...`
++- `git grep -n "ReservationService|LiveService|LiveEvent|live_events|ReservationStatus|CONVERTED_TO_SALE|CANCELLED|ACTIVE|ItemStatus.RESERVED|ItemStatus.SOLD|PaymentAllocation|PaymentStatus.ACTIVE" -- ...`
++- `git grep -n "vendido operativo|operativo|cerrar venta operativa|deshacer vendido|OPERATIONAL_SOLD|SOLD|sale|Sale|payment|Payment|cash|caja" -- ...`
++- lectura focal de `ReservationService.java`, `ReservationServiceLiveOperationalStatusTests.java`, `Reservation.java`, `ReservationController.java`, `services/reservationService.ts` y `app/live.tsx`.
++
++Validacion focal:
++
++- `.\mvnw.cmd "-Dtest=ReservationServiceLiveOperationalStatusTests" test`: PASS, 9 tests.
++
++## Commits previos confirmados
++
++- `6f1ee15 ITEM-Z5B agrega idempotencia de reservas`
++- `ef8d255 ITEM-Z5C protege reserva activa por item`
++- `3826a43 ITEM-Z5D registra rechazos de reserva`
++- `4744b9c ITEM-Z6A documenta handoff liberacion reservas`
++- `7490809 ITEM-Z6B libera reservas de forma segura`
++- `5c0cf22 ITEM-Z6C documenta smoke liberacion reservas`
++- `1ad570e Merge branch 'feature/item-z6c-reservation-release-smoke' into develop`
++
++## Hallazgo real
++
++El vendido operativo LIVE ya existia como backend real:
++
++- campo `reservations.live_operational_status`;
++- enum `LiveReservationOperationalStatus.OPERATIONAL_SOLD`;
++- endpoint existente `PATCH /api/reservations/{reservationId}/live-operational-status`;
++- evento `LIVE_OPERATIONAL_SOLD` en `live_events`;
++- UI en `/live` que llama `updateLiveReservationOperationalStatus`.
++
++Riesgo encontrado:
++
++- `ReservationService.updateLiveOperationalStatus` validaba que la reserva fuera LIVE y permisos, pero no validaba que `reservation.status` siguiera `ACTIVE` ni que el item siguiera `RESERVED` antes de persistir `OPERATIONAL_SOLD`.
++
++## Implementacion realizada
++
++Se agrego validacion defensiva solo para `nextStatus == OPERATIONAL_SOLD`:
++
++- rechaza `ReservationStatus.CANCELLED`;
++- rechaza `ReservationStatus.CONVERTED_TO_SALE`;
++- rechaza cualquier estado core distinto de `ACTIVE`;
++- rechaza `liveOperationalStatus = CANCELLED`;
++- exige `item.status = RESERVED`;
++- no toca `item.status`;
++- no crea venta;
++- no crea pago;
++- no toca caja;
++- no cambia precio;
++- no libera inventario;
++- no crea endpoints ni migraciones.
++
++## Tests agregados/ajustados
++
++En `ReservationServiceLiveOperationalStatusTests`:
++
++- caso exitoso confirma que `OPERATIONAL_SOLD` conserva `ReservationStatus.ACTIVE` y `ItemStatus.RESERVED`;
++- rechazo de `CANCELLED`;
++- rechazo de `CONVERTED_TO_SALE`;
++- rechazo de apartado LIVE operativamente `CANCELLED`;
++- rechazo para item `AVAILABLE`, `SOLD`, `DISABLED` y `ON_CONSIGNMENT`;
++- en rechazos no se llama `repository.save` ni `liveEventService.record`.
++
++## Archivos tocados
++
++- `backend/control-ropa/src/main/java/com/hpsqsoft/ctrlropa/reservation/ReservationService.java`
++- `backend/control-ropa/src/test/java/com/hpsqsoft/ctrlropa/reservation/ReservationServiceLiveOperationalStatusTests.java`
++- `docs/ITEM_Z7_OPERATIONAL_SOLD_LIVE_SAFE.md`
++- `docs/ERP_BITACORA_CAMBIOS.md`
++- `docs/ERP_RIESGOS_OPERATIVOS.md`
++- `docs/ERP_TENANT_IMPLEMENTATION_BACKLOG.md`
++- `qa-reports/ITEM-Z7-operational-sold-live-safe-report-20260610-001059.md`
++- `git-diffs/20260610-ITEM-Z7-operational-sold-live-safe.diff`
++- `git-diffs/20260610-ITEM-Z7-operational-sold-live-safe-stat.txt`
++
++## Validaciones completas
++
++- `.\mvnw.cmd "-Dtest=ReservationServiceLiveOperationalStatusTests" test`: PASS, 9 tests.
++- `.\mvnw.cmd test`: PASS. Se cargo `.env` en el proceso sin imprimir secretos; hubo warning local de Logback por acceso al archivo de log, no bloqueante.
++- `npm.cmd run lint`: PASS con 0 errores y 53 warnings preexistentes.
++- `npx.cmd tsc --noEmit`: PASS.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: PASS.
++- `git --no-pager diff --check`: PASS.
++- `git --no-pager diff --cached --check`: PASS despues de normalizar espacios finales en la evidencia generada.
++- `git status`: PASS antes de commit; solo cambios ITEM-Z7 en staging.
++
++## Confirmacion de restricciones
++
++- No se tocaron pagos funcionalmente.
++- No se toco caja.
++- No se toco precio LIVE.
++- No se tocaron devoluciones.
++- No se tocaron autorizaciones.
++- No se tocaron permisos/RBAC.
++- No se crearon endpoints.
++- No se crearon migraciones.
++- No se cambio venta financiera.
++
++## Riesgos y QA pendiente
++
++- Falta smoke API real con una reserva LIVE desechable.
++- Falta QA visual real en `/live`.
++- Conversion financiera real y reversas con pago siguen fuera de alcance.
++
++## GO/NO-GO
++
++- `GO_TECNICO` si pasa la suite completa.
++- `PENDING_QA_VISUAL` porque no hubo navegador/screenshots reales.
++- No se marca `QA_PASS`.

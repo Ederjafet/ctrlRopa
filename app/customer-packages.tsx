@@ -1,10 +1,9 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { Customer, getCustomerById, getCustomersByBranch } from '@/services/customerService';
@@ -140,21 +139,23 @@ export default function CustomerPackagesScreen() {
 
   if (isLoading) {
     return (
-      <AppScreen>
+      <AppShellPage
+        title="Paquetes"
+        subtitle="Preparacion y seguimiento por cliente"
+        activeRoute="customers"
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   if (!selectedCustomerId) {
     return (
-      <AppScreen>
-        <AppBackButton fallbackRoute="/" />
-
-        <AppText variant="title" bold>
-          Paquetes
-        </AppText>
-
+      <AppShellPage
+        title="Paquetes"
+        subtitle="Preparacion y seguimiento por cliente"
+        activeRoute="customers"
+      >
         <AppCard>
           <AppText variant="subtitle" bold>
             Selecciona cliente
@@ -187,7 +188,7 @@ export default function CustomerPackagesScreen() {
             ))
           )}
         </AppCard>
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
@@ -214,13 +215,18 @@ export default function CustomerPackagesScreen() {
   );
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute="/customer-packages" />
-
-      <AppText variant="title" bold>
-        Paquetes del cliente
-      </AppText>
-
+    <AppShellPage
+      title="Paquetes del cliente"
+      subtitle="Preparacion e historial de entrega"
+      activeRoute="customers"
+      rightContent={
+        <AppButton
+          title="Volver"
+          variant="secondary"
+          onPress={() => router.replace('/customer-packages' as any)}
+        />
+      }
+    >
       <AppCard>
         <AppText variant="subtitle" bold>
           {customer?.name || 'Cliente'}
@@ -280,7 +286,7 @@ export default function CustomerPackagesScreen() {
           disabled={isCreating}
         />
       </AppBottomModal>
-    </AppScreen>
+    </AppShellPage>
   );
 }
 

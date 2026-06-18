@@ -1,0 +1,414 @@
+﻿diff --git a/app/live.tsx b/app/live.tsx
+index c2041f0..76f1979 100644
+--- a/app/live.tsx
++++ b/app/live.tsx
+@@ -2009,6 +2009,15 @@ export default function LiveScreen() {
+       return;
+     }
+
++    if (activeItem?.id === item.id) {
++      setLiveNotice({
++        title: t('live.itemAlreadyLiveTitle'),
++        message: t('live.itemAlreadyLiveMessage'),
++        tone: 'warning',
++      });
++      return;
++    }
++
+     const availability = getItemLiveAvailability(item);
+     if (!availability.canGoOnAir) {
+       setLiveNotice({
+@@ -2070,21 +2079,28 @@ export default function LiveScreen() {
+       return;
+     }
+
++    const itemToSet = selectedItem;
++    const isSwitchingPreparedItem = !!activeItem && activeItem.id !== itemToSet.id;
+     setIsSavingActiveItem(true);
+
+     try {
+-      const updated = await setLiveActiveItem(selectedLive.id, selectedItem.id);
++      const updated = await setLiveActiveItem(selectedLive.id, itemToSet.id);
+       setSelectedLive(updated);
+       setLives((current) =>
+         current.map((live) => (live.id === updated.id ? updated : live))
+       );
+       setActiveItemForReservation(activeItemFromLive(updated));
++      setSelectedItem(null);
+       await updateLiveEvents(updated.id);
+       setLiveNotice({
+-        title: t('live.activeProductUpdatedTitle'),
+-        message: t('live.activeProductUpdatedMessage', {
+-          item: selectedItem.code,
+-        }),
++        title: isSwitchingPreparedItem
++          ? t('live.preparedItemNowLiveTitle')
++          : t('live.activeProductUpdatedTitle'),
++        message: isSwitchingPreparedItem
++          ? t('live.preparedItemNowLiveMessage')
++          : t('live.activeProductUpdatedMessage', {
++              item: itemToSet.code,
++            }),
+         tone: 'success',
+       });
+     } catch (err: any) {
+@@ -2098,6 +2114,17 @@ export default function LiveScreen() {
+     }
+   };
+
++  const handleRemovePreparedItem = () => {
++    if (!selectedItem) return;
++
++    setSelectedItem(null);
++    setLiveNotice({
++      title: t('live.preparedItemRemovedTitle'),
++      message: t('live.preparedItemRemovedMessage'),
++      tone: 'success',
++    });
++  };
++
+   const handleClearActiveItem = async () => {
+     if (!session || !selectedLive || !activeItem) {
+       return;
+@@ -2654,34 +2681,49 @@ export default function LiveScreen() {
+           </View>
+
+           {options.showOnAirAction ? (
+-            <AppButton
+-              title={
+-                isOnAir
+-                  ? t('live.productAlreadyOnAir')
+-                  : t('live.markSelectedProductOnAir')
+-              }
+-              variant={isOnAir ? 'neutral' : 'primary'}
+-              onPress={handleSetSelectedItemActive}
+-              loading={isSavingActiveItem}
+-              disabled={
+-                isSavingActiveItem ||
+-                !operatorFlowEnabled ||
+-                !maySetActiveItem ||
+-                isOnAir ||
+-                !availability.canGoOnAir
+-              }
+-              disabledReason={
+-                !maySetActiveItem
+-                  ? t('live.liveOperatePermissionError')
+-                  : !operatorFlowEnabled
+-                    ? t('live.selectOpenLiveReason')
+-                    : isOnAir
+-                      ? t('live.productAlreadyOnAir')
+-                      : !availability.canGoOnAir
+-                        ? availability.reason
+-                      : undefined
+-              }
+-            />
++            <View style={styles.preparedItemActions}>
++              <AppButton
++                title={
++                  isOnAir
++                    ? t('live.productAlreadyOnAir')
++                    : t('live.markSelectedProductOnAir')
++                }
++                variant={isOnAir ? 'neutral' : 'primary'}
++                onPress={handleSetSelectedItemActive}
++                loading={isSavingActiveItem}
++                disabled={
++                  isSavingActiveItem ||
++                  !operatorFlowEnabled ||
++                  !maySetActiveItem ||
++                  isOnAir ||
++                  !availability.canGoOnAir
++                }
++                disabledReason={
++                  !maySetActiveItem
++                    ? t('live.liveOperatePermissionError')
++                    : !operatorFlowEnabled
++                      ? t('live.selectOpenLiveReason')
++                      : isOnAir
++                        ? t('live.productAlreadyOnAir')
++                        : !availability.canGoOnAir
++                          ? availability.reason
++                        : undefined
++                }
++              />
++              {isPreparedForChange ? (
++                <>
++                  <AppButton
++                    title={t('live.removePreparedItem')}
++                    variant="neutral"
++                    onPress={handleRemovePreparedItem}
++                    disabled={isSavingActiveItem}
++                  />
++                  <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
++                    {t('live.removePreparedItemHelp')}
++                  </AppText>
++                </>
++              ) : null}
++            </View>
+           ) : null}
+           {options.highlighted && isOnAir && options.showActiveActions !== false ? (
+             <View style={styles.buttonRow}>
+@@ -2708,12 +2750,28 @@ export default function LiveScreen() {
+                 <AppButton
+                   title={t('live.changeItemOnAir')}
+                   variant="secondary"
+-                  onPress={() => setIsItemModalVisible(true)}
+-                  disabled={!maySelectItem}
+-                  disabledReason={t('live.itemPermissionError')}
++                  onPress={handleSetSelectedItemActive}
++                  loading={isSavingActiveItem}
++                  disabled={
++                    isSavingActiveItem ||
++                    !preparedItem ||
++                    !operatorFlowEnabled ||
++                    !maySetActiveItem
++                  }
++                  disabledReason={
++                    !maySetActiveItem
++                      ? t('live.liveOperatePermissionError')
++                      : !operatorFlowEnabled
++                        ? t('live.selectOpenLiveReason')
++                        : !preparedItem
++                          ? t('live.prepareItemBeforeSwitch')
++                          : undefined
++                  }
+                 />
+                 <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+-                  {t('live.changeItemOnAirHelp')}
++                  {preparedItem
++                    ? t('live.changeItemOnAirHelp')
++                    : t('live.prepareItemBeforeSwitch')}
+                 </AppText>
+               </View>
+             </View>
+@@ -5717,6 +5775,9 @@ const styles = StyleSheet.create({
+   actionHelperText: {
+     marginTop: 4,
+   },
++  preparedItemActions: {
++    gap: 8,
++  },
+   buttonRow: {
+     flexDirection: 'row',
+     flexWrap: 'wrap',
+diff --git a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+index b18e0ca..33015e2 100644
+--- a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
++++ b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+@@ -1,5 +1,8 @@
+ # LIVE-Z6A - AppShell y layout operacional
+
++> Nota LIVE-Z9D: `Cambiar por prenda preparada` usa directamente la prenda preparada visible y no abre el selector.
++> `Quitar prenda preparada` limpia solo la preparacion local, sin afectar prenda al aire, precio, cliente ni apartado.
++
+ ## Objetivo
+
+ Integrar `/live` al layout profesional del producto usando `AppShell`, sidebar, TopBar y navegacion lateral responsive, sin cambiar reglas operativas profundas ni backend.
+diff --git a/docs/LIVE_Z9B_APARTADO_COPY_ALIGNMENT.md b/docs/LIVE_Z9B_APARTADO_COPY_ALIGNMENT.md
+index 96f8701..975bc40 100644
+--- a/docs/LIVE_Z9B_APARTADO_COPY_ALIGNMENT.md
++++ b/docs/LIVE_Z9B_APARTADO_COPY_ALIGNMENT.md
+@@ -61,6 +61,10 @@ Implementacion frontend:
+
+ LIVE-Z9C refina `Apartados recientes` para que las acciones visibles dependan del estado actual. `Mantener apartado` deja de mostrarse cuando el registro ya esta en estado visible `Apartado`, porque no genera un cambio operativo perceptible para la persona usuaria.
+
++## Continuidad LIVE-Z9D
++
++LIVE-Z9D mantiene la regla de conservar la prenda preparada al apartar la prenda al aire y agrega controles para usarla o retirarla de forma explicita: `Cambiar por prenda preparada` ejecuta el cambio directo y `Quitar prenda preparada` limpia solo la preparacion local.
++
+ ## Sin cambios funcionales backend
+
+ No se modifico:
+diff --git a/docs/LIVE_Z9C_ACTIONABLE_HOLD_STATES.md b/docs/LIVE_Z9C_ACTIONABLE_HOLD_STATES.md
+index 7488e5b..84c6a73 100644
+--- a/docs/LIVE_Z9C_ACTIONABLE_HOLD_STATES.md
++++ b/docs/LIVE_Z9C_ACTIONABLE_HOLD_STATES.md
+@@ -59,3 +59,7 @@ Se reemplaza el mensaje generico `Estado actualizado` por confirmaciones segun a
+ ## GO/NO-GO
+
+ GO si pasan validaciones tecnicas y en manual no aparece ninguna accion sin efecto perceptible en `Apartados recientes`.
++
++## Continuidad LIVE-Z9D
++
++LIVE-Z9D corrige el flujo de `Prenda preparada para cambio`: `Cambiar por prenda preparada` ya no abre el selector cuando existe una preparada visible, se agrega `Quitar prenda preparada` y se muestra aviso si se intenta preparar la misma prenda que ya esta al aire.
+diff --git a/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md b/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md
+new file mode 100644
+index 0000000..03aabb5
+--- /dev/null
++++ b/docs/LIVE_Z9D_PREPARED_ITEM_FLOW_FIXES.md
+@@ -0,0 +1,80 @@
++# LIVE-Z9D - Correcciones de flujo de prenda preparada
++
++## Objetivo
++
++Corregir el flujo frontend de prenda preparada para que las acciones visibles correspondan exactamente con lo que prometen los botones.
++
++Esta fase no modifica backend, permisos, capacidades, endpoints ni contratos de API.
++
++## Reglas corregidas
++
++### Cambiar por prenda preparada
++
++Si existe una prenda preparada visible:
++
++- `Cambiar por prenda preparada` cambia directamente la prenda al aire por esa prenda preparada.
++- No abre el selector de prendas.
++- La prenda preparada pasa a ser la nueva prenda al aire.
++- Despues del cambio exitoso se limpia la prenda preparada.
++- El precio principal queda sincronizado con la nueva prenda al aire.
++- Se conserva el endpoint y el registro operativo existente de cambio de prenda al aire.
++
++Si no existe prenda preparada:
++
++- El boton queda bloqueado.
++- Se muestra la ayuda `Primero prepara una prenda para poder cambiarla.`
++- El selector se abre desde `Buscar prenda`, `Escanear QR` o `Crear prenda rapida`, no desde el boton de cambio.
++
++### Quitar prenda preparada
++
++La tarjeta `Prenda preparada para cambio` ahora incluye `Quitar prenda preparada`.
++
++La accion:
++
++- limpia solo la prenda preparada;
++- no modifica la prenda al aire;
++- no modifica el precio de la prenda al aire;
++- no modifica cliente seleccionado;
++- no modifica apartados;
++- no llama backend.
++
++### Seleccionar la misma prenda que ya esta al aire
++
++Si el operador selecciona en el modal la misma prenda que ya esta al aire:
++
++- no cambia la prenda al aire;
++- no prepara esa prenda como cambio;
++- no modifica precio;
++- muestra el aviso `Prenda ya al aire`;
++- el mensaje indica que debe seleccionar otra prenda para prepararla como cambio.
++
++## Textos agregados
++
++- `Quitar prenda preparada`
++- `Quita esta prenda de preparacion. No afecta la prenda al aire.`
++- `Prenda ya al aire`
++- `Esta prenda ya esta al aire. Selecciona otra prenda para prepararla como cambio.`
++- `Primero prepara una prenda para poder cambiarla.`
++- `La prenda preparada paso al aire.`
++- `La prenda preparada fue retirada.`
++
++## Validacion manual esperada
++
++1. Entrar con `qa.admin@local.test`.
++2. Abrir `/live`.
++3. Tener una prenda al aire.
++4. Preparar otra prenda.
++5. Presionar `Cambiar por prenda preparada`.
++6. Confirmar que no abre el selector.
++7. Confirmar que la preparada pasa al aire.
++8. Confirmar que el precio cambia al de la nueva prenda al aire.
++9. Preparar otra prenda.
++10. Presionar `Quitar prenda preparada`.
++11. Confirmar que solo desaparece la preparada.
++12. Abrir selector y elegir la misma prenda al aire.
++13. Confirmar aviso `Prenda ya al aire`.
++14. Validar light/dark y vistas vendedor/supervisor.
++
++## GO/NO-GO
++
++GO si las validaciones tecnicas pasan y el flujo manual confirma que el boton de cambio ya no abre selector cuando existe prenda preparada.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index 35abef4..486facb 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -559,7 +559,16 @@
+     "operationalHoldReactivatedMessage": "The record returned to Hold for follow-up. No payment or cash register movement was recorded.",
+     "operationalStatusNoChangesTitle": "No changes",
+     "operationalStatusNoChangesMessage": "This record was already on hold.",
+-    "returnToReservedHelp": "Returns this record to Hold for follow-up. It does not record payment or cash register movement."
++    "returnToReservedHelp": "Returns this record to Hold for follow-up. It does not record payment or cash register movement.",
++    "removePreparedItem": "REMOVE PREPARED ITEM",
++    "removePreparedItemHelp": "This removes the prepared item only. It does not affect the live item.",
++    "itemAlreadyLiveTitle": "Item already live",
++    "itemAlreadyLiveMessage": "This item is already live. Select another item to prepare it as a switch.",
++    "prepareItemBeforeSwitch": "Prepare an item first before switching.",
++    "preparedItemNowLiveTitle": "The prepared item is now live",
++    "preparedItemNowLiveMessage": "The prepared item is now live and ready for holds.",
++    "preparedItemRemovedTitle": "Prepared item removed",
++    "preparedItemRemovedMessage": "The prepared item was removed."
+   },
+   "payments": {
+     "title": "Payments / Collections",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index aaf38b2..47c72d4 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -559,7 +559,16 @@
+     "operationalHoldReactivatedMessage": "El registro volvio a estado Apartado para seguimiento. No se registro pago ni caja.",
+     "operationalStatusNoChangesTitle": "Sin cambios",
+     "operationalStatusNoChangesMessage": "Este registro ya estaba como Apartado.",
+-    "returnToReservedHelp": "Regresa este registro a estado Apartado para seguimiento. No registra pago ni caja."
++    "returnToReservedHelp": "Regresa este registro a estado Apartado para seguimiento. No registra pago ni caja.",
++    "removePreparedItem": "QUITAR PRENDA PREPARADA",
++    "removePreparedItemHelp": "Quita esta prenda de preparacion. No afecta la prenda al aire.",
++    "itemAlreadyLiveTitle": "Prenda ya al aire",
++    "itemAlreadyLiveMessage": "Esta prenda ya esta al aire. Selecciona otra prenda para prepararla como cambio.",
++    "prepareItemBeforeSwitch": "Primero prepara una prenda para poder cambiarla.",
++    "preparedItemNowLiveTitle": "La prenda preparada paso al aire",
++    "preparedItemNowLiveMessage": "La prenda preparada paso al aire y quedo lista para apartados.",
++    "preparedItemRemovedTitle": "Prenda preparada retirada",
++    "preparedItemRemovedMessage": "La prenda preparada fue retirada."
+   },
+   "payments": {
+     "title": "Pagos / Cobros",
+diff --git a/qa-reports/LIVE-Z9D-prepared-item-flow-fixes-report-20260605-150727.md b/qa-reports/LIVE-Z9D-prepared-item-flow-fixes-report-20260605-150727.md
+new file mode 100644
+index 0000000..125cca7
+--- /dev/null
++++ b/qa-reports/LIVE-Z9D-prepared-item-flow-fixes-report-20260605-150727.md
+@@ -0,0 +1,45 @@
++# LIVE-Z9D - Reporte de correcciones de prenda preparada
++
++## Objetivo
++
++Corregir el flujo frontend de prenda preparada para que `Cambiar por prenda preparada` y `Quitar prenda preparada` sean acciones claras, directas y sin efectos colaterales.
++
++## Cambios implementados
++
++- `Cambiar por prenda preparada` ya no abre el selector cuando existe una prenda preparada visible.
++- El cambio usa directamente la prenda preparada actual y la pone al aire mediante el flujo existente.
++- Despues del cambio exitoso se limpia la prenda preparada.
++- El precio principal queda sincronizado con la nueva prenda al aire al actualizar `activeItem`.
++- Se agrego `Quitar prenda preparada`, que limpia solo la seleccion preparada local.
++- Si se selecciona la misma prenda que ya esta al aire, se muestra aviso `Prenda ya al aire` y no se modifica estado.
++- Se agregaron locales ES/EN para acciones y avisos.
++
++## Alcance
++
++- Frontend, locales, documentacion y evidencia.
++- Sin cambios backend, AUTH/RBAC, pagos, caja, reportes, billing, IA, endpoints ni contratos API.
++
++## Validaciones tecnicas
++
++Ejecutadas el 2026-06-05:
++
++- OK - `npm.cmd run lint` (sin errores; 60 warnings preexistentes).
++- OK - `npx.cmd tsc --noEmit`.
++- OK - `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export` (73 rutas exportadas).
++- OK - `cd backend/control-ropa; ./mvnw.cmd test` (73 tests, 0 fallas, 0 errores).
++- OK - `cd backend/control-ropa; ./mvnw.cmd -q -DskipTests package`.
++- Pendiente de cierre - `git diff --check`.
++
++Warnings observados:
++
++- Lint conserva 60 warnings ya existentes, no introducidos por esta fase.
++- Maven test muestra warnings de entorno conocidos: MySQL 5.7 fuera de soporte comunitario, Mockito dynamic agent y password generado por Spring Security en contexto de test.
++
++## Riesgos
++
++- La validacion manual debe confirmar que el endpoint existente de prenda al aire actualiza precio y eventos como antes.
++- La accion `Quitar prenda preparada` es local; no persiste estado porque no existe contrato backend para una preparacion separada.
++
++## GO/NO-GO
++
++GO tecnico condicionado a `git diff --check` final.

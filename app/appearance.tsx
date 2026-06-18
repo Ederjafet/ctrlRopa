@@ -1,9 +1,8 @@
-﻿import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import ColorField from '@/components/ui/ColorField';
 import { AppDatePreview } from '@/components/ui/AppDateField';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import {
@@ -18,6 +17,7 @@ import { isAdmin } from '@/services/accessControl';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Image, Pressable, StyleSheet, Switch, TextInput, View } from 'react-native';
 
 const DEFAULT_FORM: AppearanceSettings = {
@@ -104,6 +104,7 @@ const normalizeHex = (value?: string | null) => {
 export default function AppearanceScreen() {
   const router = useRouter();
   const { theme, reloadTheme } = useAppTheme();
+  const { t } = useTranslation('common');
   const [user, setUser] = useState<UserSession | null>(null);
   const [form, setForm] = useState<AppearanceSettings>(DEFAULT_FORM);
   const [loading, setLoading] = useState(true);
@@ -155,7 +156,7 @@ export default function AppearanceScreen() {
     const invalidFields = COLOR_FIELDS.filter((key) => !isValidHex(form[key] as string));
 
     if (invalidFields.length > 0) {
-      Alert.alert('Color invalido', 'Revisa los colores. Deben tener formato HEX, por ejemplo #2563EB.');
+      Alert.alert(t('appearance.invalidColorTitle'), t('appearance.invalidColorMessage'));
       return false;
     }
 
@@ -243,9 +244,9 @@ export default function AppearanceScreen() {
       });
 
       await reloadTheme();
-      Alert.alert('Listo', 'La apariencia se guardo correctamente.');
+      Alert.alert(t('appearance.savedTitle'), t('appearance.savedMessage'));
     } catch (error) {
-      Alert.alert('Error', 'No se pudo guardar la apariencia.');
+      Alert.alert(t('appearance.saveErrorTitle'), t('appearance.saveErrorMessage'));
     } finally {
       setSaving(false);
     }
@@ -253,80 +254,98 @@ export default function AppearanceScreen() {
 
   if (loading || !user) {
     return (
-      <AppScreen>
-        <AppText>Cargando apariencia...</AppText>
-      </AppScreen>
+      <AppShellPage
+        title={t('navigation.items.appearance')}
+        subtitle={t('appearance.subtitle')}
+        activeRoute="appearance"
+        session={user}
+      >
+        <AppText>{t('common.loading')}</AppText>
+      </AppShellPage>
     );
   }
 
   return (
-    <AppScreen>
-      <AppBackButton fallbackRoute="/" />
-
-      <AppText variant="title" bold>
-        Apariencia / Branding
-      </AppText>
-
+    <AppShellPage
+      title={t('navigation.items.appearance')}
+      subtitle={t('appearance.subtitle')}
+      activeRoute="appearance"
+      session={user}
+    >
       <AppCard>
         <AppText variant="subtitle" bold>
-          Identidad
+          {t('appearance.identity')}
         </AppText>
 
         <Field
-          label="Nombre del sistema"
+          label={t('appearance.systemName')}
           value={form.appName || ''}
           onChangeText={(value) => updateField('appName', value)}
         />
 
         <Field
-          label="Logo general URL"
+          label={t('appearance.logoUrl')}
           value={form.logoUrl || ''}
           onChangeText={(value) => updateField('logoUrl', value)}
         />
 
         <Field
-          label="Favicon URL"
+          label={t('appearance.faviconUrl')}
           value={form.faviconUrl || ''}
           onChangeText={(value) => updateField('faviconUrl', value)}
         />
 
         <Field
-          label="Logo login URL"
+          label={t('appearance.loginLogoUrl')}
           value={form.loginLogoUrl || ''}
           onChangeText={(value) => updateField('loginLogoUrl', value)}
         />
-        <LogoPreview title="Vista previa login" url={form.loginLogoUrl || form.logoUrl || ''} />
+        <LogoPreview title={t('appearance.loginPreview')} url={form.loginLogoUrl || form.logoUrl || ''} />
 
         <Field
-          label="Logo impresion URL"
+          label={t('appearance.printLogoUrl')}
           value={form.printLogoUrl || ''}
           onChangeText={(value) => updateField('printLogoUrl', value)}
         />
-        <LogoPreview title="Vista previa impresion" url={form.printLogoUrl || form.logoUrl || ''} />
+        <LogoPreview title={t('appearance.printPreview')} url={form.printLogoUrl || form.logoUrl || ''} />
+      </AppCard>
+
+      <AppCard variant="info">
+        <AppText variant="subtitle" bold>
+          {t('paletteGenerator.appearanceCardTitle')}
+        </AppText>
+        <AppText color={theme.colors.mutedText} style={styles.sectionHint}>
+          {t('paletteGenerator.appearanceCardHelp')}
+        </AppText>
+        <AppButton
+          title={t('paletteGenerator.openGenerator')}
+          variant="secondary"
+          onPress={() => router.push('/ui-kit')}
+        />
       </AppCard>
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Tarjetas informativas
+          {t('appearance.infoCards')}
         </AppText>
         <AppText color={theme.colors.mutedText} style={styles.sectionHint}>
-          Se usan para textos de introduccion o contexto, no para acciones.
+          {t('appearance.infoCardsHelp')}
         </AppText>
 
         <ColorField
-          label="Tarjeta informativa - fondo"
+          label={t('appearance.infoCardBackground')}
           value={form.infoCardBackgroundColor || ''}
           onChangeText={(value) => updateColorField('infoCardBackgroundColor', value)}
         />
 
         <ColorField
-          label="Tarjeta informativa - texto"
+          label={t('appearance.infoCardText')}
           value={form.infoCardTextColor || ''}
           onChangeText={(value) => updateColorField('infoCardTextColor', value)}
         />
 
         <ColorField
-          label="Tarjeta informativa - borde"
+          label={t('appearance.infoCardBorder')}
           value={form.infoCardBorderColor || ''}
           onChangeText={(value) => updateColorField('infoCardBorderColor', value)}
         />
@@ -341,33 +360,33 @@ export default function AppearanceScreen() {
           ]}
         >
           <AppText bold color={form.infoCardTextColor}>
-            Ejemplo informativo
+            {t('appearance.infoExampleTitle')}
           </AppText>
           <AppText color={form.infoCardTextColor}>
-            Este bloque no es un boton; solo da contexto.
+            {t('appearance.infoExampleText')}
           </AppText>
         </View>
       </AppCard>
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Colores generales
+          {t('appearance.generalColors')}
         </AppText>
 
         <ColorField
-          label="Color primario"
+          label={t('appearance.primaryColor')}
           value={form.primaryColor || ''}
           onChangeText={(value) => updateColorField('primaryColor', value)}
         />
 
         <ColorField
-          label="Color secundario"
+          label={t('appearance.secondaryColor')}
           value={form.secondaryColor || ''}
           onChangeText={(value) => updateColorField('secondaryColor', value)}
         />
 
         <ColorField
-          label="Color de acento"
+          label={t('appearance.accentColor')}
           value={form.accentColor || ''}
           onChangeText={(value) => updateColorField('accentColor', value)}
         />
@@ -375,131 +394,131 @@ export default function AppearanceScreen() {
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Botones
+          {t('appearance.buttons')}
         </AppText>
 
         <ColorField
-          label="Boton primario - fondo"
+          label={t('appearance.primaryButtonBackground')}
           value={form.primaryButtonColor || ''}
           onChangeText={(value) => updateColorField('primaryButtonColor', value)}
         />
 
         <ColorField
-          label="Boton primario - texto"
+          label={t('appearance.primaryButtonText')}
           value={form.primaryButtonTextColor || ''}
           onChangeText={(value) => updateColorField('primaryButtonTextColor', value)}
         />
         <ButtonPreview
-          label="Vista previa primario"
-          title="Primario"
+          label={t('appearance.primaryPreview')}
+          title={t('appearance.primaryButton')}
           backgroundColor={form.primaryButtonColor}
           textColor={form.primaryButtonTextColor}
         />
 
         <ColorField
-          label="Boton secundario - fondo"
+          label={t('appearance.secondaryButtonBackground')}
           value={form.secondaryButtonColor || ''}
           onChangeText={(value) => updateColorField('secondaryButtonColor', value)}
         />
 
         <ColorField
-          label="Boton secundario - texto"
+          label={t('appearance.secondaryButtonText')}
           value={form.secondaryButtonTextColor || ''}
           onChangeText={(value) => updateColorField('secondaryButtonTextColor', value)}
         />
         <ButtonPreview
-          label="Vista previa secundario"
-          title="Secundario"
+          label={t('appearance.secondaryPreview')}
+          title={t('appearance.secondaryButton')}
           backgroundColor={form.secondaryButtonColor}
           textColor={form.secondaryButtonTextColor}
         />
 
         <ColorField
-          label="Boton operativo - fondo"
+          label={t('appearance.operationButtonBackground')}
           value={form.operationButtonColor || ''}
           onChangeText={(value) => updateColorField('operationButtonColor', value)}
         />
 
         <ColorField
-          label="Boton operativo - texto"
+          label={t('appearance.operationButtonText')}
           value={form.operationButtonTextColor || ''}
           onChangeText={(value) => updateColorField('operationButtonTextColor', value)}
         />
         <ButtonPreview
-          label="Vista previa operativo"
-          title="Seleccionar cliente"
+          label={t('appearance.operationPreview')}
+          title={t('appearance.selectCustomerPreview')}
           backgroundColor={form.operationButtonColor}
           textColor={form.operationButtonTextColor}
         />
 
         <ColorField
-          label="Boton peligro - fondo"
+          label={t('appearance.dangerButtonBackground')}
           value={form.dangerButtonColor || ''}
           onChangeText={(value) => updateColorField('dangerButtonColor', value)}
         />
 
         <ColorField
-          label="Boton peligro - texto"
+          label={t('appearance.dangerButtonText')}
           value={form.dangerButtonTextColor || ''}
           onChangeText={(value) => updateColorField('dangerButtonTextColor', value)}
         />
         <ButtonPreview
-          label="Vista previa peligro"
-          title="Cancelar venta"
+          label={t('appearance.dangerPreview')}
+          title={t('appearance.cancelSalePreview')}
           backgroundColor={form.dangerButtonColor}
           textColor={form.dangerButtonTextColor}
         />
 
         <ColorField
-          label="Boton cancelar - fondo"
+          label={t('appearance.cancelButtonBackground')}
           value={form.cancelButtonColor || ''}
           onChangeText={(value) => updateColorField('cancelButtonColor', value)}
         />
 
         <ColorField
-          label="Boton cancelar - texto"
+          label={t('appearance.cancelButtonText')}
           value={form.cancelButtonTextColor || ''}
           onChangeText={(value) => updateColorField('cancelButtonTextColor', value)}
         />
         <ButtonPreview
-          label="Vista previa cancelar"
-          title="Cancelar"
+          label={t('appearance.cancelPreview')}
+          title={t('common.cancel')}
           backgroundColor={form.cancelButtonColor}
           textColor={form.cancelButtonTextColor}
         />
 
         <ColorField
-          label="Boton volver - fondo"
+          label={t('appearance.backButtonBackground')}
           value={form.backButtonColor || ''}
           onChangeText={(value) => updateColorField('backButtonColor', value)}
         />
 
         <ColorField
-          label="Boton volver - texto"
+          label={t('appearance.backButtonText')}
           value={form.backButtonTextColor || ''}
           onChangeText={(value) => updateColorField('backButtonTextColor', value)}
         />
         <ButtonPreview
-          label="Vista previa volver"
-          title="Volver"
+          label={t('appearance.backPreview')}
+          title={t('common.back')}
           backgroundColor={form.backButtonColor}
           textColor={form.backButtonTextColor}
         />
 
         <ColorField
-          label="Boton menu principal - fondo"
+          label={t('appearance.mainMenuButtonBackground')}
           value={form.menuButtonColor || ''}
           onChangeText={(value) => updateColorField('menuButtonColor', value)}
         />
 
         <ColorField
-          label="Boton menu principal - texto"
+          label={t('appearance.mainMenuButtonText')}
           value={form.menuButtonTextColor || ''}
           onChangeText={(value) => updateColorField('menuButtonTextColor', value)}
         />
         <ButtonPreview
-          label="Vista previa menu principal"
-          title="Menu principal"
+          label={t('appearance.mainMenuPreview')}
+          title={t('common.mainMenu')}
           backgroundColor={form.menuButtonColor}
           textColor={form.menuButtonTextColor}
         />
@@ -508,23 +527,23 @@ export default function AppearanceScreen() {
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Calendario
+          {t('appearance.calendar')}
         </AppText>
 
         <ColorField
-          label="Dia seleccionado - fondo"
+          label={t('appearance.selectedDayBackground')}
           value={form.calendarSelectedColor || ''}
           onChangeText={(value) => updateColorField('calendarSelectedColor', value)}
         />
 
         <ColorField
-          label="Dia seleccionado - texto"
+          label={t('appearance.selectedDayText')}
           value={form.calendarSelectedTextColor || ''}
           onChangeText={(value) => updateColorField('calendarSelectedTextColor', value)}
         />
 
         <ColorField
-          label="Calendario - texto"
+          label={t('appearance.calendarText')}
           value={form.calendarTextColor || ''}
           onChangeText={(value) => updateColorField('calendarTextColor', value)}
         />
@@ -538,23 +557,23 @@ export default function AppearanceScreen() {
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Mi dashboard
+          {t('appearance.dashboard')}
         </AppText>
 
         <ColorField
-          label="Metrica - fondo"
+          label={t('appearance.metricBackground')}
           value={form.dashboardMetricBackgroundColor || ''}
           onChangeText={(value) => updateColorField('dashboardMetricBackgroundColor', value)}
         />
 
         <ColorField
-          label="Metrica - texto"
+          label={t('appearance.metricText')}
           value={form.dashboardMetricTextColor || ''}
           onChangeText={(value) => updateColorField('dashboardMetricTextColor', value)}
         />
 
         <ColorField
-          label="Dashboard - acento"
+          label={t('appearance.dashboardAccent')}
           value={form.dashboardAccentColor || ''}
           onChangeText={(value) => updateColorField('dashboardAccentColor', value)}
         />
@@ -569,7 +588,7 @@ export default function AppearanceScreen() {
           ]}
         >
           <AppText variant="caption" color={form.dashboardMetricTextColor}>
-            Ventas de hoy
+            {t('appearance.todaySales')}
           </AppText>
           <AppText bold color={form.dashboardAccentColor}>
             $1,250.00
@@ -579,36 +598,36 @@ export default function AppearanceScreen() {
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Tema y estilo
+          {t('appearance.themeAndStyle')}
         </AppText>
 
         <OptionGroup<ThemeMode>
-          label="Tema"
+          label={t('appearance.theme')}
           value={form.themeMode || 'LIGHT'}
           options={[
-            { label: 'Claro', value: 'LIGHT' },
-            { label: 'Oscuro', value: 'DARK' },
-            { label: 'Auto', value: 'AUTO' },
+            { label: t('theme.light'), value: 'LIGHT' },
+            { label: t('theme.dark'), value: 'DARK' },
+            { label: t('appearance.autoTheme'), value: 'AUTO' },
           ]}
           onChange={(value) => updateField('themeMode', value)}
         />
 
         <OptionGroup<DensityMode>
-          label="Densidad"
+          label={t('appearance.density')}
           value={form.densityMode || 'NORMAL'}
           options={[
-            { label: 'Normal', value: 'NORMAL' },
-            { label: 'Compacta', value: 'COMPACT' },
+            { label: t('appearance.normalDensity'), value: 'NORMAL' },
+            { label: t('appearance.compactDensity'), value: 'COMPACT' },
           ]}
           onChange={(value) => updateField('densityMode', value)}
         />
 
         <OptionGroup<ButtonStyle>
-          label="Estilo de botones"
+          label={t('appearance.buttonStyle')}
           value={form.buttonStyle || 'ROUNDED'}
           options={[
-            { label: 'Redondeados', value: 'ROUNDED' },
-            { label: 'Rectos', value: 'STRAIGHT' },
+            { label: t('appearance.roundedButtons'), value: 'ROUNDED' },
+            { label: t('appearance.straightButtons'), value: 'STRAIGHT' },
           ]}
           onChange={(value) => updateField('buttonStyle', value)}
         />
@@ -616,11 +635,11 @@ export default function AppearanceScreen() {
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Impresion
+          {t('appearance.printing')}
         </AppText>
 
         <View style={styles.switchRow}>
-          <AppText>Mostrar logo en documentos</AppText>
+          <AppText>{t('appearance.showLogoOnPrints')}</AppText>
           <Switch
             value={form.showLogoOnPrints ?? true}
             onValueChange={(value) => updateField('showLogoOnPrints', value)}
@@ -628,22 +647,22 @@ export default function AppearanceScreen() {
         </View>
 
         <Field
-          label="Pie de pagina"
+          label={t('appearance.footerText')}
           value={form.printFooterText || ''}
           onChangeText={(value) => updateField('printFooterText', value)}
           multiline
         />
 
         <Field
-          label="Mensaje de agradecimiento en paquete"
+          label={t('appearance.packageThanks')}
           value={form.packageThankYouText || ''}
           onChangeText={(value) => updateField('packageThankYouText', value)}
           multiline
         />
       </AppCard>
 
-      <AppButton title="Guardar cambios" loading={saving} onPress={save} />
-    </AppScreen>
+      <AppButton title={t('appearance.saveChanges')} loading={saving} onPress={save} />
+    </AppShellPage>
   );
 }
 
@@ -719,6 +738,7 @@ function ButtonPreview({
 
 function LogoPreview({ title, url }: { title: string; url?: string }) {
   const { theme } = useAppTheme();
+  const { t } = useTranslation('common');
 
   return (
     <View style={styles.logoPreviewBlock}>
@@ -729,7 +749,7 @@ function LogoPreview({ title, url }: { title: string; url?: string }) {
         {url ? (
           <Image source={{ uri: url }} resizeMode="contain" style={styles.logoImage} />
         ) : (
-          <AppText color={theme.colors.mutedText}>Sin logo configurado</AppText>
+          <AppText color={theme.colors.mutedText}>{t('appearance.noLogoConfigured')}</AppText>
         )}
       </View>
     </View>
@@ -871,4 +891,3 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 });
-

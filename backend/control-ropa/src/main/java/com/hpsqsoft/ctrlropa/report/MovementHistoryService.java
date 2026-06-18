@@ -5,6 +5,7 @@ import com.hpsqsoft.ctrlropa.branch.BranchRepository;
 import com.hpsqsoft.ctrlropa.security.access.AccessService;
 import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
 import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
+import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
@@ -28,15 +29,18 @@ public class MovementHistoryService {
     private final BranchRepository branchRepository;
     private final AccessService accessService;
     private final CurrentUser currentUser;
+    private final TenantAccessGuard tenantAccessGuard;
 
     public MovementHistoryService(JdbcTemplate jdbcTemplate,
                                   BranchRepository branchRepository,
                                   AccessService accessService,
-                                  CurrentUser currentUser) {
+                                  CurrentUser currentUser,
+                                  TenantAccessGuard tenantAccessGuard) {
         this.jdbcTemplate = jdbcTemplate;
         this.branchRepository = branchRepository;
         this.accessService = accessService;
         this.currentUser = currentUser;
+        this.tenantAccessGuard = tenantAccessGuard;
     }
 
     public MovementHistoryResponse getMovementHistory(Long branchId,
@@ -65,6 +69,7 @@ public class MovementHistoryService {
         String normalizedType = normalizeMovementType(movementType);
         Branch branch = branchRepository.findById(branchId)
                 .orElseThrow(() -> new IllegalArgumentException("Sucursal no encontrada"));
+        tenantAccessGuard.requireBranch(branch.getId(), "La sucursal del reporte no pertenece al tenant activo");
 
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime end = endDate.plusDays(1).atStartOfDay();

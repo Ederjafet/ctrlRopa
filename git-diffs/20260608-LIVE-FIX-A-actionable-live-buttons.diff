@@ -1,0 +1,537 @@
+﻿diff --git a/app/live.tsx b/app/live.tsx
+index 260d588..2e5cee3 100644
+--- a/app/live.tsx
++++ b/app/live.tsx
+@@ -442,6 +442,7 @@ export default function LiveScreen() {
+   const [liveNotice, setLiveNotice] = useState<LiveNotice | null>(null);
+   const [closeLiveToConfirm, setCloseLiveToConfirm] = useState<Live | null>(null);
+   const [activateLiveToConfirm, setActivateLiveToConfirm] = useState<Live | null>(null);
++  const [operationalSoldToConfirm, setOperationalSoldToConfirm] = useState<number | null>(null);
+   const [cancelReservationToConfirm, setCancelReservationToConfirm] = useState<number | null>(null);
+   const [reservationIssue, setReservationIssue] = useState<LiveReservationIssue | null>(null);
+   const [showDemoMetrics, setShowDemoMetrics] = useState(true);
+@@ -1868,14 +1869,68 @@ export default function LiveScreen() {
+       return;
+     }
+
+-    Alert.alert(t('live.operationalSoldConfirmTitle'), t('live.operationalSoldConfirmMessage'), [
+-      { text: t('common.cancel'), style: 'cancel' },
+-      {
+-        text: t('live.confirmOperationalSold'),
+-        onPress: () =>
+-          handleUpdateReservationOperationalStatus(reservationId, 'OPERATIONAL_SOLD'),
+-      },
+-    ]);
++    if (!selectedLive) {
++      setLiveNotice({
++        title: t('live.operationalSoldUnavailableTitle'),
++        message: t('live.selectOpenLiveReason'),
++        tone: 'warning',
++      });
++      return;
++    }
++
++    const reservationEntry = recentReservations.find(
++      ({ reservation }) => reservation.id === reservationId
++    );
++
++    if (!reservationEntry) {
++      setLiveNotice({
++        title: t('live.operationalSoldUnavailableTitle'),
++        message: t('live.operationalSoldUnavailableMessage'),
++        tone: 'warning',
++      });
++      return;
++    }
++
++    const paid = paidByReservationId[reservationId] ?? 0;
++    const settled = isReservationSettled(reservationEntry.reservation, paid);
++    const operationalStatus = getLiveReservationOperationalStatus(reservationEntry.reservation);
++
++    if (settled) {
++      setLiveNotice({
++        title: t('live.operationalSoldUnavailableTitle'),
++        message: t('live.operationalSoldAlreadySettledMessage'),
++        tone: 'warning',
++      });
++      return;
++    }
++
++    if (operationalStatus === 'OPERATIONAL_SOLD') {
++      setLiveNotice({
++        title: t('live.operationalStatusNoChangesTitle'),
++        message: t('live.operationalSoldAlreadyClosedMessage'),
++        tone: 'warning',
++      });
++      return;
++    }
++
++    if (operationalStatus === 'CANCELLED') {
++      setLiveNotice({
++        title: t('live.operationalSoldUnavailableTitle'),
++        message: t('live.operationalSoldCancelledMessage'),
++        tone: 'warning',
++      });
++      return;
++    }
++
++    setOperationalSoldToConfirm(reservationId);
++  };
++
++  const confirmOperationalSold = async () => {
++    if (!operationalSoldToConfirm) return;
++
++    const reservationId = operationalSoldToConfirm;
++    setOperationalSoldToConfirm(null);
++    await handleUpdateReservationOperationalStatus(reservationId, 'OPERATIONAL_SOLD');
+   };
+
+   const handleCancelLiveReservation = (reservationId: number) => {
+@@ -2263,6 +2318,22 @@ export default function LiveScreen() {
+     }
+   };
+
++  const handleChangeToPreparedItem = () => {
++    const hasPreparedItemForSwitch =
++      !!activeItem && !!selectedItem && activeItem.id !== selectedItem.id;
++
++    if (!hasPreparedItemForSwitch) {
++      setLiveNotice({
++        title: t('live.preparedItemRequiredTitle'),
++        message: t('live.preparedItemRequiredMessage'),
++        tone: 'warning',
++      });
++      return;
++    }
++
++    void handleSetSelectedItemActive();
++  };
++
+   const handleRemovePreparedItem = () => {
+     if (!selectedItem) return;
+
+@@ -2985,11 +3056,10 @@ export default function LiveScreen() {
+                 <AppButton
+                   title={t('live.changeItemOnAir')}
+                   variant="secondary"
+-                  onPress={handleSetSelectedItemActive}
++                  onPress={handleChangeToPreparedItem}
+                   loading={isSavingActiveItem}
+                   disabled={
+                     isSavingActiveItem ||
+-                    !preparedItem ||
+                     !operatorFlowEnabled ||
+                     !maySetActiveItem
+                   }
+@@ -2998,9 +3068,7 @@ export default function LiveScreen() {
+                       ? t('live.liveOperatePermissionError')
+                       : !operatorFlowEnabled
+                         ? t('live.selectOpenLiveReason')
+-                        : !preparedItem
+-                          ? t('live.prepareItemBeforeSwitch')
+-                          : undefined
++                        : undefined
+                   }
+                 />
+                 <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+@@ -5886,6 +5954,38 @@ export default function LiveScreen() {
+         />
+       </AppBottomModal>
+
++      <AppBottomModal
++        visible={operationalSoldToConfirm !== null}
++        title={t('live.operationalSoldConfirmTitle')}
++        onClose={() => setOperationalSoldToConfirm(null)}
++        showCancelButton={false}
++      >
++        <AppText>
++          {t('live.operationalSoldConfirmMessage')}
++        </AppText>
++        <AppText color={theme.colors.warning} bold>
++          {t('live.operationalSoldConfirmNoPaymentWarning')}
++        </AppText>
++        <View style={styles.buttonRow}>
++          <View style={styles.buttonFill}>
++            <AppButton
++              title={t('common.cancel')}
++              variant="secondary"
++              onPress={() => setOperationalSoldToConfirm(null)}
++              disabled={updatingOperationalReservationId !== null}
++            />
++          </View>
++          <View style={styles.buttonFill}>
++            <AppButton
++              title={t('live.confirmOperationalSold')}
++              onPress={confirmOperationalSold}
++              loading={updatingOperationalReservationId !== null}
++              disabled={updatingOperationalReservationId !== null}
++            />
++          </View>
++        </View>
++      </AppBottomModal>
++
+       <AppBottomModal
+         visible={cancelReservationToConfirm !== null}
+         title={t('live.cancelHoldTitle')}
+diff --git a/docs/LIVE_FIX_A_ACTIONABLE_LIVE_BUTTONS.md b/docs/LIVE_FIX_A_ACTIONABLE_LIVE_BUTTONS.md
+new file mode 100644
+index 0000000..e2d5558
+--- /dev/null
++++ b/docs/LIVE_FIX_A_ACTIONABLE_LIVE_BUTTONS.md
+@@ -0,0 +1,83 @@
++# LIVE-FIX-A - Acciones LIVE sin respuesta y validaciones accionables
++
++## Resumen
++
++QA reporto dos acciones visibles en `/live` que podian percibirse como botones sin respuesta:
++
++- `CAMBIAR POR PRENDA PREPARADA` en `PRENDA AL AIRE AHORA` cuando aun no existe prenda preparada.
++- `Cerrar como venta LIVE` cuando la accion no puede continuar por estado, permiso o informacion desactualizada.
++
++Esta fase corrige el feedback de frontend sin tocar backend, endpoints, pagos, caja ni reglas profundas de LIVE.
++
++## Cambios aplicados
++
++- `Cambiar por prenda preparada` ya no queda bloqueado silenciosamente por falta de prenda preparada.
++- Si no hay prenda preparada, el boton muestra un aviso accionable:
++  - indica que falta una prenda preparada;
++  - explica que debe seleccionarse una prenda distinta a la que esta al aire antes de cambiar.
++- `Cerrar como venta LIVE` deja de depender del `Alert` nativo para la confirmacion principal.
++- Se agrego confirmacion visual dentro de la app con `AppBottomModal`.
++- Antes de confirmar venta LIVE se validan estados locales seguros:
++  - sin LIVE abierto seleccionado;
++  - apartado ya no disponible en la vista;
++  - apartado ya liquidado;
++  - apartado ya cerrado como venta LIVE;
++  - apartado cancelado.
++- En esos casos se muestra `LiveNoticeModal` con mensaje claro y no se ejecuta actualizacion silenciosa.
++
++## Reglas mantenidas
++
++- No se registra pago ni movimiento de caja al cerrar como venta LIVE.
++- No se modifican permisos ni capacidades.
++- No se crean endpoints.
++- No se modifica backend.
++- No se cambian filtros de disponibilidad ni reglas de apartados.
++- No se toca el flujo de vendedor/supervisor/no access.
++
++## i18n
++
++Se agregaron claves nuevas en:
++
++- `locales/es/common.json`
++- `locales/en/common.json`
++- `locales/pt-BR/common.json`
++- `locales/fr/common.json`
++- `locales/ja/common.json`
++- `locales/zh/common.json`
++- `locales/ko/common.json`
++
++Las claves cubren:
++
++- falta de prenda preparada;
++- confirmacion de venta LIVE sin pago/caja;
++- bloqueo de venta LIVE por estados no validos;
++- apartado no disponible en la vista actual.
++
++## Validacion manual esperada
++
++1. Entrar a `/live` como admin u operador.
++2. Tener una prenda al aire sin prenda preparada.
++3. Presionar `CAMBIAR POR PRENDA PREPARADA`.
++4. Confirmar que aparece un aviso claro y no queda sin respuesta.
++5. Preparar una prenda distinta.
++6. Presionar `CAMBIAR POR PRENDA PREPARADA`.
++7. Confirmar que la prenda preparada pasa al aire como antes.
++8. Crear o usar un apartado LIVE pendiente.
++9. Presionar `Cerrar como venta LIVE`.
++10. Confirmar que aparece una confirmacion visual dentro de la app.
++11. Confirmar que el mensaje aclara que no registra pago ni caja.
++12. Confirmar y validar que el estado cambia a venta LIVE.
++13. Repetir con apartados ya cerrados/cancelados/liquidados si estan disponibles.
++14. Validar light/dark y mobile/tablet.
++
++## Limitaciones
++
++- Esta fase no implementa cambios backend.
++- La confirmacion usa estado local/refrescado ya disponible en `/live`.
++- Si la informacion quedo desactualizada, se muestra mensaje para actualizar y reintentar.
++- La validacion final de concurrencia sigue dependiendo del backend existente.
++
++## GO/NO-GO
++
++- GO tecnico si lint, TypeScript, export web, Maven test/package y `git diff --check` pasan.
++- PENDING_QA hasta que QA ejecute el flujo manual con evidencia.
+diff --git a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+index 170a1c2..204a4a1 100644
+--- a/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
++++ b/docs/LIVE_Z6_OPERATIONAL_RULES_AND_SHELL.md
+@@ -9,6 +9,8 @@
+
+ > Nota LIVE-Z10A: la autorizacion de cambio de precio LIVE queda marcada como no disponible porque no existe backend real de solicitudes/aprobaciones. La UI ya no muestra `Solicitud pendiente` simulada.
+
++> Nota LIVE-FIX-A: las acciones visibles `Cambiar por prenda preparada` y `Cerrar como venta LIVE` ahora muestran feedback accionable cuando no pueden continuar; no deben quedarse sin respuesta visible.
++
+ ## Objetivo
+
+ Integrar `/live` al layout profesional del producto usando `AppShell`, sidebar, TopBar y navegacion lateral responsive, sin cambiar reglas operativas profundas ni backend.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index 7494f2a..20cd3d2 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -4,6 +4,8 @@
+
+ > Actualizacion PRODUCT-D4 REAL: la corrida nueva se prepara en `docs/PRODUCT_D4_REAL_QA_EXECUTION_PLAN.md` y `docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md`. La plantilla de resultados esta en `qa-reports/manual-evidence/PRODUCT-D4-REAL-QA-results-template-20260608.md`.
+
++> Actualizacion LIVE-FIX-A: agregar a la corrida manual que `CAMBIAR POR PRENDA PREPARADA` muestre aviso si no hay prenda preparada y que `Cerrar como venta LIVE` use confirmacion visual accionable.
++
+ ## Objetivo
+
+ PRODUCT-D4 existe para convertir los casos `PENDIENTE_MANUAL` de PRODUCT-D2/D3 en resultados reales: `PASS`, `FAIL`, `BLOQUEADO` o `NO_APLICA`, siempre con evidencia capturada.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index d8e7567..e126cdb 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -547,6 +547,12 @@
+     "markOperationalSoldHelp": "Closes this hold as a sale within LIVE. It does not record payment or cash register movement.",
+     "operationalSoldConfirmTitle": "Close as LIVE sale",
+     "operationalSoldConfirmMessage": "Close this hold as a LIVE sale? This does not record payment or cash register movement.",
++    "operationalSoldConfirmNoPaymentWarning": "This action does not record payment or cash register movement.",
++    "operationalSoldUnavailableTitle": "Cannot close as LIVE sale",
++    "operationalSoldUnavailableMessage": "Refresh the screen and try again. The hold is no longer available in this view.",
++    "operationalSoldAlreadySettledMessage": "This hold is already settled. Review the detail before changing its operational status.",
++    "operationalSoldAlreadyClosedMessage": "This hold is already closed as a LIVE sale.",
++    "operationalSoldCancelledMessage": "This hold is cancelled and cannot be closed as a LIVE sale.",
+     "confirmOperationalSold": "Close as LIVE sale",
+     "operationalSoldTitle": "LIVE sale recorded",
+     "operationalSoldMessage": "The hold was closed as a sale within LIVE. No payment or cash register movement was recorded.",
+@@ -607,6 +613,8 @@
+     "removePreparedItemHelp": "This removes the prepared item only. It does not affect the live item.",
+     "itemAlreadyLiveTitle": "Item already live",
+     "itemAlreadyLiveMessage": "This item is already live. Select another item to prepare it as a switch.",
++    "preparedItemRequiredTitle": "Prepared item required",
++    "preparedItemRequiredMessage": "Select an item different from the one on air and leave it prepared before switching.",
+     "prepareItemBeforeSwitch": "Prepare an item first before switching.",
+     "preparedItemNowLiveTitle": "The prepared item is now live",
+     "preparedItemNowLiveMessage": "The prepared item is now live and ready for holds.",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index 9b9dcb4..6f65277 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -546,6 +546,12 @@
+     "markOperationalSold": "Cerrar como venta LIVE",
+     "operationalSoldConfirmTitle": "Cerrar como venta LIVE",
+     "operationalSoldConfirmMessage": "Cerrar este apartado como venta LIVE? Esto no registra pago ni caja.",
++    "operationalSoldConfirmNoPaymentWarning": "Esta accion no registra pago ni movimiento de caja.",
++    "operationalSoldUnavailableTitle": "No se puede cerrar como venta LIVE",
++    "operationalSoldUnavailableMessage": "Actualiza la pantalla y vuelve a intentar. El apartado ya no esta disponible en esta vista.",
++    "operationalSoldAlreadySettledMessage": "Este apartado ya esta liquidado. Revisa el detalle antes de cambiar su estado operativo.",
++    "operationalSoldAlreadyClosedMessage": "Este apartado ya esta cerrado como venta LIVE.",
++    "operationalSoldCancelledMessage": "Este apartado esta cancelado y no puede cerrarse como venta LIVE.",
+     "confirmOperationalSold": "Cerrar como venta LIVE",
+     "operationalSoldTitle": "Venta LIVE registrada",
+     "operationalSoldMessage": "El apartado quedo cerrado como venta dentro del en vivo. No se registro pago ni caja.",
+@@ -607,6 +613,8 @@
+     "removePreparedItemHelp": "Quita esta prenda de preparacion. No afecta la prenda al aire.",
+     "itemAlreadyLiveTitle": "Prenda ya al aire",
+     "itemAlreadyLiveMessage": "Esta prenda ya esta al aire. Selecciona otra prenda para prepararla como cambio.",
++    "preparedItemRequiredTitle": "Falta prenda preparada",
++    "preparedItemRequiredMessage": "Selecciona una prenda distinta a la que esta al aire y dejala preparada antes de cambiar.",
+     "prepareItemBeforeSwitch": "Primero prepara una prenda para poder cambiarla.",
+     "preparedItemNowLiveTitle": "La prenda preparada paso al aire",
+     "preparedItemNowLiveMessage": "La prenda preparada paso al aire y quedo lista para apartados.",
+diff --git a/locales/fr/common.json b/locales/fr/common.json
+index 69d1712..8436bf3 100644
+--- a/locales/fr/common.json
++++ b/locales/fr/common.json
+@@ -547,6 +547,12 @@
+     "markOperationalSoldHelp": "Marquer opérationnel vendu",
+     "operationalSoldConfirmTitle": "Opérationnel vendu confirmer",
+     "operationalSoldConfirmMessage": "Opérationnel vendu confirmer",
++    "operationalSoldConfirmNoPaymentWarning": "Cette action n'enregistre aucun paiement ni mouvement de caisse.",
++    "operationalSoldUnavailableTitle": "Impossible de fermer comme vente LIVE",
++    "operationalSoldUnavailableMessage": "Actualisez l'ecran et reessayez. La reservation n'est plus disponible dans cette vue.",
++    "operationalSoldAlreadySettledMessage": "Cette reservation est deja reglee. Consultez le detail avant de changer son statut operationnel.",
++    "operationalSoldAlreadyClosedMessage": "Cette reservation est deja fermee comme vente LIVE.",
++    "operationalSoldCancelledMessage": "Cette reservation est annulee et ne peut pas etre fermee comme vente LIVE.",
+     "confirmOperationalSold": "Confirmer opérationnel vendu",
+     "operationalSoldTitle": "Opérationnel vendu",
+     "operationalSoldMessage": "Opérationnel vendu",
+@@ -607,6 +613,8 @@
+     "removePreparedItemHelp": "Retirer préparé article",
+     "itemAlreadyLiveTitle": "Article élément LIVE",
+     "itemAlreadyLiveMessage": "Article élément LIVE",
++    "preparedItemRequiredTitle": "Article prepare requis",
++    "preparedItemRequiredMessage": "Selectionnez un article different de celui a l'antenne et laissez-le prepare avant de changer.",
+     "prepareItemBeforeSwitch": "Préparer article avant changer",
+     "preparedItemNowLiveTitle": "Préparé article maintenant LIVE",
+     "preparedItemNowLiveMessage": "Préparé article maintenant LIVE",
+diff --git a/locales/ja/common.json b/locales/ja/common.json
+index ccb1442..6fbecc3 100644
+--- a/locales/ja/common.json
++++ b/locales/ja/common.json
+@@ -547,6 +547,12 @@
+     "markOperationalSoldHelp": "マーク 運用 販売済み",
+     "operationalSoldConfirmTitle": "運用 販売済み 確認",
+     "operationalSoldConfirmMessage": "運用 販売済み 確認",
++    "operationalSoldConfirmNoPaymentWarning": "この操作では支払いもレジ処理も記録されません。",
++    "operationalSoldUnavailableTitle": "LIVE販売として完了できません",
++    "operationalSoldUnavailableMessage": "画面を更新してもう一度お試しください。この取り置きはこの表示では利用できません。",
++    "operationalSoldAlreadySettledMessage": "この取り置きはすでに精算済みです。ステータスを変更する前に詳細を確認してください。",
++    "operationalSoldAlreadyClosedMessage": "この取り置きはすでにLIVE販売として完了しています。",
++    "operationalSoldCancelledMessage": "この取り置きはキャンセル済みのため、LIVE販売として完了できません。",
+     "confirmOperationalSold": "確認 運用 販売済み",
+     "operationalSoldTitle": "運用 販売済み",
+     "operationalSoldMessage": "運用 販売済み",
+@@ -607,6 +613,8 @@
+     "removePreparedItemHelp": "削除 準備済み 商品",
+     "itemAlreadyLiveTitle": "商品 項目 LIVE",
+     "itemAlreadyLiveMessage": "商品 項目 LIVE",
++    "preparedItemRequiredTitle": "準備済み商品が必要です",
++    "preparedItemRequiredMessage": "現在配信中の商品とは別の商品を選び、切り替える前に準備してください。",
+     "prepareItemBeforeSwitch": "準備 商品 項目 切替",
+     "preparedItemNowLiveTitle": "準備済み 商品 今 LIVE",
+     "preparedItemNowLiveMessage": "準備済み 商品 今 LIVE",
+diff --git a/locales/ko/common.json b/locales/ko/common.json
+index c1202cf..d2b38a8 100644
+--- a/locales/ko/common.json
++++ b/locales/ko/common.json
+@@ -547,6 +547,12 @@
+     "markOperationalSoldHelp": "표시 운영 판매됨",
+     "operationalSoldConfirmTitle": "운영 판매됨 확인",
+     "operationalSoldConfirmMessage": "운영 판매됨 확인",
++    "operationalSoldConfirmNoPaymentWarning": "이 작업은 결제나 금전함 이동을 기록하지 않습니다.",
++    "operationalSoldUnavailableTitle": "LIVE 판매로 마감할 수 없습니다",
++    "operationalSoldUnavailableMessage": "화면을 새로고침한 뒤 다시 시도하세요. 이 홀드는 현재 보기에서 사용할 수 없습니다.",
++    "operationalSoldAlreadySettledMessage": "이 홀드는 이미 정산되었습니다. 운영 상태를 변경하기 전에 상세를 확인하세요.",
++    "operationalSoldAlreadyClosedMessage": "이 홀드는 이미 LIVE 판매로 마감되었습니다.",
++    "operationalSoldCancelledMessage": "이 홀드는 취소되어 LIVE 판매로 마감할 수 없습니다.",
+     "confirmOperationalSold": "확인 운영 판매됨",
+     "operationalSoldTitle": "운영 판매됨",
+     "operationalSoldMessage": "운영 판매됨",
+@@ -607,6 +613,8 @@
+     "removePreparedItemHelp": "제거 준비됨 상품",
+     "itemAlreadyLiveTitle": "상품 항목 LIVE",
+     "itemAlreadyLiveMessage": "상품 항목 LIVE",
++    "preparedItemRequiredTitle": "준비된 상품이 필요합니다",
++    "preparedItemRequiredMessage": "현재 방송 중인 상품과 다른 상품을 선택하고, 전환하기 전에 준비 상태로 두세요.",
+     "prepareItemBeforeSwitch": "준비 상품 항목 전환",
+     "preparedItemNowLiveTitle": "준비됨 상품 지금 LIVE",
+     "preparedItemNowLiveMessage": "준비됨 상품 지금 LIVE",
+diff --git a/locales/pt-BR/common.json b/locales/pt-BR/common.json
+index 00b73ea..904ddab 100644
+--- a/locales/pt-BR/common.json
++++ b/locales/pt-BR/common.json
+@@ -547,6 +547,12 @@
+     "markOperationalSoldHelp": "Marcar operacional vendido",
+     "operationalSoldConfirmTitle": "Operacional vendido confirmar",
+     "operationalSoldConfirmMessage": "Operacional vendido confirmar",
++    "operationalSoldConfirmNoPaymentWarning": "Esta acao nao registra pagamento nem movimento de caixa.",
++    "operationalSoldUnavailableTitle": "Nao e possivel fechar como venda LIVE",
++    "operationalSoldUnavailableMessage": "Atualize a tela e tente novamente. A reserva nao esta mais disponivel nesta visualizacao.",
++    "operationalSoldAlreadySettledMessage": "Esta reserva ja esta liquidada. Revise o detalhe antes de mudar o status operacional.",
++    "operationalSoldAlreadyClosedMessage": "Esta reserva ja esta fechada como venda LIVE.",
++    "operationalSoldCancelledMessage": "Esta reserva esta cancelada e nao pode ser fechada como venda LIVE.",
+     "confirmOperationalSold": "Confirmar operacional vendido",
+     "operationalSoldTitle": "Operacional vendido",
+     "operationalSoldMessage": "Operacional vendido",
+@@ -607,6 +613,8 @@
+     "removePreparedItemHelp": "Remover preparado peça",
+     "itemAlreadyLiveTitle": "Peça campo LIVE",
+     "itemAlreadyLiveMessage": "Peça campo LIVE",
++    "preparedItemRequiredTitle": "Falta peca preparada",
++    "preparedItemRequiredMessage": "Selecione uma peca diferente da que esta no ar e deixe-a preparada antes de trocar.",
+     "prepareItemBeforeSwitch": "Preparar peça antes trocar",
+     "preparedItemNowLiveTitle": "Preparado peça agora LIVE",
+     "preparedItemNowLiveMessage": "Preparado peça agora LIVE",
+diff --git a/locales/zh/common.json b/locales/zh/common.json
+index 7d61555..762fa8d 100644
+--- a/locales/zh/common.json
++++ b/locales/zh/common.json
+@@ -547,6 +547,12 @@
+     "markOperationalSoldHelp": "标记运营已售",
+     "operationalSoldConfirmTitle": "运营已售确认",
+     "operationalSoldConfirmMessage": "运营已售确认",
++    "operationalSoldConfirmNoPaymentWarning": "此操作不会记录付款或收银变动。",
++    "operationalSoldUnavailableTitle": "无法关闭为LIVE销售",
++    "operationalSoldUnavailableMessage": "请刷新屏幕后重试。此预留在当前视图中已不可用。",
++    "operationalSoldAlreadySettledMessage": "此预留已结清。更改运营状态前请先查看详情。",
++    "operationalSoldAlreadyClosedMessage": "此预留已关闭为LIVE销售。",
++    "operationalSoldCancelledMessage": "此预留已取消，无法关闭为LIVE销售。",
+     "confirmOperationalSold": "确认运营已售",
+     "operationalSoldTitle": "运营已售",
+     "operationalSoldMessage": "运营已售",
+@@ -607,6 +613,8 @@
+     "removePreparedItemHelp": "移除已准备商品",
+     "itemAlreadyLiveTitle": "商品项目LIVE",
+     "itemAlreadyLiveMessage": "商品项目LIVE",
++    "preparedItemRequiredTitle": "需要已准备商品",
++    "preparedItemRequiredMessage": "请选择不同于当前上架的商品，并在切换前将其设为已准备。",
+     "prepareItemBeforeSwitch": "准备商品项目切换",
+     "preparedItemNowLiveTitle": "已准备商品现在LIVE",
+     "preparedItemNowLiveMessage": "已准备商品现在LIVE",
+diff --git a/qa-reports/LIVE-FIX-A-actionable-live-buttons-report-20260608-165246.md b/qa-reports/LIVE-FIX-A-actionable-live-buttons-report-20260608-165246.md
+new file mode 100644
+index 0000000..0ab8644
+--- /dev/null
++++ b/qa-reports/LIVE-FIX-A-actionable-live-buttons-report-20260608-165246.md
+@@ -0,0 +1,59 @@
++# LIVE-FIX-A - Acciones LIVE sin respuesta y validaciones accionables
++
++## Contexto QA
++
++QA reporto que algunas acciones visibles en `/live` no daban respuesta clara:
++
++- `CAMBIAR POR PRENDA PREPARADA` cuando no habia prenda preparada.
++- `Cerrar como venta LIVE` cuando la accion no podia continuar o faltaba una confirmacion visible dentro de la app.
++
++## Alcance ejecutado
++
++- Se corrigio el flujo de cambio por prenda preparada para mostrar aviso accionable cuando falta una prenda preparada.
++- Se reemplazo la confirmacion nativa de `Cerrar como venta LIVE` por una confirmacion visual en la app.
++- Se agregaron validaciones frontend antes de confirmar venta LIVE para estados locales no validos.
++- Se agregaron claves i18n en ES, EN, PT-BR, FR, JA, ZH y KO.
++- Se documento la fase en `docs/LIVE_FIX_A_ACTIONABLE_LIVE_BUTTONS.md`.
++
++## Fuera de alcance
++
++- No se modifico backend.
++- No se crearon endpoints.
++- No se tocaron pagos, caja ni reportes backend.
++- No se cambiaron permisos, RBAC ni reglas profundas de LIVE.
++- No se implemento WebSocket/SSE.
++
++## Validaciones ejecutadas
++
++- `npm.cmd run lint`: PASS con 53 warnings preexistentes del repositorio y 0 errores.
++- `npx.cmd tsc --noEmit`: PASS.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: PASS.
++- `backend/control-ropa/./mvnw.cmd test`: PASS tras cargar `.env` local sin imprimir secretos.
++- `backend/control-ropa/./mvnw.cmd -q -DskipTests package`: PASS tras cargar `.env` local sin imprimir secretos.
++- `git --no-pager diff --check`: PASS.
++
++Notas de entorno:
++
++- El primer intento de Maven fallo porque `CONTROL_ROPA_DB_PASSWORD` no estaba cargado en el proceso.
++- El segundo intento cargo `.env`, pero conservo comillas simples de la URL local y Maven rechazo el JDBC URL.
++- El tercer intento removio comillas simples/dobles solo en memoria y Maven test paso.
++- Durante Maven test aparecio ruido de logback por ruta local de logs sin permiso; no bloqueo la ejecucion.
++
++## Validacion manual esperada
++
++1. Abrir `/live` como admin/operador.
++2. Tener prenda al aire sin prenda preparada.
++3. Presionar `CAMBIAR POR PRENDA PREPARADA`.
++4. Confirmar aviso accionable.
++5. Preparar una prenda distinta.
++6. Presionar `CAMBIAR POR PRENDA PREPARADA`.
++7. Confirmar que la prenda preparada pasa al aire.
++8. Presionar `Cerrar como venta LIVE` en un apartado elegible.
++9. Confirmar modal visual de venta LIVE.
++10. Confirmar que el texto aclara que no registra pago ni caja.
++11. Validar light/dark y mobile/tablet.
++
++## Estado
++
++- Estado tecnico inicial: cambios implementados.
++- Estado QA: PENDING_QA.

@@ -47,20 +47,69 @@ export type AppearanceSettings = {
   updatedByUserId?: number | null;
 };
 
-export async function getAppearanceSettings(): Promise<AppearanceSettings> {
-  try {
-    const data = await apiRequest<AppearanceSettings>('/api/appearance');
-    return data ?? {};
-  } catch {
-    return {};
+type GetAppearanceSettingsOptions = {
+  force?: boolean;
+};
+
+const APPEARANCE_CACHE_TTL_MS = 5 * 60 * 1000;
+
+let cachedAppearanceSettings: AppearanceSettings | null = null;
+let cachedAppearanceLoadedAt = 0;
+let pendingAppearanceRequest: Promise<AppearanceSettings> | null = null;
+
+export function clearAppearanceSettingsCache() {
+  cachedAppearanceSettings = null;
+  cachedAppearanceLoadedAt = 0;
+  pendingAppearanceRequest = null;
+}
+
+export async function getAppearanceSettings(
+  options: GetAppearanceSettingsOptions = {}
+): Promise<AppearanceSettings> {
+  const now = Date.now();
+  const canUseCached =
+    !options.force &&
+    cachedAppearanceSettings !== null &&
+    now - cachedAppearanceLoadedAt < APPEARANCE_CACHE_TTL_MS;
+
+  if (canUseCached && cachedAppearanceSettings) {
+    return cachedAppearanceSettings;
   }
+
+  if (!options.force && pendingAppearanceRequest) {
+    return pendingAppearanceRequest;
+  }
+
+  const request = apiRequest<AppearanceSettings>('/api/appearance', {
+    includeSession: false,
+  })
+    .then((data) => {
+      cachedAppearanceSettings = data ?? {};
+      cachedAppearanceLoadedAt = Date.now();
+      return cachedAppearanceSettings;
+    })
+    .catch(() => cachedAppearanceSettings ?? {})
+    .finally(() => {
+      if (pendingAppearanceRequest === request) {
+        pendingAppearanceRequest = null;
+      }
+    });
+
+  pendingAppearanceRequest = request;
+
+  return request;
 }
 
 export async function updateAppearanceSettings(
   payload: AppearanceSettings
 ): Promise<AppearanceSettings> {
-  return apiRequest<AppearanceSettings>('/api/appearance', {
+  const updated = await apiRequest<AppearanceSettings>('/api/appearance', {
     method: 'PUT',
     body: payload,
   });
+
+  cachedAppearanceSettings = updated ?? {};
+  cachedAppearanceLoadedAt = Date.now();
+
+  return updated;
 }

@@ -1,14 +1,14 @@
 package com.hpsqsoft.ctrlropa.health;
 
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
 
 @RestController
-@RequestMapping("/api/health")
 public class HealthController {
 
-    @GetMapping
+    @GetMapping({"/api/health", "/api/health/"})
     public HealthResponse health() {
         return new HealthResponse("OK", LocalDateTime.now());
     }

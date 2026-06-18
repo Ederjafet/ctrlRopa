@@ -11,6 +11,7 @@ public class MeResponse {
     private String status;
     private Boolean passwordChangeRequired;
 
+    private CompanyInfo company;
     private BranchInfo branch;
     private List<RoleInfo> roles;
     private List<PermissionInfo> permissions;
@@ -25,6 +26,7 @@ public class MeResponse {
                       String phone,
                       String status,
                       Boolean passwordChangeRequired,
+                      CompanyInfo company,
                       BranchInfo branch,
                       List<RoleInfo> roles,
                       List<PermissionInfo> permissions,
@@ -35,6 +37,7 @@ public class MeResponse {
         this.phone = phone;
         this.status = status;
         this.passwordChangeRequired = passwordChangeRequired;
+        this.company = company;
         this.branch = branch;
         this.roles = roles;
         this.permissions = permissions;
@@ -59,6 +62,9 @@ public class MeResponse {
     public Boolean getPasswordChangeRequired() { return passwordChangeRequired; }
     public void setPasswordChangeRequired(Boolean passwordChangeRequired) { this.passwordChangeRequired = passwordChangeRequired; }
 
+    public CompanyInfo getCompany() { return company; }
+    public void setCompany(CompanyInfo company) { this.company = company; }
+
     public BranchInfo getBranch() { return branch; }
     public void setBranch(BranchInfo branch) { this.branch = branch; }
 
@@ -70,6 +76,30 @@ public class MeResponse {
 
     public List<ChannelInfo> getChannels() { return channels; }
     public void setChannels(List<ChannelInfo> channels) { this.channels = channels; }
+
+    public static class CompanyInfo {
+        private Long id;
+        private String code;
+        private String name;
+
+        public CompanyInfo() {
+        }
+
+        public CompanyInfo(Long id, String code, String name) {
+            this.id = id;
+            this.code = code;
+            this.name = name;
+        }
+
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+
+        public String getCode() { return code; }
+        public void setCode(String code) { this.code = code; }
+
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+    }
 
     public static class BranchInfo {
         private Long id;

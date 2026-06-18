@@ -1,0 +1,870 @@
+﻿diff --git a/app/index.tsx b/app/index.tsx
+index 8428c3b..9f9d06c 100644
+--- a/app/index.tsx
++++ b/app/index.tsx
+@@ -1,5 +1,5 @@
+ import AppShell from '@/components/layout/AppShell';
+-import { SidebarSection } from '@/components/layout/Sidebar';
++import { buildMainNavSections } from '@/components/layout/appNavigation';
+ import DashboardTemplate from '@/components/templates/DashboardTemplate';
+ import ActionTile from '@/components/ui/ActionTile';
+ import EmptyState from '@/components/ui/EmptyState';
+@@ -35,104 +35,6 @@ function money(value: number | string | null | undefined) {
+   });
+ }
+
+-function buildNavSections(session: UserSession | null): SidebarSection[] {
+-  const liveAllowed = canViewLive(session);
+-  const customersAllowed = canAccessByPermission(session, 'VIEW_CUSTOMERS');
+-  const reservationsAllowed =
+-    canAccess(session, 'DOOR_RESERVATION', 'DO_DOOR_RESERVATION') || liveAllowed;
+-  const usersAllowed = canAccessByPermission(session, 'MANAGE_USERS') || isAdmin(session);
+-  const systemAllowed =
+-    canAccessByPermission(session, 'MANAGE_ROLES') ||
+-    canAccessByPermission(session, 'MANAGE_BRANCH_CHANNELS') ||
+-    isAdmin(session);
+-  const reportsAllowed = canAccessByPermission(session, 'VIEW_REPORTS') || isAdmin(session);
+-  const appearanceAllowed = isAdmin(session);
+-
+-  const primaryItems = [
+-    {
+-      key: 'home',
+-      label: 'Inicio',
+-      route: '/',
+-      icon: 'space-dashboard' as const,
+-    },
+-    liveAllowed
+-      ? {
+-          key: 'live',
+-          label: 'LIVE',
+-          route: '/live',
+-          icon: 'live-tv' as const,
+-        }
+-      : null,
+-    customersAllowed
+-      ? {
+-          key: 'customers',
+-          label: 'Clientes',
+-          route: '/customers',
+-          icon: 'groups' as const,
+-        }
+-      : null,
+-    reservationsAllowed
+-      ? {
+-          key: 'reservations',
+-          label: 'Reservas',
+-          route: '/reservations',
+-          icon: 'bookmark' as const,
+-        }
+-      : null,
+-  ].filter(Boolean);
+-
+-  const controlItems = [
+-    usersAllowed
+-      ? {
+-          key: 'users',
+-          label: 'Usuarios',
+-          route: '/users',
+-          icon: 'manage-accounts' as const,
+-        }
+-      : null,
+-    systemAllowed
+-      ? {
+-          key: 'system',
+-          label: 'Sistema',
+-          route: '/system',
+-          icon: 'settings' as const,
+-        }
+-      : null,
+-    reportsAllowed
+-      ? {
+-          key: 'reports',
+-          label: 'Reportes',
+-          route: '/reports',
+-          icon: 'analytics' as const,
+-        }
+-      : null,
+-    appearanceAllowed
+-      ? {
+-          key: 'appearance',
+-          label: 'Configuracion',
+-          route: '/appearance',
+-          icon: 'palette' as const,
+-        }
+-      : null,
+-  ].filter(Boolean);
+-  const developmentItems = [
+-    appearanceAllowed
+-      ? {
+-          key: 'ui-kit',
+-          label: 'UI Kit',
+-          route: '/ui-kit',
+-          icon: 'dashboard-customize' as const,
+-        }
+-      : null,
+-  ].filter(Boolean);
+-
+-  return [
+-    { title: 'Operacion', items: primaryItems },
+-    { title: 'Control', items: controlItems },
+-    { title: 'Desarrollo', items: developmentItems },
+-  ].filter((section) => section.items.length > 0) as SidebarSection[];
+-}
+-
+ function buildQuickActions(session: UserSession | null): QuickAction[] {
+   return [
+     {
+@@ -225,7 +127,7 @@ export default function HomeDashboard() {
+   }, []);
+
+   const actorContext = useMemo(() => resolveLiveActorContext(session), [session]);
+-  const navSections = useMemo(() => buildNavSections(session), [session]);
++  const navSections = useMemo(() => buildMainNavSections(session), [session]);
+   const quickActions = useMemo(
+     () => buildQuickActions(session).filter((action) => action.allowed),
+     [session]
+diff --git a/app/live.tsx b/app/live.tsx
+index 76f1979..eea573e 100644
+--- a/app/live.tsx
++++ b/app/live.tsx
+@@ -1,7 +1,7 @@
+ import QRScannerModal from '@/components/qr/QRScannerModal';
+ import AuthorizationRequestPanel from '@/components/live/AuthorizationRequestPanel';
+ import AppShell from '@/components/layout/AppShell';
+-import { SidebarSection } from '@/components/layout/Sidebar';
++import { buildMainNavSections } from '@/components/layout/appNavigation';
+ import LiveDesktopLayout from '@/components/live/LiveDesktopLayout';
+ import LiveMobileLayout from '@/components/live/LiveMobileLayout';
+ import LiveTabletLayout from '@/components/live/LiveTabletLayout';
+@@ -23,12 +23,7 @@ import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
+-import {
+-  canAccess,
+-  canAccessByPermission,
+-  hasEffectivePermission,
+-  isAdmin,
+-} from '@/services/accessControl';
++import { hasEffectivePermission } from '@/services/accessControl';
+ import { ApiError } from '@/services/apiClient';
+ import { Customer, getCustomersByBranch } from '@/services/customerService';
+ import { getItemsByBranch, Item } from '@/services/itemService';
+@@ -228,58 +223,6 @@ function getItemStatusLabel(status: string | null | undefined, t: (key: string)
+   }
+ }
+
+-function buildLiveNavSections(session: UserSession | null): SidebarSection[] {
+-  const liveAllowed = canViewLive(session);
+-  const customersAllowed = canAccessByPermission(session, 'VIEW_CUSTOMERS');
+-  const reservationsAllowed =
+-    canAccess(session, 'DOOR_RESERVATION', 'DO_DOOR_RESERVATION') || liveAllowed;
+-  const usersAllowed = canAccessByPermission(session, 'MANAGE_USERS') || isAdmin(session);
+-  const systemAllowed =
+-    canAccessByPermission(session, 'MANAGE_ROLES') ||
+-    canAccessByPermission(session, 'MANAGE_BRANCH_CHANNELS') ||
+-    isAdmin(session);
+-  const reportsAllowed = canAccessByPermission(session, 'VIEW_REPORTS') || isAdmin(session);
+-  const appearanceAllowed = isAdmin(session);
+-
+-  const primaryItems = [
+-    { key: 'home', label: 'Inicio', route: '/', icon: 'space-dashboard' as const },
+-    liveAllowed ? { key: 'live', label: 'LIVE', route: '/live', icon: 'live-tv' as const } : null,
+-    customersAllowed
+-      ? { key: 'customers', label: 'Clientes', route: '/customers', icon: 'groups' as const }
+-      : null,
+-    reservationsAllowed
+-      ? { key: 'reservations', label: 'Reservas', route: '/reservations', icon: 'bookmark' as const }
+-      : null,
+-  ].filter(Boolean);
+-
+-  const controlItems = [
+-    usersAllowed
+-      ? { key: 'users', label: 'Usuarios', route: '/users', icon: 'manage-accounts' as const }
+-      : null,
+-    systemAllowed
+-      ? { key: 'system', label: 'Sistema', route: '/system', icon: 'settings' as const }
+-      : null,
+-    reportsAllowed
+-      ? { key: 'reports', label: 'Reportes', route: '/reports', icon: 'analytics' as const }
+-      : null,
+-    appearanceAllowed
+-      ? { key: 'appearance', label: 'Configuracion', route: '/appearance', icon: 'palette' as const }
+-      : null,
+-  ].filter(Boolean);
+-
+-  const developmentItems = [
+-    appearanceAllowed
+-      ? { key: 'ui-kit', label: 'UI Kit', route: '/ui-kit', icon: 'dashboard-customize' as const }
+-      : null,
+-  ].filter(Boolean);
+-
+-  return [
+-    { title: 'Operacion', items: primaryItems },
+-    { title: 'Control', items: controlItems },
+-    { title: 'Desarrollo', items: developmentItems },
+-  ].filter((section) => section.items.length > 0) as SidebarSection[];
+-}
+-
+ function activeItemFromLive(live: Live | null): Item | null {
+   if (!live?.activeItemId) return null;
+
+@@ -3701,7 +3644,7 @@ export default function LiveScreen() {
+   };
+   const preparedItem =
+     selectedItem && activeItem?.id !== selectedItem.id ? selectedItem : null;
+-  const navSections = useMemo(() => buildLiveNavSections(session), [session]);
++  const navSections = useMemo(() => buildMainNavSections(session), [session]);
+   const liveShellSubtitle = isTablet
+     ? t('live.tabletHeaderHelp')
+     : isDesktop
+diff --git a/app/reservation-detail.tsx b/app/reservation-detail.tsx
+index 403907a..19b5ffa 100644
+--- a/app/reservation-detail.tsx
++++ b/app/reservation-detail.tsx
+@@ -11,14 +11,9 @@ import EmptyState from '@/components/ui/EmptyState';
+ import EntitySummaryCard from '@/components/ui/EntitySummaryCard';
+ import SectionHeader from '@/components/ui/SectionHeader';
+ import StatusBadge from '@/components/ui/StatusBadge';
+-import { SidebarSection } from '@/components/layout/Sidebar';
++import { buildMainNavSections } from '@/components/layout/appNavigation';
+ import { useAppTheme } from '@/context/AppThemeContext';
+-import {
+-  canAccess,
+-  canAccessByPermission,
+-  hasEffectivePermission,
+-  isAdmin,
+-} from '@/services/accessControl';
++import { hasEffectivePermission } from '@/services/accessControl';
+ import { apiRequest } from '@/services/apiClient';
+ import {
+   isNotFoundError,
+@@ -34,7 +29,6 @@ import {
+   cancelReservation,
+   removeReservationFromBox,
+ } from '@/services/reservationService';
+-import { canViewLive } from '@/services/livePermissionGuards';
+ import { getSession, UserSession } from '@/services/sessionStorage';
+ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+ import { useCallback, useMemo, useState } from 'react';
+@@ -215,55 +209,6 @@ function getPaymentMethodLabel(
+   return 'Metodo no especificado';
+ }
+
+-function buildNavSections(session: UserSession | null): SidebarSection[] {
+-  const liveAllowed = canViewLive(session);
+-  const customersAllowed = canAccessByPermission(session, 'VIEW_CUSTOMERS');
+-  const reservationsAllowed =
+-    canAccess(session, 'DOOR_RESERVATION', 'DO_DOOR_RESERVATION') || liveAllowed;
+-  const usersAllowed = canAccessByPermission(session, 'MANAGE_USERS') || isAdmin(session);
+-  const systemAllowed =
+-    canAccessByPermission(session, 'MANAGE_ROLES') ||
+-    canAccessByPermission(session, 'MANAGE_BRANCH_CHANNELS') ||
+-    isAdmin(session);
+-  const reportsAllowed = canAccessByPermission(session, 'VIEW_REPORTS') || isAdmin(session);
+-  const adminAllowed = isAdmin(session);
+-
+-  const primaryItems = [
+-    { key: 'home', label: 'Inicio', route: '/', icon: 'space-dashboard' as const },
+-    liveAllowed ? { key: 'live', label: 'LIVE', route: '/live', icon: 'live-tv' as const } : null,
+-    customersAllowed
+-      ? { key: 'customers', label: 'Clientes', route: '/customers', icon: 'groups' as const }
+-      : null,
+-    reservationsAllowed
+-      ? { key: 'reservations', label: 'Reservas', route: '/reservations', icon: 'bookmark' as const }
+-      : null,
+-  ].filter(Boolean);
+-
+-  const controlItems = [
+-    usersAllowed
+-      ? { key: 'users', label: 'Usuarios', route: '/users', icon: 'manage-accounts' as const }
+-      : null,
+-    systemAllowed
+-      ? { key: 'system', label: 'Sistema', route: '/system', icon: 'settings' as const }
+-      : null,
+-    reportsAllowed
+-      ? { key: 'reports', label: 'Reportes', route: '/reports', icon: 'analytics' as const }
+-      : null,
+-  ].filter(Boolean);
+-
+-  const developmentItems = [
+-    adminAllowed
+-      ? { key: 'ui-kit', label: 'UI Kit', route: '/ui-kit', icon: 'dashboard-customize' as const }
+-      : null,
+-  ].filter(Boolean);
+-
+-  return [
+-    { title: 'Operacion', items: primaryItems },
+-    { title: 'Control', items: controlItems },
+-    { title: 'Desarrollo', items: developmentItems },
+-  ].filter((section) => section.items.length > 0) as SidebarSection[];
+-}
+-
+ export default function ReservationDetailScreen() {
+   const { id, returnTo } = useLocalSearchParams<{
+     id?: string | string[];
+@@ -396,7 +341,7 @@ export default function ReservationDetailScreen() {
+   const overpaid = Math.max(totalPaid - total, 0);
+   const isActive = reservation?.status === 'ACTIVE';
+   const canCancel = isActive && !paymentAccessRestricted && totalPaid <= 0;
+-  const navSections = useMemo(() => buildNavSections(session), [session]);
++  const navSections = useMemo(() => buildMainNavSections(session), [session]);
+   const isLiveContext =
+     returnRoute === '/live' ||
+     !!reservation?.liveId ||
+@@ -512,7 +457,10 @@ export default function ReservationDetailScreen() {
+         session={session}
+         navSections={navSections}
+       >
+-        <AppBackButton fallbackRoute={returnRoute || (isLiveContext ? '/live' : '/reservations')} />
++        <AppBackButton
++          fallbackRoute={returnRoute || (isLiveContext ? '/live' : '/reservations')}
++          showMenuButton={false}
++        />
+         <EmptyState title="Cargando apartado..." message="Estamos preparando el detalle." />
+       </AppShell>
+     );
+@@ -527,7 +475,10 @@ export default function ReservationDetailScreen() {
+         session={session}
+         navSections={navSections}
+       >
+-        <AppBackButton fallbackRoute={returnRoute || (isLiveContext ? '/live' : '/reservations')} />
++        <AppBackButton
++          fallbackRoute={returnRoute || (isLiveContext ? '/live' : '/reservations')}
++          showMenuButton={false}
++        />
+         <EmptyState
+           title={loadError?.category === 'not-found' ? 'Apartado no encontrado' : 'No se pudo cargar el apartado'}
+           message={loadError?.message || 'No se encontro la informacion solicitada.'}
+@@ -549,7 +500,10 @@ export default function ReservationDetailScreen() {
+         header={
+           <View style={styles.headerStack}>
+             <View style={styles.headerActions}>
+-              <AppBackButton fallbackRoute={returnRoute || (isLiveContext ? '/live' : '/reservations')} />
++              <AppBackButton
++                fallbackRoute={returnRoute || (isLiveContext ? '/live' : '/reservations')}
++                showMenuButton={false}
++              />
+               <View style={styles.headerButtons}>
+                 {isLiveContext ? (
+                   <AppButton
+@@ -558,11 +512,6 @@ export default function ReservationDetailScreen() {
+                     onPress={() => router.replace('/live' as any)}
+                   />
+                 ) : null}
+-                <AppButton
+-                  title="Menu principal"
+-                  variant="secondary"
+-                  onPress={() => router.replace('/' as any)}
+-                />
+               </View>
+             </View>
+             <SectionHeader
+diff --git a/app/ui-kit.tsx b/app/ui-kit.tsx
+index 67e20e8..d96bc3b 100644
+--- a/app/ui-kit.tsx
++++ b/app/ui-kit.tsx
+@@ -1,5 +1,5 @@
+ import AppShell from '@/components/layout/AppShell';
+-import { SidebarSection } from '@/components/layout/Sidebar';
++import { buildMainNavSections } from '@/components/layout/appNavigation';
+ import DashboardTemplate from '@/components/templates/DashboardTemplate';
+ import DetailTemplate from '@/components/templates/DetailTemplate';
+ import ListTemplate from '@/components/templates/ListTemplate';
+@@ -18,8 +18,7 @@ import MetricCard from '@/components/ui/MetricCard';
+ import SectionHeader from '@/components/ui/SectionHeader';
+ import StatusBadge from '@/components/ui/StatusBadge';
+ import { useAppTheme } from '@/context/AppThemeContext';
+-import { canAccess, canAccessByPermission, isAdmin, isNoAccess } from '@/services/accessControl';
+-import { canViewLive } from '@/services/livePermissionGuards';
++import { isAdmin, isNoAccess } from '@/services/accessControl';
+ import { ensureSessionActive, getSession, UserSession } from '@/services/sessionStorage';
+ import { designTokens, viewVariants } from '@/theme/designTokens';
+ import {
+@@ -34,54 +33,6 @@ import { Redirect } from 'expo-router';
+ import { useEffect, useMemo, useState } from 'react';
+ import { ActivityIndicator, StyleSheet, View } from 'react-native';
+
+-function buildNavSections(session: UserSession | null): SidebarSection[] {
+-  const liveAllowed = canViewLive(session);
+-  const customersAllowed = canAccessByPermission(session, 'VIEW_CUSTOMERS');
+-  const reservationsAllowed =
+-    canAccess(session, 'DOOR_RESERVATION', 'DO_DOOR_RESERVATION') || liveAllowed;
+-  const usersAllowed = canAccessByPermission(session, 'MANAGE_USERS') || isAdmin(session);
+-  const systemAllowed =
+-    canAccessByPermission(session, 'MANAGE_ROLES') ||
+-    canAccessByPermission(session, 'MANAGE_BRANCH_CHANNELS') ||
+-    isAdmin(session);
+-  const reportsAllowed = canAccessByPermission(session, 'VIEW_REPORTS') || isAdmin(session);
+-  const adminAllowed = isAdmin(session);
+-
+-  const primaryItems = [
+-    { key: 'home', label: 'Inicio', route: '/', icon: 'space-dashboard' as const },
+-    liveAllowed ? { key: 'live', label: 'LIVE', route: '/live', icon: 'live-tv' as const } : null,
+-    customersAllowed
+-      ? { key: 'customers', label: 'Clientes', route: '/customers', icon: 'groups' as const }
+-      : null,
+-    reservationsAllowed
+-      ? { key: 'reservations', label: 'Reservas', route: '/reservations', icon: 'bookmark' as const }
+-      : null,
+-  ].filter(Boolean);
+-
+-  const controlItems = [
+-    usersAllowed
+-      ? { key: 'users', label: 'Usuarios', route: '/users', icon: 'manage-accounts' as const }
+-      : null,
+-    systemAllowed
+-      ? { key: 'system', label: 'Sistema', route: '/system', icon: 'settings' as const }
+-      : null,
+-    reportsAllowed
+-      ? { key: 'reports', label: 'Reportes', route: '/reports', icon: 'analytics' as const }
+-      : null,
+-  ].filter(Boolean);
+-  const developmentItems = [
+-    adminAllowed
+-      ? { key: 'ui-kit', label: 'UI Kit', route: '/ui-kit', icon: 'dashboard-customize' as const }
+-      : null,
+-  ].filter(Boolean);
+-
+-  return [
+-    { title: 'Operacion', items: primaryItems },
+-    { title: 'Control', items: controlItems },
+-    { title: 'Desarrollo', items: developmentItems },
+-  ].filter((section) => section.items.length > 0) as SidebarSection[];
+-}
+-
+ export default function UiKitPreview() {
+   const {
+     theme,
+@@ -171,7 +122,7 @@ export default function UiKitPreview() {
+     };
+   }, []);
+
+-  const navSections = useMemo(() => buildNavSections(session), [session]);
++  const navSections = useMemo(() => buildMainNavSections(session), [session]);
+
+   useEffect(() => {
+     const baseColors = activePreset.colors[activeScheme];
+diff --git a/components/layout/Sidebar.tsx b/components/layout/Sidebar.tsx
+index bac2234..7cf62c4 100644
+--- a/components/layout/Sidebar.tsx
++++ b/components/layout/Sidebar.tsx
+@@ -5,10 +5,12 @@ import { useAppTheme } from '@/context/AppThemeContext';
+ import { UserSession } from '@/services/sessionStorage';
+ import { designTokens } from '@/theme/designTokens';
+ import { MaterialIcons } from '@expo/vector-icons';
++import { useTranslation } from 'react-i18next';
+ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+
+ export type SidebarSection = {
+   title?: string;
++  titleKey?: string;
+   items: SidebarNavItemConfig[];
+ };
+
+@@ -23,7 +25,21 @@ type Props = {
+
+ export default function Sidebar({ sections, activeRoute, onNavigate, session, onClose, onSignOut }: Props) {
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+   const roleLabel = session?.roles?.map((role) => role.code).join(', ') || 'Sin rol';
++  const normalizedActiveRoute = activeRoute?.replace(/^\//, '');
++  const isActiveItem = (item: SidebarNavItemConfig) => {
++    const normalizedItemRoute = item.route?.replace(/^\//, '');
++    const aliases = item.activeFor ?? [];
++
++    return (
++      activeRoute === item.key ||
++      activeRoute === item.route ||
++      normalizedActiveRoute === item.key ||
++      normalizedActiveRoute === normalizedItemRoute ||
++      aliases.some((alias) => alias === activeRoute || alias.replace(/^\//, '') === normalizedActiveRoute)
++    );
++  };
+
+   return (
+     <View
+@@ -62,14 +78,14 @@ export default function Sidebar({ sections, activeRoute, onNavigate, session, on
+             Ctrl Ropa
+           </AppText>
+           <AppText variant="caption" color={theme.colors.mutedText}>
+-            Operacion y control
++            {t('navigation.brandHelp')}
+           </AppText>
+         </View>
+         {onClose ? (
+           <Pressable
+             onPress={onClose}
+             accessibilityRole="button"
+-            accessibilityLabel="Cerrar menu"
++            accessibilityLabel={t('navigation.closeMenu')}
+             style={({ pressed }) => [
+               styles.closeButton,
+               {
+@@ -91,21 +107,21 @@ export default function Sidebar({ sections, activeRoute, onNavigate, session, on
+       >
+         {sections.map((section, index) => (
+           <View key={`${section.title ?? 'section'}-${index}`} style={styles.section}>
+-            {section.title ? (
++            {section.title || section.titleKey ? (
+               <AppText
+                 variant="caption"
+                 color={theme.colors.mutedText}
+                 bold
+                 style={styles.sectionLabel}
+               >
+-                {section.title}
++                {section.titleKey ? t(section.titleKey) : section.title}
+               </AppText>
+             ) : null}
+             {section.items.map((item) => (
+               <SidebarNavItem
+                 key={item.key}
+                 item={item}
+-                active={activeRoute === item.key || activeRoute === item.route}
++                active={isActiveItem(item)}
+                 onPress={onNavigate}
+               />
+             ))}
+@@ -149,7 +165,7 @@ export default function Sidebar({ sections, activeRoute, onNavigate, session, on
+           >
+             <MaterialIcons name="logout" size={18} color={theme.colors.danger} />
+             <AppText color={theme.colors.danger} bold>
+-              Cerrar sesion
++              {t('navigation.signOut')}
+             </AppText>
+           </Pressable>
+         </View>
+diff --git a/components/layout/SidebarNavItem.tsx b/components/layout/SidebarNavItem.tsx
+index 8af2fcc..7407029 100644
+--- a/components/layout/SidebarNavItem.tsx
++++ b/components/layout/SidebarNavItem.tsx
+@@ -2,15 +2,19 @@ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import { designTokens } from '@/theme/designTokens';
+ import { MaterialIcons } from '@expo/vector-icons';
++import { useTranslation } from 'react-i18next';
+ import { Pressable, StyleSheet, View } from 'react-native';
+
+ export type SidebarNavItemConfig = {
+   key: string;
+   label: string;
++  labelKey?: string;
+   route?: string;
++  activeFor?: string[];
+   icon?: keyof typeof MaterialIcons.glyphMap;
+   disabled?: boolean;
+   helper?: string;
++  helperKey?: string;
+ };
+
+ type Props = {
+@@ -21,8 +25,11 @@ type Props = {
+
+ export default function SidebarNavItem({ item, active, onPress }: Props) {
+   const { theme } = useAppTheme();
++  const { t } = useTranslation('common');
+   const disabled = item.disabled || !item.route;
+   const iconColor = active ? theme.colors.accent : theme.colors.mutedText;
++  const label = item.labelKey ? t(item.labelKey) : item.label;
++  const helper = item.helperKey ? t(item.helperKey) : item.helper;
+
+   return (
+     <Pressable
+@@ -45,15 +52,15 @@ export default function SidebarNavItem({ item, active, onPress }: Props) {
+           color={active ? theme.colors.textPrimary : theme.colors.text}
+           numberOfLines={1}
+         >
+-          {item.label}
++          {label}
+         </AppText>
+-        {item.helper ? (
++        {helper ? (
+           <AppText
+             variant="caption"
+             color={active ? theme.colors.textSecondary : theme.colors.mutedText}
+             numberOfLines={1}
+           >
+-            {item.helper}
++            {helper}
+           </AppText>
+         ) : null}
+       </View>
+diff --git a/components/layout/appNavigation.ts b/components/layout/appNavigation.ts
+index ef406a4..3e5999a 100644
+--- a/components/layout/appNavigation.ts
++++ b/components/layout/appNavigation.ts
+@@ -33,88 +33,92 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
+   const adminAllowed = isAdmin(session);
+
+   const homeItems = [
+-    { key: 'home', label: 'Resumen operativo', route: '/', icon: 'space-dashboard' as const },
++    { key: 'home', label: 'Resumen operativo', labelKey: 'navigation.items.homeSummary', route: '/', activeFor: ['home', '/'], icon: 'space-dashboard' as const },
+   ];
+
+   const operationItems = [
+     liveAllowed
+-      ? { key: 'live', label: 'En vivo', route: '/live', icon: 'live-tv' as const }
++      ? { key: 'live', label: 'En vivo', labelKey: 'navigation.items.live', route: '/live', activeFor: ['live', '/live'], icon: 'live-tv' as const }
+       : null,
+     doorSaleAllowed
+-      ? { key: 'door-sale', label: 'Venta puerta', route: '/door-sale', icon: 'point-of-sale' as const }
++      ? { key: 'door-sale', label: 'Venta puerta', labelKey: 'navigation.items.doorSale', route: '/door-sale', activeFor: ['door-sale', '/door-sale'], icon: 'point-of-sale' as const }
+       : null,
+     doorReservationAllowed
+       ? {
+           key: 'door-reservation',
+           label: 'Apartado puerta',
++          labelKey: 'navigation.items.doorHold',
+           route: '/door-reservation',
++          activeFor: ['door-reservation', '/door-reservation'],
+           icon: 'assignment' as const,
+         }
+       : null,
+     reservationsAllowed
+-      ? { key: 'reservations', label: 'Apartados', route: '/reservations', icon: 'bookmark' as const }
++      ? { key: 'reservations', label: 'Apartados', labelKey: 'navigation.items.holds', route: '/reservations', activeFor: ['reservations', '/reservations', 'reservation-detail', '/reservation-detail'], icon: 'bookmark' as const }
+       : null,
+     customersAllowed
+-      ? { key: 'customers', label: 'Clientes', route: '/customers', icon: 'groups' as const }
++      ? { key: 'customers', label: 'Clientes', labelKey: 'navigation.items.customers', route: '/customers', activeFor: ['customers', '/customers', 'customers-create', '/customers-create'], icon: 'groups' as const }
+       : null,
+   ].filter(Boolean);
+
+   const inventoryItems = [
+     inventoryAllowed
+-      ? { key: 'items', label: 'Prendas / Inventario', route: '/items', icon: 'inventory-2' as const }
++      ? { key: 'items', label: 'Prendas / Inventario', labelKey: 'navigation.items.itemsInventory', route: '/items', activeFor: ['items', '/items'], icon: 'inventory-2' as const }
+       : null,
+     inventoryManageAllowed
+-      ? { key: 'items-create', label: 'Alta de prendas', route: '/items-create', icon: 'add-box' as const }
++      ? { key: 'items-create', label: 'Alta de prendas', labelKey: 'navigation.items.createItems', route: '/items-create', activeFor: ['items-create', '/items-create'], icon: 'add-box' as const }
+       : null,
+     inventoryAllowed
+-      ? { key: 'batches', label: 'Lotes', route: '/batches', icon: 'inventory' as const }
++      ? { key: 'batches', label: 'Lotes', labelKey: 'navigation.items.batches', route: '/batches', activeFor: ['batches', '/batches', 'batch-form', '/batch-form', 'batch-detail', '/batch-detail'], icon: 'inventory' as const }
+       : null,
+   ].filter(Boolean);
+
+   const adminItems = [
+     usersAllowed
+-      ? { key: 'users', label: 'Usuarios', route: '/users', icon: 'manage-accounts' as const }
++      ? { key: 'users', label: 'Usuarios', labelKey: 'navigation.items.users', route: '/users', activeFor: ['users', '/users', 'users-form', '/users-form'], icon: 'manage-accounts' as const }
+       : null,
+     rolesAllowed
+-      ? { key: 'system-roles', label: 'Roles', route: '/system-roles', icon: 'admin-panel-settings' as const }
++      ? { key: 'system-roles', label: 'Roles', labelKey: 'navigation.items.roles', route: '/system-roles', activeFor: ['system-roles', '/system-roles'], icon: 'admin-panel-settings' as const }
+       : null,
+     channelsAllowed
+-      ? { key: 'system-channels', label: 'Canales operativos', route: '/system-channels', icon: 'hub' as const }
++      ? { key: 'system-channels', label: 'Canales operativos', labelKey: 'navigation.items.channels', route: '/system-channels', activeFor: ['system-channels', '/system-channels'], icon: 'hub' as const }
+       : null,
+     systemAllowed
+-      ? { key: 'system', label: 'Sistema', route: '/system', icon: 'settings' as const }
++      ? { key: 'system', label: 'Sistema', labelKey: 'navigation.items.system', route: '/system', activeFor: ['system', '/system'], icon: 'settings' as const }
+       : null,
+     adminAllowed
+-      ? { key: 'appearance', label: 'Apariencia / Branding', route: '/appearance', icon: 'palette' as const }
++      ? { key: 'appearance', label: 'Apariencia / Branding', labelKey: 'navigation.items.appearance', route: '/appearance', activeFor: ['appearance', '/appearance'], icon: 'palette' as const }
+       : null,
+   ].filter(Boolean);
+
+   const reportItems = [
+     reportsAllowed
+-      ? { key: 'reports', label: 'Reportes generales', route: '/reports', icon: 'analytics' as const }
++      ? { key: 'reports', label: 'Reportes generales', labelKey: 'navigation.items.reportsGeneral', route: '/reports', activeFor: ['reports', '/reports'], icon: 'analytics' as const }
+       : null,
+     reportsAllowed
+-      ? { key: 'report-daily-store', label: 'Diario tienda', route: '/report-daily-store', icon: 'today' as const }
++      ? { key: 'report-daily-store', label: 'Diario tienda', labelKey: 'navigation.items.dailyStore', route: '/report-daily-store', activeFor: ['report-daily-store', '/report-daily-store'], icon: 'today' as const }
+       : null,
+     reportsAllowed
+-      ? { key: 'report-deliveries', label: 'Entregas diarias', route: '/report-deliveries', icon: 'local-shipping' as const }
++      ? { key: 'report-deliveries', label: 'Entregas diarias', labelKey: 'navigation.items.dailyDeliveries', route: '/report-deliveries', activeFor: ['report-deliveries', '/report-deliveries'], icon: 'local-shipping' as const }
+       : null,
+     reportsAllowed
+-      ? { key: 'report-deposits', label: 'Depositos diarios', route: '/report-deposits', icon: 'payments' as const }
++      ? { key: 'report-deposits', label: 'Depositos diarios', labelKey: 'navigation.items.dailyDeposits', route: '/report-deposits', activeFor: ['report-deposits', '/report-deposits'], icon: 'payments' as const }
+       : null,
+     reportsAllowed
+       ? {
+           key: 'report-cancellations',
+           label: 'Cancelaciones diarias',
++          labelKey: 'navigation.items.dailyCancellations',
+           route: '/report-cancellations',
++          activeFor: ['report-cancellations', '/report-cancellations'],
+           icon: 'cancel' as const,
+         }
+       : null,
+     reportsAllowed
+-      ? { key: 'report-live', label: 'Control Live', route: '/report-live', icon: 'live-tv' as const }
++      ? { key: 'report-live', label: 'Control Live', labelKey: 'navigation.items.liveControl', route: '/report-live', activeFor: ['report-live', '/report-live'], icon: 'live-tv' as const }
+       : null,
+     reportsAllowed
+-      ? { key: 'report-remissions', label: 'Remisiones', route: '/report-remissions', icon: 'receipt-long' as const }
++      ? { key: 'report-remissions', label: 'Remisiones', labelKey: 'navigation.items.remissions', route: '/report-remissions', activeFor: ['report-remissions', '/report-remissions'], icon: 'receipt-long' as const }
+       : null,
+   ].filter(Boolean);
+
+@@ -123,32 +127,34 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
+       ? {
+           key: 'system-security-audit',
+           label: 'Auditoria de seguridad',
++          labelKey: 'navigation.items.securityAudit',
+           route: '/system-security-audit',
++          activeFor: ['system-security-audit', '/system-security-audit'],
+           icon: 'security' as const,
+         }
+       : null,
+     adminAllowed
+-      ? { key: 'system-security', label: 'Seguridad dev', route: '/system-security', icon: 'lock' as const }
++      ? { key: 'system-security', label: 'Seguridad dev', labelKey: 'navigation.items.devSecurity', route: '/system-security', activeFor: ['system-security', '/system-security'], icon: 'lock' as const }
+       : null,
+     adminAllowed
+-      ? { key: 'system-sessions', label: 'Sesiones y bloqueos', route: '/system-sessions', icon: 'lock-clock' as const }
++      ? { key: 'system-sessions', label: 'Sesiones y bloqueos', labelKey: 'navigation.items.sessionsLocks', route: '/system-sessions', activeFor: ['system-sessions', '/system-sessions'], icon: 'lock-clock' as const }
+       : null,
+   ].filter(Boolean);
+
+   const developmentItems = [
+     adminAllowed
+-      ? { key: 'ui-kit', label: 'UI Kit', route: '/ui-kit', icon: 'dashboard-customize' as const }
++      ? { key: 'ui-kit', label: 'UI Kit', labelKey: 'navigation.items.uiKit', route: '/ui-kit', activeFor: ['ui-kit', '/ui-kit'], icon: 'dashboard-customize' as const }
+       : null,
+   ].filter(Boolean);
+
+   return [
+-    { title: 'Inicio', items: homeItems },
+-    { title: 'Operacion', items: operationItems },
+-    { title: 'Inventario', items: inventoryItems },
+-    { title: 'Administracion', items: adminItems },
+-    { title: 'Reportes', items: reportItems },
+-    { title: 'Seguridad', items: securityItems },
+-    { title: 'Desarrollo', items: developmentItems },
++    { title: 'Inicio', titleKey: 'navigation.sections.home', items: homeItems },
++    { title: 'Operacion', titleKey: 'navigation.sections.operation', items: operationItems },
++    { title: 'Inventario', titleKey: 'navigation.sections.inventory', items: inventoryItems },
++    { title: 'Administracion', titleKey: 'navigation.sections.administration', items: adminItems },
++    { title: 'Reportes', titleKey: 'navigation.sections.reports', items: reportItems },
++    { title: 'Seguridad', titleKey: 'navigation.sections.security', items: securityItems },
++    { title: 'Desarrollo', titleKey: 'navigation.sections.development', items: developmentItems },
+   ].filter((section) => section.items.length > 0) as SidebarSection[];
+ }
+
+diff --git a/docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md b/docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md
+index 63b3d77..37425b8 100644
+--- a/docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md
++++ b/docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md
+@@ -32,6 +32,10 @@ La navegacion principal ahora se agrupa desde `components/layout/appNavigation.t
+ - Seguridad
+ - Desarrollo
+
++## Nota PRODUCT-D6.1
++
++PRODUCT-D6.1 refuerza esta decision: las pantallas AppShell auditadas deben consumir `buildMainNavSections(session)` como unica fuente de navegacion. Las secciones e items agregan claves i18n para que el sidebar/drawer respete Espanol/Ingles y no quede mezclado con el idioma de la pantalla.
++
+ Reglas aplicadas:
+
+ - No se muestran categorias vacias.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index e04e09a..5d47eee 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -618,5 +618,46 @@
+     "validPrice": "Enter a valid price.",
+     "validQuantity": "Enter a valid quantity.",
+     "liveReturnHelp": "After creating the item, you can return to LIVE to prepare it or put it on air."
++  },
++  "navigation": {
++    "brandHelp": "Operation and control",
++    "closeMenu": "Close menu",
++    "signOut": "Sign out",
++    "sections": {
++      "home": "Home",
++      "operation": "Operation",
++      "inventory": "Inventory",
++      "administration": "Administration",
++      "reports": "Reports",
++      "security": "Security",
++      "development": "Development"
++    },
++    "items": {
++      "homeSummary": "Operational summary",
++      "live": "Live",
++      "doorSale": "Door sale",
++      "doorHold": "Door hold",
++      "holds": "Holds",
++      "customers": "Customers",
++      "itemsInventory": "Items / Inventory",
++      "createItems": "Create items",
++      "batches": "Batches",
++      "users": "Users",
++      "roles": "Roles",
++      "channels": "Operational channels",
++      "system": "System",
++      "appearance": "Appearance / Branding",
++      "reportsGeneral": "General reports",
++      "dailyStore": "Daily store",
++      "dailyDeliveries": "Daily deliveries",
++      "dailyDeposits": "Daily deposits",
++      "dailyCancellations": "Daily cancellations",
++      "liveControl": "Live control",
++      "remissions": "Remissions",
++      "securityAudit": "Security audit",
++      "devSecurity": "Dev security",
++      "sessionsLocks": "Sessions and locks",
++      "uiKit": "UI Kit"
++    }
+   }
+ }
+diff --git a/locales/es/common.json b/locales/es/common.json
+index ec18b5b..78108f4 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -618,5 +618,46 @@
+     "validPrice": "Ingresa un precio valido.",
+     "validQuantity": "Ingresa una cantidad valida.",
+     "liveReturnHelp": "Al generar la prenda, podras volver al LIVE para prepararla o ponerla al aire."
++  },
++  "navigation": {
++    "brandHelp": "Operacion y control",
++    "closeMenu": "Cerrar menu",
++    "signOut": "Cerrar sesion",
++    "sections": {
++      "home": "Inicio",
++      "operation": "Operacion",
++      "inventory": "Inventario",
++      "administration": "Administracion",
++      "reports": "Reportes",
++      "security": "Seguridad",
++      "development": "Desarrollo"
++    },
++    "items": {
++      "homeSummary": "Resumen operativo",
++      "live": "En vivo",
++      "doorSale": "Venta puerta",
++      "doorHold": "Apartado puerta",
++      "holds": "Apartados",
++      "customers": "Clientes",
++      "itemsInventory": "Prendas / Inventario",
++      "createItems": "Alta de prendas",
++      "batches": "Lotes",
++      "users": "Usuarios",
++      "roles": "Roles",
++      "channels": "Canales operativos",
++      "system": "Sistema",
++      "appearance": "Apariencia / Branding",
++      "reportsGeneral": "Reportes generales",
++      "dailyStore": "Diario tienda",
++      "dailyDeliveries": "Entregas diarias",
++      "dailyDeposits": "Depositos diarios",
++      "dailyCancellations": "Cancelaciones diarias",
++      "liveControl": "Control Live",
++      "remissions": "Remisiones",
++      "securityAudit": "Auditoria de seguridad",
++      "devSecurity": "Seguridad dev",
++      "sessionsLocks": "Sesiones y bloqueos",
++      "uiKit": "UI Kit"
++    }
+   }
+ }

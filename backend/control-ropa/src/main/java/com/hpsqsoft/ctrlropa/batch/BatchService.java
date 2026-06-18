@@ -11,6 +11,9 @@ import com.hpsqsoft.ctrlropa.item.ItemRepository;
 import com.hpsqsoft.ctrlropa.security.access.AccessService;
 import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
 import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
+import com.hpsqsoft.ctrlropa.tenant.CurrentTenantContext;
+import com.hpsqsoft.ctrlropa.tenant.TenantResolver;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +36,7 @@ public class BatchService {
     private final ItemRepository itemRepository;
     private final AccessService accessService;
     private final CurrentUser currentUser;
+    private final TenantResolver tenantResolver;
 
     public BatchService(BatchRepository batchRepository,
                         BatchClassificationDetailRepository classificationRepository,
@@ -41,7 +45,8 @@ public class BatchService {
                         SupplierRepository supplierRepository,
                         ItemRepository itemRepository,
                         AccessService accessService,
-                        CurrentUser currentUser) {
+                        CurrentUser currentUser,
+                        TenantResolver tenantResolver) {
         this.batchRepository = batchRepository;
         this.classificationRepository = classificationRepository;
         this.branchRepository = branchRepository;
@@ -50,13 +55,15 @@ public class BatchService {
         this.itemRepository = itemRepository;
         this.accessService = accessService;
         this.currentUser = currentUser;
+        this.tenantResolver = tenantResolver;
     }
 
     @Transactional(readOnly = true)
     public List<BatchResponse> findByBranch(Long branchId) {
         accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_INVENTORY);
+        CurrentTenantContext tenant = resolveAndValidateBranch(branchId);
 
-        return batchRepository.findByBranchIdOrderByCreatedAtDesc(branchId)
+        return batchRepository.findByCompanyIdAndBranchIdOrderByCreatedAtDesc(tenant.getCompanyId(), branchId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -65,16 +72,17 @@ public class BatchService {
     @Transactional(readOnly = true)
     public BatchResponse findById(Long id) {
         accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_INVENTORY);
-        return toResponse(findEntity(id));
+        return toResponse(findEntity(id, currentCompanyId()));
     }
 
     @Transactional(readOnly = true)
     public BatchResponse findByFolio(String folio) {
         accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_INVENTORY);
 
-        Batch batch = batchRepository.findByFolio(folio)
+        Batch batch = batchRepository.findByCompanyIdAndFolio(currentCompanyId(), folio)
                 .orElseThrow(() -> new IllegalArgumentException("Lote no encontrado con folio: " + folio));
 
+        validateBatchBranch(batch);
         return toResponse(batch);
     }
 
@@ -90,13 +98,15 @@ public class BatchService {
             throw new IllegalArgumentException("La cantidad esperada debe ser mayor a cero");
         }
 
+        CurrentTenantContext tenant = resolveAndValidateBranch(branchId);
         Branch branch = branchRepository.findById(branchId)
                 .orElseThrow(() -> new IllegalArgumentException("Sucursal no encontrada"));
 
         Batch batch = new Batch();
+        batch.setCompany(branch.getCompany());
         batch.setBranch(branch);
         batch.setSupplier(resolveSupplier(request.getSupplierId()));
-        batch.setFolio(generateUniqueFolio());
+        batch.setFolio(generateUniqueFolio(tenant.getCompanyId()));
         batch.setExpectedQuantity(request.getExpectedQuantity());
         batch.setReceivedQuantity(null);
         batch.setStatus(BatchStatus.ANNOUNCED);
@@ -118,7 +128,7 @@ public class BatchService {
             throw new IllegalArgumentException("La cantidad recibida debe ser cero o mayor");
         }
 
-        Batch batch = findEntity(id);
+        Batch batch = findEntity(id, currentCompanyId());
         assertNotCancelled(batch);
 
         if (batch.getStatus() == BatchStatus.RECONCILED) {
@@ -143,7 +153,7 @@ public class BatchService {
         Long userId = currentUser.getUserId();
         accessService.assertCan(userId, PermissionCode.MANAGE_INVENTORY);
 
-        Batch batch = findEntity(id);
+        Batch batch = findEntity(id, currentCompanyId());
         assertNotCancelled(batch);
 
         if (batch.getStatus() == BatchStatus.ANNOUNCED) {
@@ -211,7 +221,7 @@ public class BatchService {
         Long userId = currentUser.getUserId();
         accessService.assertCan(userId, PermissionCode.MANAGE_INVENTORY);
 
-        Batch batch = findEntity(id);
+        Batch batch = findEntity(id, currentCompanyId());
         assertNotCancelled(batch);
 
         if (batch.getReceivedQuantity() == null) {
@@ -232,13 +242,14 @@ public class BatchService {
         Long userId = currentUser.getUserId();
         accessService.assertCan(userId, PermissionCode.MANAGE_INVENTORY);
 
-        Batch batch = findEntity(id);
+        Batch batch = findEntity(id, currentCompanyId());
 
         if (batch.getStatus() == BatchStatus.CANCELLED) {
             return toResponse(batch);
         }
 
-        int itemCount = itemRepository.findByBatchIdOrderByCreatedAtAsc(batch.getId()).size();
+        assertNoCrossCompanyItems(batch);
+        long itemCount = countTenantItems(batch);
 
         if (itemCount > 0) {
             throw new IllegalArgumentException("No se puede cancelar un lote que ya tiene prendas asociadas");
@@ -256,9 +267,11 @@ public class BatchService {
         return toResponse(batchRepository.save(batch));
     }
 
-    private Batch findEntity(Long id) {
-        return batchRepository.findById(id)
+    private Batch findEntity(Long id, Long companyId) {
+        Batch batch = batchRepository.findByCompanyIdAndId(companyId, id)
                 .orElseThrow(() -> new IllegalArgumentException("Lote no encontrado con id: " + id));
+        validateBatchBranch(batch);
+        return batch;
     }
 
     private void assertNotCancelled(Batch batch) {
@@ -267,13 +280,13 @@ public class BatchService {
         }
     }
 
-    private String generateUniqueFolio() {
+    private String generateUniqueFolio(Long companyId) {
         String folio;
 
         do {
             folio = "L-" + Year.now().getValue() + "-" +
                     UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
-        } while (batchRepository.existsByFolio(folio));
+        } while (batchRepository.existsByCompanyIdAndFolio(companyId, folio));
 
         return folio;
     }
@@ -289,7 +302,7 @@ public class BatchService {
                 .mapToInt(BatchClassificationDetailResponse::getQuantity)
                 .sum();
 
-        int itemCount = itemRepository.findByBatchIdOrderByCreatedAtAsc(batch.getId()).size();
+        int itemCount = Math.toIntExact(countTenantItems(batch));
 
         return new BatchResponse(
                 batch.getId(),
@@ -363,5 +376,36 @@ public class BatchService {
     private String appendNote(String current, String note) {
         if (current == null || current.isBlank()) return note;
         return current + "\n" + note;
+    }
+
+    private Long currentCompanyId() {
+        return tenantResolver.resolveCurrent().getCompanyId();
+    }
+
+    private CurrentTenantContext resolveAndValidateBranch(Long branchId) {
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        tenantResolver.assertBranchBelongsToCompany(branchId, tenant.getCompanyId());
+        return tenant;
+    }
+
+    private void validateBatchBranch(Batch batch) {
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        Long branchId = batch.getBranch().getId();
+        tenantResolver.assertBranchBelongsToCompany(branchId, tenant.getCompanyId());
+        if (tenant.getBranchId() != null && !tenant.getBranchId().equals(branchId)) {
+            throw new AccessDeniedException("El lote no pertenece a la sucursal activa");
+        }
+    }
+
+    private long countTenantItems(Batch batch) {
+        return itemRepository.countByCompanyIdAndBatchId(batch.getCompany().getId(), batch.getId());
+    }
+
+    private void assertNoCrossCompanyItems(Batch batch) {
+        long totalItems = itemRepository.countByBatchId(batch.getId());
+        long tenantItems = countTenantItems(batch);
+        if (totalItems != tenantItems) {
+            throw new IllegalStateException("El lote tiene prendas asociadas a otra compania");
+        }
     }
 }

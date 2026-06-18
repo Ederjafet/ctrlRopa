@@ -7,6 +7,7 @@ import com.hpsqsoft.ctrlropa.customerpackage.CustomerPackage;
 import com.hpsqsoft.ctrlropa.customerpackage.CustomerPackageItem;
 import com.hpsqsoft.ctrlropa.customerpackage.CustomerPackageItemRepository;
 import com.hpsqsoft.ctrlropa.customerpackage.CustomerPackageRepository;
+import com.hpsqsoft.ctrlropa.item.Item;
 import com.hpsqsoft.ctrlropa.item.ItemRepository;
 import com.hpsqsoft.ctrlropa.item.ItemStatus;
 import com.hpsqsoft.ctrlropa.order.CustomerOrderService;
@@ -20,6 +21,9 @@ import com.hpsqsoft.ctrlropa.sale.SaleStatus;
 import com.hpsqsoft.ctrlropa.security.access.AccessService;
 import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
 import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
+import com.hpsqsoft.ctrlropa.tenant.CurrentTenantContext;
+import com.hpsqsoft.ctrlropa.tenant.TenantResolver;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +49,7 @@ public class PaymentService {
     private final CustomerPackageItemRepository customerPackageItemRepository;
     private final AccessService accessService;
     private final CurrentUser currentUser;
+    private final TenantResolver tenantResolver;
 
     public PaymentService(PaymentRepository paymentRepository,
                           PaymentAllocationRepository allocationRepository,
@@ -57,7 +62,8 @@ public class PaymentService {
                           CustomerPackageRepository customerPackageRepository,
                           CustomerPackageItemRepository customerPackageItemRepository,
                           AccessService accessService,
-                          CurrentUser currentUser) {
+                          CurrentUser currentUser,
+                          TenantResolver tenantResolver) {
         this.paymentRepository = paymentRepository;
         this.allocationRepository = allocationRepository;
         this.paymentMethodRepository = paymentMethodRepository;
@@ -70,6 +76,7 @@ public class PaymentService {
         this.customerPackageItemRepository = customerPackageItemRepository;
         this.accessService = accessService;
         this.currentUser = currentUser;
+        this.tenantResolver = tenantResolver;
     }
 
     public PaymentResponse create(CreatePaymentRequest request) {
@@ -304,8 +311,10 @@ public class PaymentService {
 
     @Transactional(readOnly = true)
     public PaymentResponse findById(Long id) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_PAYMENTS);
         Payment payment = paymentRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Pago no encontrado con id: " + id));
+        assertPaymentBelongsToCurrentTenant(payment);
 
         PaymentMethod paymentMethod = paymentMethodRepository.findById(payment.getPaymentMethodId())
                 .orElseThrow(() -> new IllegalArgumentException("Método de pago no encontrado"));
@@ -315,9 +324,11 @@ public class PaymentService {
 
     @Transactional(readOnly = true)
     public List<PaymentResponse> findByCustomer(Long customerId) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_PAYMENTS);
         return paymentRepository.findByCustomerIdOrderByCreatedAtDesc(customerId)
                 .stream()
                 .map(payment -> {
+                    assertPaymentBelongsToCurrentTenant(payment);
                     PaymentMethod method = paymentMethodRepository.findById(payment.getPaymentMethodId())
                             .orElseThrow(() -> new IllegalArgumentException("Método de pago no encontrado"));
                     return toResponse(payment, method);
@@ -327,11 +338,13 @@ public class PaymentService {
     
     @Transactional(readOnly = true)
     public List<PaymentResponse> findByReservation(Long reservationId) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_PAYMENTS);
         return allocationRepository.findByReservationIdOrderByCreatedAtAsc(reservationId)
                 .stream()
                 .map(allocation -> {
                     Payment payment = paymentRepository.findById(allocation.getPaymentId())
                             .orElseThrow(() -> new IllegalArgumentException("Pago no encontrado"));
+                    assertPaymentBelongsToCurrentTenant(payment);
 
                     PaymentMethod method = paymentMethodRepository.findById(payment.getPaymentMethodId())
                             .orElseThrow(() -> new IllegalArgumentException("Método de pago no encontrado"));
@@ -347,6 +360,7 @@ public class PaymentService {
 
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new IllegalArgumentException("Pago no encontrado con id: " + paymentId));
+        assertPaymentBelongsToCurrentTenant(payment);
 
         if (payment.getStatus() != PaymentStatus.ACTIVE) {
             throw new IllegalArgumentException("Solo se pueden anular pagos activos");
@@ -400,16 +414,20 @@ public class PaymentService {
     }
     
     public PaymentResponse createByItemCode(String code, CreatePaymentByItemRequest request) {
-        var item = itemRepository.findByCode(code)
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        Item item = itemRepository.findByCompanyIdAndCode(tenant.getCompanyId(), code)
                 .orElseThrow(() -> new IllegalArgumentException("Item no encontrado con código: " + code));
 
+        assertBranchIdBelongsToCurrentTenant(item.getBranch().getId(), "El item no pertenece a la sucursal activa");
         return createByResolvedItem(item.getId(), request, "Pago item " + item.getCode());
     }
 
     public PaymentResponse createByQrCode(String qrCode, CreatePaymentByItemRequest request) {
-        var item = itemRepository.findByQrCode(qrCode)
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        Item item = itemRepository.findByCompanyIdAndQrCode(tenant.getCompanyId(), qrCode)
                 .orElseThrow(() -> new IllegalArgumentException("Item no encontrado con QR: " + qrCode));
 
+        assertBranchIdBelongsToCurrentTenant(item.getBranch().getId(), "El item no pertenece a la sucursal activa");
         return createByResolvedItem(item.getId(), request, "Pago QR " + item.getCode());
     }
 
@@ -458,6 +476,7 @@ public class PaymentService {
             if (sale.getStatus() != SaleStatus.ACTIVE) {
                 throw new IllegalArgumentException("Solo se puede pagar una venta activa");
             }
+            assertBranchIdBelongsToCurrentTenant(sale.getBranch().getId(), "La venta no pertenece a la sucursal activa");
 
             return new TargetData(
                     sale.getCustomer().getId(),
@@ -473,6 +492,7 @@ public class PaymentService {
         if (reservation.getStatus() != ReservationStatus.ACTIVE) {
             throw new IllegalArgumentException("Solo se puede pagar una reserva activa");
         }
+        assertBranchIdBelongsToCurrentTenant(reservation.getBranch().getId(), "La reserva no pertenece a la sucursal activa");
 
         Long customerOrderId = customerOrderService.findOrderIdByReservationId(reservation.getId());
         if (customerOrderId == null) {
@@ -593,6 +613,18 @@ public class PaymentService {
                 payment.getCreatedByUserId(),
                 allocations
         );
+    }
+
+    private void assertPaymentBelongsToCurrentTenant(Payment payment) {
+        assertBranchIdBelongsToCurrentTenant(payment.getBranchId(), "El pago no pertenece a la sucursal activa");
+    }
+
+    private void assertBranchIdBelongsToCurrentTenant(Long branchId, String message) {
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        tenantResolver.assertBranchBelongsToCompany(branchId, tenant.getCompanyId());
+        if (tenant.getBranchId() != null && !tenant.getBranchId().equals(branchId)) {
+            throw new AccessDeniedException(message);
+        }
     }
 
     private static class TargetData {

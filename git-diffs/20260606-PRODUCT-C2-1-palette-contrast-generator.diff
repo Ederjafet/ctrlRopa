@@ -1,0 +1,2153 @@
+diff --git a/app/appearance.tsx b/app/appearance.tsx
+index a2950a3..93fd08e 100644
+--- a/app/appearance.tsx
++++ b/app/appearance.tsx
+@@ -310,6 +310,20 @@ export default function AppearanceScreen() {
+         <LogoPreview title={t('appearance.printPreview')} url={form.printLogoUrl || form.logoUrl || ''} />
+       </AppCard>
+
++      <AppCard variant="info">
++        <AppText variant="subtitle" bold>
++          {t('paletteGenerator.appearanceCardTitle')}
++        </AppText>
++        <AppText color={theme.colors.mutedText} style={styles.sectionHint}>
++          {t('paletteGenerator.appearanceCardHelp')}
++        </AppText>
++        <AppButton
++          title={t('paletteGenerator.openGenerator')}
++          variant="secondary"
++          onPress={() => router.push('/ui-kit')}
++        />
++      </AppCard>
++
+       <AppCard>
+         <AppText variant="subtitle" bold>
+           {t('appearance.infoCards')}
+diff --git a/app/ui-kit.tsx b/app/ui-kit.tsx
+index d96bc3b..e698db5 100644
+--- a/app/ui-kit.tsx
++++ b/app/ui-kit.tsx
+@@ -15,13 +15,16 @@ import AppText from '@/components/ui/AppText';
+ import EmptyState from '@/components/ui/EmptyState';
+ import EntitySummaryCard from '@/components/ui/EntitySummaryCard';
+ import MetricCard from '@/components/ui/MetricCard';
++import PaletteGeneratorCard from '@/components/ui/PaletteGeneratorCard';
+ import SectionHeader from '@/components/ui/SectionHeader';
+ import StatusBadge from '@/components/ui/StatusBadge';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import { isAdmin, isNoAccess } from '@/services/accessControl';
+ import { ensureSessionActive, getSession, UserSession } from '@/services/sessionStorage';
++import { HarmonyType, SemanticPalette } from '@/theme/colorUtils';
+ import { designTokens, viewVariants } from '@/theme/designTokens';
+ import {
++  DesignPresetColors,
+   EditableVisualTokenKey,
+   ThemeScheme,
+   editableVisualTokenKeys,
+@@ -31,6 +34,7 @@ import {
+ } from '@/theme/designPresets';
+ import { Redirect } from 'expo-router';
+ import { useEffect, useMemo, useState } from 'react';
++import { useTranslation } from 'react-i18next';
+ import { ActivityIndicator, StyleSheet, View } from 'react-native';
+
+ export default function UiKitPreview() {
+@@ -60,7 +64,10 @@ export default function UiKitPreview() {
+   });
+   const [editorRadius, setEditorRadius] = useState<'standard' | 'soft' | 'compact'>('soft');
+   const [editorDensity, setEditorDensity] = useState<'NORMAL' | 'COMPACT'>('NORMAL');
++  const [paletteBaseColor, setPaletteBaseColor] = useState('#2563EB');
++  const [paletteHarmony, setPaletteHarmony] = useState<HarmonyType>('complementary');
+   const [identityFeedback, setIdentityFeedback] = useState<string | null>(null);
++  const { t } = useTranslation();
+
+   const activePreset = useMemo(
+     () => designPresets.find((preset) => preset.id === visualPresetId) ?? designPresets[0],
+@@ -144,6 +151,7 @@ export default function UiKitPreview() {
+     );
+
+     setEditorValues(nextValues);
++    setPaletteBaseColor(nextValues.primary);
+     setEditorRadius(customVisualIdentity?.radius ?? activePreset.radius);
+     setEditorDensity(customVisualIdentity?.density ?? activePreset.density);
+     setIdentityFeedback(null);
+@@ -154,6 +162,27 @@ export default function UiKitPreview() {
+     setIdentityFeedback(null);
+   };
+
++  const applyGeneratedPalette = async (palette: SemanticPalette) => {
++    const nextValues = {
++      ...editorValues,
++      ...palette,
++    };
++
++    setEditorValues(nextValues);
++    setPaletteBaseColor(palette.primary);
++
++    await setCustomVisualIdentity({
++      presetId: visualPresetId,
++      colors: {
++        ...(customVisualIdentity?.colors ?? {}),
++        [activeScheme]: nextValues,
++      },
++      radius: editorRadius,
++      density: editorDensity,
++    });
++    setIdentityFeedback(t('paletteGenerator.appliedFeedback'));
++  };
++
+   const applyVisualIdentityChanges = async () => {
+     if (hasEditorErrors) {
+       setIdentityFeedback('Corrige los colores invalidos antes de aplicar.');
+@@ -260,16 +289,7 @@ export default function UiKitPreview() {
+                   </View>
+                   {preset.id === visualPresetId ? <StatusBadge label="Activo" tone="success" /> : null}
+                 </View>
+-                <View style={styles.presetSwatches}>
+-                  {[
+-                    preset.colors[theme.isDark ? 'dark' : 'light'].primary,
+-                    preset.colors[theme.isDark ? 'dark' : 'light'].accent,
+-                    preset.colors[theme.isDark ? 'dark' : 'light'].success,
+-                    preset.colors[theme.isDark ? 'dark' : 'light'].danger,
+-                  ].map((color) => (
+-                    <View key={color} style={[styles.presetSwatch, { backgroundColor: color }]} />
+-                  ))}
+-                </View>
++                <PresetMiniPreview colors={preset.colors[theme.isDark ? 'dark' : 'light']} />
+                 <AppButton
+                   title={preset.id === visualPresetId ? 'Plantilla activa' : 'Usar plantilla'}
+                   variant={preset.id === visualPresetId ? 'neutral' : 'secondary'}
+@@ -281,8 +301,25 @@ export default function UiKitPreview() {
+       </View>
+
+       <SectionHeader
+-        title="Editor controlado"
+-        subtitle="Personaliza tokens semanticos principales de la plantilla activa."
++        title={t('paletteGenerator.sectionTitle')}
++        subtitle={t('paletteGenerator.sectionSubtitle')}
++      />
++      <PaletteGeneratorCard
++        activeScheme={activeScheme}
++        baseColor={paletteBaseColor}
++        harmony={paletteHarmony}
++        onApplyPalette={applyGeneratedPalette}
++        onBaseColorChange={(value) => {
++          setPaletteBaseColor(value);
++          setIdentityFeedback(null);
++        }}
++        onHarmonyChange={setPaletteHarmony}
++        onTokenChange={updateEditorToken}
++      />
++
++      <SectionHeader
++        title={t('paletteGenerator.controlledEditorTitle')}
++        subtitle={t('paletteGenerator.controlledEditorSubtitle')}
+       />
+       <AppCard variant="elevated" style={styles.previewCard}>
+         <View style={styles.themePreviewHeader}>
+@@ -315,7 +352,7 @@ export default function UiKitPreview() {
+                   ]}
+                 />
+                 <AppText variant="caption" color={theme.colors.textSecondary} style={styles.editorLabel}>
+-                  {visualTokenLabels[key]}
++                  {t(`paletteGenerator.tokens.${key}`, visualTokenLabels[key])}
+                 </AppText>
+               </View>
+               <AppInput
+@@ -796,6 +833,36 @@ export default function UiKitPreview() {
+   );
+ }
+
++function PresetMiniPreview({ colors }: { colors: DesignPresetColors }) {
++  return (
++    <View style={[styles.presetMiniCanvas, { backgroundColor: colors.background }]}>
++      <View style={[styles.presetMiniSidebar, { backgroundColor: colors.primary }]}>
++        <View style={[styles.presetMiniLine, { backgroundColor: colors.textOnPrimary }]} />
++        <View style={[styles.presetMiniLineShort, { backgroundColor: colors.textOnPrimary }]} />
++      </View>
++      <View style={styles.presetMiniContent}>
++        <View
++          style={[
++            styles.presetMiniCard,
++            {
++              backgroundColor: colors.surface,
++              borderColor: colors.border,
++            },
++          ]}
++        >
++          <View style={[styles.presetMiniHeading, { backgroundColor: colors.textPrimary }]} />
++          <View style={[styles.presetMiniSubline, { backgroundColor: colors.textMuted }]} />
++          <View style={styles.presetMiniControls}>
++            <View style={[styles.presetMiniButton, { backgroundColor: colors.primary }]} />
++            <View style={[styles.presetMiniBadge, { backgroundColor: colors.success }]} />
++            <View style={[styles.presetMiniBadge, { backgroundColor: colors.danger }]} />
++          </View>
++        </View>
++      </View>
++    </View>
++  );
++}
++
+ const styles = StyleSheet.create({
+   buttonRow: {
+     alignItems: 'center',
+@@ -838,6 +905,65 @@ const styles = StyleSheet.create({
+   previewCard: {
+     gap: designTokens.spacing.sm,
+   },
++  presetMiniBadge: {
++    borderRadius: 999,
++    height: 14,
++    width: 34,
++  },
++  presetMiniButton: {
++    borderRadius: 8,
++    height: 22,
++    width: 74,
++  },
++  presetMiniCanvas: {
++    borderRadius: 14,
++    flexDirection: 'row',
++    minHeight: 116,
++    overflow: 'hidden',
++  },
++  presetMiniCard: {
++    borderRadius: 10,
++    borderWidth: 1,
++    gap: 8,
++    padding: 10,
++  },
++  presetMiniContent: {
++    flex: 1,
++    padding: 10,
++  },
++  presetMiniControls: {
++    alignItems: 'center',
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 7,
++  },
++  presetMiniHeading: {
++    borderRadius: 999,
++    height: 8,
++    width: '72%',
++  },
++  presetMiniLine: {
++    borderRadius: 999,
++    height: 7,
++    opacity: 0.92,
++  },
++  presetMiniLineShort: {
++    borderRadius: 999,
++    height: 7,
++    opacity: 0.68,
++    width: '62%',
++  },
++  presetMiniSidebar: {
++    gap: 8,
++    padding: 10,
++    width: 58,
++  },
++  presetMiniSubline: {
++    borderRadius: 999,
++    height: 7,
++    opacity: 0.72,
++    width: '52%',
++  },
+   previewTextBlock: {
+     flex: 1,
+     minWidth: 0,
+diff --git a/components/ui/PaletteGeneratorCard.tsx b/components/ui/PaletteGeneratorCard.tsx
+new file mode 100644
+index 0000000..0122350
+--- /dev/null
++++ b/components/ui/PaletteGeneratorCard.tsx
+@@ -0,0 +1,697 @@
++import { useAppTheme } from '@/context/AppThemeContext';
++import { EditableVisualTokenKey } from '@/theme/designPresets';
++import {
++  HarmonyType,
++  SemanticPalette,
++  generateHarmonyColors,
++  generateSemanticPalette,
++  generateShades,
++  generateTints,
++  generateTones,
++  getContrastRatio,
++  getContrastStatus,
++  getReadableTextColor,
++  hexToHsl,
++  hexToRgb,
++  isValidHexColor,
++  normalizeHexColor,
++} from '@/theme/colorUtils';
++import React, { useMemo } from 'react';
++import { useTranslation } from 'react-i18next';
++import { Platform, Pressable, StyleSheet, View } from 'react-native';
++import AppButton from './AppButton';
++import AppCard from './AppCard';
++import AppInput from './AppInput';
++import AppText from './AppText';
++
++type Props = {
++  activeScheme: 'light' | 'dark';
++  baseColor: string;
++  harmony: HarmonyType;
++  onApplyPalette: (palette: SemanticPalette) => void;
++  onBaseColorChange: (value: string) => void;
++  onHarmonyChange: (harmony: HarmonyType) => void;
++  onTokenChange: (key: EditableVisualTokenKey, value: string) => void;
++};
++
++type ContrastStatus = ReturnType<typeof getContrastStatus>;
++
++const HARMONIES: HarmonyType[] = ['monochromatic', 'complementary', 'analogous', 'triadic', 'tetradic'];
++const QUICK_SWATCHES = ['#2563EB', '#0F766E', '#7C3AED', '#DB2777', '#EA580C', '#15803D', '#0F172A'];
++const LIGHT_TEXT = '#FFFFFF';
++const DARK_TEXT = '#0F172A';
++
++export default function PaletteGeneratorCard({
++  activeScheme,
++  baseColor,
++  harmony,
++  onApplyPalette,
++  onBaseColorChange,
++  onHarmonyChange,
++  onTokenChange,
++}: Props) {
++  const { theme } = useAppTheme();
++  const { t } = useTranslation();
++  const normalizedBase = normalizeHexColor(baseColor);
++  const baseIsValid = isValidHexColor(baseColor);
++
++  const palette = useMemo(
++    () => generateSemanticPalette(normalizedBase, harmony, activeScheme),
++    [activeScheme, harmony, normalizedBase],
++  );
++  const tints = useMemo(() => generateTints(normalizedBase, 7), [normalizedBase]);
++  const shades = useMemo(() => generateShades(normalizedBase, 7), [normalizedBase]);
++  const tones = useMemo(() => generateTones(normalizedBase, 7), [normalizedBase]);
++  const harmonyColors = useMemo(
++    () => generateHarmonyColors(normalizedBase, harmony),
++    [harmony, normalizedBase],
++  );
++  const baseRgb = hexToRgb(normalizedBase);
++  const baseHsl = hexToHsl(normalizedBase);
++
++  const contrastRows = useMemo(() => {
++    const textOnBackground = activeScheme === 'dark' ? '#F8FAFC' : DARK_TEXT;
++    const textOnSurface = activeScheme === 'dark' ? '#F8FAFC' : DARK_TEXT;
++    return [
++      {
++        key: 'primaryLight',
++        label: t('paletteGenerator.contrast.primaryLight'),
++        foreground: LIGHT_TEXT,
++        background: palette.primary,
++      },
++      {
++        key: 'primaryDark',
++        label: t('paletteGenerator.contrast.primaryDark'),
++        foreground: DARK_TEXT,
++        background: palette.primary,
++      },
++      {
++        key: 'accent',
++        label: t('paletteGenerator.contrast.accent'),
++        foreground: getReadableTextColor(palette.accent),
++        background: palette.accent,
++      },
++      {
++        key: 'danger',
++        label: t('paletteGenerator.contrast.danger'),
++        foreground: getReadableTextColor(palette.danger),
++        background: palette.danger,
++      },
++      {
++        key: 'background',
++        label: t('paletteGenerator.contrast.background'),
++        foreground: textOnBackground,
++        background: palette.background,
++      },
++      {
++        key: 'surface',
++        label: t('paletteGenerator.contrast.surface'),
++        foreground: textOnSurface,
++        background: palette.surface,
++      },
++      {
++        key: 'button',
++        label: t('paletteGenerator.contrast.button'),
++        foreground: getReadableTextColor(palette.primary),
++        background: palette.primary,
++      },
++    ].map((row) => {
++      const ratio = getContrastRatio(row.foreground, row.background);
++      return {
++        ...row,
++        ratio,
++        status: getContrastStatus(ratio),
++        recommendedText: getReadableTextColor(row.background) === LIGHT_TEXT ? ('light' as const) : ('dark' as const),
++      };
++    });
++  }, [activeScheme, palette, t]);
++
++  const hasLowContrast = contrastRows.some((row) => row.status === 'low');
++  const tokenEntries = Object.entries(palette) as [EditableVisualTokenKey, string][];
++
++  const webColorInput =
++    Platform.OS === 'web'
++      ? React.createElement('input', {
++          'aria-label': t('paletteGenerator.baseColor'),
++          onChange: (event: { target?: { value?: string } }) => {
++            const nextValue = event.target?.value;
++            if (nextValue) onBaseColorChange(normalizeHexColor(nextValue));
++          },
++          style: {
++            background: 'transparent',
++            border: '0',
++            cursor: 'pointer',
++            height: 46,
++            padding: 0,
++            width: 72,
++          },
++          type: 'color',
++          value: normalizedBase,
++        })
++      : null;
++
++  return (
++    <AppCard variant="elevated" style={styles.card}>
++      <View style={styles.headerRow}>
++        <View style={styles.flexBlock}>
++          <AppText variant="subtitle" bold>
++            {t('paletteGenerator.title')}
++          </AppText>
++          <AppText variant="caption" color={theme.colors.mutedText}>
++            {t('paletteGenerator.subtitle')}
++          </AppText>
++        </View>
++        <View
++          style={[
++            styles.basePreview,
++            {
++              backgroundColor: normalizedBase,
++              borderColor: theme.colors.borderStrong,
++            },
++          ]}
++        />
++      </View>
++
++      <View style={styles.generatorGrid}>
++        <View style={styles.controlColumn}>
++          <AppText bold>{t('paletteGenerator.baseColor')}</AppText>
++          <View style={styles.baseInputRow}>
++            {webColorInput}
++            <AppInput
++              value={baseColor}
++              onChangeText={(value) => onBaseColorChange(value)}
++              autoCapitalize="none"
++              autoCorrect={false}
++              placeholder="#2563EB"
++              error={baseColor && !baseIsValid ? t('paletteGenerator.invalidHex') : undefined}
++              style={styles.hexInput}
++            />
++          </View>
++
++          <View style={styles.colorMetaRow}>
++            <MetaPill label="HEX" value={normalizedBase} />
++            <MetaPill
++              label="RGB"
++              value={baseRgb ? `${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}` : '-'}
++            />
++            <MetaPill
++              label="HSL"
++              value={baseHsl ? `${Math.round(baseHsl.h)}, ${baseHsl.s}%, ${baseHsl.l}%` : '-'}
++            />
++          </View>
++
++          <AppText variant="caption" color={theme.colors.mutedText}>
++            {t('paletteGenerator.quickSwatches')}
++          </AppText>
++          <View style={styles.swatchRow}>
++            {QUICK_SWATCHES.map((color) => (
++              <ColorSwatch
++                key={color}
++                color={color}
++                label={color}
++                onPress={() => onBaseColorChange(color)}
++                selected={normalizedBase === color}
++              />
++            ))}
++          </View>
++        </View>
++
++        <View style={styles.controlColumn}>
++          <AppText bold>{t('paletteGenerator.harmony')}</AppText>
++          <View style={styles.harmonyGrid}>
++            {HARMONIES.map((option) => (
++              <AppButton
++                key={option}
++                title={t(`paletteGenerator.harmonies.${option}`)}
++                variant={harmony === option ? 'secondary' : 'neutral'}
++                onPress={() => onHarmonyChange(option)}
++                style={styles.harmonyButton}
++              />
++            ))}
++          </View>
++          <AppText variant="caption" color={theme.colors.mutedText}>
++            {t('paletteGenerator.harmonyHelp')}
++          </AppText>
++          <View style={styles.swatchRow}>
++            {harmonyColors.map((color) => (
++              <ColorSwatch key={color} color={color} label={color} onPress={() => onBaseColorChange(color)} />
++            ))}
++          </View>
++        </View>
++      </View>
++
++      <VariationBlock title={t('paletteGenerator.tints')} colors={tints} onPick={onBaseColorChange} />
++      <VariationBlock title={t('paletteGenerator.shades')} colors={shades} onPick={onBaseColorChange} />
++      <VariationBlock title={t('paletteGenerator.tones')} colors={tones} onPick={onBaseColorChange} />
++
++      <View style={styles.sectionBlock}>
++        <View style={styles.headerRow}>
++          <View style={styles.flexBlock}>
++            <AppText bold>{t('paletteGenerator.suggestedPalette')}</AppText>
++            <AppText variant="caption" color={theme.colors.mutedText}>
++              {t('paletteGenerator.suggestedPaletteHelp')}
++            </AppText>
++          </View>
++          <AppButton
++            title={t('paletteGenerator.applyLocal')}
++            variant="primary"
++            onPress={() => onApplyPalette(palette)}
++          />
++        </View>
++        <View style={styles.tokenGrid}>
++          {tokenEntries.map(([key, color]) => (
++            <Pressable key={key} onPress={() => onTokenChange(key, color)} style={styles.tokenSwatch}>
++              <View
++                style={[
++                  styles.tokenColor,
++                  {
++                    backgroundColor: color,
++                    borderColor: theme.colors.borderStrong,
++                  },
++                ]}
++              />
++              <AppText variant="caption" bold>
++                {t(`paletteGenerator.tokens.${key}`)}
++              </AppText>
++              <AppText variant="caption" color={theme.colors.mutedText}>
++                {color}
++              </AppText>
++            </Pressable>
++          ))}
++        </View>
++      </View>
++
++      <View style={styles.generatorGrid}>
++        <View style={styles.controlColumn}>
++          <AppText bold>{t('paletteGenerator.contrastTitle')}</AppText>
++          <AppText variant="caption" color={theme.colors.mutedText}>
++            {t('paletteGenerator.contrastHelp')}
++          </AppText>
++          {hasLowContrast ? (
++            <View
++              style={[
++                styles.warningPanel,
++                {
++                  backgroundColor: theme.colors.warningBackground,
++                  borderColor: theme.colors.warning,
++                },
++              ]}
++            >
++              <AppText bold color={theme.colors.warning}>
++                {t('paletteGenerator.lowContrast')}
++              </AppText>
++              <AppText variant="caption" color={theme.colors.textSecondary}>
++                {t('paletteGenerator.reviewBeforeApply')}
++              </AppText>
++            </View>
++          ) : null}
++          <View style={styles.contrastList}>
++            {contrastRows.map((row) => (
++              <ContrastRow
++                key={row.key}
++                label={row.label}
++                ratio={row.ratio}
++                status={row.status}
++                recommendedText={row.recommendedText}
++              />
++            ))}
++          </View>
++        </View>
++
++        <UiPreview palette={palette} activeScheme={activeScheme} />
++      </View>
++    </AppCard>
++  );
++}
++
++function VariationBlock({
++  colors,
++  onPick,
++  title,
++}: {
++  colors: string[];
++  onPick: (color: string) => void;
++  title: string;
++}) {
++  return (
++    <View style={styles.sectionBlock}>
++      <AppText bold>{title}</AppText>
++      <View style={styles.scaleRow}>
++        {colors.map((color) => (
++          <Pressable key={color} onPress={() => onPick(color)} style={styles.scaleSwatchWrap}>
++            <View style={[styles.scaleSwatch, { backgroundColor: color }]} />
++            <AppText variant="caption" style={styles.hexText}>
++              {color}
++            </AppText>
++          </Pressable>
++        ))}
++      </View>
++    </View>
++  );
++}
++
++function ColorSwatch({
++  color,
++  label,
++  onPress,
++  selected,
++}: {
++  color: string;
++  label: string;
++  onPress: () => void;
++  selected?: boolean;
++}) {
++  const { theme } = useAppTheme();
++  return (
++    <Pressable
++      accessibilityLabel={label}
++      onPress={onPress}
++      style={[
++        styles.roundSwatch,
++        {
++          backgroundColor: color,
++          borderColor: selected ? theme.colors.accent : theme.colors.borderStrong,
++          borderWidth: selected ? 3 : 1,
++        },
++      ]}
++    />
++  );
++}
++
++function MetaPill({ label, value }: { label: string; value: string }) {
++  const { theme } = useAppTheme();
++  return (
++    <View
++      style={[
++        styles.metaPill,
++        {
++          backgroundColor: theme.colors.surfaceMuted,
++          borderColor: theme.colors.borderSubtle,
++        },
++      ]}
++    >
++      <AppText variant="caption" bold>
++        {label}
++      </AppText>
++      <AppText variant="caption" color={theme.colors.mutedText}>
++        {value}
++      </AppText>
++    </View>
++  );
++}
++
++function ContrastRow({
++  label,
++  ratio,
++  recommendedText,
++  status,
++}: {
++  label: string;
++  ratio: number | null;
++  recommendedText: 'light' | 'dark';
++  status: ContrastStatus;
++}) {
++  const { theme } = useAppTheme();
++  const { t } = useTranslation();
++  const toneColor =
++    status === 'ok'
++      ? theme.colors.success
++      : status === 'low'
++        ? theme.colors.danger
++        : theme.colors.warning;
++
++  return (
++    <View style={[styles.contrastRow, { borderColor: theme.colors.borderSubtle }]}>
++      <View style={styles.flexBlock}>
++        <AppText variant="caption" bold>
++          {label}
++        </AppText>
++        <AppText variant="caption" color={theme.colors.mutedText}>
++          {t('paletteGenerator.recommendedText')}{' '}
++          {recommendedText === 'light' ? t('paletteGenerator.lightText') : t('paletteGenerator.darkText')}
++        </AppText>
++      </View>
++      <View style={styles.contrastMetric}>
++        <AppText variant="caption" bold color={toneColor}>
++          {t(`paletteGenerator.contrastStatuses.${status}`)}
++        </AppText>
++        <AppText variant="caption" color={theme.colors.mutedText}>
++          {ratio === null ? '-' : ratio.toFixed(2)}
++        </AppText>
++      </View>
++    </View>
++  );
++}
++
++function UiPreview({ activeScheme, palette }: { activeScheme: 'light' | 'dark'; palette: SemanticPalette }) {
++  const { t } = useTranslation();
++  const textColor = activeScheme === 'dark' ? '#F8FAFC' : '#0F172A';
++  const mutedColor = activeScheme === 'dark' ? '#CBD5E1' : '#475569';
++  const primaryText = getReadableTextColor(palette.primary);
++  const accentText = getReadableTextColor(palette.accent);
++  const dangerText = getReadableTextColor(palette.danger);
++
++  return (
++    <View style={styles.controlColumn}>
++      <AppText bold>{t('paletteGenerator.previewTitle')}</AppText>
++      <View style={[styles.uiPreviewCanvas, { backgroundColor: palette.background }]}>
++        <View style={[styles.previewSidebar, { backgroundColor: palette.primary }]}>
++          <View style={[styles.previewSidebarLine, { backgroundColor: primaryText }]} />
++          <View style={[styles.previewSidebarLineShort, { backgroundColor: primaryText }]} />
++          <View style={[styles.previewSidebarPill, { backgroundColor: palette.accent }]} />
++        </View>
++        <View style={styles.previewContent}>
++          <View style={[styles.previewPanel, { backgroundColor: palette.surface, borderColor: palette.secondary }]}>
++            <AppText bold color={textColor}>
++              {t('paletteGenerator.previewCardTitle')}
++            </AppText>
++            <AppText variant="caption" color={mutedColor}>
++              {t('paletteGenerator.previewCardText')}
++            </AppText>
++            <View style={styles.previewButtonRow}>
++              <View style={[styles.previewButton, { backgroundColor: palette.primary }]}>
++                <AppText variant="caption" bold color={primaryText}>
++                  {t('paletteGenerator.previewPrimaryButton')}
++                </AppText>
++              </View>
++              <View style={[styles.previewButton, { backgroundColor: palette.accent }]}>
++                <AppText variant="caption" bold color={accentText}>
++                  {t('paletteGenerator.previewSecondaryButton')}
++                </AppText>
++              </View>
++            </View>
++            <View style={[styles.previewInput, { borderColor: palette.secondary }]}>
++              <AppText variant="caption" color={mutedColor}>
++                {t('paletteGenerator.previewInput')}
++              </AppText>
++            </View>
++            <View style={styles.previewButtonRow}>
++              <View style={[styles.previewBadge, { backgroundColor: palette.success }]}>
++                <AppText variant="caption" bold color={getReadableTextColor(palette.success)}>
++                  {t('paletteGenerator.previewActiveBadge')}
++                </AppText>
++              </View>
++              <View style={[styles.previewBadge, { backgroundColor: palette.danger }]}>
++                <AppText variant="caption" bold color={dangerText}>
++                  {t('paletteGenerator.previewReservedBadge')}
++                </AppText>
++              </View>
++            </View>
++            <View style={[styles.previewNotice, { borderColor: palette.warning }]}>
++              <AppText variant="caption" color={textColor}>
++                {t('paletteGenerator.previewNotice')}
++              </AppText>
++            </View>
++          </View>
++        </View>
++      </View>
++    </View>
++  );
++}
++
++const styles = StyleSheet.create({
++  baseInputRow: {
++    alignItems: 'flex-start',
++    flexDirection: 'row',
++    gap: 10,
++  },
++  basePreview: {
++    borderRadius: 14,
++    borderWidth: 1,
++    height: 74,
++    width: 112,
++  },
++  card: {
++    gap: 16,
++  },
++  colorMetaRow: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 8,
++  },
++  contrastList: {
++    gap: 8,
++  },
++  contrastMetric: {
++    alignItems: 'flex-end',
++    minWidth: 86,
++  },
++  contrastRow: {
++    alignItems: 'center',
++    borderRadius: 10,
++    borderWidth: 1,
++    flexDirection: 'row',
++    gap: 10,
++    padding: 10,
++  },
++  controlColumn: {
++    flex: 1,
++    gap: 10,
++    minWidth: 260,
++  },
++  flexBlock: {
++    flex: 1,
++    minWidth: 0,
++  },
++  generatorGrid: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 16,
++  },
++  harmonyButton: {
++    minHeight: 44,
++  },
++  harmonyGrid: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 8,
++  },
++  headerRow: {
++    alignItems: 'center',
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 12,
++    justifyContent: 'space-between',
++  },
++  hexInput: {
++    minWidth: 160,
++  },
++  hexText: {
++    textAlign: 'center',
++  },
++  metaPill: {
++    borderRadius: 10,
++    borderWidth: 1,
++    paddingHorizontal: 10,
++    paddingVertical: 8,
++  },
++  previewBadge: {
++    borderRadius: 999,
++    paddingHorizontal: 9,
++    paddingVertical: 5,
++  },
++  previewButton: {
++    borderRadius: 8,
++    paddingHorizontal: 11,
++    paddingVertical: 8,
++  },
++  previewButtonRow: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 8,
++  },
++  previewContent: {
++    flex: 1,
++    padding: 12,
++  },
++  previewInput: {
++    borderRadius: 8,
++    borderWidth: 1,
++    paddingHorizontal: 10,
++    paddingVertical: 9,
++  },
++  previewNotice: {
++    borderLeftWidth: 4,
++    borderRadius: 8,
++    padding: 9,
++  },
++  previewPanel: {
++    borderRadius: 12,
++    borderWidth: 1,
++    gap: 9,
++    padding: 12,
++  },
++  previewSidebar: {
++    gap: 8,
++    padding: 10,
++    width: 74,
++  },
++  previewSidebarLine: {
++    borderRadius: 999,
++    height: 8,
++    opacity: 0.92,
++  },
++  previewSidebarLineShort: {
++    borderRadius: 999,
++    height: 8,
++    opacity: 0.72,
++    width: '68%',
++  },
++  previewSidebarPill: {
++    borderRadius: 999,
++    height: 28,
++    marginTop: 8,
++  },
++  roundSwatch: {
++    borderRadius: 999,
++    height: 36,
++    width: 36,
++  },
++  scaleRow: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 8,
++  },
++  scaleSwatch: {
++    borderRadius: 8,
++    height: 42,
++    width: 74,
++  },
++  scaleSwatchWrap: {
++    alignItems: 'center',
++    gap: 4,
++  },
++  sectionBlock: {
++    gap: 8,
++  },
++  swatchRow: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 8,
++  },
++  tokenColor: {
++    borderRadius: 10,
++    borderWidth: 1,
++    height: 44,
++  },
++  tokenGrid: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 10,
++  },
++  tokenSwatch: {
++    gap: 5,
++    minWidth: 126,
++  },
++  uiPreviewCanvas: {
++    borderRadius: 14,
++    flexDirection: 'row',
++    minHeight: 276,
++    overflow: 'hidden',
++  },
++  warningPanel: {
++    borderLeftWidth: 4,
++    borderRadius: 10,
++    padding: 10,
++  },
++});
+diff --git a/docs/PRODUCT_C2_1_PALETTE_CONTRAST_GENERATOR.md b/docs/PRODUCT_C2_1_PALETTE_CONTRAST_GENERATOR.md
+new file mode 100644
+index 0000000..518559c
+--- /dev/null
++++ b/docs/PRODUCT_C2_1_PALETTE_CONTRAST_GENERATOR.md
+@@ -0,0 +1,190 @@
++# PRODUCT-C2.1 - Generador visual de paletas y contraste
++
++Fecha: 2026-06-06
++Rama: `feature/product-c2-1-palette-contrast-generator`
++
++## Objetivo
++
++PRODUCT-C2.1 convierte el editor controlado de identidad visual en una experiencia mas visual para QA y administracion tecnica: el usuario elige un color base, revisa armonias, variaciones, contraste y una mini preview real antes de aplicar la paleta localmente.
++
++No se toca backend, no se crean endpoints y no se agrega persistencia por tenant. La aplicacion sigue usando la persistencia local de `CustomVisualIdentity` creada en PRODUCT-C2.
++
++## Color base
++
++El generador vive en `/ui-kit`, dentro de la seccion de identidad visual.
++
++Permite:
++
++- seleccionar color base con muestra grande;
++- editar HEX;
++- usar input nativo de color en web cuando esta disponible;
++- usar swatches rapidos;
++- ver valores HEX, RGB y HSL;
++- actualizar la preview inmediatamente.
++
++Los valores invalidos no rompen la pantalla: el generador usa fallback seguro para calcular preview y muestra helper de HEX valido.
++
++## Armonias implementadas
++
++Se implementaron armonias internas sin librerias externas:
++
++- monocromatica;
++- complementaria;
++- analoga;
++- triadica;
++- tetradica.
++
++Las armonias sugieren acentos visuales, pero no sustituyen automaticamente la semantica de `success`, `warning` y `danger`. Esos tokens mantienen verdes, ambares y rojos controlados para estados operativos.
++
++## Variaciones
++
++Desde el color base se generan:
++
++- tints / claros;
++- shades / oscuros;
++- tones / desaturados;
++- escala compacta de 7 tonos por grupo.
++
++Cada swatch puede seleccionarse para convertirlo en nuevo color base.
++
++## Contraste
++
++Se agrego un panel de contraste basico con luminancia relativa y ratio aproximado WCAG.
++
++Se revisa:
++
++- texto claro sobre `primary`;
++- texto oscuro sobre `primary`;
++- texto sobre `accent`;
++- texto sobre `danger`;
++- texto principal sobre `background`;
++- texto principal sobre `surface`;
++- boton primario con texto recomendado.
++
++Estados visibles:
++
++- contraste correcto;
++- revisar;
++- contraste bajo.
++
++Si hay bajo contraste, se muestra advertencia antes de aplicar. No se bloquea completamente la aplicacion local, pero la advertencia queda visible para que QA no aplique una paleta claramente ilegible sin verla.
++
++## Preview real de UI
++
++El generador incluye una mini interfaz con:
++
++- sidebar;
++- card;
++- boton primario;
++- boton secundario;
++- input;
++- badge activo;
++- badge reservado/danger;
++- aviso operativo.
++
++La preview usa la paleta sugerida, no solo puntos de color, para que el usuario vea el efecto real antes de aplicar.
++
++## Aplicacion local
++
++La accion `Aplicar paleta localmente` actualiza:
++
++- `primary`;
++- `secondary`;
++- `accent`;
++- `success`;
++- `warning`;
++- `danger`;
++- `background`;
++- `surface`.
++
++Tambien actualiza el editor HEX existente y persiste en `AsyncStorage` mediante `setCustomVisualIdentity`.
++
++No se guarda en backend ni por tenant en esta fase.
++
++## Previews de plantillas
++
++Las tarjetas de plantillas en `/ui-kit` se cambiaron de puntos de color a mini previews con:
++
++- fondo;
++- sidebar;
++- card;
++- boton primario;
++- badge success;
++- badge danger.
++
++Esto permite distinguir visualmente `retailPremium`, `darkConsole`, `blueCorporate`, `boutique` y `classicErp` antes de aplicar.
++
++## /appearance
++
++`/appearance` conserva sus campos actuales de branding y HEX.
++
++Se agrega una tarjeta informativa que abre el generador avanzado en `/ui-kit`. No se duplica el laboratorio visual para evitar complejidad y no mezclarlo con branding, logos o configuracion de impresion.
++
++## I18N
++
++Se agrego la seccion `paletteGenerator.*` a:
++
++- `es`;
++- `en`;
++- `pt-BR`;
++- `fr`;
++- `ja`;
++- `zh`;
++- `ko`.
++
++Auditoria local:
++
++```text
++es: leaves=1147 missing=0 extra=0
++en: leaves=1147 missing=0 extra=0
++pt-BR: leaves=1147 missing=0 extra=0
++fr: leaves=1147 missing=0 extra=0
++ja: leaves=1147 missing=0 extra=0
++zh: leaves=1147 missing=0 extra=0
++ko: leaves=1147 missing=0 extra=0
++static i18n keys=992
++missing=0
++```
++
++Las traducciones nuevas son base tecnica y requieren revision humana/nativa antes de release internacional.
++
++## Utilidades internas
++
++Se agrego `theme/colorUtils.ts` con utilidades propias para:
++
++- validar y normalizar HEX;
++- convertir HEX/RGB/HSL;
++- ajustar HSL;
++- generar tints, shades y tones;
++- generar armonias;
++- calcular luminancia relativa;
++- calcular contraste;
++- sugerir texto claro u oscuro;
++- generar paleta semantica segura.
++
++No se instalaron dependencias externas.
++
++## Validacion manual esperada
++
++1. Entrar con `qa.admin`.
++2. Abrir `/ui-kit`.
++3. Abrir el generador de paleta.
++4. Elegir color base.
++5. Ver variaciones.
++6. Cambiar armonia.
++7. Ver paleta sugerida.
++8. Revisar contraste.
++9. Aplicar paleta localmente.
++10. Confirmar que la preview y el editor HEX cambian.
++11. Abrir `/live` o `/customers` y confirmar que el tema local se aplica.
++12. Cambiar light/dark.
++13. Restaurar plantilla.
++
++## Limitaciones
++
++- No hay persistencia backend ni por tenant.
++- No se implementa color wheel complejo.
++- No se instalan librerias externas.
++- No se incluyen fuentes externas.
++- La revision de contraste es basica, no reemplaza auditoria completa de accesibilidad.
++- Las traducciones nuevas requieren revision nativa.
+diff --git a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+index 46b3d3b..49f8b5b 100644
+--- a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
++++ b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+@@ -335,3 +335,13 @@ PRODUCT-I18N-B reduce mezclas visibles de idioma en LIVE, AppShell, sistema y fo
+ Fecha: 2026-06-06
+
+ PRODUCT-I18N-B.1 define un glosario visual para terminos tecnicos que pueden mantenerse como prestamos (`LIVE`, `QR`, `URL`, `UI Kit`, `API`, `ID`, `CSV`) y corrige claves crudas de LIVE. La revision visual debe asegurar que esos prestamos no rompan jerarquia, contraste, sidebar, dark mode ni responsive.
++
++---
++
++## Continuidad PRODUCT-C2.1 - Generador visual de paletas
++
++Fecha: 2026-06-06
++
++PRODUCT-C2.1 agrega en `/ui-kit` un generador visual de paletas con color base, armonias, tints, shades, tones, contraste basico y mini preview real de UI. La aplicacion sigue sin persistencia backend por tenant: las paletas se aplican localmente usando los overrides de PRODUCT-C2.
++
++La validacion visual debe revisar que las paletas aplicadas conserven legibilidad en AppShell, LIVE, clientes, light/dark y responsive. Si el panel marca bajo contraste, QA debe tratarlo como advertencia antes de aceptar la combinacion.
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index cb04cc1..5fb1574 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -245,3 +245,19 @@ Agregar a la corrida manual:
+ - revisar que `UI Kit`/`UIキット` no se vea roto en sidebar ni en modo oscuro;
+ - confirmar que `LIVE`, `QR`, `URL`, `API`, `ID` y `CSV` se mantienen como prestamos tecnicos cuando aparezcan;
+ - confirmar que no aparecen claves crudas `live.*`, `navigation.*`, `system.*`, `common.*` en los flujos principales.
++
++## Nota PRODUCT-C2.1
++
++Agregar a la corrida manual de sistema visual:
++
++- entrar con `qa.admin`;
++- abrir `/ui-kit`;
++- elegir un color base en el generador visual;
++- revisar tints, shades, tones y armonias;
++- confirmar que el panel de contraste muestra ratio y estado;
++- aplicar la paleta localmente;
++- confirmar que preview, editor HEX y tema aplicado cambian;
++- abrir `/live` y `/customers` para validar que la identidad local se refleja en pantallas reales;
++- cambiar light/dark y revisar contraste;
++- volver a `/ui-kit` y restaurar plantilla;
++- abrir `/appearance` y confirmar que aparece acceso al generador avanzado sin romper campos de branding.
+diff --git a/docs/PRODUCT_I18N_B1_GLOSSARY_RAW_KEYS.md b/docs/PRODUCT_I18N_B1_GLOSSARY_RAW_KEYS.md
+index d0c339b..ccbbfd3 100644
+--- a/docs/PRODUCT_I18N_B1_GLOSSARY_RAW_KEYS.md
++++ b/docs/PRODUCT_I18N_B1_GLOSSARY_RAW_KEYS.md
+@@ -144,3 +144,9 @@ No se cambio layout ni logica del sidebar.
+ - Las traducciones siguen siendo base tecnica y requieren revision humana/nativa antes de release internacional.
+ - No se traducen codigos tecnicos, permisos, rutas, IDs ni estados backend cuando son datos.
+ - No se tocan pagos/caja en esta fase.
++
++## Continuidad PRODUCT-C2.1
++
++PRODUCT-C2.1 agrega claves `paletteGenerator.*` para el generador visual de paletas en los siete idiomas soportados. Se mantienen prestamos tecnicos controlados como `HEX`, `RGB`, `HSL`, `WCAG` y `UI Kit`, porque funcionan como siglas/terminos tecnicos universales dentro de una herramienta visual.
++
++Los terminos operativos del generador si se traducen: color base, armonia, contraste, texto recomendado, paleta sugerida, aplicar localmente y preview.
+diff --git a/locales/en/common.json b/locales/en/common.json
+index b2f7bcf..bdeb98e 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -1082,6 +1082,76 @@
+     "packageThanks": "Package thank-you message",
+     "saveChanges": "Save changes"
+   },
++  "paletteGenerator": {
++    "sectionTitle": "Visual palette generator",
++    "sectionSubtitle": "Choose a base color and review harmonies, variations, contrast, and preview before applying.",
++    "controlledEditorTitle": "Controlled editor",
++    "controlledEditorSubtitle": "Customize the main semantic tokens of the active template.",
++    "title": "Palette generator",
++    "subtitle": "Create a coherent palette from a base color without touching backend.",
++    "baseColor": "Base color",
++    "invalidHex": "Use a valid HEX format. Example: #2563EB",
++    "quickSwatches": "Quick swatches",
++    "harmony": "Color harmony",
++    "harmonyHelp": "Harmonies suggest accents without replacing semantic status colors.",
++    "harmonies": {
++      "monochromatic": "Monochromatic",
++      "complementary": "Complementary",
++      "analogous": "Analogous",
++      "triadic": "Triadic",
++      "tetradic": "Tetradic"
++    },
++    "tints": "Tints / light",
++    "shades": "Shades / dark",
++    "tones": "Tones / desaturated",
++    "suggestedPalette": "Suggested palette",
++    "suggestedPaletteHelp": "Tap a token to load it into the editor or apply the full palette locally.",
++    "applyLocal": "Apply palette locally",
++    "appliedFeedback": "Palette applied locally.",
++    "contrastTitle": "Basic contrast",
++    "contrastHelp": "Approximate WCAG contrast review for text, buttons, and surfaces.",
++    "lowContrast": "Low contrast",
++    "reviewBeforeApply": "Review this color before applying it.",
++    "recommendedText": "Recommended text:",
++    "lightText": "light",
++    "darkText": "dark",
++    "contrastStatuses": {
++      "ok": "Contrast OK",
++      "low": "Low contrast",
++      "review": "Review"
++    },
++    "contrast": {
++      "primaryLight": "Light text on primary",
++      "primaryDark": "Dark text on primary",
++      "accent": "Text on accent",
++      "danger": "Text on danger",
++      "background": "Primary text on background",
++      "surface": "Primary text on surface",
++      "button": "Primary button with text"
++    },
++    "tokens": {
++      "primary": "Primary",
++      "secondary": "Secondary",
++      "accent": "Accent",
++      "success": "Success",
++      "warning": "Warning",
++      "danger": "Danger / reserved",
++      "background": "Background",
++      "surface": "Surface"
++    },
++    "previewTitle": "Real UI preview",
++    "previewCardTitle": "Operational panel",
++    "previewCardText": "Buttons, badges, and input use the suggested palette.",
++    "previewPrimaryButton": "Primary",
++    "previewSecondaryButton": "Secondary",
++    "previewInput": "Sample input",
++    "previewActiveBadge": "Active",
++    "previewReservedBadge": "Reserved",
++    "previewNotice": "Sample operational notice.",
++    "appearanceCardTitle": "Advanced palette generator",
++    "appearanceCardHelp": "Create harmonies, variations, and contrast from UI Kit. Application remains local in this phase.",
++    "openGenerator": "Open generator in UI Kit"
++  },
+   "usersForm": {
+     "newTitle": "New user",
+     "editTitle": "Edit user",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index 178fd56..f90107d 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -1082,6 +1082,76 @@
+     "packageThanks": "Mensaje de agradecimiento en paquete",
+     "saveChanges": "Guardar cambios"
+   },
++  "paletteGenerator": {
++    "sectionTitle": "Generador visual de paletas",
++    "sectionSubtitle": "Elige un color base y revisa armonias, variaciones, contraste y preview antes de aplicar.",
++    "controlledEditorTitle": "Editor controlado",
++    "controlledEditorSubtitle": "Personaliza tokens semanticos principales de la plantilla activa.",
++    "title": "Generador de paleta",
++    "subtitle": "Crea una paleta coherente desde un color base sin tocar backend.",
++    "baseColor": "Color base",
++    "invalidHex": "Usa formato HEX valido. Ejemplo: #2563EB",
++    "quickSwatches": "Muestras rapidas",
++    "harmony": "Armonia de color",
++    "harmonyHelp": "Las armonias sugieren acentos sin reemplazar colores semanticos de estado.",
++    "harmonies": {
++      "monochromatic": "Monocromatica",
++      "complementary": "Complementaria",
++      "analogous": "Analoga",
++      "triadic": "Triadica",
++      "tetradic": "Tetradica"
++    },
++    "tints": "Tints / claros",
++    "shades": "Shades / oscuros",
++    "tones": "Tones / desaturados",
++    "suggestedPalette": "Paleta sugerida",
++    "suggestedPaletteHelp": "Toca un token para cargarlo en el editor o aplica toda la paleta localmente.",
++    "applyLocal": "Aplicar paleta localmente",
++    "appliedFeedback": "Paleta aplicada localmente.",
++    "contrastTitle": "Contraste basico",
++    "contrastHelp": "Revision aproximada de contraste WCAG para texto, botones y superficies.",
++    "lowContrast": "Contraste bajo",
++    "reviewBeforeApply": "Revisa este color antes de aplicarlo.",
++    "recommendedText": "Texto recomendado:",
++    "lightText": "claro",
++    "darkText": "oscuro",
++    "contrastStatuses": {
++      "ok": "Contraste correcto",
++      "low": "Contraste bajo",
++      "review": "Revisar"
++    },
++    "contrast": {
++      "primaryLight": "Texto claro sobre primary",
++      "primaryDark": "Texto oscuro sobre primary",
++      "accent": "Texto sobre accent",
++      "danger": "Texto sobre danger",
++      "background": "Texto principal sobre background",
++      "surface": "Texto principal sobre surface",
++      "button": "Boton primario con texto"
++    },
++    "tokens": {
++      "primary": "Primario",
++      "secondary": "Secundario",
++      "accent": "Acento",
++      "success": "Exito",
++      "warning": "Advertencia",
++      "danger": "Peligro / reservado",
++      "background": "Fondo",
++      "surface": "Superficie"
++    },
++    "previewTitle": "Preview real de UI",
++    "previewCardTitle": "Panel operativo",
++    "previewCardText": "Botones, badges e input usan la paleta sugerida.",
++    "previewPrimaryButton": "Primario",
++    "previewSecondaryButton": "Secundario",
++    "previewInput": "Input de ejemplo",
++    "previewActiveBadge": "Activo",
++    "previewReservedBadge": "Reservada",
++    "previewNotice": "Aviso operativo de ejemplo.",
++    "appearanceCardTitle": "Generador avanzado de paletas",
++    "appearanceCardHelp": "Crea armonias, variaciones y contraste desde UI Kit. La aplicacion sigue siendo local en esta fase.",
++    "openGenerator": "Abrir generador en UI Kit"
++  },
+   "usersForm": {
+     "newTitle": "Nuevo usuario",
+     "editTitle": "Editar usuario",
+diff --git a/locales/fr/common.json b/locales/fr/common.json
+index 73112ec..058104d 100644
+--- a/locales/fr/common.json
++++ b/locales/fr/common.json
+@@ -1082,6 +1082,76 @@
+     "packageThanks": "Colis élément",
+     "saveChanges": "Enregistrer élément"
+   },
++  "paletteGenerator": {
++    "sectionTitle": "Générateur visuel de palettes",
++    "sectionSubtitle": "Choisissez une couleur de base et vérifiez les harmonies, variations, contrastes et aperçu avant application.",
++    "controlledEditorTitle": "Éditeur contrôlé",
++    "controlledEditorSubtitle": "Personnalisez les principaux tokens sémantiques du modèle actif.",
++    "title": "Générateur de palette",
++    "subtitle": "Créez une palette cohérente depuis une couleur de base sans toucher au backend.",
++    "baseColor": "Couleur de base",
++    "invalidHex": "Utilisez un format HEX valide. Exemple : #2563EB",
++    "quickSwatches": "Échantillons rapides",
++    "harmony": "Harmonie de couleur",
++    "harmonyHelp": "Les harmonies suggèrent des accents sans remplacer les couleurs sémantiques de statut.",
++    "harmonies": {
++      "monochromatic": "Monochromatique",
++      "complementary": "Complémentaire",
++      "analogous": "Analogue",
++      "triadic": "Triadique",
++      "tetradic": "Tétradique"
++    },
++    "tints": "Tints / clairs",
++    "shades": "Shades / sombres",
++    "tones": "Tones / désaturés",
++    "suggestedPalette": "Palette suggérée",
++    "suggestedPaletteHelp": "Touchez un token pour le charger dans l'éditeur ou appliquez toute la palette localement.",
++    "applyLocal": "Appliquer la palette localement",
++    "appliedFeedback": "Palette appliquée localement.",
++    "contrastTitle": "Contraste de base",
++    "contrastHelp": "Vérification approximative WCAG du contraste pour textes, boutons et surfaces.",
++    "lowContrast": "Contraste faible",
++    "reviewBeforeApply": "Vérifiez cette couleur avant de l'appliquer.",
++    "recommendedText": "Texte recommandé :",
++    "lightText": "clair",
++    "darkText": "sombre",
++    "contrastStatuses": {
++      "ok": "Contraste correct",
++      "low": "Contraste faible",
++      "review": "À vérifier"
++    },
++    "contrast": {
++      "primaryLight": "Texte clair sur primary",
++      "primaryDark": "Texte sombre sur primary",
++      "accent": "Texte sur accent",
++      "danger": "Texte sur danger",
++      "background": "Texte principal sur background",
++      "surface": "Texte principal sur surface",
++      "button": "Bouton primaire avec texte"
++    },
++    "tokens": {
++      "primary": "Primaire",
++      "secondary": "Secondaire",
++      "accent": "Accent",
++      "success": "Succès",
++      "warning": "Avertissement",
++      "danger": "Danger / réservé",
++      "background": "Fond",
++      "surface": "Surface"
++    },
++    "previewTitle": "Aperçu réel de l'UI",
++    "previewCardTitle": "Panneau opérationnel",
++    "previewCardText": "Les boutons, badges et champs utilisent la palette suggérée.",
++    "previewPrimaryButton": "Primaire",
++    "previewSecondaryButton": "Secondaire",
++    "previewInput": "Champ exemple",
++    "previewActiveBadge": "Actif",
++    "previewReservedBadge": "Réservé",
++    "previewNotice": "Avis opérationnel d'exemple.",
++    "appearanceCardTitle": "Générateur avancé de palettes",
++    "appearanceCardHelp": "Créez des harmonies, variations et contrastes depuis UI Kit. L'application reste locale dans cette phase.",
++    "openGenerator": "Ouvrir le générateur dans UI Kit"
++  },
+   "usersForm": {
+     "newTitle": "Nouveau",
+     "editTitle": "Modifier",
+diff --git a/locales/ja/common.json b/locales/ja/common.json
+index 21e0424..79315a9 100644
+--- a/locales/ja/common.json
++++ b/locales/ja/common.json
+@@ -1082,6 +1082,76 @@
+     "packageThanks": "パッケージ 項目",
+     "saveChanges": "保存 項目"
+   },
++  "paletteGenerator": {
++    "sectionTitle": "ビジュアルパレット生成",
++    "sectionSubtitle": "ベースカラーを選び、適用前に配色、バリエーション、コントラスト、プレビューを確認します。",
++    "controlledEditorTitle": "制御エディター",
++    "controlledEditorSubtitle": "有効なテンプレートの主要な意味トークンを調整します。",
++    "title": "パレット生成",
++    "subtitle": "バックエンドを変更せずに、ベースカラーから一貫したパレットを作成します。",
++    "baseColor": "ベースカラー",
++    "invalidHex": "有効なHEX形式を使用してください。例: #2563EB",
++    "quickSwatches": "クイックスウォッチ",
++    "harmony": "カラー調和",
++    "harmonyHelp": "調和はアクセント候補を示します。状態用の意味カラーは置き換えません。",
++    "harmonies": {
++      "monochromatic": "モノクロマティック",
++      "complementary": "補色",
++      "analogous": "類似色",
++      "triadic": "トライアド",
++      "tetradic": "テトラード"
++    },
++    "tints": "Tints / 明るい色",
++    "shades": "Shades / 暗い色",
++    "tones": "Tones / 低彩度",
++    "suggestedPalette": "おすすめパレット",
++    "suggestedPaletteHelp": "トークンをタップしてエディターに読み込むか、パレット全体をローカルに適用します。",
++    "applyLocal": "パレットをローカル適用",
++    "appliedFeedback": "パレットをローカルに適用しました。",
++    "contrastTitle": "基本コントラスト",
++    "contrastHelp": "テキスト、ボタン、サーフェスのWCAG近似コントラストを確認します。",
++    "lowContrast": "低コントラスト",
++    "reviewBeforeApply": "適用前にこの色を確認してください。",
++    "recommendedText": "推奨テキスト:",
++    "lightText": "明るい",
++    "darkText": "暗い",
++    "contrastStatuses": {
++      "ok": "コントラストOK",
++      "low": "低コントラスト",
++      "review": "確認"
++    },
++    "contrast": {
++      "primaryLight": "primary上の明るいテキスト",
++      "primaryDark": "primary上の暗いテキスト",
++      "accent": "accent上のテキスト",
++      "danger": "danger上のテキスト",
++      "background": "background上の主テキスト",
++      "surface": "surface上の主テキスト",
++      "button": "テキスト付き主ボタン"
++    },
++    "tokens": {
++      "primary": "プライマリ",
++      "secondary": "セカンダリ",
++      "accent": "アクセント",
++      "success": "成功",
++      "warning": "警告",
++      "danger": "危険 / 予約済み",
++      "background": "背景",
++      "surface": "サーフェス"
++    },
++    "previewTitle": "実UIプレビュー",
++    "previewCardTitle": "運用パネル",
++    "previewCardText": "ボタン、バッジ、入力欄におすすめパレットを使用します。",
++    "previewPrimaryButton": "プライマリ",
++    "previewSecondaryButton": "セカンダリ",
++    "previewInput": "サンプル入力",
++    "previewActiveBadge": "有効",
++    "previewReservedBadge": "予約済み",
++    "previewNotice": "サンプル運用通知。",
++    "appearanceCardTitle": "高度なパレット生成",
++    "appearanceCardHelp": "UIキットで調和、バリエーション、コントラストを作成します。この段階では適用はローカルのみです。",
++    "openGenerator": "UIキットで生成を開く"
++  },
+   "usersForm": {
+     "newTitle": "新規",
+     "editTitle": "編集",
+diff --git a/locales/ko/common.json b/locales/ko/common.json
+index 3a0b5fc..1cdaf86 100644
+--- a/locales/ko/common.json
++++ b/locales/ko/common.json
+@@ -1082,6 +1082,76 @@
+     "packageThanks": "패키지 항목",
+     "saveChanges": "저장 항목"
+   },
++  "paletteGenerator": {
++    "sectionTitle": "시각적 팔레트 생성기",
++    "sectionSubtitle": "기본 색상을 선택하고 적용 전에 조화, 변형, 대비, 미리보기를 확인합니다.",
++    "controlledEditorTitle": "제어 편집기",
++    "controlledEditorSubtitle": "활성 템플릿의 주요 의미 색상 토큰을 조정합니다.",
++    "title": "팔레트 생성기",
++    "subtitle": "백엔드를 변경하지 않고 기본 색상으로 일관된 팔레트를 만듭니다.",
++    "baseColor": "기본 색상",
++    "invalidHex": "유효한 HEX 형식을 사용하세요. 예: #2563EB",
++    "quickSwatches": "빠른 색상",
++    "harmony": "색상 조화",
++    "harmonyHelp": "조화 색상은 강조색을 제안하며 상태 의미 색상을 대체하지 않습니다.",
++    "harmonies": {
++      "monochromatic": "단색",
++      "complementary": "보색",
++      "analogous": "유사색",
++      "triadic": "삼각 배색",
++      "tetradic": "사각 배색"
++    },
++    "tints": "Tints / 밝은 색",
++    "shades": "Shades / 어두운 색",
++    "tones": "Tones / 저채도",
++    "suggestedPalette": "추천 팔레트",
++    "suggestedPaletteHelp": "토큰을 눌러 편집기에 넣거나 전체 팔레트를 로컬에 적용합니다.",
++    "applyLocal": "팔레트 로컬 적용",
++    "appliedFeedback": "팔레트가 로컬에 적용되었습니다.",
++    "contrastTitle": "기본 대비",
++    "contrastHelp": "텍스트, 버튼, 표면의 WCAG 대비를 근사치로 확인합니다.",
++    "lowContrast": "낮은 대비",
++    "reviewBeforeApply": "적용 전에 이 색상을 확인하세요.",
++    "recommendedText": "추천 텍스트:",
++    "lightText": "밝게",
++    "darkText": "어둡게",
++    "contrastStatuses": {
++      "ok": "대비 양호",
++      "low": "낮은 대비",
++      "review": "검토"
++    },
++    "contrast": {
++      "primaryLight": "primary 위 밝은 텍스트",
++      "primaryDark": "primary 위 어두운 텍스트",
++      "accent": "accent 위 텍스트",
++      "danger": "danger 위 텍스트",
++      "background": "background 위 기본 텍스트",
++      "surface": "surface 위 기본 텍스트",
++      "button": "텍스트가 있는 기본 버튼"
++    },
++    "tokens": {
++      "primary": "기본",
++      "secondary": "보조",
++      "accent": "강조",
++      "success": "성공",
++      "warning": "경고",
++      "danger": "위험 / 예약됨",
++      "background": "배경",
++      "surface": "표면"
++    },
++    "previewTitle": "실제 UI 미리보기",
++    "previewCardTitle": "운영 패널",
++    "previewCardText": "버튼, 배지, 입력에 추천 팔레트를 사용합니다.",
++    "previewPrimaryButton": "기본",
++    "previewSecondaryButton": "보조",
++    "previewInput": "예시 입력",
++    "previewActiveBadge": "활성",
++    "previewReservedBadge": "예약됨",
++    "previewNotice": "예시 운영 알림.",
++    "appearanceCardTitle": "고급 팔레트 생성기",
++    "appearanceCardHelp": "UI Kit에서 조화, 변형, 대비를 만듭니다. 이 단계에서는 로컬로만 적용됩니다.",
++    "openGenerator": "UI Kit에서 생성기 열기"
++  },
+   "usersForm": {
+     "newTitle": "새",
+     "editTitle": "편집",
+diff --git a/locales/pt-BR/common.json b/locales/pt-BR/common.json
+index 91f31ec..23652d3 100644
+--- a/locales/pt-BR/common.json
++++ b/locales/pt-BR/common.json
+@@ -1082,6 +1082,76 @@
+     "packageThanks": "Pacote campo",
+     "saveChanges": "Salvar campo"
+   },
++  "paletteGenerator": {
++    "sectionTitle": "Gerador visual de paletas",
++    "sectionSubtitle": "Escolha uma cor base e revise harmonias, variações, contraste e prévia antes de aplicar.",
++    "controlledEditorTitle": "Editor controlado",
++    "controlledEditorSubtitle": "Personalize os principais tokens semânticos do modelo ativo.",
++    "title": "Gerador de paleta",
++    "subtitle": "Crie uma paleta coerente a partir de uma cor base sem tocar no backend.",
++    "baseColor": "Cor base",
++    "invalidHex": "Use um formato HEX válido. Exemplo: #2563EB",
++    "quickSwatches": "Amostras rápidas",
++    "harmony": "Harmonia de cor",
++    "harmonyHelp": "As harmonias sugerem acentos sem substituir as cores semânticas de status.",
++    "harmonies": {
++      "monochromatic": "Monocromática",
++      "complementary": "Complementar",
++      "analogous": "Análoga",
++      "triadic": "Triádica",
++      "tetradic": "Tetrádica"
++    },
++    "tints": "Tints / claros",
++    "shades": "Shades / escuros",
++    "tones": "Tones / dessaturados",
++    "suggestedPalette": "Paleta sugerida",
++    "suggestedPaletteHelp": "Toque em um token para carregá-lo no editor ou aplique toda a paleta localmente.",
++    "applyLocal": "Aplicar paleta localmente",
++    "appliedFeedback": "Paleta aplicada localmente.",
++    "contrastTitle": "Contraste básico",
++    "contrastHelp": "Revisão aproximada de contraste WCAG para texto, botões e superfícies.",
++    "lowContrast": "Baixo contraste",
++    "reviewBeforeApply": "Revise esta cor antes de aplicá-la.",
++    "recommendedText": "Texto recomendado:",
++    "lightText": "claro",
++    "darkText": "escuro",
++    "contrastStatuses": {
++      "ok": "Contraste correto",
++      "low": "Baixo contraste",
++      "review": "Revisar"
++    },
++    "contrast": {
++      "primaryLight": "Texto claro sobre primary",
++      "primaryDark": "Texto escuro sobre primary",
++      "accent": "Texto sobre accent",
++      "danger": "Texto sobre danger",
++      "background": "Texto principal sobre background",
++      "surface": "Texto principal sobre surface",
++      "button": "Botão primário com texto"
++    },
++    "tokens": {
++      "primary": "Primário",
++      "secondary": "Secundário",
++      "accent": "Acento",
++      "success": "Sucesso",
++      "warning": "Advertência",
++      "danger": "Perigo / reservado",
++      "background": "Fundo",
++      "surface": "Superfície"
++    },
++    "previewTitle": "Prévia real da UI",
++    "previewCardTitle": "Painel operacional",
++    "previewCardText": "Botões, badges e input usam a paleta sugerida.",
++    "previewPrimaryButton": "Primário",
++    "previewSecondaryButton": "Secundário",
++    "previewInput": "Input de exemplo",
++    "previewActiveBadge": "Ativo",
++    "previewReservedBadge": "Reservado",
++    "previewNotice": "Aviso operacional de exemplo.",
++    "appearanceCardTitle": "Gerador avançado de paletas",
++    "appearanceCardHelp": "Crie harmonias, variações e contraste a partir do UI Kit. A aplicação permanece local nesta fase.",
++    "openGenerator": "Abrir gerador no UI Kit"
++  },
+   "usersForm": {
+     "newTitle": "Novo",
+     "editTitle": "Editar",
+diff --git a/locales/zh/common.json b/locales/zh/common.json
+index 80d5c54..914ad08 100644
+--- a/locales/zh/common.json
++++ b/locales/zh/common.json
+@@ -1082,6 +1082,76 @@
+     "packageThanks": "包裹项目",
+     "saveChanges": "保存项目"
+   },
++  "paletteGenerator": {
++    "sectionTitle": "可视化调色板生成器",
++    "sectionSubtitle": "选择基础色，并在应用前查看配色、变化、对比度和预览。",
++    "controlledEditorTitle": "受控编辑器",
++    "controlledEditorSubtitle": "自定义当前模板的主要语义颜色。",
++    "title": "调色板生成器",
++    "subtitle": "从基础色创建一致的调色板，不修改后端。",
++    "baseColor": "基础色",
++    "invalidHex": "请使用有效的HEX格式。例如：#2563EB",
++    "quickSwatches": "快速色块",
++    "harmony": "色彩和谐",
++    "harmonyHelp": "和谐配色用于建议强调色，不替换状态语义颜色。",
++    "harmonies": {
++      "monochromatic": "单色",
++      "complementary": "互补",
++      "analogous": "类似",
++      "triadic": "三角色",
++      "tetradic": "四角色"
++    },
++    "tints": "Tints / 浅色",
++    "shades": "Shades / 深色",
++    "tones": "Tones / 低饱和",
++    "suggestedPalette": "建议调色板",
++    "suggestedPaletteHelp": "点击颜色令牌加载到编辑器，或将整套调色板应用到本地。",
++    "applyLocal": "本地应用调色板",
++    "appliedFeedback": "调色板已本地应用。",
++    "contrastTitle": "基础对比度",
++    "contrastHelp": "近似检查文本、按钮和表面的WCAG对比度。",
++    "lowContrast": "低对比度",
++    "reviewBeforeApply": "应用前请检查此颜色。",
++    "recommendedText": "推荐文本：",
++    "lightText": "浅色",
++    "darkText": "深色",
++    "contrastStatuses": {
++      "ok": "对比度正常",
++      "low": "低对比度",
++      "review": "检查"
++    },
++    "contrast": {
++      "primaryLight": "primary上的浅色文本",
++      "primaryDark": "primary上的深色文本",
++      "accent": "accent上的文本",
++      "danger": "danger上的文本",
++      "background": "background上的主文本",
++      "surface": "surface上的主文本",
++      "button": "带文本的主按钮"
++    },
++    "tokens": {
++      "primary": "主色",
++      "secondary": "次色",
++      "accent": "强调色",
++      "success": "成功",
++      "warning": "警告",
++      "danger": "危险 / 已预留",
++      "background": "背景",
++      "surface": "表面"
++    },
++    "previewTitle": "真实UI预览",
++    "previewCardTitle": "运营面板",
++    "previewCardText": "按钮、徽章和输入框使用建议调色板。",
++    "previewPrimaryButton": "主按钮",
++    "previewSecondaryButton": "次按钮",
++    "previewInput": "示例输入",
++    "previewActiveBadge": "启用",
++    "previewReservedBadge": "已预留",
++    "previewNotice": "示例运营提示。",
++    "appearanceCardTitle": "高级调色板生成器",
++    "appearanceCardHelp": "在UI Kit中创建和谐配色、变化和对比度。本阶段仅本地应用。",
++    "openGenerator": "在UI Kit中打开生成器"
++  },
+   "usersForm": {
+     "newTitle": "新建",
+     "editTitle": "编辑",
+diff --git a/qa-reports/PRODUCT-C2-1-palette-contrast-generator-report-20260606-233619.md b/qa-reports/PRODUCT-C2-1-palette-contrast-generator-report-20260606-233619.md
+new file mode 100644
+index 0000000..a086baa
+--- /dev/null
++++ b/qa-reports/PRODUCT-C2-1-palette-contrast-generator-report-20260606-233619.md
+@@ -0,0 +1,115 @@
++# PRODUCT-C2.1 - Generador visual de paletas y contraste
++
++Fecha: 2026-06-06 23:36:19 America/Mexico_City
++Rama: feature/product-c2-1-palette-contrast-generator
++
++## Alcance
++
++- Agregar utilidades internas de color en `theme/colorUtils.ts`.
++- Agregar generador visual de paletas en `/ui-kit`.
++- Mantener editor HEX y overrides locales existentes.
++- Agregar armonias, variaciones, contraste basico y preview real de UI.
++- Mejorar previews de plantillas visuales.
++- Agregar acceso desde `/appearance` sin duplicar el laboratorio visual.
++- Agregar claves i18n en 7 idiomas.
++
++## Implementacion
++
++### Utilidades de color
++
++`theme/colorUtils.ts` incluye:
++
++- validacion y normalizacion HEX;
++- conversion HEX/RGB/HSL;
++- conversion HSL/RGB/HEX;
++- ajuste HSL;
++- tints, shades y tones;
++- armonias monocromatica, complementaria, analoga, triadica y tetradica;
++- luminancia relativa;
++- contraste WCAG aproximado;
++- recomendacion de texto claro/oscuro;
++- generacion de paleta semantica.
++
++### Generador en UI Kit
++
++El generador permite:
++
++- elegir color base;
++- editar HEX;
++- usar input nativo de color en web;
++- usar swatches rapidos;
++- ver HEX/RGB/HSL;
++- cambiar armonia;
++- ver tints, shades y tones;
++- cargar tokens individuales al editor;
++- aplicar paleta localmente;
++- revisar contraste;
++- ver preview real de UI.
++
++### Aplicacion local
++
++La accion `Aplicar paleta localmente` actualiza los tokens:
++
++- primary;
++- secondary;
++- accent;
++- success;
++- warning;
++- danger;
++- background;
++- surface.
++
++La persistencia usa `setCustomVisualIdentity` y `AsyncStorage`. No se toca backend.
++
++## I18N
++
++Se agrego `paletteGenerator.*` en:
++
++- es;
++- en;
++- pt-BR;
++- fr;
++- ja;
++- zh;
++- ko.
++
++Auditoria:
++
++- es: leaves=1147 missing=0 extra=0
++- en: leaves=1147 missing=0 extra=0
++- pt-BR: leaves=1147 missing=0 extra=0
++- fr: leaves=1147 missing=0 extra=0
++- ja: leaves=1147 missing=0 extra=0
++- zh: leaves=1147 missing=0 extra=0
++- ko: leaves=1147 missing=0 extra=0
++- static i18n keys=992
++- missing=0
++
++## Validaciones ejecutadas
++
++- `npm.cmd run lint`: PASS, 0 errores, 53 advertencias preexistentes.
++- `npx.cmd tsc --noEmit`: PASS.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: PASS.
++- `backend/control-ropa/.\\mvnw.cmd test`: PASS, 73 tests, 0 fallas, 0 errores.
++- `backend/control-ropa/.\\mvnw.cmd -q -DskipTests package`: PASS.
++- `git --no-pager diff --check`: PASS.
++
++## Validacion manual esperada
++
++1. Entrar con `qa.admin`.
++2. Abrir `/ui-kit`.
++3. Elegir color base en el generador.
++4. Ver tints, shades y tones.
++5. Cambiar armonia.
++6. Revisar paleta sugerida.
++7. Confirmar que el panel de contraste muestra estados y ratios.
++8. Aplicar paleta localmente.
++9. Confirmar que preview y editor HEX cambian.
++10. Abrir `/live` o `/customers` y confirmar que el tema local se refleja.
++11. Cambiar light/dark.
++12. Restaurar plantilla.
++13. Abrir `/appearance` y confirmar acceso al generador avanzado.
++
++## Resultado
++
++GO tecnico para QA visual/manual. No se implemento persistencia backend ni tenant; queda pendiente para una fase de branding por tenant.
+diff --git a/theme/colorUtils.ts b/theme/colorUtils.ts
+new file mode 100644
+index 0000000..9cd9523
+--- /dev/null
++++ b/theme/colorUtils.ts
+@@ -0,0 +1,245 @@
++export type RgbColor = {
++  r: number;
++  g: number;
++  b: number;
++};
++
++export type HslColor = {
++  h: number;
++  s: number;
++  l: number;
++};
++
++export type HarmonyType = 'monochromatic' | 'complementary' | 'analogous' | 'triadic' | 'tetradic';
++
++export type SemanticPalette = {
++  primary: string;
++  secondary: string;
++  accent: string;
++  success: string;
++  warning: string;
++  danger: string;
++  background: string;
++  surface: string;
++};
++
++const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
++const normalizeHue = (hue: number) => ((hue % 360) + 360) % 360;
++const toHexChannel = (value: number) => clamp(Math.round(value), 0, 255).toString(16).padStart(2, '0');
++
++export function isValidHexColor(value?: string | null) {
++  if (!value) return false;
++  return /^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value.trim());
++}
++
++export function normalizeHexColor(value?: string | null, fallback = '#2563EB') {
++  if (!value) return fallback;
++  const trimmed = value.trim();
++  if (!isValidHexColor(trimmed)) return fallback;
++  const clean = trimmed.replace('#', '');
++  const normalized =
++    clean.length === 3
++      ? clean
++          .split('')
++          .map((char) => char + char)
++          .join('')
++      : clean;
++  return `#${normalized.toUpperCase()}`;
++}
++
++export function hexToRgb(value?: string | null): RgbColor | null {
++  if (!isValidHexColor(value)) return null;
++  const clean = normalizeHexColor(value).replace('#', '');
++  return {
++    r: parseInt(clean.slice(0, 2), 16),
++    g: parseInt(clean.slice(2, 4), 16),
++    b: parseInt(clean.slice(4, 6), 16),
++  };
++}
++
++export function rgbToHex({ r, g, b }: RgbColor) {
++  return `#${toHexChannel(r)}${toHexChannel(g)}${toHexChannel(b)}`.toUpperCase();
++}
++
++export function rgbToHsl({ r, g, b }: RgbColor): HslColor {
++  const red = r / 255;
++  const green = g / 255;
++  const blue = b / 255;
++  const max = Math.max(red, green, blue);
++  const min = Math.min(red, green, blue);
++  const delta = max - min;
++  let h = 0;
++  const l = (max + min) / 2;
++
++  if (delta !== 0) {
++    if (max === red) h = ((green - blue) / delta) % 6;
++    else if (max === green) h = (blue - red) / delta + 2;
++    else h = (red - green) / delta + 4;
++    h *= 60;
++  }
++
++  const s = delta === 0 ? 0 : delta / (1 - Math.abs(2 * l - 1));
++
++  return {
++    h: normalizeHue(h),
++    s: Math.round(s * 100),
++    l: Math.round(l * 100),
++  };
++}
++
++export function hslToRgb({ h, s, l }: HslColor): RgbColor {
++  const hue = normalizeHue(h);
++  const saturation = clamp(s, 0, 100) / 100;
++  const lightness = clamp(l, 0, 100) / 100;
++  const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
++  const x = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
++  const match = lightness - chroma / 2;
++  let red = 0;
++  let green = 0;
++  let blue = 0;
++
++  if (hue < 60) [red, green, blue] = [chroma, x, 0];
++  else if (hue < 120) [red, green, blue] = [x, chroma, 0];
++  else if (hue < 180) [red, green, blue] = [0, chroma, x];
++  else if (hue < 240) [red, green, blue] = [0, x, chroma];
++  else if (hue < 300) [red, green, blue] = [x, 0, chroma];
++  else [red, green, blue] = [chroma, 0, x];
++
++  return {
++    r: Math.round((red + match) * 255),
++    g: Math.round((green + match) * 255),
++    b: Math.round((blue + match) * 255),
++  };
++}
++
++export function hslToHex(color: HslColor) {
++  return rgbToHex(hslToRgb(color));
++}
++
++export function hexToHsl(value?: string | null): HslColor | null {
++  const rgb = hexToRgb(value);
++  return rgb ? rgbToHsl(rgb) : null;
++}
++
++export function adjustHsl(value: string, adjustment: Partial<HslColor>) {
++  const hsl = hexToHsl(value);
++  if (!hsl) return normalizeHexColor(value);
++  return hslToHex({
++    h: normalizeHue(adjustment.h ?? hsl.h),
++    s: clamp(adjustment.s ?? hsl.s, 0, 100),
++    l: clamp(adjustment.l ?? hsl.l, 0, 100),
++  });
++}
++
++export function generateTints(value: string, count = 6) {
++  const base = hexToHsl(value) ?? hexToHsl('#2563EB')!;
++  return Array.from({ length: count }, (_, index) => {
++    const ratio = (index + 1) / (count + 1);
++    return hslToHex({ ...base, l: base.l + (96 - base.l) * ratio });
++  });
++}
++
++export function generateShades(value: string, count = 6) {
++  const base = hexToHsl(value) ?? hexToHsl('#2563EB')!;
++  return Array.from({ length: count }, (_, index) => {
++    const ratio = (index + 1) / (count + 1);
++    return hslToHex({ ...base, l: base.l - (base.l - 12) * ratio });
++  });
++}
++
++export function generateTones(value: string, count = 6) {
++  const base = hexToHsl(value) ?? hexToHsl('#2563EB')!;
++  return Array.from({ length: count }, (_, index) => {
++    const ratio = (index + 1) / (count + 1);
++    return hslToHex({
++      ...base,
++      s: base.s - (base.s - 24) * ratio,
++      l: base.l + (50 - base.l) * ratio * 0.4,
++    });
++  });
++}
++
++export function generateHarmonyColors(value: string, harmony: HarmonyType) {
++  const base = hexToHsl(value) ?? hexToHsl('#2563EB')!;
++  const hueSets: Record<HarmonyType, number[]> = {
++    monochromatic: [0, 0, 0, 0],
++    complementary: [0, 180, 210, 330],
++    analogous: [0, -30, 30, 60],
++    triadic: [0, 120, 240, 180],
++    tetradic: [0, 90, 180, 270],
++  };
++
++  return hueSets[harmony].map((offset, index) =>
++    hslToHex({
++      h: base.h + offset,
++      s: clamp(base.s - index * 6, 28, 86),
++      l: clamp(base.l + (index === 0 ? 0 : index % 2 === 0 ? -4 : 5), 28, 72),
++    }),
++  );
++}
++
++export function getRelativeLuminance(value: string) {
++  const rgb = hexToRgb(value);
++  if (!rgb) return null;
++
++  const channels = [rgb.r, rgb.g, rgb.b].map((channel) => {
++    const normalized = channel / 255;
++    return normalized <= 0.03928
++      ? normalized / 12.92
++      : Math.pow((normalized + 0.055) / 1.055, 2.4);
++  });
++
++  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
++}
++
++export function getContrastRatio(foreground: string, background: string) {
++  const foregroundLuminance = getRelativeLuminance(foreground);
++  const backgroundLuminance = getRelativeLuminance(background);
++  if (foregroundLuminance === null || backgroundLuminance === null) return null;
++
++  const lighter = Math.max(foregroundLuminance, backgroundLuminance);
++  const darker = Math.min(foregroundLuminance, backgroundLuminance);
++  return (lighter + 0.05) / (darker + 0.05);
++}
++
++export function getReadableTextColor(background: string, lightText = '#FFFFFF', darkText = '#0F172A') {
++  const lightRatio = getContrastRatio(lightText, background) ?? 0;
++  const darkRatio = getContrastRatio(darkText, background) ?? 0;
++  return lightRatio >= darkRatio ? lightText : darkText;
++}
++
++export function getContrastStatus(ratio: number | null): 'ok' | 'review' | 'low' {
++  if (ratio === null) return 'review';
++  if (ratio >= 4.5) return 'ok';
++  if (ratio >= 3) return 'review';
++  return 'low';
++}
++
++export function generateSemanticPalette(
++  value: string,
++  harmony: HarmonyType,
++  scheme: 'light' | 'dark',
++): SemanticPalette {
++  const base = normalizeHexColor(value);
++  const baseHsl = hexToHsl(base) ?? hexToHsl('#2563EB')!;
++  const harmonyColors = generateHarmonyColors(base, harmony);
++  const tone = generateTones(base, 4);
++  const shade = generateShades(base, 4);
++
++  return {
++    primary: base,
++    secondary: scheme === 'dark' ? tone[1] : shade[1],
++    accent: harmony === 'monochromatic' ? tone[2] : harmonyColors[1],
++    success: scheme === 'dark' ? '#86EFAC' : '#15803D',
++    warning: scheme === 'dark' ? '#FBBF24' : '#B45309',
++    danger: scheme === 'dark' ? '#FCA5A5' : '#B91C1C',
++    background:
++      scheme === 'dark'
++        ? hslToHex({ h: baseHsl.h, s: clamp(baseHsl.s * 0.28, 8, 24), l: 7 })
++        : hslToHex({ h: baseHsl.h, s: clamp(baseHsl.s * 0.24, 8, 22), l: 97 }),
++    surface:
++      scheme === 'dark'
++        ? hslToHex({ h: baseHsl.h, s: clamp(baseHsl.s * 0.3, 10, 28), l: 13 })
++        : hslToHex({ h: baseHsl.h, s: clamp(baseHsl.s * 0.18, 4, 16), l: 100 }),
++  };
++}

@@ -1,0 +1,391 @@
+﻿diff --git a/app/live.tsx b/app/live.tsx
+index 2e5cee3..c7661a4 100644
+--- a/app/live.tsx
++++ b/app/live.tsx
+@@ -4573,7 +4573,11 @@ export default function LiveScreen() {
+                               mayChangeLiveReservationStatus ? (
+                                 <View style={styles.buttonFill}>
+                                   <AppButton
+-                                    title={t('live.returnToReserved')}
++                                    title={
++                                      operationalSold
++                                        ? t('live.undoOperationalSold')
++                                        : t('live.returnToReserved')
++                                    }
+                                     variant="secondary"
+                                     loading={isUpdatingOperationalStatus}
+                                     onPress={() =>
+@@ -4584,7 +4588,9 @@ export default function LiveScreen() {
+                                     }
+                                   />
+                                   <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+-                                    {t('live.returnToReservedHelp')}
++                                    {operationalSold
++                                      ? t('live.undoOperationalSoldHelp')
++                                      : t('live.returnToReservedHelp')}
+                                   </AppText>
+                                 </View>
+                               ) : null}
+@@ -5660,7 +5666,7 @@ export default function LiveScreen() {
+                     {operationalSold && mayChangeLiveReservationStatus ? (
+                       <View style={styles.buttonFill}>
+                         <AppButton
+-                          title={t('live.returnToReserved')}
++                          title={t('live.undoOperationalSold')}
+                           variant="secondary"
+                           loading={isUpdatingOperationalStatus}
+                           onPress={() =>
+@@ -5671,7 +5677,7 @@ export default function LiveScreen() {
+                           }
+                         />
+                         <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+-                          {t('live.returnToReservedHelp')}
++                          {t('live.undoOperationalSoldHelp')}
+                         </AppText>
+                       </View>
+                     ) : null}
+diff --git a/docs/LIVE_FIX_A_ACTIONABLE_LIVE_BUTTONS.md b/docs/LIVE_FIX_A_ACTIONABLE_LIVE_BUTTONS.md
+index e2d5558..4c6b4fe 100644
+--- a/docs/LIVE_FIX_A_ACTIONABLE_LIVE_BUTTONS.md
++++ b/docs/LIVE_FIX_A_ACTIONABLE_LIVE_BUTTONS.md
+@@ -25,6 +25,23 @@ Esta fase corrige el feedback de frontend sin tocar backend, endpoints, pagos, c
+   - apartado cancelado.
+ - En esos casos se muestra `LiveNoticeModal` con mensaje claro y no se ejecuta actualizacion silenciosa.
+
++## Complemento de microcopy
++
++QA detecto que, despues de cerrar un apartado como venta LIVE, la accion inversa `Volver a apartado` podia confundirse con `Cancelar apartado`.
++
++Se separo el microcopy:
++
++- `Deshacer cierre de venta LIVE`: revierte el cierre operativo de venta LIVE y regresa el registro a seguimiento como apartado.
++- `Cancelar apartado`: cancela el apartado operativo de la prenda.
++
++Textos objetivo:
++
++- `Cerrar como venta LIVE`: cierra el apartado como venta operativa dentro del LIVE, sin pago ni caja.
++- `Deshacer cierre de venta LIVE`: regresa el registro a seguimiento como apartado, sin pago ni caja.
++- `Cancelar apartado`: cancela el apartado de la prenda, sin pago ni caja.
++
++No se cambiaron estados funcionales ni llamadas backend; solo se ajustaron claves y textos visibles.
++
+ ## Reglas mantenidas
+
+ - No se registra pago ni movimiento de caja al cerrar como venta LIVE.
+@@ -67,8 +84,12 @@ Las claves cubren:
+ 10. Confirmar que aparece una confirmacion visual dentro de la app.
+ 11. Confirmar que el mensaje aclara que no registra pago ni caja.
+ 12. Confirmar y validar que el estado cambia a venta LIVE.
+-13. Repetir con apartados ya cerrados/cancelados/liquidados si estan disponibles.
+-14. Validar light/dark y mobile/tablet.
++13. Confirmar que la accion inversa dice `Deshacer cierre de venta LIVE`.
++14. Confirmar que `Deshacer cierre de venta LIVE` regresa el registro a seguimiento como apartado.
++15. Confirmar que `Cancelar apartado` sigue siendo una accion separada.
++16. Confirmar que ambos textos de ayuda aclaran que no registran pago ni caja.
++17. Repetir con apartados ya cerrados/cancelados/liquidados si estan disponibles.
++18. Validar light/dark y mobile/tablet.
+
+ ## Limitaciones
+
+diff --git a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+index 20cd3d2..a6b8482 100644
+--- a/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
++++ b/docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md
+@@ -6,6 +6,8 @@
+
+ > Actualizacion LIVE-FIX-A: agregar a la corrida manual que `CAMBIAR POR PRENDA PREPARADA` muestre aviso si no hay prenda preparada y que `Cerrar como venta LIVE` use confirmacion visual accionable.
+
++> Complemento LIVE-FIX-A: validar que la accion inversa posterior a una venta LIVE diga `Deshacer cierre de venta LIVE`, que sea distinta de `Cancelar apartado` y que ambos helpers aclaren que no registran pago ni caja.
++
+ ## Objetivo
+
+ PRODUCT-D4 existe para convertir los casos `PENDIENTE_MANUAL` de PRODUCT-D2/D3 en resultados reales: `PASS`, `FAIL`, `BLOQUEADO` o `NO_APLICA`, siempre con evidencia capturada.
+diff --git a/docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md b/docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md
+index 300a514..dd09df6 100644
+--- a/docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md
++++ b/docs/PRODUCT_D4_REAL_QA_TEST_MATRIX.md
+@@ -26,6 +26,11 @@
+ | D4R-014 | Prendas / inventario | `qa.admin@local.test` | `/live` | Filtro de prendas disponibles/apartadas/vendidas | Dataset con estados variados | Abrir Buscar prenda; cambiar filtros | Disponibles por defecto; Todas muestra motivos; busqueda respeta filtro | Pendiente | PENDING_QA | S1 | Pendiente | Pendiente |
+ | D4R-015 | Prendas / inventario | `qa.admin@local.test` | `/items-create?returnTo=%2Flive` | Alta rapida valida campos requeridos | Catalogos cargados | Dejar campos requeridos vacios y generar | Dialogo accionable, helpers inline, formulario conserva valores | Pendiente | PENDING_QA | S2 | Pendiente | Pendiente |
+ | D4R-016 | LIVE operador | `qa.vendedor.centro@local.test` | `/live` | Cambio de precio no simula autorizacion | Vendedor sin capacidad de cambiar precio | Revisar precio LIVE | Precio solo lectura; no aparece solicitud pendiente simulada | Pendiente | PENDING_QA | S1 | Pendiente | Pendiente |
++| D4R-026 | LIVE operador | `qa.admin@local.test` | `/live` | Cerrar apartado como venta LIVE | LIVE activo con apartado elegible | Presionar `Cerrar como venta LIVE`; confirmar accion | Apartado cambia a venta LIVE operativa; no registra pago ni caja | Pendiente | PENDING_QA | S1 | Pendiente | Pendiente |
++| D4R-027 | LIVE operador | `qa.admin@local.test` | `/live` | Accion inversa de venta LIVE clara | Apartado ya cerrado como venta LIVE | Revisar acciones disponibles del registro | La accion inversa dice `Deshacer cierre de venta LIVE`; no dice `Volver a apartado` en ese estado | Pendiente | PENDING_QA | S2 | Pendiente | Pendiente |
++| D4R-028 | LIVE operador | `qa.admin@local.test` | `/live` | Deshacer cierre regresa a seguimiento | Apartado cerrado como venta LIVE | Presionar `Deshacer cierre de venta LIVE` | Registro vuelve a seguimiento como apartado; no registra pago ni caja | Pendiente | PENDING_QA | S1 | Pendiente | Pendiente |
++| D4R-029 | LIVE operador | `qa.admin@local.test` | `/live` | Cancelar apartado separado de deshacer venta | Apartado activo o venta LIVE segun flujo | Comparar `Deshacer cierre de venta LIVE` y `Cancelar apartado` | Las acciones no parecen iguales; cancelar apartado mantiene intencion de cancelar la prenda | Pendiente | PENDING_QA | S2 | Pendiente | Pendiente |
++| D4R-030 | LIVE operador | `qa.admin@local.test` | `/live` | Helpers aclaran no pago/caja | Apartado elegible y apartado cerrado como venta LIVE | Revisar ayudas de `Cerrar como venta LIVE`, `Deshacer cierre de venta LIVE` y `Cancelar apartado` | Los textos aclaran que no registran pago ni caja | Pendiente | PENDING_QA | S2 | Pendiente | Pendiente |
+ | D4R-017 | Apartados / reservas | `qa.admin@local.test` | `/reservations` | Apartados visibles y navegables | Apartados existentes | Abrir listado y detalle si aplica | Datos visibles, AppShell correcto, sin layout legacy | Pendiente | PENDING_QA | S2 | Pendiente | Pendiente |
+ | D4R-018 | UI Kit / diseno visual | `qa.admin@local.test` | `/ui-kit` | Revisar diseno visual | Admin logueado | Abrir editor visual | Flujo guiado visible; modo avanzado no satura; preview correcta | Pendiente | PENDING_QA | S3 | Pendiente | Pendiente |
+ | D4R-019 | UI Kit / diseno visual | `qa.admin@local.test` | `/ui-kit` | Cambiar/restaurar tema local | Admin logueado | Cambiar colores marca; aplicar; restaurar plantilla | Preview cambia; app refleja tema; restaurar vuelve al preset | Pendiente | PENDING_QA | S3 | Pendiente | Pendiente |
+diff --git a/docs/QA_TODO_HANDOFF.md b/docs/QA_TODO_HANDOFF.md
+index 236ee12..901c704 100644
+--- a/docs/QA_TODO_HANDOFF.md
++++ b/docs/QA_TODO_HANDOFF.md
+@@ -77,6 +77,11 @@ Usar `docs/QA_RESULTS_LOG.md` y la plantilla `qa-reports/manual-evidence/PRODUCT
+ | LIVE-007 | `qa.admin@local.test` | `/live` | Paneles accionables consistentes | Intentar apartar sin cliente; sin prenda; prenda ya apartada | Panel contextual claro, no modal innecesario | Estados preparados | PENDING_QA | Pendiente | Pendiente | S2 |
+ | LIVE-008 | `qa.admin@local.test` | `/items-create?returnTo=%2Flive` | Alta rapida valida faltantes | Dejar talla/precio/cantidad faltantes; generar | Dialogo accionable, helpers inline, no limpia formulario | Catalogos cargados | PENDING_QA | Pendiente | Pendiente | S2 |
+ | LIVE-009 | `qa.vendedor.centro@local.test` | `/live` | Autorizacion precio no simulada | Usar usuario sin `canChangeLivePrice`; revisar precio | Precio solo lectura; no modal de solicitud; no `Solicitud pendiente` | Live activo con prenda al aire | PENDING_QA | Pendiente | Pendiente | S1 |
++| LIVE-010 | `qa.admin@local.test` | `/live` | Cerrar apartado como venta LIVE | Presionar `Cerrar como venta LIVE`; confirmar accion | Apartado cambia a venta LIVE operativa; no registra pago ni caja | LIVE activo con apartado elegible | PENDING_QA | Pendiente | Pendiente | S1 |
++| LIVE-011 | `qa.admin@local.test` | `/live` | Accion inversa clara | Revisar acciones despues de venta LIVE | La accion inversa dice `Deshacer cierre de venta LIVE` | Apartado cerrado como venta LIVE | PENDING_QA | Pendiente | Pendiente | S2 |
++| LIVE-012 | `qa.admin@local.test` | `/live` | Deshacer cierre vuelve a apartado | Presionar `Deshacer cierre de venta LIVE` | Registro regresa a seguimiento como apartado; no registra pago ni caja | Apartado cerrado como venta LIVE | PENDING_QA | Pendiente | Pendiente | S1 |
++| LIVE-013 | `qa.admin@local.test` | `/live` | Cancelar apartado separado | Comparar `Deshacer cierre de venta LIVE` con `Cancelar apartado` | No parecen la misma accion; cancelar mantiene intencion de cancelar apartado | Apartado activo o venta LIVE segun flujo | PENDING_QA | Pendiente | Pendiente | S2 |
++| LIVE-014 | `qa.admin@local.test` | `/live` | Helpers no pago/caja | Revisar ayudas de cerrar, deshacer y cancelar | Los textos aclaran que no registran pago ni caja | Apartado elegible | PENDING_QA | Pendiente | Pendiente | S2 |
+ | UI-001 | `qa.admin@local.test` | `/ui-kit` | Flujo diseno visual | Abrir editor; revisar pasos visibles | Titulo comunica diseno de aplicacion; tecnico queda avanzado | N/A | PENDING_QA | Pendiente | Pendiente | S3 |
+ | UI-002 | `qa.admin@local.test` | `/ui-kit` | Cambiar colores marca | Cambiar primario/secundario/acento con picker propio | No abre selector nativo como experiencia principal; preview cambia | N/A | PENDING_QA | Pendiente | Pendiente | S3 |
+ | UI-003 | `qa.admin@local.test` | `/ui-kit` | Restaurar plantilla | Aplicar paleta local; restaurar plantilla | Tema vuelve a preset activo | N/A | PENDING_QA | Pendiente | Pendiente | S3 |
+diff --git a/locales/en/common.json b/locales/en/common.json
+index e126cdb..a8a6a91 100644
+--- a/locales/en/common.json
++++ b/locales/en/common.json
+@@ -544,7 +544,7 @@
+     "viewDetail": "View detail",
+     "charge": "Charge",
+     "markOperationalSold": "Close as LIVE sale",
+-    "markOperationalSoldHelp": "Closes this hold as a sale within LIVE. It does not record payment or cash register movement.",
++    "markOperationalSoldHelp": "Closes this hold as an operational sale within LIVE. It does not record payment or cashbox movement.",
+     "operationalSoldConfirmTitle": "Close as LIVE sale",
+     "operationalSoldConfirmMessage": "Close this hold as a LIVE sale? This does not record payment or cash register movement.",
+     "operationalSoldConfirmNoPaymentWarning": "This action does not record payment or cash register movement.",
+@@ -570,7 +570,7 @@
+     "markPending": "Keep hold",
+     "markPendingHelp": "Keeps the hold active for follow-up. It does not confirm sale, payment, or cashbox.",
+     "cancelOperational": "Cancel hold",
+-    "cancelOperationalHelp": "Cancels the operational hold for this item. It does not record payment or cash register movement.",
++    "cancelOperationalHelp": "Cancels the hold for this item. It does not record payment or cashbox movement.",
+     "cancelHoldTitle": "Cancel hold",
+     "cancelHoldReasonPrompt": "Select the cancellation reason. This does not process payments or cashbox movements.",
+     "cancelReasonCustomerDeclined": "Customer declined",
+@@ -608,6 +608,8 @@
+     "operationalHoldReactivatedMessage": "The record returned to Hold for follow-up. No payment or cash register movement was recorded.",
+     "operationalStatusNoChangesTitle": "No changes",
+     "operationalStatusNoChangesMessage": "This record was already on hold.",
++    "undoOperationalSold": "Undo LIVE sale close",
++    "undoOperationalSoldHelp": "Returns this record to follow-up as a hold. It does not record payment or cashbox movement.",
+     "returnToReservedHelp": "Returns this record to Hold for follow-up. It does not record payment or cash register movement.",
+     "removePreparedItem": "REMOVE PREPARED ITEM",
+     "removePreparedItemHelp": "This removes the prepared item only. It does not affect the live item.",
+diff --git a/locales/es/common.json b/locales/es/common.json
+index 6f65277..a1842ec 100644
+--- a/locales/es/common.json
++++ b/locales/es/common.json
+@@ -599,15 +599,17 @@
+     "noSize": "Sin talla",
+     "suggestedPrice": "Precio sugerido:",
+     "noPrice": "Sin precio",
+-    "markOperationalSoldHelp": "Cierra este apartado como venta dentro del LIVE. No registra pago ni caja.",
++    "markOperationalSoldHelp": "Cierra este apartado como venta operativa dentro del LIVE. No registra pago ni caja.",
+     "markPendingHelp": "Deja el apartado activo para seguimiento. No confirma venta, pago ni caja.",
+-    "cancelOperationalHelp": "Cancela el apartado operativo de esta prenda. No registra pago ni caja.",
++    "cancelOperationalHelp": "Cancela el apartado de esta prenda. No registra pago ni caja.",
+     "operationalCancelledTitle": "Apartado cancelado",
+     "operationalCancelledMessage": "El apartado fue cancelado operativamente. No se registro pago ni caja.",
+     "operationalHoldReactivatedTitle": "Apartado reactivado",
+     "operationalHoldReactivatedMessage": "El registro volvio a estado Apartado para seguimiento. No se registro pago ni caja.",
+     "operationalStatusNoChangesTitle": "Sin cambios",
+     "operationalStatusNoChangesMessage": "Este registro ya estaba como Apartado.",
++    "undoOperationalSold": "Deshacer cierre de venta LIVE",
++    "undoOperationalSoldHelp": "Regresa este registro a seguimiento como apartado. No registra pago ni caja.",
+     "returnToReservedHelp": "Regresa este registro a estado Apartado para seguimiento. No registra pago ni caja.",
+     "removePreparedItem": "QUITAR PRENDA PREPARADA",
+     "removePreparedItemHelp": "Quita esta prenda de preparacion. No afecta la prenda al aire.",
+diff --git a/locales/fr/common.json b/locales/fr/common.json
+index 8436bf3..e13ed30 100644
+--- a/locales/fr/common.json
++++ b/locales/fr/common.json
+@@ -544,7 +544,7 @@
+     "viewDetail": "Voir détail",
+     "charge": "Facturation",
+     "markOperationalSold": "Marquer opérationnel vendu",
+-    "markOperationalSoldHelp": "Marquer opérationnel vendu",
++    "markOperationalSoldHelp": "Ferme cette reservation comme vente operationnelle dans LIVE. N'enregistre aucun paiement ni caisse.",
+     "operationalSoldConfirmTitle": "Opérationnel vendu confirmer",
+     "operationalSoldConfirmMessage": "Opérationnel vendu confirmer",
+     "operationalSoldConfirmNoPaymentWarning": "Cette action n'enregistre aucun paiement ni mouvement de caisse.",
+@@ -570,7 +570,7 @@
+     "markPending": "Marquer en attente",
+     "markPendingHelp": "Marquer en attente",
+     "cancelOperational": "Annuler opérationnel",
+-    "cancelOperationalHelp": "Annuler opérationnel",
++    "cancelOperationalHelp": "Annule la reservation de cet article. N'enregistre aucun paiement ni caisse.",
+     "cancelHoldTitle": "Annuler mise de côté",
+     "cancelHoldReasonPrompt": "Annuler mise de côté motif",
+     "cancelReasonCustomerDeclined": "Annuler motif client élément",
+@@ -608,6 +608,8 @@
+     "operationalHoldReactivatedMessage": "Opérationnel mise de côté élément",
+     "operationalStatusNoChangesTitle": "Opérationnel statut sans élément",
+     "operationalStatusNoChangesMessage": "Opérationnel statut sans élément",
++    "undoOperationalSold": "Annuler la cloture de vente LIVE",
++    "undoOperationalSoldHelp": "Remet cet enregistrement en suivi comme reservation. N'enregistre aucun paiement ni caisse.",
+     "returnToReservedHelp": "Retour réservé",
+     "removePreparedItem": "Retirer préparé article",
+     "removePreparedItemHelp": "Retirer préparé article",
+diff --git a/locales/ja/common.json b/locales/ja/common.json
+index 6fbecc3..5264af4 100644
+--- a/locales/ja/common.json
++++ b/locales/ja/common.json
+@@ -544,7 +544,7 @@
+     "viewDetail": "詳細を見る",
+     "charge": "請求",
+     "markOperationalSold": "マーク 運用 販売済み",
+-    "markOperationalSoldHelp": "マーク 運用 販売済み",
++    "markOperationalSoldHelp": "この取り置きをLIVE内の運用販売として完了します。支払いもレジ処理も記録しません。",
+     "operationalSoldConfirmTitle": "運用 販売済み 確認",
+     "operationalSoldConfirmMessage": "運用 販売済み 確認",
+     "operationalSoldConfirmNoPaymentWarning": "この操作では支払いもレジ処理も記録されません。",
+@@ -570,7 +570,7 @@
+     "markPending": "マーク 保留",
+     "markPendingHelp": "マーク 保留",
+     "cancelOperational": "キャンセル 運用",
+-    "cancelOperationalHelp": "キャンセル 運用",
++    "cancelOperationalHelp": "この商品の取り置きをキャンセルします。支払いもレジ処理も記録しません。",
+     "cancelHoldTitle": "キャンセル 取り置き",
+     "cancelHoldReasonPrompt": "キャンセル 取り置き 理由",
+     "cancelReasonCustomerDeclined": "キャンセル 理由 顧客 項目",
+@@ -608,6 +608,8 @@
+     "operationalHoldReactivatedMessage": "運用 取り置き 項目",
+     "operationalStatusNoChangesTitle": "運用 ステータス なし 項目",
+     "operationalStatusNoChangesMessage": "運用 ステータス なし 項目",
++    "undoOperationalSold": "LIVE販売完了を取り消す",
++    "undoOperationalSoldHelp": "この記録を取り置きのフォローアップに戻します。支払いもレジ処理も記録しません。",
+     "returnToReservedHelp": "戻る 取り置き済み",
+     "removePreparedItem": "削除 準備済み 商品",
+     "removePreparedItemHelp": "削除 準備済み 商品",
+diff --git a/locales/ko/common.json b/locales/ko/common.json
+index d2b38a8..984d498 100644
+--- a/locales/ko/common.json
++++ b/locales/ko/common.json
+@@ -544,7 +544,7 @@
+     "viewDetail": "상세 보기",
+     "charge": "청구",
+     "markOperationalSold": "표시 운영 판매됨",
+-    "markOperationalSoldHelp": "표시 운영 판매됨",
++    "markOperationalSoldHelp": "이 홀드를 LIVE 안의 운영 판매로 마감합니다. 결제나 금전함 이동은 기록하지 않습니다.",
+     "operationalSoldConfirmTitle": "운영 판매됨 확인",
+     "operationalSoldConfirmMessage": "운영 판매됨 확인",
+     "operationalSoldConfirmNoPaymentWarning": "이 작업은 결제나 금전함 이동을 기록하지 않습니다.",
+@@ -570,7 +570,7 @@
+     "markPending": "표시 대기",
+     "markPendingHelp": "표시 대기",
+     "cancelOperational": "취소 운영",
+-    "cancelOperationalHelp": "취소 운영",
++    "cancelOperationalHelp": "이 상품의 홀드를 취소합니다. 결제나 금전함 이동은 기록하지 않습니다.",
+     "cancelHoldTitle": "취소 홀드",
+     "cancelHoldReasonPrompt": "취소 홀드 사유",
+     "cancelReasonCustomerDeclined": "취소 사유 고객 항목",
+@@ -608,6 +608,8 @@
+     "operationalHoldReactivatedMessage": "운영 홀드 항목",
+     "operationalStatusNoChangesTitle": "운영 상태 없음 항목",
+     "operationalStatusNoChangesMessage": "운영 상태 없음 항목",
++    "undoOperationalSold": "LIVE 판매 마감 되돌리기",
++    "undoOperationalSoldHelp": "이 기록을 홀드 후속 관리로 되돌립니다. 결제나 금전함 이동은 기록하지 않습니다.",
+     "returnToReservedHelp": "돌아가기 홀드됨",
+     "removePreparedItem": "제거 준비됨 상품",
+     "removePreparedItemHelp": "제거 준비됨 상품",
+diff --git a/locales/pt-BR/common.json b/locales/pt-BR/common.json
+index 904ddab..8a39356 100644
+--- a/locales/pt-BR/common.json
++++ b/locales/pt-BR/common.json
+@@ -544,7 +544,7 @@
+     "viewDetail": "Ver detalhe",
+     "charge": "Cobrança",
+     "markOperationalSold": "Marcar operacional vendido",
+-    "markOperationalSoldHelp": "Marcar operacional vendido",
++    "markOperationalSoldHelp": "Fecha esta reserva como venda operacional dentro do LIVE. Nao registra pagamento nem caixa.",
+     "operationalSoldConfirmTitle": "Operacional vendido confirmar",
+     "operationalSoldConfirmMessage": "Operacional vendido confirmar",
+     "operationalSoldConfirmNoPaymentWarning": "Esta acao nao registra pagamento nem movimento de caixa.",
+@@ -570,7 +570,7 @@
+     "markPending": "Marcar pendente",
+     "markPendingHelp": "Marcar pendente",
+     "cancelOperational": "Cancelar operacional",
+-    "cancelOperationalHelp": "Cancelar operacional",
++    "cancelOperationalHelp": "Cancela a reserva desta peca. Nao registra pagamento nem caixa.",
+     "cancelHoldTitle": "Cancelar apartado",
+     "cancelHoldReasonPrompt": "Cancelar apartado motivo",
+     "cancelReasonCustomerDeclined": "Cancelar motivo cliente campo",
+@@ -608,6 +608,8 @@
+     "operationalHoldReactivatedMessage": "Operacional apartado campo",
+     "operationalStatusNoChangesTitle": "Operacional status sem campo",
+     "operationalStatusNoChangesMessage": "Operacional status sem campo",
++    "undoOperationalSold": "Desfazer fechamento de venda LIVE",
++    "undoOperationalSoldHelp": "Retorna este registro para acompanhamento como reserva. Nao registra pagamento nem caixa.",
+     "returnToReservedHelp": "Voltar apartado",
+     "removePreparedItem": "Remover preparado peça",
+     "removePreparedItemHelp": "Remover preparado peça",
+diff --git a/locales/zh/common.json b/locales/zh/common.json
+index 762fa8d..034fcf4 100644
+--- a/locales/zh/common.json
++++ b/locales/zh/common.json
+@@ -544,7 +544,7 @@
+     "viewDetail": "查看详情",
+     "charge": "收款",
+     "markOperationalSold": "标记运营已售",
+-    "markOperationalSoldHelp": "标记运营已售",
++    "markOperationalSoldHelp": "将此预留关闭为LIVE内的运营销售。不会记录付款或收银变动。",
+     "operationalSoldConfirmTitle": "运营已售确认",
+     "operationalSoldConfirmMessage": "运营已售确认",
+     "operationalSoldConfirmNoPaymentWarning": "此操作不会记录付款或收银变动。",
+@@ -570,7 +570,7 @@
+     "markPending": "标记待处理",
+     "markPendingHelp": "标记待处理",
+     "cancelOperational": "取消运营",
+-    "cancelOperationalHelp": "取消运营",
++    "cancelOperationalHelp": "取消此商品的预留。不会记录付款或收银变动。",
+     "cancelHoldTitle": "取消预留",
+     "cancelHoldReasonPrompt": "取消预留原因",
+     "cancelReasonCustomerDeclined": "取消原因客户项目",
+@@ -608,6 +608,8 @@
+     "operationalHoldReactivatedMessage": "运营预留项目",
+     "operationalStatusNoChangesTitle": "运营状态无项目",
+     "operationalStatusNoChangesMessage": "运营状态无项目",
++    "undoOperationalSold": "撤销LIVE销售关闭",
++    "undoOperationalSoldHelp": "将此记录恢复为预留跟进。不会记录付款或收银变动。",
+     "returnToReservedHelp": "返回已预留",
+     "removePreparedItem": "移除已准备商品",
+     "removePreparedItemHelp": "移除已准备商品",
+diff --git a/qa-reports/LIVE-FIX-A-microcopy-actions-report-20260608-171556.md b/qa-reports/LIVE-FIX-A-microcopy-actions-report-20260608-171556.md
+new file mode 100644
+index 0000000..28c66ce
+--- /dev/null
++++ b/qa-reports/LIVE-FIX-A-microcopy-actions-report-20260608-171556.md
+@@ -0,0 +1,41 @@
++# LIVE-FIX-A - Complemento de microcopy de acciones LIVE
++
++## Contexto QA
++
++QA detecto microcopy confuso despues de cerrar un apartado como venta LIVE:
++
++- `Volver a apartado` no explicaba que deshacia el cierre operativo de venta LIVE.
++- Junto a `Cancelar apartado`, podia parecer una accion similar o ambigua.
++
++## Alcance ejecutado
++
++- Se agrego accion especifica `Deshacer cierre de venta LIVE` solo para registros en estado `OPERATIONAL_SOLD`.
++- Se mantuvo `Cancelar apartado` como accion separada.
++- Se ajustaron helpers:
++  - `Cerrar como venta LIVE`: venta operativa dentro del LIVE, sin pago ni caja.
++  - `Deshacer cierre de venta LIVE`: regresa a seguimiento como apartado, sin pago ni caja.
++  - `Cancelar apartado`: cancela el apartado de la prenda, sin pago ni caja.
++- Se actualizaron textos en ES, EN, PT-BR, FR, JA, ZH y KO.
++- Se actualizaron documentos QA y matriz PRODUCT-D4 REAL.
++
++## Fuera de alcance
++
++- No se modifico backend.
++- No se cambiaron estados funcionales.
++- No se tocaron pagos ni caja.
++- No se cambiaron permisos.
++- No se toco cambio de precio.
++
++## Validaciones ejecutadas
++
++- `npm.cmd run lint`: PASS con 53 warnings preexistentes del repositorio y 0 errores.
++- `npx.cmd tsc --noEmit`: PASS.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: PASS.
++- `git --no-pager diff --check`: PASS.
++
++No se ejecuto Maven porque el complemento no modifica backend, configuracion, contratos ni reglas funcionales.
++
++## Estado QA
++
++- Estado tecnico: implementado.
++- Estado QA: PENDING_QA.

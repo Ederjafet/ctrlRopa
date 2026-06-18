@@ -1,0 +1,21 @@
+﻿ app/batch-detail.tsx                             | 31 ++++++++++------
+ app/batch-form.tsx                               | 23 +++++++-----
+ app/customer-addresses-create.tsx                | 20 +++++++----
+ app/customer-addresses/[id].tsx                  | 28 ++++++++++-----
+ app/customer-order-detail.tsx                    | 32 ++++++++++-------
+ app/customer-orders.tsx                          | 46 +++++++++++++-----------
+ app/customer-package-detail.tsx                  | 32 ++++++++++-------
+ app/customer-packages.tsx                        | 46 +++++++++++++-----------
+ app/customers-create.tsx                         | 33 ++++++++++-------
+ app/customers.tsx                                | 10 ++++--
+ app/customers/[id].tsx                           | 32 ++++++++++-------
+ app/items/[id].tsx                               | 33 +++++++++++------
+ app/reservations.tsx                             | 10 ++++--
+ app/users.tsx                                    | 10 ++++--
+ docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md          |  8 +++++
+ docs/PRODUCT_D4_MANUAL_QA_EVIDENCE.md            | 20 +++++++++++
+ docs/PRODUCT_D5_NAVIGATION_PERMISSIONS_AUDIT.md  |  4 +++
+ docs/PRODUCT_D6_3_LEGACY_PREMIUM_MIGRATION.md    |  4 +++
+ docs/PRODUCT_D6_4_OPERATIONAL_LEGACY_APPSHELL.md | 12 ++++++-
+ docs/PRODUCT_D6_5_LEGACY_ROUTE_AUDIT.md          | 11 ++++++
+ 20 files changed, 301 insertions(+), 144 deletions(-)

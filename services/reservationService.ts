@@ -6,6 +6,12 @@ export type ReservationStatus =
   | 'CONVERTED_TO_SALE'
   | 'COMPLETED';
 
+export type LiveReservationOperationalStatus =
+  | 'PENDING'
+  | 'RESERVED'
+  | 'OPERATIONAL_SOLD'
+  | 'CANCELLED';
+
 export type CreateReservationRequest = {
   itemId: number;
   customerId: number;
@@ -14,6 +20,10 @@ export type CreateReservationRequest = {
   salesChannelId: number;
   price: number;
   createdByUserId: number;
+};
+
+type CreateReservationOptions = {
+  idempotencyKey?: string;
 };
 
 export type Reservation = {
@@ -33,18 +43,40 @@ export type Reservation = {
   sellerUserName?: string | null;
   price: number;
   status?: ReservationStatus;
+  liveOperationalStatus?: LiveReservationOperationalStatus | null;
+  liveOperationalStatusUpdatedAt?: string | null;
+  liveOperationalStatusUpdatedByUserId?: number | null;
+  liveOperationalStatusReason?: string | null;
   boxId?: number | null;
   boxCode?: string | null;
   createdAt?: string;
 };
 
 export async function createReservation(
-  payload: CreateReservationRequest
+  payload: CreateReservationRequest,
+  options: CreateReservationOptions = {}
 ): Promise<Reservation> {
+  const idempotencyKey = options.idempotencyKey ?? createReservationIdempotencyKey();
+
   return apiRequest<Reservation>('/api/reservations', {
     method: 'POST',
     body: payload,
+    headers: {
+      'X-Idempotency-Key': idempotencyKey,
+    },
   });
+}
+
+function createReservationIdempotencyKey(): string {
+  const cryptoApi = globalThis.crypto;
+  const randomUUID =
+    cryptoApi && typeof cryptoApi.randomUUID === 'function'
+      ? cryptoApi.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random()
+          .toString(36)
+          .slice(2)}`;
+
+  return `reservation-${randomUUID}`;
 }
 
 export async function getReservationsByBranch(
@@ -100,4 +132,18 @@ export async function cancelReservation(
           reason,
         },
   });
+}
+
+export async function updateLiveReservationOperationalStatus(
+  reservationId: number,
+  status: LiveReservationOperationalStatus,
+  reason?: string
+): Promise<Reservation> {
+  return apiRequest<Reservation>(
+    `/api/reservations/${reservationId}/live-operational-status`,
+    {
+      method: 'PATCH',
+      body: reason ? { status, reason } : { status },
+    }
+  );
 }

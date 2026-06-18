@@ -1,0 +1,3794 @@
+﻿diff --git a/app/customers.tsx b/app/customers.tsx
+index 3df6565..c21c07b 100644
+--- a/app/customers.tsx
++++ b/app/customers.tsx
+@@ -1,29 +1,20 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShell from '@/components/layout/AppShell';
++import { buildMainNavSections, getSessionScopeLabel } from '@/components/layout/appNavigation';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+ import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
++import EmptyState from '@/components/ui/EmptyState';
++import StatusBadge from '@/components/ui/StatusBadge';
+ import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
+-
+-import {
+-    Customer,
+-    getCustomersByBranch,
+-} from '@/services/customerService';
+-
+-import { ApiError } from '@/services/apiClient';
+ import { canAccessByPermission } from '@/services/accessControl';
+-import { getSession } from '@/services/sessionStorage';
+-
++import { ApiError } from '@/services/apiClient';
++import { Customer, getCustomersByBranch } from '@/services/customerService';
++import { getSession, UserSession } from '@/services/sessionStorage';
+ import { useFocusEffect, useRouter } from 'expo-router';
+-import { useCallback, useState } from 'react';
+-import {
+-    ActivityIndicator,
+-    FlatList,
+-    Pressable,
+-    StyleSheet,
+-    View,
+-} from 'react-native';
++import { useCallback, useMemo, useState } from 'react';
++import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
+
+ export default function CustomersScreen() {
+   const router = useRouter();
+@@ -35,6 +26,8 @@ export default function CustomersScreen() {
+   const [search, setSearch] = useState('');
+   const [isLoading, setIsLoading] = useState(true);
+   const [canCreateCustomer, setCanCreateCustomer] = useState(false);
++  const [session, setSession] = useState<UserSession | null>(null);
++  const navSections = useMemo(() => buildMainNavSections(session), [session]);
+
+   useFocusEffect(
+     useCallback(() => {
+@@ -43,19 +36,21 @@ export default function CustomersScreen() {
+   );
+
+   const loadCustomers = async () => {
+-    const session = await getSession();
+-    if (!session) return;
++    const currentSession = await getSession();
++    if (!currentSession) return;
+
+-    if (!canAccessByPermission(session, 'VIEW_CUSTOMERS')) {
++    setSession(currentSession);
++
++    if (!canAccessByPermission(currentSession, 'VIEW_CUSTOMERS')) {
+       router.replace('/access-denied' as any);
+       return;
+     }
+
+-    setCanCreateCustomer(canAccessByPermission(session, 'CREATE_CUSTOMER'));
++    setCanCreateCustomer(canAccessByPermission(currentSession, 'CREATE_CUSTOMER'));
+
+     try {
+       setIsLoading(true);
+-      const data = await getCustomersByBranch(session.branchId);
++      const data = await getCustomersByBranch(currentSession.branchId);
+       setCustomers(data);
+       setFiltered(data);
+     } catch (err: any) {
+@@ -97,23 +92,27 @@ export default function CustomersScreen() {
+   }
+
+   return (
+-    <AppScreen scroll={false}>
+-      <AppBackButton fallbackRoute="/" />
+-
+-      <AppText variant="title" bold>
+-        Clientes
+-      </AppText>
+-
+-      {canCreateCustomer ? (
+-        <AppButton
+-          title="Nuevo cliente"
+-          onPress={() => router.push('/customers-create' as any)}
+-        />
+-      ) : null}
+-
++    <AppShell
++      title="Clientes"
++      subtitle="Seguimiento comercial y datos de contacto"
++      contextTitle="Cartera de clientes"
++      contextSubtitle={getSessionScopeLabel(session)}
++      activeRoute="customers"
++      session={session}
++      navSections={navSections}
++      rightContent={
++        canCreateCustomer ? (
++          <AppButton
++            title="Nuevo cliente"
++            variant="secondary"
++            onPress={() => router.push('/customers-create' as any)}
++          />
++        ) : null
++      }
++    >
+       <View style={styles.search}>
+         <AppInput
+-          placeholder="Buscar por nombre, teléfono o correo"
++          placeholder="Buscar por nombre, telefono o correo"
+           value={search}
+           onChangeText={handleSearch}
+         />
+@@ -132,51 +131,69 @@ export default function CustomersScreen() {
+             style={styles.customerTile}
+             onPress={() => router.push(`/customers/${item.id}` as any)}
+           >
+-            <AppCard>
+-              <AppText bold>{item.name}</AppText>
+-
+-              <AppText>
+-                {item.phone || 'Sin teléfono'} ·{' '}
+-                {item.email || 'Sin correo'}
+-              </AppText>
+-
+-              {item.isGeneric ? (
+-                <AppText variant="caption" color="#666666">
+-                  Cliente genérico {item.genericType || ''}
+-                </AppText>
+-              ) : null}
+-
+-              <AppText variant="caption" color="#666666" style={styles.hint}>
++            <AppCard variant="elevated" style={styles.customerCard}>
++              <View style={styles.customerHeader}>
++                <View style={styles.customerText}>
++                  <AppText bold numberOfLines={2}>
++                    {item.name}
++                  </AppText>
++                  <AppText numberOfLines={2}>
++                    {item.phone || 'Sin telefono'} · {item.email || 'Sin correo'}
++                  </AppText>
++                </View>
++                {item.isGeneric ? (
++                  <StatusBadge label={`Generico ${item.genericType || ''}`.trim()} tone="info" />
++                ) : null}
++              </View>
++
++              <AppText variant="caption" style={styles.hint}>
+                 Tocar para ver detalle
+               </AppText>
+             </AppCard>
+           </Pressable>
+         )}
+         ListEmptyComponent={
+-          <AppText>No hay clientes registrados.</AppText>
++          <EmptyState
++            title="No hay clientes registrados"
++            message="Cuando existan clientes, apareceran aqui."
++          />
+         }
+       />
+-    </AppScreen>
++    </AppShell>
+   );
+ }
+
+ const styles = StyleSheet.create({
+-  list: {
+-    flex: 1,
++  customerCard: {
++    minHeight: 126,
+   },
+-  listContent: {
+-    paddingBottom: 24,
++  customerHeader: {
++    alignItems: 'flex-start',
++    flexDirection: 'row',
++    gap: 12,
++    justifyContent: 'space-between',
+   },
+-  search: {
+-    marginTop: 12,
++  customerText: {
++    flex: 1,
++    minWidth: 0,
++  },
++  customerTile: {
++    flex: 1,
+   },
+   hint: {
+     marginTop: 8,
+   },
+-  customerTile: {
++  list: {
+     flex: 1,
+   },
+   listColumns: {
+     gap: 12,
+   },
++  listContent: {
++    gap: 12,
++    paddingBottom: 24,
++  },
++  search: {
++    marginBottom: 12,
++  },
+ });
+diff --git a/app/live.tsx b/app/live.tsx
+index 0f6ddcf..3794415 100644
+--- a/app/live.tsx
++++ b/app/live.tsx
+@@ -2395,7 +2395,7 @@ export default function LiveScreen() {
+     const isHighlightedBlocked =
+       !!options.highlighted && !isHighlightedReserved && !availability.canGoOnAir;
+     const cardBorderColor = isHighlightedReserved
+-      ? theme.colors.warning
++      ? theme.colors.danger
+       : isHighlightedBlocked
+         ? theme.colors.danger
+       : options.highlighted
+@@ -2413,14 +2413,14 @@ export default function LiveScreen() {
+         ? theme.colors.surfaceAlt
+         : theme.colors.surfaceElevated;
+     const placeholderBackgroundColor = isHighlightedReserved
+-      ? theme.colors.surfaceAlt
++      ? theme.colors.dangerSoft
+       : options.highlighted
+       ? theme.colors.accentSoft
+       : isPreparedForChange
+         ? theme.colors.warningBackground
+         : theme.colors.accentSoft;
+     const stateColor = isHighlightedReserved
+-      ? theme.colors.warning
++      ? theme.colors.danger
+       : isHighlightedBlocked
+         ? theme.colors.danger
+       : options.highlighted
+@@ -2432,7 +2432,7 @@ export default function LiveScreen() {
+       ? t('live.activeItemReservedStatus')
+       : availability.label;
+     const availabilityTone = isHighlightedReserved
+-      ? theme.colors.warning
++      ? theme.colors.danger
+       : isHighlightedBlocked
+         ? theme.colors.danger
+       : availability.canGoOnAir
+@@ -2509,13 +2509,13 @@ export default function LiveScreen() {
+                     style={[
+                       styles.operatorItemBadge,
+                       {
+-                        backgroundColor: theme.colors.warningBackground,
+-                        borderColor: theme.colors.warning,
++                        backgroundColor: theme.colors.dangerSoft,
++                        borderColor: theme.colors.danger,
+                         borderRadius: theme.radius.sm,
+                       },
+                     ]}
+                   >
+-                    <AppText variant="caption" color={theme.colors.warning} bold>
++                    <AppText variant="caption" color={theme.colors.danger} bold>
+                       {t('live.activeItemReservedChip')}
+                     </AppText>
+                   </View>
+@@ -2557,13 +2557,13 @@ export default function LiveScreen() {
+                 {
+                   backgroundColor: theme.isDark
+                     ? theme.colors.surfaceMuted
+-                    : theme.colors.warningBackground,
+-                  borderColor: theme.colors.warning,
++                    : theme.colors.dangerSoft,
++                  borderColor: theme.colors.danger,
+                   borderRadius: theme.radius.sm,
+                 },
+               ]}
+             >
+-              <AppText variant="caption" color={theme.colors.warning}>
++              <AppText variant="caption" color={theme.colors.danger}>
+                 {t('live.activeItemReservedNextStepHelp')}
+               </AppText>
+             </View>
+diff --git a/app/reports.tsx b/app/reports.tsx
+index 8fdeeb2..f94d881 100644
+--- a/app/reports.tsx
++++ b/app/reports.tsx
+@@ -1,11 +1,13 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShell from '@/components/layout/AppShell';
++import { buildMainNavSections, getSessionScopeLabel } from '@/components/layout/appNavigation';
++import ActionTile from '@/components/ui/ActionTile';
+ import AppInfoCard from '@/components/ui/AppInfoCard';
+ import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
++import { getSession, UserSession } from '@/services/sessionStorage';
+ import { useRouter } from 'expo-router';
+-import { Pressable, StyleSheet, View } from 'react-native';
++import { useEffect, useMemo, useState } from 'react';
+
+ type ReportAccess = {
+   title: string;
+@@ -25,8 +27,8 @@ const reports: ReportAccess[] = [
+     route: '/report-deliveries',
+   },
+   {
+-    title: 'Depósitos diarios',
+-    description: 'Pagos recibidos, métodos, referencias y totales del día.',
++    title: 'Depositos diarios',
++    description: 'Pagos recibidos, metodos, referencias y totales del dia.',
+     route: '/report-deposits',
+   },
+   {
+@@ -36,7 +38,7 @@ const reports: ReportAccess[] = [
+   },
+   {
+     title: 'Control Live',
+-    description: 'Paquetes, piezas, saldos y liquidación de operación Live.',
++    description: 'Paquetes, piezas, saldos y liquidacion de operacion Live.',
+     route: '/report-live',
+   },
+   {
+@@ -49,79 +51,41 @@ const reports: ReportAccess[] = [
+ export default function ReportsScreen() {
+   const router = useRouter();
+   const { theme } = useAppTheme();
++  const [session, setSession] = useState<UserSession | null>(null);
++  const navSections = useMemo(() => buildMainNavSections(session), [session]);
+
+-  return (
+-    <AppScreen>
+-      <AppBackButton fallbackRoute="/" />
+-
+-      <AppText variant="title" bold>
+-        Reportes
+-      </AppText>
++  useEffect(() => {
++    getSession().then(setSession);
++  }, []);
+
++  return (
++    <AppShell
++      title="Reportes"
++      subtitle="Consultas operativas por fecha y sucursal"
++      contextTitle="Centro de reportes"
++      contextSubtitle={getSessionScopeLabel(session)}
++      activeRoute="reports"
++      session={session}
++      navSections={navSections}
++    >
+       <AppInfoCard title="Reportes operativos">
+         <AppText color={theme.colors.infoCardText}>
+-          Consulta reportes por fecha y sucursal. Incluye operación diaria,
+-          depósitos, entregas, cancelaciones, control Live y remisiones.
++          Consulta reportes por fecha y sucursal. Incluye operacion diaria, depositos, entregas,
++          cancelaciones, control Live y remisiones.
+         </AppText>
+       </AppInfoCard>
+
+       <AppResponsiveGrid tabletColumns={2} desktopColumns={3}>
+         {reports.map((report) => (
+-          <Pressable
++          <ActionTile
+             key={report.title}
++            title={report.title}
++            subtitle={report.description}
++            icon="analytics"
+             onPress={() => router.push(report.route as any)}
+-            style={({ pressed }) => [
+-              styles.reportCard,
+-              {
+-                backgroundColor: theme.colors.surface,
+-                borderColor: theme.colors.border,
+-                borderRadius: theme.radius.md,
+-                opacity: pressed ? 0.8 : 1,
+-                padding: theme.spacing.md,
+-              },
+-            ]}
+-          >
+-            <View style={styles.headerRow}>
+-              <View style={styles.headerText}>
+-                <AppText variant="subtitle" bold>
+-                  {report.title}
+-                </AppText>
+-                <AppText color={theme.colors.mutedText}>{report.description}</AppText>
+-                <AppText bold color={theme.colors.accent} style={styles.actionText}>
+-                  Abrir reporte
+-                </AppText>
+-              </View>
+-              <AppText color={theme.colors.accent} style={styles.chevron}>
+-                ›
+-              </AppText>
+-            </View>
+-          </Pressable>
++          />
+         ))}
+       </AppResponsiveGrid>
+-    </AppScreen>
++    </AppShell>
+   );
+ }
+-
+-const styles = StyleSheet.create({
+-  headerRow: {
+-    alignItems: 'flex-start',
+-    flexDirection: 'row',
+-    gap: 12,
+-    justifyContent: 'space-between',
+-  },
+-  headerText: {
+-    flex: 1,
+-  },
+-  reportCard: {
+-    borderWidth: 1,
+-    marginBottom: 12,
+-    minHeight: 118,
+-  },
+-  actionText: {
+-    marginTop: 12,
+-  },
+-  chevron: {
+-    fontSize: 28,
+-    lineHeight: 32,
+-  },
+-});
+diff --git a/app/reservations.tsx b/app/reservations.tsx
+index b170495..40b554a 100644
+--- a/app/reservations.tsx
++++ b/app/reservations.tsx
+@@ -1,4 +1,5 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShell from '@/components/layout/AppShell';
++import { buildMainNavSections, getSessionScopeLabel } from '@/components/layout/appNavigation';
+ import AppBottomModal from '@/components/ui/AppBottomModal';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+@@ -6,8 +7,8 @@ import AppInput from '@/components/ui/AppInput';
+ import AppOptionRow from '@/components/ui/AppOptionRow';
+ import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+-import { useAppTheme } from '@/context/AppThemeContext';
+-
++import EmptyState from '@/components/ui/EmptyState';
++import StatusBadge from '@/components/ui/StatusBadge';
+ import { Box, getActiveBoxesByBranch } from '@/services/boxService';
+ import {
+   assignReservationToBox,
+@@ -15,18 +16,10 @@ import {
+   getReservationsWithoutBox,
+   type Reservation,
+ } from '@/services/reservationService';
+-import { getSession } from '@/services/sessionStorage';
+-
++import { getSession, UserSession } from '@/services/sessionStorage';
+ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+ import { useCallback, useMemo, useState } from 'react';
+-import {
+-  ActivityIndicator,
+-  Alert,
+-  FlatList,
+-  Pressable,
+-  StyleSheet,
+-  View,
+-} from 'react-native';
++import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
+
+ type ReservationFilter = 'ACTIVE' | 'WITHOUT_BOX';
+
+@@ -74,10 +67,23 @@ function formatMoney(value?: number | null) {
+   return `$${Number(value).toFixed(2)}`;
+ }
+
++function getReservationTone(status?: string): 'success' | 'warning' | 'danger' | 'info' | 'neutral' {
++  switch (status) {
++    case 'ACTIVE':
++      return 'success';
++    case 'CANCELLED':
++      return 'danger';
++    case 'COMPLETED':
++    case 'CONVERTED_TO_SALE':
++      return 'info';
++    default:
++      return 'neutral';
++  }
++}
++
+ export default function ReservationsScreen() {
+   const router = useRouter();
+   const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
+-  const { theme } = useAppTheme();
+   const returnTo = Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo;
+   const isLiveContext = returnTo === '/live';
+
+@@ -91,15 +97,18 @@ export default function ReservationsScreen() {
+   const [errorMessage, setErrorMessage] = useState('');
+   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
+   const [isBoxModalVisible, setIsBoxModalVisible] = useState(false);
++  const [session, setSession] = useState<UserSession | null>(null);
++  const navSections = useMemo(() => buildMainNavSections(session), [session]);
+
+   const loadReservations = useCallback(
+     async (refreshing = false, nextFilter: ReservationFilter = filter) => {
+-      const session = await getSession();
++      const currentSession = await getSession();
++      setSession(currentSession);
+
+-      if (!session?.branchId) {
++      if (!currentSession?.branchId) {
+         setReservations([]);
+         setBoxes([]);
+-        setErrorMessage('No se encontró sucursal activa en la sesión.');
++        setErrorMessage('No se encontro sucursal activa en la sesion.');
+         setIsLoading(false);
+         setIsRefreshing(false);
+         return;
+@@ -116,9 +125,9 @@ export default function ReservationsScreen() {
+
+         const [reservationData, boxData] = await Promise.all([
+           nextFilter === 'WITHOUT_BOX'
+-            ? getReservationsWithoutBox(session.branchId)
+-            : getReservationsByBranch(session.branchId),
+-          getActiveBoxesByBranch(session.branchId),
++            ? getReservationsWithoutBox(currentSession.branchId)
++            : getReservationsByBranch(currentSession.branchId),
++          getActiveBoxesByBranch(currentSession.branchId),
+         ]);
+
+         const active = reservationData.filter((reservation) => {
+@@ -156,7 +165,7 @@ export default function ReservationsScreen() {
+         ${reservation.itemCode ?? ''}
+         ${reservation.customerName ?? ''}
+         ${reservation.status ?? ''}
+-                ${reservation.salesChannelName ?? ''}
++        ${reservation.salesChannelName ?? ''}
+         ${reservation.liveId ?? ''}
+         ${reservation.liveNotes ?? ''}
+         ${reservation.boxCode ?? ''}
+@@ -211,37 +220,30 @@ export default function ReservationsScreen() {
+   }
+
+   return (
+-    <AppScreen scroll={false}>
+-      <AppBackButton fallbackRoute={returnTo || '/'} />
+-
+-      <View style={styles.header}>
+-        <AppText variant="title" bold>
+-          Apartados / Reservas
+-        </AppText>
+-        <AppText variant="caption">
+-          Reservas activas de la sucursal
+-        </AppText>
+-      </View>
+-
+-      {isLiveContext ? (
+-        <AppButton
+-          title="Volver al live activo"
+-          variant="secondary"
+-          onPress={() => router.replace('/live' as any)}
+-          style={styles.liveReturnButton}
+-        />
+-      ) : null}
+-
++    <AppShell
++      title="Reservas"
++      subtitle="Apartados activos, cajas y seguimiento"
++      contextTitle="Apartados y reservas"
++      contextSubtitle={getSessionScopeLabel(session)}
++      activeRoute="reservations"
++      session={session}
++      navSections={navSections}
++      rightContent={
++        isLiveContext ? (
++          <AppButton title="Volver al live" variant="secondary" onPress={() => router.replace('/live' as any)} />
++        ) : null
++      }
++    >
+       <View style={styles.filterRow}>
+         <AppButton
+           title="Activas"
+-          variant={filter === 'ACTIVE' ? 'primary' : 'secondary'}
++          variant={filter === 'ACTIVE' ? 'primary' : 'neutral'}
+           onPress={() => changeFilter('ACTIVE')}
+           style={styles.filterButton}
+         />
+         <AppButton
+           title="Sin caja"
+-          variant={filter === 'WITHOUT_BOX' ? 'primary' : 'secondary'}
++          variant={filter === 'WITHOUT_BOX' ? 'primary' : 'neutral'}
+           onPress={() => changeFilter('WITHOUT_BOX')}
+           style={styles.filterButton}
+         />
+@@ -254,7 +256,7 @@ export default function ReservationsScreen() {
+       />
+
+       {errorMessage ? (
+-        <AppCard>
++        <AppCard variant="danger">
+           <AppText>{errorMessage}</AppText>
+           <AppButton
+             title="Reintentar"
+@@ -278,39 +280,25 @@ export default function ReservationsScreen() {
+               })
+             }
+           >
+-            <AppCard>
++            <AppCard variant="elevated">
+               <View style={styles.cardHeader}>
+-                <AppText bold>Apartado #{item.id}</AppText>
+-                <AppText bold>{getReservationStatusLabel(item.status)}</AppText>
++                <View style={styles.cardTitle}>
++                  <AppText bold>Apartado #{item.id}</AppText>
++                  <AppText variant="caption">
++                    {getSalesChannelLabel(item.salesChannelCode, item.salesChannelName) || 'Canal no capturado'}
++                  </AppText>
++                </View>
++                <StatusBadge label={getReservationStatusLabel(item.status)} tone={getReservationTone(item.status)} />
+               </View>
+
+-              <AppText>
+-                Cliente: {item.customerName || `ID ${item.customerId}`}
+-              </AppText>
+-
+-              <AppText>
+-                Prenda: {item.itemCode || `ID ${item.itemId}`}
+-              </AppText>
+-
+-              {getSalesChannelLabel(item.salesChannelCode, item.salesChannelName) ? (
+-                <AppText>
+-                  Canal: {getSalesChannelLabel(item.salesChannelCode, item.salesChannelName)}
+-                </AppText>
+-              ) : null}
+-
+-              {item.liveId ? (
+-                <AppText>
+-                  Live: {getLiveLabel(item)}
+-                </AppText>
+-              ) : null}
+-
++              <AppText>Cliente: {item.customerName || `ID ${item.customerId}`}</AppText>
++              <AppText>Prenda: {item.itemCode || `ID ${item.itemId}`}</AppText>
++              {item.liveId ? <AppText>Live: {getLiveLabel(item)}</AppText> : null}
+               <AppText>Caja: {item.boxCode || 'Sin caja'}</AppText>
+
+               <View style={styles.row}>
+                 <AppText bold>{formatMoney(item.price)}</AppText>
+-                <AppText variant="caption" color={theme.colors.mutedText}>
+-                  Tocar para ver detalle
+-                </AppText>
++                <AppText variant="caption">Tocar para ver detalle</AppText>
+               </View>
+
+               {!item.boxId ? (
+@@ -328,30 +316,21 @@ export default function ReservationsScreen() {
+         onRefresh={() => loadReservations(true)}
+         contentContainerStyle={styles.listContent}
+         ListEmptyComponent={
+-          <AppCard>
+-            <AppText>
+-              {filter === 'WITHOUT_BOX'
+-                ? 'No hay apartados activos sin caja.'
+-                : 'No hay apartados activos.'}
+-            </AppText>
+-          </AppCard>
++          <EmptyState
++            title={filter === 'WITHOUT_BOX' ? 'No hay apartados activos sin caja' : 'No hay apartados activos'}
++            message="Cuando existan reservas para este filtro, apareceran aqui."
++          />
+         }
+       />
+
+-      <AppBottomModal
+-        visible={isBoxModalVisible}
+-        title="Asignar caja"
+-        onClose={closeBoxModal}
+-      >
++      <AppBottomModal visible={isBoxModalVisible} title="Asignar caja" onClose={closeBoxModal}>
+         {selectedReservation ? (
+-          <AppCard>
++          <AppCard variant="subtle">
+             <AppText bold>Apartado #{selectedReservation.id}</AppText>
+             <AppText>
+               Cliente: {selectedReservation.customerName || `ID ${selectedReservation.customerId}`}
+             </AppText>
+-            <AppText>
+-              Prenda: {selectedReservation.itemCode || `ID ${selectedReservation.itemId}`}
+-            </AppText>
++            <AppText>Prenda: {selectedReservation.itemCode || `ID ${selectedReservation.itemId}`}</AppText>
+           </AppCard>
+         ) : null}
+
+@@ -365,68 +344,62 @@ export default function ReservationsScreen() {
+             />
+           ))
+         ) : (
+-          <AppText color={theme.colors.mutedText}>
+-            No hay cajas activas configuradas para esta sucursal.
+-          </AppText>
++          <AppText>No hay cajas activas configuradas para esta sucursal.</AppText>
+         )}
+
+-        {isAssigningBox ? (
+-          <AppText color={theme.colors.mutedText} style={styles.savingText}>
+-            Asignando caja...
+-          </AppText>
+-        ) : null}
++        {isAssigningBox ? <AppText style={styles.savingText}>Asignando caja...</AppText> : null}
+       </AppBottomModal>
+-    </AppScreen>
++    </AppShell>
+   );
+ }
+
+ const styles = StyleSheet.create({
+-  list: {
+-    flex: 1,
++  assignButton: {
++    marginTop: 12,
+   },
+-  loadingContainer: {
+-    flex: 1,
+-    alignItems: 'center',
+-    justifyContent: 'center',
++  cardHeader: {
++    alignItems: 'flex-start',
++    flexDirection: 'row',
++    gap: 12,
++    justifyContent: 'space-between',
++    marginBottom: 8,
+   },
+-  loadingText: {
+-    marginTop: 12,
++  cardTitle: {
++    flex: 1,
++    minWidth: 0,
+   },
+-  header: {
+-    marginBottom: 12,
++  filterButton: {
++    flex: 1,
+   },
+   filterRow: {
+     flexDirection: 'row',
+     gap: 8,
+     marginBottom: 12,
+   },
+-  liveReturnButton: {
+-    marginBottom: 12,
+-  },
+-  filterButton: {
++  list: {
+     flex: 1,
+   },
+-  retryButton: {
+-    marginTop: 12,
+-  },
+   listContent: {
++    gap: 12,
+     paddingBottom: 24,
+   },
+-  cardHeader: {
+-    flexDirection: 'row',
+-    justifyContent: 'space-between',
+-    gap: 12,
+-    marginBottom: 8,
++  loadingContainer: {
++    alignItems: 'center',
++    flex: 1,
++    justifyContent: 'center',
++  },
++  loadingText: {
++    marginTop: 12,
++  },
++  retryButton: {
++    marginTop: 12,
+   },
+   row: {
+-    marginTop: 10,
+-    flexDirection: 'row',
+-    justifyContent: 'space-between',
+     alignItems: 'center',
++    flexDirection: 'row',
+     gap: 12,
+-  },
+-  assignButton: {
+-    marginTop: 12,
++    justifyContent: 'space-between',
++    marginTop: 10,
+   },
+   savingText: {
+     marginTop: 12,
+diff --git a/app/system.tsx b/app/system.tsx
+index a6a21dc..c7b5b2b 100644
+--- a/app/system.tsx
++++ b/app/system.tsx
+@@ -1,7 +1,8 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShell from '@/components/layout/AppShell';
++import { buildMainNavSections, getSessionScopeLabel } from '@/components/layout/appNavigation';
++import ActionTile from '@/components/ui/ActionTile';
+ import AppButton from '@/components/ui/AppButton';
+ import AppInfoCard from '@/components/ui/AppInfoCard';
+-import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import { hasPermission, hasRole } from '@/services/accessControl';
+@@ -15,7 +16,7 @@ import {
+ } from '@/services/liveLayoutPreferences';
+ import { getSession, UserSession } from '@/services/sessionStorage';
+ import { useRouter } from 'expo-router';
+-import { useEffect, useState } from 'react';
++import { useEffect, useMemo, useState } from 'react';
+ import { useTranslation } from 'react-i18next';
+ import { Pressable, StyleSheet, View } from 'react-native';
+
+@@ -33,6 +34,7 @@ export default function SystemScreen() {
+   const [livePreferences, setLivePreferences] = useState<LiveLayoutPreferences>(
+     DEFAULT_LIVE_LAYOUT_PREFERENCES
+   );
++  const navSections = useMemo(() => buildMainNavSections(user), [user]);
+
+   useEffect(() => {
+     getSession().then((currentUser) => {
+@@ -57,13 +59,15 @@ export default function SystemScreen() {
+   };
+
+   return (
+-    <AppScreen>
+-      <AppBackButton fallbackRoute="/" />
+-
+-      <AppText variant="title" bold>
+-        {t('system.title')}
+-      </AppText>
+-
++    <AppShell
++      title={t('system.title')}
++      subtitle="Preferencias, canales y controles del sistema"
++      contextTitle="Sistema y configuracion"
++      contextSubtitle={getSessionScopeLabel(user)}
++      activeRoute="system"
++      session={user}
++      navSections={navSections}
++    >
+       <AppInfoCard title={t('system.sensitiveTitle')}>
+         <AppText>{t('system.sensitiveHelp')}</AppText>
+       </AppInfoCard>
+@@ -186,7 +190,7 @@ export default function SystemScreen() {
+           />
+         ) : null}
+       </View>
+-    </AppScreen>
++    </AppShell>
+   );
+ }
+
+@@ -221,26 +225,8 @@ function LivePreferenceRow({
+ }
+
+ function SystemTile({ title, description, onPress }: SystemTileProps) {
+-  const { theme } = useAppTheme();
+-
+   return (
+-    <Pressable
+-      onPress={onPress}
+-      style={({ pressed }) => [
+-        styles.tile,
+-        {
+-          backgroundColor: pressed ? theme.colors.optionPressedBackground : theme.colors.surface,
+-          borderColor: theme.colors.border,
+-          borderRadius: theme.radius.md,
+-          padding: theme.spacing.md,
+-        },
+-      ]}
+-    >
+-      <AppText bold>{title}</AppText>
+-      <AppText variant="caption" color={theme.colors.mutedText}>
+-        {description}
+-      </AppText>
+-    </Pressable>
++    <ActionTile title={title} subtitle={description} icon="settings" onPress={onPress} />
+   );
+ }
+
+diff --git a/app/ui-kit.tsx b/app/ui-kit.tsx
+index 86fe622..69836ad 100644
+--- a/app/ui-kit.tsx
++++ b/app/ui-kit.tsx
+@@ -9,6 +9,7 @@ import ActionTile from '@/components/ui/ActionTile';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
++import AppNoticeDropdown from '@/components/ui/AppNoticeDropdown';
+ import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
+ import AppText from '@/components/ui/AppText';
+ import EmptyState from '@/components/ui/EmptyState';
+@@ -74,7 +75,14 @@ function buildNavSections(session: UserSession | null): SidebarSection[] {
+ }
+
+ export default function UiKitPreview() {
+-  const { theme, themeMode, toggleThemeMode } = useAppTheme();
++  const {
++    theme,
++    themeMode,
++    toggleThemeMode,
++    visualPresetId,
++    designPresets,
++    setVisualPresetId,
++  } = useAppTheme();
+   const [loading, setLoading] = useState(true);
+   const [isLogged, setIsLogged] = useState(false);
+   const [session, setSession] = useState<UserSession | null>(null);
+@@ -150,6 +158,61 @@ export default function UiKitPreview() {
+         subtitle="Estos datos solo viven en /ui-kit; no se usan en pantallas reales."
+       />
+
++      <SectionHeader
++        title="Identidad visual"
++        subtitle="Selector local de plantilla visual. Persistencia por cliente/tenant queda pendiente."
++      />
++      <View style={styles.previewCard}>
++        <View style={styles.themePreviewHeader}>
++          <View style={styles.previewTextBlock}>
++            <AppText bold>Plantilla visual activa</AppText>
++            <AppText variant="caption" color={theme.colors.mutedText}>
++              Esta configuracion se guarda localmente en esta fase.
++            </AppText>
++          </View>
++          <StatusBadge
++            label={designPresets.find((preset) => preset.id === visualPresetId)?.label ?? 'Preset'}
++            tone="role"
++          />
++        </View>
++        <AppResponsiveGrid tabletColumns={2} desktopColumns={3}>
++          {designPresets
++            .filter((preset) => preset.active)
++            .map((preset) => (
++              <AppCard
++                key={preset.id}
++                variant={preset.id === visualPresetId ? 'selected' : 'subtle'}
++                style={styles.presetCard}
++              >
++                <View style={styles.themePreviewHeader}>
++                  <View style={styles.previewTextBlock}>
++                    <AppText bold>{preset.label}</AppText>
++                    <AppText variant="caption" color={theme.colors.mutedText}>
++                      {preset.description}
++                    </AppText>
++                  </View>
++                  {preset.id === visualPresetId ? <StatusBadge label="Activo" tone="success" /> : null}
++                </View>
++                <View style={styles.presetSwatches}>
++                  {[
++                    preset.colors[theme.isDark ? 'dark' : 'light'].primary,
++                    preset.colors[theme.isDark ? 'dark' : 'light'].accent,
++                    preset.colors[theme.isDark ? 'dark' : 'light'].success,
++                    preset.colors[theme.isDark ? 'dark' : 'light'].danger,
++                  ].map((color) => (
++                    <View key={color} style={[styles.presetSwatch, { backgroundColor: color }]} />
++                  ))}
++                </View>
++                <AppButton
++                  title={preset.id === visualPresetId ? 'Plantilla activa' : 'Usar plantilla'}
++                  variant={preset.id === visualPresetId ? 'neutral' : 'secondary'}
++                  onPress={() => setVisualPresetId(preset.id)}
++                />
++              </AppCard>
++            ))}
++        </AppResponsiveGrid>
++      </View>
++
+       <SectionHeader title="Design tokens" subtitle="Colores, radios, sombras y spacing base" />
+       <AppResponsiveGrid tabletColumns={2} desktopColumns={4}>
+         {Object.entries(designTokens.colors).slice(0, 12).map(([name, color]) => (
+@@ -233,7 +296,7 @@ export default function UiKitPreview() {
+                 </AppText>
+                 <View style={styles.inlineList}>
+                   <StatusBadge label="Disponible" tone="success" />
+-                  <StatusBadge label="Reservada" tone="warning" />
++                  <StatusBadge label="Reservada" tone="reserved" />
+                   <StatusBadge label="Bloqueada" />
+                 </View>
+               </View>
+@@ -309,6 +372,59 @@ export default function UiKitPreview() {
+             <StatusBadge label="Info" tone="info" />
+           </View>
+         </AppCard>
++        <AppCard variant="elevated" style={styles.previewCard}>
++          <SectionHeader title="Card variants" subtitle="Superficies listas para pantallas reales" />
++          <View
++            style={[
++              styles.surfacePreview,
++              {
++                backgroundColor: theme.colors.surfaceAlt,
++                borderColor: theme.colors.borderSubtle,
++              },
++            ]}
++          >
++            <AppText bold>Subtle</AppText>
++            <AppText variant="caption" color={theme.colors.mutedText}>
++              Contexto de baja prioridad.
++            </AppText>
++          </View>
++          <View
++            style={[
++              styles.surfacePreview,
++              {
++                backgroundColor: theme.colors.surfaceElevated,
++                borderColor: theme.colors.accent,
++                borderLeftColor: theme.colors.accent,
++                borderLeftWidth: 4,
++              },
++            ]}
++          >
++            <AppText bold>Selected</AppText>
++            <AppText variant="caption" color={theme.colors.mutedText}>
++              Registro o modulo activo.
++            </AppText>
++          </View>
++          <View style={styles.inlineList}>
++            <StatusBadge label="warning" tone="warning" />
++            <StatusBadge label="success" tone="success" />
++            <StatusBadge label="danger" tone="danger" />
++          </View>
++        </AppCard>
++        <AppCard variant="elevated" style={styles.previewCard}>
++          <SectionHeader title="Notices" subtitle="Mensajes operativos con jerarquia" />
++          <AppNoticeDropdown
++            title="Autorizacion pendiente"
++            message="La solicitud requiere integracion backend antes de ejecutar la accion."
++            tone="warning"
++            defaultExpanded={false}
++          />
++          <AppNoticeDropdown
++            title="Operacion lista"
++            message="Los datos requeridos estan completos para continuar."
++            tone="success"
++            defaultExpanded={false}
++          />
++        </AppCard>
+         <MetricCard label="MetricCard" value="$12,450" helper="Dato de ejemplo para preview" />
+         <AppCard style={styles.previewCard}>
+           <SectionHeader title="Inputs" subtitle="Texto, placeholder y readonly en claro/oscuro" />
+@@ -335,7 +451,7 @@ export default function UiKitPreview() {
+
+       <SectionHeader title="Panel LIVE premium" subtitle="Referencia visual usada por consola operativa" />
+       <AppResponsiveGrid tabletColumns={2} desktopColumns={3}>
+-        <AppCard style={styles.previewCard}>
++        <AppCard variant="danger" style={styles.previewCard}>
+           <View style={styles.themePreviewHeader}>
+             <StatusBadge label="Preparada" tone="warning" />
+             <AppText variant="caption" color={theme.colors.mutedText}>
+@@ -348,7 +464,7 @@ export default function UiKitPreview() {
+           </AppText>
+           <AppButton title="Poner al aire" variant="primary" onPress={() => undefined} />
+         </AppCard>
+-        <AppCard style={[styles.previewCard, { borderColor: theme.colors.success }]}>
++        <AppCard variant="success" style={styles.previewCard}>
+           <View style={styles.themePreviewHeader}>
+             <StatusBadge label="Al aire" tone="success" />
+             <StatusBadge label="Disponible" tone="success" />
+@@ -359,10 +475,10 @@ export default function UiKitPreview() {
+           </AppText>
+           <AppButton title="Reservar ahora" variant="primary" onPress={() => undefined} />
+         </AppCard>
+-        <AppCard style={[styles.previewCard, { borderColor: theme.colors.warning }]}>
++        <AppCard variant="warning" style={styles.previewCard}>
+           <View style={styles.themePreviewHeader}>
+             <StatusBadge label="Al aire" tone="success" />
+-            <StatusBadge label="Reservada" tone="warning" />
++            <StatusBadge label="Reservada" tone="reserved" />
+           </View>
+           <AppText bold>Prenda reservada</AppText>
+           <AppText variant="caption" color={theme.colors.warning}>
+@@ -458,11 +574,33 @@ const styles = StyleSheet.create({
+   previewCard: {
+     gap: designTokens.spacing.sm,
+   },
++  previewTextBlock: {
++    flex: 1,
++    minWidth: 0,
++  },
++  presetCard: {
++    gap: designTokens.spacing.sm,
++  },
++  presetSwatches: {
++    flexDirection: 'row',
++    gap: designTokens.spacing.xs,
++  },
++  presetSwatch: {
++    borderRadius: designTokens.radius.full,
++    height: 20,
++    width: 20,
++  },
+   swatch: {
+     borderRadius: designTokens.radius.md,
+     height: 42,
+     width: '100%',
+   },
++  surfacePreview: {
++    borderRadius: designTokens.radius.lg,
++    borderWidth: 1,
++    gap: designTokens.spacing.xs,
++    padding: designTokens.spacing.md,
++  },
+   themePreviewCanvas: {
+     borderRadius: designTokens.radius.lg,
+     padding: designTokens.spacing.lg,
+diff --git a/app/users.tsx b/app/users.tsx
+index 9fcccf6..6ea4ec6 100644
+--- a/app/users.tsx
++++ b/app/users.tsx
+@@ -1,12 +1,14 @@
+-import AppBackButton from '@/components/ui/AppBackButton';
++import AppShell from '@/components/layout/AppShell';
++import { buildMainNavSections, getSessionScopeLabel } from '@/components/layout/appNavigation';
+ import AppButton from '@/components/ui/AppButton';
+ import AppCard from '@/components/ui/AppCard';
+ import AppInput from '@/components/ui/AppInput';
+ import AppScreen from '@/components/ui/AppScreen';
+ import AppText from '@/components/ui/AppText';
+-import { useAppTheme } from '@/context/AppThemeContext';
++import EmptyState from '@/components/ui/EmptyState';
++import StatusBadge from '@/components/ui/StatusBadge';
+ import { canManageUsers } from '@/services/livePermissionGuards';
+-import { getSession } from '@/services/sessionStorage';
++import { getSession, UserSession } from '@/services/sessionStorage';
+ import {
+   activateUser,
+   AdminUser,
+@@ -15,13 +17,7 @@ import {
+ } from '@/services/userAdminService';
+ import { useFocusEffect, useRouter } from 'expo-router';
+ import { useCallback, useMemo, useState } from 'react';
+-import {
+-  ActivityIndicator,
+-  Alert,
+-  FlatList,
+-  StyleSheet,
+-  View,
+-} from 'react-native';
++import { ActivityIndicator, Alert, FlatList, StyleSheet, View } from 'react-native';
+
+ function isActive(user: AdminUser) {
+   return String(user.status).toUpperCase() === 'ACTIVE';
+@@ -50,12 +46,13 @@ function inheritedPermissionCount(user: AdminUser) {
+
+ export default function UsersScreen() {
+   const router = useRouter();
+-  const { theme } = useAppTheme();
+
+   const [users, setUsers] = useState<AdminUser[]>([]);
+   const [search, setSearch] = useState('');
+   const [isLoading, setIsLoading] = useState(true);
+   const [busyUserId, setBusyUserId] = useState<number | null>(null);
++  const [session, setSession] = useState<UserSession | null>(null);
++  const navSections = useMemo(() => buildMainNavSections(session), [session]);
+
+   useFocusEffect(
+     useCallback(() => {
+@@ -66,8 +63,10 @@ export default function UsersScreen() {
+   const loadUsers = async () => {
+     try {
+       setIsLoading(true);
+-      const session = await getSession();
+-      if (!canManageUsers(session)) {
++      const currentSession = await getSession();
++      setSession(currentSession);
++
++      if (!canManageUsers(currentSession)) {
+         router.replace('/access-denied');
+         return;
+       }
+@@ -104,8 +103,8 @@ export default function UsersScreen() {
+     const active = isActive(user);
+     const title = active ? 'Desactivar usuario' : 'Activar usuario';
+     const message = active
+-      ? `¿Desactivar a ${user.name}? No se eliminará, solo quedará inactivo.`
+-      : `¿Activar nuevamente a ${user.name}?`;
++      ? `Desactivar a ${user.name}? No se eliminara, solo quedara inactivo.`
++      : `Activar nuevamente a ${user.name}?`;
+
+     Alert.alert(title, message, [
+       { text: 'Cancelar', style: 'cancel' },
+@@ -142,22 +141,22 @@ export default function UsersScreen() {
+   }
+
+   return (
+-    <AppScreen scroll={false}>
+-      <AppBackButton fallbackRoute="/" />
+-
+-      <AppText variant="title" bold>
+-        Usuarios
+-      </AppText>
+-
+-      <AppText color={theme.colors.mutedText} style={styles.description}>
++    <AppShell
++      title="Usuarios"
++      subtitle="Administracion de accesos y estado operativo"
++      contextTitle="Control de usuarios"
++      contextSubtitle={getSessionScopeLabel(session)}
++      activeRoute="users"
++      session={session}
++      navSections={navSections}
++      rightContent={
++        <AppButton title="Nuevo usuario" variant="secondary" onPress={() => router.push('/users-form' as any)} />
++      }
++    >
++      <AppText>
+         Administra usuarios del sistema. No se eliminan registros: se activan o desactivan.
+       </AppText>
+
+-      <AppButton
+-        title="Nuevo usuario"
+-        onPress={() => router.push('/users-form' as any)}
+-      />
+-
+       <View style={styles.search}>
+         <AppInput
+           placeholder="Buscar por nombre, correo, sucursal o rol"
+@@ -180,48 +179,28 @@ export default function UsersScreen() {
+           const inheritedPermissions = inheritedPermissionCount(item);
+
+           return (
+-            <AppCard>
++            <AppCard variant="elevated">
+               <View style={styles.headerRow}>
+                 <View style={styles.headerInfo}>
+                   <AppText bold>{item.name}</AppText>
+                   <AppText>{item.email}</AppText>
+                 </View>
+
+-                <View
+-                  style={[
+-                    styles.statusBadge,
+-                    {
+-                      backgroundColor: active
+-                        ? theme.colors.optionPressedBackground
+-                        : theme.colors.inputBackground,
+-                      borderColor: active
+-                        ? theme.colors.accent
+-                        : theme.colors.border,
+-                    },
+-                  ]}
+-                >
+-                  <AppText
+-                    variant="caption"
+-                    color={active ? theme.colors.accent : theme.colors.mutedText}
+-                    bold
+-                  >
+-                    {active ? 'Activo' : 'Inactivo'}
+-                  </AppText>
+-                </View>
++                <StatusBadge label={active ? 'Activo' : 'Inactivo'} tone={active ? 'success' : 'neutral'} />
+               </View>
+
+               <AppText style={styles.meta}>Sucursal: {item.branchName || 'Sin sucursal'}</AppText>
+               <AppText style={styles.meta}>Roles: {roleSummary(item)}</AppText>
+
+-              {item.phone ? <AppText style={styles.meta}>Teléfono: {item.phone}</AppText> : null}
++              {item.phone ? <AppText style={styles.meta}>Telefono: {item.phone}</AppText> : null}
+
+-              <AppText variant="caption" color={theme.colors.mutedText} style={styles.meta}>
++              <AppText variant="caption" style={styles.meta}>
+                 Permisos directos del usuario: {directPermissions.length}
+               </AppText>
+-              <AppText variant="caption" color={theme.colors.mutedText} style={styles.metaCompact}>
++              <AppText variant="caption" style={styles.metaCompact}>
+                 Permisos heredados por roles: {inheritedPermissions}
+               </AppText>
+-              <AppText variant="caption" color={theme.colors.mutedText} style={styles.metaCompact}>
++              <AppText variant="caption" style={styles.metaCompact}>
+                 Permisos efectivos totales: {effectivePermissions.length}
+               </AppText>
+
+@@ -246,43 +225,36 @@ export default function UsersScreen() {
+             </AppCard>
+           );
+         }}
+-        ListEmptyComponent={
+-          <AppCard>
+-            <AppText>No hay usuarios para mostrar.</AppText>
+-          </AppCard>
+-        }
++        ListEmptyComponent={<EmptyState title="No hay usuarios para mostrar" />}
+       />
+-    </AppScreen>
++    </AppShell>
+   );
+ }
+
+ const styles = StyleSheet.create({
+-  description: {
+-    marginBottom: 12,
++  actionButton: {
++    flex: 1,
+   },
+-  search: {
++  actions: {
++    flexDirection: 'row',
++    gap: 10,
+     marginTop: 12,
+   },
+-  list: {
++  headerInfo: {
+     flex: 1,
+   },
+-  listContent: {
+-    paddingBottom: 24,
+-  },
+   headerRow: {
+     alignItems: 'flex-start',
+     flexDirection: 'row',
+-    justifyContent: 'space-between',
+     gap: 10,
++    justifyContent: 'space-between',
+   },
+-  headerInfo: {
++  list: {
+     flex: 1,
+   },
+-  statusBadge: {
+-    borderWidth: 1,
+-    borderRadius: 999,
+-    paddingHorizontal: 10,
+-    paddingVertical: 4,
++  listContent: {
++    gap: 12,
++    paddingBottom: 24,
+   },
+   meta: {
+     marginTop: 6,
+@@ -290,12 +262,7 @@ const styles = StyleSheet.create({
+   metaCompact: {
+     marginTop: 2,
+   },
+-  actions: {
+-    flexDirection: 'row',
+-    gap: 10,
++  search: {
+     marginTop: 12,
+   },
+-  actionButton: {
+-    flex: 1,
+-  },
+ });
+diff --git a/components/layout/AppShell.tsx b/components/layout/AppShell.tsx
+index 132912e..4e982d1 100644
+--- a/components/layout/AppShell.tsx
++++ b/components/layout/AppShell.tsx
+@@ -73,7 +73,6 @@ export default function AppShell({
+   return (
+     <View style={[styles.shell, { backgroundColor: theme.colors.background }]}>
+       <View
+-        pointerEvents="none"
+         style={[
+           styles.ambientPanel,
+           {
+@@ -138,6 +137,7 @@ const styles = StyleSheet.create({
+     height: 188,
+     left: 0,
+     opacity: 0.82,
++    pointerEvents: 'none',
+     position: 'absolute',
+     right: 0,
+     top: 0,
+diff --git a/components/layout/Sidebar.tsx b/components/layout/Sidebar.tsx
+index 0dff424..bac2234 100644
+--- a/components/layout/Sidebar.tsx
++++ b/components/layout/Sidebar.tsx
+@@ -46,6 +46,18 @@ export default function Sidebar({ sections, activeRoute, onNavigate, session, on
+             },
+           ]}
+         >
++          <View
++            style={[
++              styles.brandMark,
++              {
++                backgroundColor: theme.colors.accentSoft,
++                borderColor: theme.colors.accent,
++                borderRadius: designTokens.radius.md,
++              },
++            ]}
++          >
++            <MaterialIcons name="storefront" size={18} color={theme.colors.accent} />
++          </View>
+           <AppText variant="subtitle" bold>
+             Ctrl Ropa
+           </AppText>
+@@ -61,8 +73,8 @@ export default function Sidebar({ sections, activeRoute, onNavigate, session, on
+             style={({ pressed }) => [
+               styles.closeButton,
+               {
+-              backgroundColor: theme.colors.infoCardBackground,
+-              borderColor: theme.colors.borderSubtle,
++                backgroundColor: theme.colors.infoCardBackground,
++                borderColor: theme.colors.borderSubtle,
+                 borderRadius: designTokens.radius.md,
+                 opacity: pressed ? 0.72 : 1,
+               },
+@@ -148,12 +160,20 @@ export default function Sidebar({ sections, activeRoute, onNavigate, session, on
+
+ const styles = StyleSheet.create({
+   brand: {
+-    flex: 1,
+     borderWidth: 1,
++    flex: 1,
+     minWidth: 0,
+     paddingHorizontal: designTokens.spacing.md,
+     paddingVertical: designTokens.spacing.sm,
+   },
++  brandMark: {
++    alignItems: 'center',
++    borderWidth: 1,
++    height: 34,
++    justifyContent: 'center',
++    marginBottom: designTokens.spacing.sm,
++    width: 34,
++  },
+   brandRow: {
+     alignItems: 'flex-start',
+     flexDirection: 'row',
+diff --git a/components/ui/ActionTile.tsx b/components/ui/ActionTile.tsx
+index 8b09c39..0b0887d 100644
+--- a/components/ui/ActionTile.tsx
++++ b/components/ui/ActionTile.tsx
+@@ -24,10 +24,13 @@ export default function ActionTile({ title, subtitle, icon = 'chevron-right', di
+         {
+           backgroundColor: theme.colors.surfaceElevated,
+           borderColor: theme.colors.borderSubtle,
++          borderLeftColor: theme.colors.accent,
++          borderLeftWidth: 3,
+           borderRadius: designTokens.radius.xl,
+           opacity: disabled ? 0.45 : pressed ? 0.78 : 1,
+           shadowColor: theme.isDark ? theme.colors.overlay : theme.colors.primary,
+           shadowOpacity: theme.isDark ? 0.18 : 0.09,
++          elevation: disabled ? 0 : 2,
+         },
+       ]}
+     >
+diff --git a/components/ui/AppCard.tsx b/components/ui/AppCard.tsx
+index 2086c8b..2d8427c 100644
+--- a/components/ui/AppCard.tsx
++++ b/components/ui/AppCard.tsx
+@@ -5,23 +5,60 @@ import { StyleSheet, View, ViewProps } from 'react-native';
+
+ type Props = ViewProps & {
+   children: ReactNode;
++  variant?: 'default' | 'elevated' | 'subtle' | 'warning' | 'success' | 'danger' | 'info' | 'selected';
+ };
+
+-export default function AppCard({ children, style, ...rest }: Props) {
++export default function AppCard({ children, style, variant = 'default', ...rest }: Props) {
+   const { theme } = useAppTheme();
+   const { isPhone } = useResponsiveLayout();
++  const isSubtle = variant === 'subtle';
++  const toneColor =
++    variant === 'warning'
++      ? theme.colors.warning
++      : variant === 'success'
++        ? theme.colors.success
++        : variant === 'danger'
++          ? theme.colors.danger
++          : variant === 'info'
++            ? theme.colors.info
++            : variant === 'selected'
++              ? theme.colors.accent
++              : theme.colors.borderSubtle;
++  const backgroundColor =
++    variant === 'warning'
++        ? theme.isDark
++          ? theme.colors.surfaceElevated
++          : theme.colors.warningBackground
++      : variant === 'success'
++        ? theme.isDark
++          ? theme.colors.surfaceElevated
++          : theme.colors.successBackground
++        : variant === 'danger'
++          ? theme.isDark
++            ? theme.colors.surfaceElevated
++            : theme.colors.dangerBackground
++          : variant === 'info'
++            ? theme.isDark
++              ? theme.colors.surfaceElevated
++              : theme.colors.infoSoft
++            : isSubtle
++              ? theme.colors.surfaceAlt
++              : theme.colors.surfaceElevated;
+
+   return (
+     <View
+       style={[
+         styles.card,
+         {
+-          backgroundColor: theme.colors.surfaceElevated,
+-          borderColor: theme.colors.borderSubtle,
+-          borderRadius: theme.radius.lg,
++          backgroundColor,
++          borderColor: toneColor,
++          borderLeftColor: variant === 'default' || isSubtle ? toneColor : toneColor,
++          borderLeftWidth: variant === 'default' || isSubtle ? 1 : 4,
++          borderRadius: variant === 'elevated' || variant === 'selected' ? theme.radius.xl : theme.radius.lg,
+           padding: isPhone ? theme.spacing.md : theme.spacing.lg,
+-          shadowColor: theme.isDark ? theme.colors.overlay : theme.colors.primary,
+-          shadowOpacity: theme.isDark ? 0.18 : 0.08,
++          shadowColor: theme.colors.shadow,
++          shadowOpacity: isSubtle ? 0.03 : theme.isDark ? 0.18 : 0.08,
++          elevation: isSubtle ? 0 : variant === 'elevated' || variant === 'selected' ? 3 : 2,
+         },
+         style,
+       ]}
+diff --git a/components/ui/AppInfoCard.tsx b/components/ui/AppInfoCard.tsx
+index 24cd22f..cb338e3 100644
+--- a/components/ui/AppInfoCard.tsx
++++ b/components/ui/AppInfoCard.tsx
+@@ -1,6 +1,7 @@
+ import { useAppTheme } from '@/context/AppThemeContext';
+ import { ReactNode } from 'react';
+-import { StyleSheet, View, ViewProps } from 'react-native';
++import { StyleSheet, ViewProps } from 'react-native';
++import AppCard from './AppCard';
+ import AppText from './AppText';
+
+ type Props = ViewProps & {
+@@ -12,15 +13,10 @@ export default function AppInfoCard({ title, children, style, ...rest }: Props)
+   const { theme } = useAppTheme();
+
+   return (
+-    <View
++    <AppCard
++      variant="info"
+       style={[
+         styles.card,
+-        {
+-          backgroundColor: theme.colors.infoCardBackground,
+-          borderColor: theme.colors.infoCardBorder,
+-          borderRadius: theme.radius.lg,
+-          padding: theme.spacing.lg,
+-        },
+         style,
+       ]}
+       {...rest}
+@@ -33,7 +29,7 @@ export default function AppInfoCard({ title, children, style, ...rest }: Props)
+       ) : (
+         children
+       )}
+-    </View>
++    </AppCard>
+   );
+ }
+
+diff --git a/components/ui/AppText.tsx b/components/ui/AppText.tsx
+index 8d6b2e2..1bb9949 100644
+--- a/components/ui/AppText.tsx
++++ b/components/ui/AppText.tsx
+@@ -35,22 +35,28 @@ export default function AppText({
+ }
+
+ const styles = StyleSheet.create({
+-  base: {},
++  base: {
++    letterSpacing: 0,
++  },
+ });
+
+ const variantStyles = StyleSheet.create({
+   title: {
+-    fontSize: 22,
+-    marginBottom: 12,
++    fontSize: 24,
++    lineHeight: 31,
++    marginBottom: 10,
+   },
+   subtitle: {
+-    fontSize: 16,
+-    marginBottom: 8,
++    fontSize: 17,
++    lineHeight: 24,
++    marginBottom: 6,
+   },
+   body: {
+     fontSize: 14,
++    lineHeight: 21,
+   },
+   caption: {
+     fontSize: 12,
++    lineHeight: 17,
+   },
+ });
+diff --git a/components/ui/MetricCard.tsx b/components/ui/MetricCard.tsx
+index eca0b63..dfdd15e 100644
+--- a/components/ui/MetricCard.tsx
++++ b/components/ui/MetricCard.tsx
+@@ -18,9 +18,9 @@ export default function MetricCard({ label, value, helper, accent, icon }: Props
+   const resolvedAccent = accent ?? theme.colors.dashboardAccent;
+
+   return (
+-    <AppCard style={[styles.card, { borderColor: theme.colors.borderSubtle }]}>
++    <AppCard variant="elevated" style={styles.card}>
+       <View style={styles.header}>
+-        <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
++        <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1} style={styles.label}>
+           {label}
+         </AppText>
+         {icon}
+@@ -54,6 +54,9 @@ const styles = StyleSheet.create({
+     flexDirection: 'row',
+     justifyContent: 'space-between',
+   },
++  label: {
++    textTransform: 'uppercase',
++  },
+   value: {
+     fontSize: 24,
+     marginTop: designTokens.spacing.sm,
+diff --git a/components/ui/RestrictedSection.tsx b/components/ui/RestrictedSection.tsx
+index 926cc6b..9ae467e 100644
+--- a/components/ui/RestrictedSection.tsx
++++ b/components/ui/RestrictedSection.tsx
+@@ -12,7 +12,7 @@ export default function RestrictedSection({ error, title = 'Acceso restringido'
+   const { theme } = useAppTheme();
+
+   return (
+-    <AppCard>
++    <AppCard variant="warning">
+       <AppText variant="subtitle" bold color={theme.colors.warning}>
+         {title}
+       </AppText>
+diff --git a/components/ui/SectionHeader.tsx b/components/ui/SectionHeader.tsx
+index 6287d10..d126dbf 100644
+--- a/components/ui/SectionHeader.tsx
++++ b/components/ui/SectionHeader.tsx
+@@ -15,7 +15,19 @@ export default function SectionHeader({ title, subtitle, rightContent }: Props)
+
+   return (
+     <View style={styles.header}>
++      <View
++        style={[
++          styles.accent,
++          {
++            backgroundColor: theme.colors.accent,
++            borderRadius: designTokens.radius.full,
++          },
++        ]}
++      />
+       <View style={styles.text}>
++        <AppText variant="caption" color={theme.colors.accent} bold style={styles.eyebrow}>
++          Sistema operativo
++        </AppText>
+         <AppText variant="subtitle" bold>
+           {title}
+         </AppText>
+@@ -34,10 +46,19 @@ const styles = StyleSheet.create({
+   header: {
+     alignItems: 'flex-start',
+     flexDirection: 'row',
+-    gap: designTokens.spacing.md,
++    gap: designTokens.spacing.sm,
+     justifyContent: 'space-between',
+     marginBottom: designTokens.spacing.md,
+-    marginTop: designTokens.spacing.xs,
++    marginTop: designTokens.spacing.sm,
++  },
++  accent: {
++    height: 34,
++    marginTop: 2,
++    width: 4,
++  },
++  eyebrow: {
++    marginBottom: 2,
++    textTransform: 'uppercase',
+   },
+   text: {
+     flex: 1,
+diff --git a/components/ui/StatusBadge.tsx b/components/ui/StatusBadge.tsx
+index c71d300..88dc611 100644
+--- a/components/ui/StatusBadge.tsx
++++ b/components/ui/StatusBadge.tsx
+@@ -3,7 +3,7 @@ import { useAppTheme } from '@/context/AppThemeContext';
+ import { designTokens } from '@/theme/designTokens';
+ import { StyleSheet, View, ViewStyle } from 'react-native';
+
+-type StatusTone = 'neutral' | 'success' | 'warning' | 'danger' | 'info';
++type StatusTone = 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'role' | 'live' | 'reserved';
+
+ type Props = {
+   label: string;
+@@ -14,23 +14,27 @@ type Props = {
+ export default function StatusBadge({ label, tone = 'neutral', style }: Props) {
+   const { theme } = useAppTheme();
+   const color =
+-    tone === 'success'
++    tone === 'reserved'
++      ? theme.colors.danger
++      : tone === 'success'
+       ? theme.colors.success
+       : tone === 'warning'
+         ? theme.colors.warning
+         : tone === 'danger'
+           ? theme.colors.danger
+-          : tone === 'info'
++          : tone === 'info' || tone === 'role' || tone === 'live'
+             ? theme.colors.accent
+             : theme.colors.textSecondary;
+   const backgroundColor =
+-    tone === 'success'
++    tone === 'reserved'
++      ? theme.colors.dangerSoft
++      : tone === 'success'
+       ? theme.colors.successBackground
+       : tone === 'warning'
+         ? theme.colors.warningBackground
+         : tone === 'danger'
+           ? theme.colors.dangerBackground
+-          : tone === 'info'
++          : tone === 'info' || tone === 'role' || tone === 'live'
+             ? theme.colors.infoCardBackground
+             : theme.colors.surfaceMuted;
+
+diff --git a/context/AppThemeContext.tsx b/context/AppThemeContext.tsx
+index cc51c01..ff44471 100644
+--- a/context/AppThemeContext.tsx
++++ b/context/AppThemeContext.tsx
+@@ -1,10 +1,17 @@
+ import { getAppearanceSettings } from '@/services/appearanceService';
++import {
++  DEFAULT_DESIGN_PRESET_ID,
++  DesignPresetId,
++  designPresets,
++  getDesignPreset,
++} from '@/theme/designPresets';
+ import AsyncStorage from '@react-native-async-storage/async-storage';
+ import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+ import { Appearance, ColorSchemeName } from 'react-native';
+
+ type ThemeColors = {
+   primary: string;
++  primarySoft: string;
+   secondary: string;
+   accent: string;
+   background: string;
+@@ -25,10 +32,15 @@ type ThemeColors = {
+   borderStrong: string;
+   danger: string;
+   dangerBackground: string;
++  dangerSoft: string;
+   success: string;
+   successBackground: string;
++  successSoft: string;
+   warning: string;
+   warningBackground: string;
++  warningSoft: string;
++  info: string;
++  infoSoft: string;
+   accentSoft: string;
+   inputBackground: string;
+   inputText: string;
+@@ -39,6 +51,8 @@ type ThemeColors = {
+   disabledText: string;
+   focusRing: string;
+   overlay: string;
++  shadow: string;
++  shadowSoft: string;
+   modalBackground: string;
+   optionBackground: string;
+   optionPressedBackground: string;
+@@ -96,6 +110,7 @@ export type AppTheme = {
+
+ const lightColors: ThemeColors = {
+   primary: '#0f172a',
++  primarySoft: '#e2e8f0',
+   secondary: '#475569',
+   accent: '#2563eb',
+   background: '#f8fafc',
+@@ -116,10 +131,15 @@ const lightColors: ThemeColors = {
+   borderStrong: '#cbd5e1',
+   danger: '#b91c1c',
+   dangerBackground: '#fef2f2',
++  dangerSoft: '#fee2e2',
+   success: '#15803d',
+   successBackground: '#ecfdf5',
++  successSoft: '#dcfce7',
+   warning: '#b45309',
+   warningBackground: '#fffbeb',
++  warningSoft: '#fef3c7',
++  info: '#0ea5e9',
++  infoSoft: '#e0f2fe',
+   accentSoft: '#dbeafe',
+   inputBackground: '#ffffff',
+   inputText: '#0f172a',
+@@ -130,6 +150,8 @@ const lightColors: ThemeColors = {
+   disabledText: '#64748b',
+   focusRing: '#2563eb',
+   overlay: 'rgba(15,23,42,0.38)',
++  shadow: '#0f172a',
++  shadowSoft: 'rgba(15,23,42,0.08)',
+   modalBackground: '#ffffff',
+   optionBackground: '#ffffff',
+   optionPressedBackground: '#f1f5f9',
+@@ -167,6 +189,7 @@ const lightColors: ThemeColors = {
+
+ const darkColors: ThemeColors = {
+   primary: '#e2e8f0',
++  primarySoft: '#1e293b',
+   secondary: '#94a3b8',
+   accent: '#93c5fd',
+   background: '#020617',
+@@ -187,10 +210,15 @@ const darkColors: ThemeColors = {
+   borderStrong: '#475569',
+   danger: '#fca5a5',
+   dangerBackground: '#3f1218',
++  dangerSoft: '#3f1218',
+   success: '#86efac',
+   successBackground: '#052e16',
++  successSoft: '#052e16',
+   warning: '#fbbf24',
+   warningBackground: '#3b2506',
++  warningSoft: '#3b2506',
++  info: '#93c5fd',
++  infoSoft: '#0b2245',
+   accentSoft: '#172554',
+   inputBackground: '#111827',
+   inputText: '#f8fafc',
+@@ -201,6 +229,8 @@ const darkColors: ThemeColors = {
+   disabledText: '#94a3b8',
+   focusRing: '#93c5fd',
+   overlay: 'rgba(0,0,0,0.62)',
++  shadow: '#000000',
++  shadowSoft: 'rgba(0,0,0,0.28)',
+   modalBackground: '#111827',
+   optionBackground: '#111827',
+   optionPressedBackground: '#1f2937',
+@@ -264,22 +294,29 @@ const createDefaultTheme = (scheme: ColorSchemeName = 'light'): AppTheme => {
+ type AppThemeContextValue = {
+   theme: AppTheme;
+   themeMode: 'LIGHT' | 'DARK';
++  visualPresetId: DesignPresetId;
++  designPresets: typeof designPresets;
+   isLoadingTheme: boolean;
+   reloadTheme: () => Promise<void>;
+   toggleThemeMode: () => Promise<void>;
+   setThemeMode: (mode: 'LIGHT' | 'DARK') => Promise<void>;
++  setVisualPresetId: (presetId: DesignPresetId) => Promise<void>;
+ };
+
+ const AppThemeContext = createContext<AppThemeContextValue>({
+   theme: createDefaultTheme('light'),
+   themeMode: 'LIGHT',
++  visualPresetId: DEFAULT_DESIGN_PRESET_ID,
++  designPresets,
+   isLoadingTheme: false,
+   reloadTheme: async () => {},
+   toggleThemeMode: async () => {},
+   setThemeMode: async () => {},
++  setVisualPresetId: async () => {},
+ });
+
+ const LOCAL_THEME_MODE_KEY = 'controlRopa.localThemeMode';
++const LOCAL_VISUAL_PRESET_KEY = 'controlRopa.localVisualPreset';
+
+ const cleanColor = (value?: string | null) => {
+   if (!value) return undefined;
+@@ -293,6 +330,7 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
+   );
+   const [theme, setTheme] = useState<AppTheme>(createDefaultTheme(systemScheme));
+   const [localThemeMode, setLocalThemeMode] = useState<'LIGHT' | 'DARK' | null>(null);
++  const [visualPresetId, setVisualPresetState] = useState<DesignPresetId>(DEFAULT_DESIGN_PRESET_ID);
+   const [isLoadingTheme, setIsLoadingTheme] = useState(true);
+
+   useEffect(() => {
+@@ -306,10 +344,14 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
+   useEffect(() => {
+     let cancelled = false;
+
+-    AsyncStorage.getItem(LOCAL_THEME_MODE_KEY)
+-      .then((value) => {
++    Promise.all([
++      AsyncStorage.getItem(LOCAL_THEME_MODE_KEY),
++      AsyncStorage.getItem(LOCAL_VISUAL_PRESET_KEY),
++    ])
++      .then(([value, presetValue]) => {
+         if (cancelled) return;
+         setLocalThemeMode(value === 'DARK' ? 'DARK' : value === 'LIGHT' ? 'LIGHT' : null);
++        setVisualPresetState(getDesignPreset(presetValue).id);
+       })
+       .catch(() => {
+         if (!cancelled) setLocalThemeMode(null);
+@@ -322,7 +364,7 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
+
+   useEffect(() => {
+     reloadTheme();
+-  }, [systemScheme, localThemeMode]);
++  }, [systemScheme, localThemeMode, visualPresetId]);
+
+   const setThemeMode = async (mode: 'LIGHT' | 'DARK') => {
+     await AsyncStorage.setItem(LOCAL_THEME_MODE_KEY, mode);
+@@ -333,6 +375,12 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
+     await setThemeMode(theme.isDark ? 'LIGHT' : 'DARK');
+   };
+
++  const setVisualPresetId = async (presetId: DesignPresetId) => {
++    const nextPreset = getDesignPreset(presetId);
++    await AsyncStorage.setItem(LOCAL_VISUAL_PRESET_KEY, nextPreset.id);
++    setVisualPresetState(nextPreset.id);
++  };
++
+   const reloadTheme = async () => {
+     try {
+       setIsLoadingTheme(true);
+@@ -346,117 +394,174 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
+             : 'light';
+
+       const baseTheme = createDefaultTheme(resolvedScheme);
++      const activePreset = getDesignPreset(visualPresetId);
++      const presetColors = activePreset.colors[baseTheme.isDark ? 'dark' : 'light'];
++      const presetRadius =
++        activePreset.radius === 'compact'
++          ? { sm: 4, md: 6, lg: 10, xl: 14 }
++          : activePreset.radius === 'soft'
++            ? { sm: 8, md: 12, lg: 18, xl: 24 }
++            : baseTheme.radius;
++      const baseSpacing =
++        settings.densityMode === 'COMPACT' || activePreset.density === 'COMPACT'
++          ? { xs: 3, sm: 6, md: 10, lg: 14, xl: 22 }
++          : baseTheme.spacing;
++      const baseRadius =
++        settings.buttonStyle === 'STRAIGHT'
++          ? { sm: 2, md: 2, lg: 2, xl: 2 }
++          : presetRadius;
++      const configuredColors = {
++        ...baseTheme.colors,
++        primary: cleanColor(settings.primaryColor) ?? baseTheme.colors.primary,
++        secondary:
++          cleanColor(settings.secondaryColor) ?? baseTheme.colors.secondary,
++        mutedText: baseTheme.colors.mutedText,
++        textSecondary: baseTheme.colors.textSecondary,
++        textMuted: baseTheme.colors.textMuted,
++        accent: cleanColor(settings.accentColor) ?? baseTheme.colors.accent,
++        primaryButtonBackground:
++          cleanColor(settings.primaryButtonColor) ??
++          cleanColor(settings.primaryColor) ??
++          baseTheme.colors.primaryButtonBackground,
++        primaryButtonText:
++          cleanColor(settings.primaryButtonTextColor) ??
++          baseTheme.colors.primaryButtonText,
++        secondaryButtonBackground:
++          cleanColor(settings.secondaryButtonColor) ??
++          cleanColor(settings.secondaryColor) ??
++          baseTheme.colors.secondaryButtonBackground,
++        secondaryButtonText:
++          cleanColor(settings.secondaryButtonTextColor) ??
++          baseTheme.colors.secondaryButtonText,
++        operationButtonBackground:
++          cleanColor(settings.operationButtonColor) ??
++          baseTheme.colors.operationButtonBackground,
++        operationButtonText:
++          cleanColor(settings.operationButtonTextColor) ??
++          baseTheme.colors.operationButtonText,
++        dangerButtonBackground:
++          cleanColor(settings.dangerButtonColor) ??
++          baseTheme.colors.dangerButtonBackground,
++        dangerButtonText:
++          cleanColor(settings.dangerButtonTextColor) ??
++          baseTheme.colors.dangerButtonText,
++        cancelButtonBackground:
++          cleanColor(settings.cancelButtonColor) ??
++          baseTheme.colors.cancelButtonBackground,
++        cancelButtonText:
++          cleanColor(settings.cancelButtonTextColor) ??
++          baseTheme.colors.cancelButtonText,
++        backButtonBackground:
++          cleanColor(settings.backButtonColor) ??
++          baseTheme.colors.backButtonBackground,
++        backButtonText:
++          cleanColor(settings.backButtonTextColor) ??
++          baseTheme.colors.backButtonText,
++        menuButtonBackground:
++          cleanColor(settings.menuButtonColor) ??
++          baseTheme.colors.menuButtonBackground,
++        menuButtonText:
++          cleanColor(settings.menuButtonTextColor) ??
++          baseTheme.colors.menuButtonText,
++        neutralButtonBackground: baseTheme.colors.neutralButtonBackground,
++        neutralButtonText: baseTheme.colors.neutralButtonText,
++        neutralButtonBorder: baseTheme.colors.neutralButtonBorder,
++        disabledButtonBackground: baseTheme.colors.disabledButtonBackground,
++        disabledButtonText: baseTheme.colors.disabledButtonText,
++        infoCardBackground:
++          cleanColor(settings.infoCardBackgroundColor) ??
++          baseTheme.colors.infoCardBackground,
++        infoCardText:
++          cleanColor(settings.infoCardTextColor) ??
++          baseTheme.colors.infoCardText,
++        infoCardBorder:
++          cleanColor(settings.infoCardBorderColor) ??
++          baseTheme.colors.infoCardBorder,
++        calendarSelectedBackground:
++          cleanColor(settings.calendarSelectedColor) ??
++          baseTheme.colors.calendarSelectedBackground,
++        calendarSelectedText:
++          cleanColor(settings.calendarSelectedTextColor) ??
++          baseTheme.colors.calendarSelectedText,
++        calendarText:
++          cleanColor(settings.calendarTextColor) ?? baseTheme.colors.calendarText,
++        dashboardMetricBackground:
++          cleanColor(settings.dashboardMetricBackgroundColor) ??
++          baseTheme.colors.dashboardMetricBackground,
++        dashboardMetricText:
++          cleanColor(settings.dashboardMetricTextColor) ??
++          baseTheme.colors.dashboardMetricText,
++        dashboardAccent:
++          cleanColor(settings.dashboardAccentColor) ??
++          baseTheme.colors.dashboardAccent,
++        inputBackground: baseTheme.colors.inputBackground,
++        inputText: baseTheme.colors.inputText,
++        inputBorder: baseTheme.colors.inputBorder,
++        placeholderText: baseTheme.colors.placeholderText,
++        inputPlaceholder: baseTheme.colors.inputPlaceholder,
++        disabledBackground: baseTheme.colors.disabledBackground,
++        disabledText: baseTheme.colors.disabledText,
++        focusRing: baseTheme.colors.focusRing,
++        overlay: baseTheme.colors.overlay,
++        shadow: baseTheme.colors.shadow,
++        shadowSoft: baseTheme.colors.shadowSoft,
++        dangerSoft: baseTheme.colors.dangerSoft,
++        successSoft: baseTheme.colors.successSoft,
++        warningSoft: baseTheme.colors.warningSoft,
++        info: baseTheme.colors.info,
++        infoSoft: baseTheme.colors.infoSoft,
++        modalBackground: baseTheme.colors.modalBackground,
++        optionBackground: baseTheme.colors.optionBackground,
++        optionPressedBackground: baseTheme.colors.optionPressedBackground,
++        optionBorder: baseTheme.colors.optionBorder,
++      };
++      const presetThemeColors = {
++        ...configuredColors,
++        ...presetColors,
++        text: presetColors.textPrimary,
++        mutedText: presetColors.textMuted,
++        placeholderText: presetColors.inputPlaceholder,
++        primaryButtonBackground: presetColors.primary,
++        primaryButtonText: presetColors.textOnPrimary,
++        secondaryButtonBackground: presetColors.accent,
++        secondaryButtonText: presetColors.textOnAccent,
++        operationButtonBackground: presetColors.primary,
++        operationButtonText: presetColors.textOnPrimary,
++        dangerButtonBackground: presetColors.danger,
++        dangerButtonText: '#ffffff',
++        cancelButtonBackground: presetColors.surfaceMuted,
++        cancelButtonText: presetColors.textPrimary,
++        backButtonBackground: presetColors.surfaceMuted,
++        backButtonText: presetColors.textPrimary,
++        menuButtonBackground: presetColors.accent,
++        menuButtonText: presetColors.textOnAccent,
++        neutralButtonBackground: presetColors.surfaceMuted,
++        neutralButtonText: presetColors.textSecondary,
++        neutralButtonBorder: presetColors.borderStrong,
++        disabledButtonBackground: presetColors.disabledBackground,
++        disabledButtonText: presetColors.disabledText,
++        infoCardBackground: presetColors.infoSoft,
++        infoCardText: presetColors.info,
++        infoCardBorder: presetColors.info,
++        modalBackground: presetColors.surfaceElevated,
++        optionBackground: presetColors.surface,
++        optionPressedBackground: presetColors.surfaceMuted,
++        optionBorder: presetColors.border,
++        calendarSelectedBackground: presetColors.primary,
++        calendarSelectedText: presetColors.textOnPrimary,
++        calendarText: presetColors.textPrimary,
++        dashboardMetricBackground: presetColors.surfaceElevated,
++        dashboardMetricText: presetColors.textPrimary,
++        dashboardAccent: presetColors.accent,
++      };
+
+       setTheme({
+         ...baseTheme,
+-        density: settings.densityMode ?? baseTheme.density,
++        density: settings.densityMode ?? activePreset.density ?? baseTheme.density,
+         buttonStyle: settings.buttonStyle ?? baseTheme.buttonStyle,
+-        spacing:
+-          settings.densityMode === 'COMPACT'
+-            ? { xs: 3, sm: 6, md: 10, lg: 14, xl: 22 }
+-            : baseTheme.spacing,
+-        radius:
+-          settings.buttonStyle === 'STRAIGHT'
+-            ? { sm: 2, md: 2, lg: 2, xl: 2 }
+-            : baseTheme.radius,
+-        colors: {
+-          ...baseTheme.colors,
+-          primary: cleanColor(settings.primaryColor) ?? baseTheme.colors.primary,
+-          secondary:
+-            cleanColor(settings.secondaryColor) ?? baseTheme.colors.secondary,
+-          mutedText: baseTheme.colors.mutedText,
+-          textSecondary: baseTheme.colors.textSecondary,
+-          textMuted: baseTheme.colors.textMuted,
+-          accent: cleanColor(settings.accentColor) ?? baseTheme.colors.accent,
+-          primaryButtonBackground:
+-            cleanColor(settings.primaryButtonColor) ??
+-            cleanColor(settings.primaryColor) ??
+-            baseTheme.colors.primaryButtonBackground,
+-          primaryButtonText:
+-            cleanColor(settings.primaryButtonTextColor) ??
+-            baseTheme.colors.primaryButtonText,
+-          secondaryButtonBackground:
+-            cleanColor(settings.secondaryButtonColor) ??
+-            cleanColor(settings.secondaryColor) ??
+-            baseTheme.colors.secondaryButtonBackground,
+-          secondaryButtonText:
+-            cleanColor(settings.secondaryButtonTextColor) ??
+-            baseTheme.colors.secondaryButtonText,
+-          operationButtonBackground:
+-            cleanColor(settings.operationButtonColor) ??
+-            baseTheme.colors.operationButtonBackground,
+-          operationButtonText:
+-            cleanColor(settings.operationButtonTextColor) ??
+-            baseTheme.colors.operationButtonText,
+-          dangerButtonBackground:
+-            cleanColor(settings.dangerButtonColor) ??
+-            baseTheme.colors.dangerButtonBackground,
+-          dangerButtonText:
+-            cleanColor(settings.dangerButtonTextColor) ??
+-            baseTheme.colors.dangerButtonText,
+-          cancelButtonBackground:
+-            cleanColor(settings.cancelButtonColor) ??
+-            baseTheme.colors.cancelButtonBackground,
+-          cancelButtonText:
+-            cleanColor(settings.cancelButtonTextColor) ??
+-            baseTheme.colors.cancelButtonText,
+-          backButtonBackground:
+-            cleanColor(settings.backButtonColor) ??
+-            baseTheme.colors.backButtonBackground,
+-          backButtonText:
+-            cleanColor(settings.backButtonTextColor) ??
+-            baseTheme.colors.backButtonText,
+-          menuButtonBackground:
+-            cleanColor(settings.menuButtonColor) ??
+-            baseTheme.colors.menuButtonBackground,
+-          menuButtonText:
+-            cleanColor(settings.menuButtonTextColor) ??
+-            baseTheme.colors.menuButtonText,
+-          neutralButtonBackground: baseTheme.colors.neutralButtonBackground,
+-          neutralButtonText: baseTheme.colors.neutralButtonText,
+-          neutralButtonBorder: baseTheme.colors.neutralButtonBorder,
+-          disabledButtonBackground: baseTheme.colors.disabledButtonBackground,
+-          disabledButtonText: baseTheme.colors.disabledButtonText,
+-          infoCardBackground:
+-            cleanColor(settings.infoCardBackgroundColor) ??
+-            baseTheme.colors.infoCardBackground,
+-          infoCardText:
+-            cleanColor(settings.infoCardTextColor) ??
+-            baseTheme.colors.infoCardText,
+-          infoCardBorder:
+-            cleanColor(settings.infoCardBorderColor) ??
+-            baseTheme.colors.infoCardBorder,
+-          calendarSelectedBackground:
+-            cleanColor(settings.calendarSelectedColor) ??
+-            baseTheme.colors.calendarSelectedBackground,
+-          calendarSelectedText:
+-            cleanColor(settings.calendarSelectedTextColor) ??
+-            baseTheme.colors.calendarSelectedText,
+-          calendarText:
+-            cleanColor(settings.calendarTextColor) ?? baseTheme.colors.calendarText,
+-          dashboardMetricBackground:
+-            cleanColor(settings.dashboardMetricBackgroundColor) ??
+-            baseTheme.colors.dashboardMetricBackground,
+-          dashboardMetricText:
+-            cleanColor(settings.dashboardMetricTextColor) ??
+-            baseTheme.colors.dashboardMetricText,
+-          dashboardAccent:
+-            cleanColor(settings.dashboardAccentColor) ??
+-            baseTheme.colors.dashboardAccent,
+-          inputBackground: baseTheme.colors.inputBackground,
+-          inputText: baseTheme.colors.inputText,
+-          inputBorder: baseTheme.colors.inputBorder,
+-          placeholderText: baseTheme.colors.placeholderText,
+-          inputPlaceholder: baseTheme.colors.inputPlaceholder,
+-          disabledBackground: baseTheme.colors.disabledBackground,
+-          disabledText: baseTheme.colors.disabledText,
+-          focusRing: baseTheme.colors.focusRing,
+-          overlay: baseTheme.colors.overlay,
+-          modalBackground: baseTheme.colors.modalBackground,
+-          optionBackground: baseTheme.colors.optionBackground,
+-          optionPressedBackground: baseTheme.colors.optionPressedBackground,
+-          optionBorder: baseTheme.colors.optionBorder,
+-        },
++        spacing: baseSpacing,
++        radius: baseRadius,
++        colors: presetThemeColors,
+       });
+     } finally {
+       setIsLoadingTheme(false);
+@@ -467,12 +572,15 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
+     () => ({
+       theme,
+       themeMode: (theme.isDark ? 'DARK' : 'LIGHT') as 'LIGHT' | 'DARK',
++      visualPresetId,
++      designPresets,
+       isLoadingTheme,
+       reloadTheme,
+       toggleThemeMode,
+       setThemeMode,
++      setVisualPresetId,
+     }),
+-    [theme, isLoadingTheme]
++    [theme, isLoadingTheme, visualPresetId]
+   );
+
+   return <AppThemeContext.Provider value={value}>{children}</AppThemeContext.Provider>;
+diff --git a/docs/LIVE_Z8B_DARK_THEME_STANDARDIZATION.md b/docs/LIVE_Z8B_DARK_THEME_STANDARDIZATION.md
+index 938052c..172c384 100644
+--- a/docs/LIVE_Z8B_DARK_THEME_STANDARDIZATION.md
++++ b/docs/LIVE_Z8B_DARK_THEME_STANDARDIZATION.md
+@@ -182,3 +182,21 @@ Estos tokens agregan profundidad y jerarquia sin hardcodear colores por pantalla
+ - Pagos/caja/reportes/billing/IA.
+ - Reglas operativas LIVE-Z6/Z7/Z8.
+ - AuthorizationRequestPanel ni su comportamiento.
++
++---
++
++## PRODUCT-C1 - Ajuste global posterior
++
++Fecha: 2026-06-05
++
++PRODUCT-C1 cambia la semantica visual de prenda reservada:
++
++- Antes: warning/ambar suave.
++- Ahora: `reserved` basado en `dangerSoft` + borde/chip `danger`.
++
++Motivo:
++
++- Una prenda reservada es bloqueo operativo, no solo advertencia.
++- Debe diferenciarse de prenda preparada y de disponibilidad normal.
++
++No cambia reglas LIVE, permisos, reserva, autorizaciones ni backend.
+diff --git a/docs/PRODUCT_B_INTERNAL_UI_KIT_FOUNDATION.md b/docs/PRODUCT_B_INTERNAL_UI_KIT_FOUNDATION.md
+index 43b5ded..177f216 100644
+--- a/docs/PRODUCT_B_INTERNAL_UI_KIT_FOUNDATION.md
++++ b/docs/PRODUCT_B_INTERNAL_UI_KIT_FOUNDATION.md
+@@ -799,3 +799,58 @@ Hacer mas visible la diferencia visual del UI Kit interno y acercar la app a un
+ ### Restricciones respetadas
+
+ No se tocaron backend, AUTH/RBAC, pagos, caja, reportes, billing, IA ni reglas operativas LIVE.
++
++---
++
++## Continuidad PRODUCT-C
++
++Fecha: 2026-06-04
++
++PRODUCT-C formaliza la direccion visual **Enterprise retail premium** y consolida el UI Kit como sistema visual global.
++
++Cambios clave:
++
++- `AppCard` incorpora variantes semanticas.
++- `SectionHeader` gana acento y jerarquia.
++- `/ui-kit` muestra cards, notices, inputs y panel LIVE premium como referencia real.
++- `RestrictedSection` hereda warning premium.
++
++Ver `docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md`.
++
++---
++
++## Continuidad PRODUCT-C1
++
++Fecha: 2026-06-05
++
++PRODUCT-C1 extiende el rollout visual premium a pantallas autenticadas principales.
++
++Pantallas migradas al lenguaje AppShell/UI Kit:
++
++- `app/customers.tsx`
++- `app/reservations.tsx`
++- `app/users.tsx`
++- `app/system.tsx`
++- `app/reports.tsx`
++
++Tambien se centralizo la navegacion principal en `components/layout/appNavigation.ts` y se formalizo la regla visual `Reservada = dangerSoft/danger premium`.
++
++Ver `docs/PRODUCT_C1_GLOBAL_PREMIUM_ROLLOUT.md`.
++
++---
++
++## Continuidad PRODUCT-C1 - Identidad visual local
++
++Fecha: 2026-06-05
++
++Se agregaron presets visuales controlados para preparar branding por cliente:
++
++- `retailPremium`
++- `darkConsole`
++- `blueCorporate`
++- `boutique`
++- `classicErp`
++
++La seleccion se realiza desde `/ui-kit` y se guarda localmente. La persistencia por cliente/tenant queda fuera de PRODUCT-C1.
++
++Ver `docs/PRODUCT_C_CLIENT_VISUAL_IDENTITY_PRESETS.md`.
+diff --git a/theme/designTokens.ts b/theme/designTokens.ts
+index 7c9cbae..d23403d 100644
+--- a/theme/designTokens.ts
++++ b/theme/designTokens.ts
+@@ -4,9 +4,13 @@ export const designTokens = {
+     secondary: '#475569',
+     accent: '#2563eb',
+     success: '#16a34a',
++    successSoft: '#dcfce7',
+     warning: '#d97706',
++    warningSoft: '#fef3c7',
+     danger: '#dc2626',
++    dangerSoft: '#fee2e2',
+     info: '#0ea5e9',
++    infoSoft: '#e0f2fe',
+     surface: '#ffffff',
+     surfaceAlt: '#f8fafc',
+     surfaceElevated: '#ffffff',
+@@ -32,6 +36,7 @@ export const designTokens = {
+     accentSoft: '#dbeafe',
+     overlay: 'rgba(15,23,42,0.38)',
+     shadow: '#0f172a',
++    shadowSoft: 'rgba(15,23,42,0.08)',
+     alertSurface: '#fffbeb',
+     alertBorder: '#f59e0b',
+   },
+@@ -40,9 +45,13 @@ export const designTokens = {
+     secondary: '#94a3b8',
+     accent: '#93c5fd',
+     success: '#86efac',
++    successSoft: '#052e16',
+     warning: '#fbbf24',
++    warningSoft: '#3b2506',
+     danger: '#fca5a5',
++    dangerSoft: '#3f1218',
+     info: '#93c5fd',
++    infoSoft: '#0b2245',
+     background: '#020617',
+     backgroundElevated: '#07111f',
+     surface: '#0f172a',
+@@ -67,6 +76,7 @@ export const designTokens = {
+     accentSoft: '#172554',
+     overlay: 'rgba(0,0,0,0.62)',
+     shadow: '#000000',
++    shadowSoft: 'rgba(0,0,0,0.28)',
+     alertSurface: '#1f2937',
+     alertBorder: '#fbbf24',
+   },
+
+diff --git a/components/layout/appNavigation.ts b/components/layout/appNavigation.ts
+new file mode 100644
+--- /dev/null
++++ b/components/layout/appNavigation.ts
+@@ -0,0 +1,62 @@
++import { SidebarSection } from '@/components/layout/Sidebar';
++import { canAccess, canAccessByPermission, isAdmin } from '@/services/accessControl';
++import { canViewLive } from '@/services/livePermissionGuards';
++import { UserSession } from '@/services/sessionStorage';
++
++export function buildMainNavSections(session: UserSession | null): SidebarSection[] {
++  const liveAllowed = canViewLive(session);
++  const customersAllowed = canAccessByPermission(session, 'VIEW_CUSTOMERS');
++  const reservationsAllowed =
++    canAccess(session, 'DOOR_RESERVATION', 'DO_DOOR_RESERVATION') || liveAllowed;
++  const usersAllowed = canAccessByPermission(session, 'MANAGE_USERS') || isAdmin(session);
++  const systemAllowed =
++    canAccessByPermission(session, 'MANAGE_ROLES') ||
++    canAccessByPermission(session, 'MANAGE_BRANCH_CHANNELS') ||
++    isAdmin(session);
++  const reportsAllowed = canAccessByPermission(session, 'VIEW_REPORTS') || isAdmin(session);
++  const adminAllowed = isAdmin(session);
++
++  const operationItems = [
++    { key: 'home', label: 'Inicio', route: '/', icon: 'space-dashboard' as const },
++    liveAllowed ? { key: 'live', label: 'LIVE', route: '/live', icon: 'live-tv' as const } : null,
++    customersAllowed
++      ? { key: 'customers', label: 'Clientes', route: '/customers', icon: 'groups' as const }
++      : null,
++    reservationsAllowed
++      ? { key: 'reservations', label: 'Reservas', route: '/reservations', icon: 'bookmark' as const }
++      : null,
++  ].filter(Boolean);
++
++  const controlItems = [
++    usersAllowed
++      ? { key: 'users', label: 'Usuarios', route: '/users', icon: 'manage-accounts' as const }
++      : null,
++    systemAllowed
++      ? { key: 'system', label: 'Sistema', route: '/system', icon: 'settings' as const }
++      : null,
++    reportsAllowed
++      ? { key: 'reports', label: 'Reportes', route: '/reports', icon: 'analytics' as const }
++      : null,
++    adminAllowed
++      ? { key: 'appearance', label: 'Configuracion', route: '/appearance', icon: 'palette' as const }
++      : null,
++  ].filter(Boolean);
++
++  const developmentItems = [
++    adminAllowed
++      ? { key: 'ui-kit', label: 'UI Kit', route: '/ui-kit', icon: 'dashboard-customize' as const }
++      : null,
++  ].filter(Boolean);
++
++  return [
++    { title: 'Operacion', items: operationItems },
++    { title: 'Control', items: controlItems },
++    { title: 'Desarrollo', items: developmentItems },
++  ].filter((section) => section.items.length > 0) as SidebarSection[];
++}
++
++export function getSessionScopeLabel(session: UserSession | null) {
++  const company = session?.companyName || session?.companyCode || 'Empresa no disponible';
++  const branch = session?.branchName || 'Sucursal no disponible';
++  return `${company} Â· ${branch}`;
++}
+
+diff --git a/theme/designPresets.ts b/theme/designPresets.ts
+new file mode 100644
+--- /dev/null
++++ b/theme/designPresets.ts
+@@ -0,0 +1,511 @@
++export type DesignPresetId =
++  | 'retailPremium'
++  | 'darkConsole'
++  | 'blueCorporate'
++  | 'boutique'
++  | 'classicErp';
++
++export type DesignPresetColors = {
++  primary: string;
++  primarySoft: string;
++  secondary: string;
++  accent: string;
++  accentSoft: string;
++  background: string;
++  backgroundElevated: string;
++  surface: string;
++  surfaceAlt: string;
++  surfaceElevated: string;
++  surfaceMuted: string;
++  border: string;
++  borderSubtle: string;
++  borderStrong: string;
++  textPrimary: string;
++  textSecondary: string;
++  textMuted: string;
++  textOnPrimary: string;
++  textOnAccent: string;
++  success: string;
++  successSoft: string;
++  warning: string;
++  warningSoft: string;
++  danger: string;
++  dangerSoft: string;
++  info: string;
++  infoSoft: string;
++  inputBackground: string;
++  inputBorder: string;
++  inputText: string;
++  inputPlaceholder: string;
++  disabledBackground: string;
++  disabledText: string;
++  shadow: string;
++  shadowSoft: string;
++  focusRing: string;
++  overlay: string;
++};
++
++export type DesignPreset = {
++  id: DesignPresetId;
++  label: string;
++  description: string;
++  active: boolean;
++  radius: 'standard' | 'soft' | 'compact';
++  density: 'NORMAL' | 'COMPACT';
++  colors: {
++    light: DesignPresetColors;
++    dark: DesignPresetColors;
++  };
++};
++
++export const DEFAULT_DESIGN_PRESET_ID: DesignPresetId = 'retailPremium';
++
++export const designPresets: DesignPreset[] = [
++  {
++    id: 'retailPremium',
++    label: 'Retail Premium',
++    description: 'Base comercial limpia para operacion retail y demo ejecutiva.',
++    active: true,
++    radius: 'soft',
++    density: 'NORMAL',
++    colors: {
++      light: {
++        primary: '#0f172a',
++        primarySoft: '#e2e8f0',
++        secondary: '#475569',
++        accent: '#2563eb',
++        accentSoft: '#dbeafe',
++        background: '#f8fafc',
++        backgroundElevated: '#eef2f7',
++        surface: '#ffffff',
++        surfaceAlt: '#f8fafc',
++        surfaceElevated: '#ffffff',
++        surfaceMuted: '#f1f5f9',
++        border: '#e2e8f0',
++        borderSubtle: '#edf2f7',
++        borderStrong: '#cbd5e1',
++        textPrimary: '#0f172a',
++        textSecondary: '#475569',
++        textMuted: '#64748b',
++        textOnPrimary: '#ffffff',
++        textOnAccent: '#ffffff',
++        success: '#15803d',
++        successSoft: '#dcfce7',
++        warning: '#b45309',
++        warningSoft: '#fef3c7',
++        danger: '#b91c1c',
++        dangerSoft: '#fee2e2',
++        info: '#0ea5e9',
++        infoSoft: '#e0f2fe',
++        inputBackground: '#ffffff',
++        inputBorder: '#cbd5e1',
++        inputText: '#0f172a',
++        inputPlaceholder: '#64748b',
++        disabledBackground: '#e2e8f0',
++        disabledText: '#64748b',
++        shadow: '#0f172a',
++        shadowSoft: 'rgba(15,23,42,0.08)',
++        focusRing: '#2563eb',
++        overlay: 'rgba(15,23,42,0.38)',
++      },
++      dark: {
++        primary: '#e2e8f0',
++        primarySoft: '#1e293b',
++        secondary: '#94a3b8',
++        accent: '#93c5fd',
++        accentSoft: '#172554',
++        background: '#020617',
++        backgroundElevated: '#07111f',
++        surface: '#0f172a',
++        surfaceAlt: '#111827',
++        surfaceElevated: '#111827',
++        surfaceMuted: '#1e293b',
++        border: '#334155',
++        borderSubtle: '#1e293b',
++        borderStrong: '#475569',
++        textPrimary: '#f8fafc',
++        textSecondary: '#cbd5e1',
++        textMuted: '#94a3b8',
++        textOnPrimary: '#020617',
++        textOnAccent: '#020617',
++        success: '#86efac',
++        successSoft: '#052e16',
++        warning: '#fbbf24',
++        warningSoft: '#3b2506',
++        danger: '#fca5a5',
++        dangerSoft: '#3f1218',
++        info: '#93c5fd',
++        infoSoft: '#0b2245',
++        inputBackground: '#111827',
++        inputBorder: '#64748b',
++        inputText: '#f8fafc',
++        inputPlaceholder: '#cbd5e1',
++        disabledBackground: '#1e293b',
++        disabledText: '#94a3b8',
++        shadow: '#000000',
++        shadowSoft: 'rgba(0,0,0,0.28)',
++        focusRing: '#93c5fd',
++        overlay: 'rgba(0,0,0,0.62)',
++      },
++    },
++  },
++  {
++    id: 'darkConsole',
++    label: 'Dark Console',
++    description: 'Consola operacional con acentos cyan y alta legibilidad.',
++    active: true,
++    radius: 'standard',
++    density: 'NORMAL',
++    colors: {
++      light: {
++        primary: '#0f172a',
++        primarySoft: '#ccfbf1',
++        secondary: '#334155',
++        accent: '#0891b2',
++        accentSoft: '#cffafe',
++        background: '#f1f5f9',
++        backgroundElevated: '#e2e8f0',
++        surface: '#ffffff',
++        surfaceAlt: '#f8fafc',
++        surfaceElevated: '#ffffff',
++        surfaceMuted: '#e2e8f0',
++        border: '#cbd5e1',
++        borderSubtle: '#e2e8f0',
++        borderStrong: '#94a3b8',
++        textPrimary: '#0f172a',
++        textSecondary: '#334155',
++        textMuted: '#64748b',
++        textOnPrimary: '#ffffff',
++        textOnAccent: '#ffffff',
++        success: '#047857',
++        successSoft: '#d1fae5',
++        warning: '#b45309',
++        warningSoft: '#fef3c7',
++        danger: '#be123c',
++        dangerSoft: '#ffe4e6',
++        info: '#0891b2',
++        infoSoft: '#cffafe',
++        inputBackground: '#ffffff',
++        inputBorder: '#94a3b8',
++        inputText: '#0f172a',
++        inputPlaceholder: '#64748b',
++        disabledBackground: '#e2e8f0',
++        disabledText: '#64748b',
++        shadow: '#0f172a',
++        shadowSoft: 'rgba(15,23,42,0.1)',
++        focusRing: '#0891b2',
++        overlay: 'rgba(15,23,42,0.42)',
++      },
++      dark: {
++        primary: '#ecfeff',
++        primarySoft: '#164e63',
++        secondary: '#a5f3fc',
++        accent: '#22d3ee',
++        accentSoft: '#083344',
++        background: '#020617',
++        backgroundElevated: '#05111f',
++        surface: '#07111f',
++        surfaceAlt: '#0f172a',
++        surfaceElevated: '#111827',
++        surfaceMuted: '#1e293b',
++        border: '#164e63',
++        borderSubtle: '#0e2938',
++        borderStrong: '#155e75',
++        textPrimary: '#ecfeff',
++        textSecondary: '#bae6fd',
++        textMuted: '#67e8f9',
++        textOnPrimary: '#022c22',
++        textOnAccent: '#022c22',
++        success: '#5eead4',
++        successSoft: '#042f2e',
++        warning: '#fbbf24',
++        warningSoft: '#3b2506',
++        danger: '#fb7185',
++        dangerSoft: '#3f1218',
++        info: '#22d3ee',
++        infoSoft: '#083344',
++        inputBackground: '#0f172a',
++        inputBorder: '#155e75',
++        inputText: '#ecfeff',
++        inputPlaceholder: '#a5f3fc',
++        disabledBackground: '#1e293b',
++        disabledText: '#94a3b8',
++        shadow: '#000000',
++        shadowSoft: 'rgba(0,0,0,0.36)',
++        focusRing: '#22d3ee',
++        overlay: 'rgba(0,0,0,0.68)',
++      },
++    },
++  },
++  {
++    id: 'blueCorporate',
++    label: 'Blue Corporate',
++    description: 'Identidad sobria azul para operacion multi-sucursal.',
++    active: true,
++    radius: 'standard',
++    density: 'NORMAL',
++    colors: {
++      light: {
++        primary: '#1e3a8a',
++        primarySoft: '#dbeafe',
++        secondary: '#475569',
++        accent: '#1d4ed8',
++        accentSoft: '#dbeafe',
++        background: '#f8fafc',
++        backgroundElevated: '#eff6ff',
++        surface: '#ffffff',
++        surfaceAlt: '#f8fafc',
++        surfaceElevated: '#ffffff',
++        surfaceMuted: '#eaf2ff',
++        border: '#bfdbfe',
++        borderSubtle: '#dbeafe',
++        borderStrong: '#93c5fd',
++        textPrimary: '#172554',
++        textSecondary: '#334155',
++        textMuted: '#64748b',
++        textOnPrimary: '#ffffff',
++        textOnAccent: '#ffffff',
++        success: '#15803d',
++        successSoft: '#dcfce7',
++        warning: '#a16207',
++        warningSoft: '#fef3c7',
++        danger: '#b91c1c',
++        dangerSoft: '#fee2e2',
++        info: '#1d4ed8',
++        infoSoft: '#dbeafe',
++        inputBackground: '#ffffff',
++        inputBorder: '#93c5fd',
++        inputText: '#172554',
++        inputPlaceholder: '#64748b',
++        disabledBackground: '#e2e8f0',
++        disabledText: '#64748b',
++        shadow: '#1e3a8a',
++        shadowSoft: 'rgba(30,58,138,0.1)',
++        focusRing: '#1d4ed8',
++        overlay: 'rgba(30,58,138,0.36)',
++      },
++      dark: {
++        primary: '#dbeafe',
++        primarySoft: '#172554',
++        secondary: '#bfdbfe',
++        accent: '#60a5fa',
++        accentSoft: '#172554',
++        background: '#020617',
++        backgroundElevated: '#08142b',
++        surface: '#0f172a',
++        surfaceAlt: '#111827',
++        surfaceElevated: '#111827',
++        surfaceMuted: '#172554',
++        border: '#1e3a8a',
++        borderSubtle: '#172554',
++        borderStrong: '#2563eb',
++        textPrimary: '#eff6ff',
++        textSecondary: '#bfdbfe',
++        textMuted: '#93c5fd',
++        textOnPrimary: '#020617',
++        textOnAccent: '#020617',
++        success: '#86efac',
++        successSoft: '#052e16',
++        warning: '#facc15',
++        warningSoft: '#3b2506',
++        danger: '#fca5a5',
++        dangerSoft: '#3f1218',
++        info: '#93c5fd',
++        infoSoft: '#172554',
++        inputBackground: '#111827',
++        inputBorder: '#2563eb',
++        inputText: '#eff6ff',
++        inputPlaceholder: '#bfdbfe',
++        disabledBackground: '#1e293b',
++        disabledText: '#94a3b8',
++        shadow: '#000000',
++        shadowSoft: 'rgba(0,0,0,0.3)',
++        focusRing: '#60a5fa',
++        overlay: 'rgba(0,0,0,0.64)',
++      },
++    },
++  },
++  {
++    id: 'boutique',
++    label: 'Boutique',
++    description: 'Acentos vino/rosa para retail de moda con tono editorial controlado.',
++    active: true,
++    radius: 'soft',
++    density: 'NORMAL',
++    colors: {
++      light: {
++        primary: '#4c0519',
++        primarySoft: '#ffe4e6',
++        secondary: '#6b4754',
++        accent: '#be123c',
++        accentSoft: '#ffe4e6',
++        background: '#fff7f8',
++        backgroundElevated: '#ffe4e6',
++        surface: '#ffffff',
++        surfaceAlt: '#fff1f2',
++        surfaceElevated: '#ffffff',
++        surfaceMuted: '#ffe4e6',
++        border: '#fecdd3',
++        borderSubtle: '#ffe4e6',
++        borderStrong: '#fda4af',
++        textPrimary: '#4c0519',
++        textSecondary: '#6b4754',
++        textMuted: '#8a5f6b',
++        textOnPrimary: '#ffffff',
++        textOnAccent: '#ffffff',
++        success: '#15803d',
++        successSoft: '#dcfce7',
++        warning: '#b45309',
++        warningSoft: '#fef3c7',
++        danger: '#be123c',
++        dangerSoft: '#ffe4e6',
++        info: '#7c3aed',
++        infoSoft: '#ede9fe',
++        inputBackground: '#ffffff',
++        inputBorder: '#fda4af',
++        inputText: '#4c0519',
++        inputPlaceholder: '#8a5f6b',
++        disabledBackground: '#ffe4e6',
++        disabledText: '#8a5f6b',
++        shadow: '#4c0519',
++        shadowSoft: 'rgba(76,5,25,0.1)',
++        focusRing: '#be123c',
++        overlay: 'rgba(76,5,25,0.36)',
++      },
++      dark: {
++        primary: '#ffe4e6',
++        primarySoft: '#4c0519',
++        secondary: '#fecdd3',
++        accent: '#fb7185',
++        accentSoft: '#4c0519',
++        background: '#12060b',
++        backgroundElevated: '#210913',
++        surface: '#1f0a12',
++        surfaceAlt: '#2b0f19',
++        surfaceElevated: '#2b0f19',
++        surfaceMuted: '#4c0519',
++        border: '#881337',
++        borderSubtle: '#4c0519',
++        borderStrong: '#be123c',
++        textPrimary: '#fff1f2',
++        textSecondary: '#fecdd3',
++        textMuted: '#fda4af',
++        textOnPrimary: '#12060b',
++        textOnAccent: '#12060b',
++        success: '#86efac',
++        successSoft: '#052e16',
++        warning: '#fbbf24',
++        warningSoft: '#3b2506',
++        danger: '#fb7185',
++        dangerSoft: '#4c0519',
++        info: '#c4b5fd',
++        infoSoft: '#2e1065',
++        inputBackground: '#2b0f19',
++        inputBorder: '#be123c',
++        inputText: '#fff1f2',
++        inputPlaceholder: '#fecdd3',
++        disabledBackground: '#4c0519',
++        disabledText: '#fda4af',
++        shadow: '#000000',
++        shadowSoft: 'rgba(0,0,0,0.34)',
++        focusRing: '#fb7185',
++        overlay: 'rgba(0,0,0,0.68)',
++      },
++    },
++  },
++  {
++    id: 'classicErp',
++    label: 'Classic ERP',
++    description: 'Panel sobrio y denso para administracion operativa tradicional.',
++    active: true,
++    radius: 'compact',
++    density: 'COMPACT',
++    colors: {
++      light: {
++        primary: '#111827',
++        primarySoft: '#e5e7eb',
++        secondary: '#4b5563',
++        accent: '#2563eb',
++        accentSoft: '#e0f2fe',
++        background: '#f3f4f6',
++        backgroundElevated: '#e5e7eb',
++        surface: '#ffffff',
++        surfaceAlt: '#f9fafb',
++        surfaceElevated: '#ffffff',
++        surfaceMuted: '#f3f4f6',
++        border: '#d1d5db',
++        borderSubtle: '#e5e7eb',
++        borderStrong: '#9ca3af',
++        textPrimary: '#111827',
++        textSecondary: '#374151',
++        textMuted: '#6b7280',
++        textOnPrimary: '#ffffff',
++        textOnAccent: '#ffffff',
++        success: '#166534',
++        successSoft: '#dcfce7',
++        warning: '#92400e',
++        warningSoft: '#fef3c7',
++        danger: '#991b1b',
++        dangerSoft: '#fee2e2',
++        info: '#1d4ed8',
++        infoSoft: '#dbeafe',
++        inputBackground: '#ffffff',
++        inputBorder: '#9ca3af',
++        inputText: '#111827',
++        inputPlaceholder: '#6b7280',
++        disabledBackground: '#e5e7eb',
++        disabledText: '#6b7280',
++        shadow: '#111827',
++        shadowSoft: 'rgba(17,24,39,0.08)',
++        focusRing: '#2563eb',
++        overlay: 'rgba(17,24,39,0.42)',
++      },
++      dark: {
++        primary: '#f9fafb',
++        primarySoft: '#1f2937',
++        secondary: '#d1d5db',
++        accent: '#93c5fd',
++        accentSoft: '#1e3a8a',
++        background: '#0b0f17',
++        backgroundElevated: '#111827',
++        surface: '#111827',
++        surfaceAlt: '#1f2937',
++        surfaceElevated: '#1f2937',
++        surfaceMuted: '#374151',
++        border: '#374151',
++        borderSubtle: '#1f2937',
++        borderStrong: '#6b7280',
++        textPrimary: '#f9fafb',
++        textSecondary: '#d1d5db',
++        textMuted: '#9ca3af',
++        textOnPrimary: '#111827',
++        textOnAccent: '#111827',
++        success: '#86efac',
++        successSoft: '#052e16',
++        warning: '#fbbf24',
++        warningSoft: '#3b2506',
++        danger: '#fca5a5',
++        dangerSoft: '#3f1218',
++        info: '#93c5fd',
++        infoSoft: '#1e3a8a',
++        inputBackground: '#1f2937',
++        inputBorder: '#6b7280',
++        inputText: '#f9fafb',
++        inputPlaceholder: '#d1d5db',
++        disabledBackground: '#374151',
++        disabledText: '#9ca3af',
++        shadow: '#000000',
++        shadowSoft: 'rgba(0,0,0,0.3)',
++        focusRing: '#93c5fd',
++        overlay: 'rgba(0,0,0,0.66)',
++      },
++    },
++  },
++];
++
++export function getDesignPreset(id?: string | null) {
++  return (
++    designPresets.find((preset) => preset.active && preset.id === id) ??
++    designPresets.find((preset) => preset.id === DEFAULT_DESIGN_PRESET_ID)!
++  );
++}
+
+diff --git a/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+new file mode 100644
+--- /dev/null
++++ b/docs/PRODUCT_C_PREMIUM_VISUAL_SYSTEM.md
+@@ -0,0 +1,251 @@
++# PRODUCT-C - Premium Visual System
++
++Fecha: 2026-06-04
++
++## Objetivo
++
++Definir y aplicar una direccion visual premium global para `control-ropa-app`, sin tocar backend ni reglas de negocio.
++
++## Direccion visual elegida
++
++La identidad visual elegida es:
++
++**Enterprise retail premium**
++
++Principios:
++
++- Panel operativo moderno, no formulario administrativo.
++- Retail profesional: claro, confiable, rapido de leer y apto para tablet.
++- Jerarquia fuerte: shell, secciones, cards, estados y acciones deben tener pesos visuales claros.
++- Dark mode disenado: superficies con profundidad, texto legible y estados sobrios.
++- Light mode limpio: fondo suave, superficies elevadas, bordes sutiles y sombras discretas.
++- Sin colores arbitrarios por pantalla si existe token semantico.
++
++## Tokens consolidados
++
++Tokens base reforzados:
++
++- `background`
++- `backgroundElevated`
++- `surface`
++- `surfaceAlt`
++- `surfaceElevated`
++- `surfaceMuted`
++- `border`
++- `borderSubtle`
++- `borderStrong`
++- `textPrimary`
++- `textSecondary`
++- `textMuted`
++- `accent`
++- `accentSoft`
++- `success`
++- `warning`
++- `danger`
++- `info`
++- `inputBackground`
++- `inputBorder`
++- `inputText`
++- `inputPlaceholder`
++- `disabledBackground`
++- `disabledText`
++- `shadow`
++- `focusRing`
++
++## Componentes base
++
++### AppCard
++
++Se formalizaron variantes:
++
++- `default`
++- `elevated`
++- `subtle`
++- `warning`
++- `success`
++- `danger`
++- `selected`
++
++Las variantes controlan superficie, borde, acento lateral, sombra y elevacion.
++
++### AppButton
++
++Variantes disponibles:
++
++- `primary`
++- `secondary`
++- `neutral`
++- `ghost`
++- `danger`
++- disabled visual con motivo.
++
++### StatusBadge
++
++Mantiene tonos:
++
++- `neutral`
++- `success`
++- `warning`
++- `danger`
++- `info`
++
++Los badges usan tokens semanticos para mantener contraste en claro/oscuro.
++
++### SectionHeader
++
++Se convirtio en encabezado visual de seccion con:
++
++- acento lateral;
++- eyebrow contextual;
++- titulo/subtitulo con mejor ritmo.
++
++## Shell premium
++
++### AppShell
++
++- Agrega superficie ambiental superior.
++- Mantiene sidebar fijo en desktop.
++- Mantiene drawer en tablet/mobile.
++- Usa ancho de contenido controlado.
++
++### Sidebar
++
++- Brand panel mas solido.
++- Marca visual con icono de tienda y acento semantico.
++- Separacion clara de secciones.
++- Estado activo con `accentSoft`, no bloque solido pesado.
++- Footer de sesion como tarjeta:
++  - rol;
++  - usuario;
++  - correo;
++  - cerrar sesion.
++
++### TopBar
++
++- Header contextual premium.
++- No duplica usuario completo en desktop.
++- Mantiene toggle claro/oscuro y acciones globales.
++
++## Pantallas impactadas
++
++### Inicio
++
++Hereda:
++
++- AppShell premium;
++- cards elevadas;
++- metricas con linea de acento;
++- action tiles con mejor profundidad y acento lateral;
++- empty states mas consistentes.
++
++### LIVE
++
++Sin cambiar reglas operativas:
++
++- action tiles de preparacion mas premium;
++- prenda al aire con superficie elevada;
++- estados reservada/disponible con acentos, no fondos saturados;
++- input de precio y helper texts legibles en claro/oscuro.
++
++### Reservation detail
++
++- `RestrictedSection` ahora usa `AppCard variant="warning"`.
++- Cards y warnings heredan el sistema visual.
++- No se cambio logica de pagos, permisos, 403 ni 404.
++
++### UI Kit
++
++`/ui-kit` ahora muestra:
++
++- tokens;
++- comparativo claro/oscuro;
++- botones;
++- inputs;
++- cards por variante;
++- badges;
++- notices;
++- templates;
++- panel LIVE premium.
++
++## No se cambio
++
++- Backend.
++- AUTH/RBAC.
++- Pagos reales.
++- Caja.
++- Reportes financieros.
++- Billing.
++- IA.
++- Reglas LIVE.
++- Permisos LIVE.
++- Contratos de API.
++
++## Validacion visual recomendada
++
++Rutas:
++
++- `/`
++- `/live`
++- `/ui-kit`
++- `/reservation-detail?id=<id valido>`
++
++Usuarios:
++
++- `qa.admin@local.test`
++- `qa.vendedor.centro@local.test`
++- `qa.supervisor.centro@local.test`
++- `qa.sinpermisos@local.test`
++
++Validar:
++
++- no hay duplicidad de usuario en desktop;
++- dark mode se ve disenado;
++- light mode se ve limpio;
++- botones tienen jerarquia;
++- cards tienen consistencia;
++- textos son legibles;
++- no hay datos fake;
++- responsive sin overflow.
++
++## Riesgos
++
++- Pantallas legacy que no usan AppShell o componentes base pueden seguir viendose menos premium.
++- QA visual manual sigue siendo necesario en tablet/AnyDesk.
++
++## GO / NO-GO
++
++GO tecnico si validaciones automatizadas pasan.
++
++GO visual condicionado a QA manual en rutas principales.
++
++## Siguiente fase recomendada
++
++PRODUCT-C2:
++
++- Auditoria de pantallas legacy fuera del shell.
++- Accesibilidad/contraste automatizable.
++- Migracion gradual de listados y formularios antiguos a componentes base.
++
++---
++
++## Continuidad PRODUCT-C1 - Presets de identidad visual
++
++Fecha: 2026-06-05
++
++Se agrego base controlada de identidad visual por cliente mediante presets locales:
++
++- `retailPremium`
++- `darkConsole`
++- `blueCorporate`
++- `boutique`
++- `classicErp`
++
++Implementacion:
++
++- `theme/designPresets.ts`
++- `context/AppThemeContext.tsx`
++- selector en `/ui-kit`
++
++La seleccion se guarda localmente y afecta la app real mediante tokens semanticos. No se persiste en backend ni tenant todavia.
++
++Ver `docs/PRODUCT_C_CLIENT_VISUAL_IDENTITY_PRESETS.md`.
+
+diff --git a/docs/PRODUCT_C1_GLOBAL_PREMIUM_ROLLOUT.md b/docs/PRODUCT_C1_GLOBAL_PREMIUM_ROLLOUT.md
+new file mode 100644
+--- /dev/null
++++ b/docs/PRODUCT_C1_GLOBAL_PREMIUM_ROLLOUT.md
+@@ -0,0 +1,246 @@
++# PRODUCT-C1 - Global Premium Visual Rollout
++
++Fecha: 2026-06-05
++Rama: `feature/product-c-premium-visual-system`
++
++## Objetivo
++
++Extender la direccion visual premium a las rutas autenticadas principales sin tocar backend, AUTH/RBAC, pagos reales, caja real, reportes backend, billing, IA, reglas LIVE, permisos LIVE, contratos de API ni migraciones.
++
++## Direccion visual
++
++La direccion elegida se mantiene como **Enterprise retail premium**:
++
++- interfaz limpia, moderna y operativa;
++- lenguaje consistente para shell, cards, botones, badges, inputs y estados;
++- light mode ejecutivo;
++- dark mode tipo consola premium;
++- menos formularios planos y menos bordes duros;
++- estados claros sin colores chillones;
++- tablet-friendly y usable en desktop/mobile.
++
++## Auditoria de pantallas autenticadas
++
++Pantallas que ya usaban AppShell antes de PRODUCT-C1:
++
++- `app/index.tsx`
++- `app/live.tsx`
++- `app/reservation-detail.tsx`
++- `app/ui-kit.tsx`
++
++Pantallas principales migradas visualmente en PRODUCT-C1:
++
++- `app/customers.tsx`
++- `app/reservations.tsx`
++- `app/users.tsx`
++- `app/system.tsx`
++- `app/reports.tsx`
++
++Pantallas principales revisadas y no migradas en esta fase:
++
++- Formularios y detalles secundarios como `users-form`, `customers-create`, reportes individuales, items, pagos, devoluciones y consignaciones.
++- Motivo: requieren una fase propia de migracion visual para evitar tocar flujos sensibles o pantallas largas con formularios legacy.
++
++## AppShell global
++
++Se agrego `components/layout/appNavigation.ts` para centralizar la navegacion principal del shell:
++
++- Inicio;
++- LIVE;
++- Clientes;
++- Reservas;
++- Usuarios;
++- Sistema;
++- Reportes;
++- Configuracion;
++- UI Kit para admin.
++
++El helper respeta permisos reales existentes y no crea roles ni permisos paralelos.
++
++## Tokens
++
++Se reforzaron tokens semanticos:
++
++- `successSoft`
++- `warningSoft`
++- `dangerSoft`
++- `infoSoft`
++- `shadowSoft`
++
++Estos tokens estan disponibles en `theme/designTokens.ts` y `context/AppThemeContext.tsx`.
++
++## Identidad visual por presets
++
++Se agrego base de plantillas visuales controladas:
++
++- `retailPremium`
++- `darkConsole`
++- `blueCorporate`
++- `boutique`
++- `classicErp`
++
++Archivo:
++
++- `theme/designPresets.ts`
++
++Selector:
++
++- `/ui-kit`, seccion `Identidad visual`.
++
++Persistencia:
++
++- local via `AsyncStorage`;
++- clave `controlRopa.localVisualPreset`.
++
++Pendiente:
++
++- persistencia por cliente/tenant en backend;
++- auditoria de cambios de branding;
++- lista blanca configurable desde administracion.
++
++## Componentes base
++
++Cambios principales:
++
++- `AppCard`: variantes `default`, `elevated`, `subtle`, `selected`, `success`, `warning`, `danger`, `info`.
++- `StatusBadge`: tonos `neutral`, `success`, `warning`, `danger`, `info`, `role`, `live`, `reserved`.
++- `AppInfoCard`: ahora usa `AppCard variant="info"`.
++- `ActionTile`: acento lateral y elevacion para accesos rapidos.
++- `MetricCard`: superficie elevada y label ejecutivo.
++- `SectionHeader`: acento lateral y jerarquia.
++- `RestrictedSection`: warning premium.
++
++## Regla visual: Prenda reservada
++
++La prenda reservada deja de verse como warning ambar dominante.
++
++Regla aplicada:
++
++- `Reservada` usa tono `reserved`, basado en `dangerSoft`.
++- Borde y chip usan `danger`.
++- Fondo suave, sin rojo chillante.
++- Se diferencia de:
++  - disponible: verde;
++  - preparada: warning/neutral suave;
++  - reservada: danger suave;
++  - error critico: danger fuerte.
++
++Pantallas/componentes impactados:
++
++- `app/live.tsx`
++- `app/ui-kit.tsx`
++- `StatusBadge`
++
++## Pantallas modificadas
++
++### Clientes
++
++- Migra a `AppShell`.
++- Conserva permisos `VIEW_CUSTOMERS` y `CREATE_CUSTOMER`.
++- Usa `AppCard`, `StatusBadge`, `EmptyState` y header contextual.
++
++### Reservas
++
++- Migra a `AppShell`.
++- Conserva filtros, refresh, detalle, `returnTo` y asignacion de caja.
++- Usa `StatusBadge`, `AppCard`, `EmptyState` y acciones con jerarquia.
++
++### Usuarios
++
++- Migra a `AppShell`.
++- Conserva guard `canManageUsers`, activar/desactivar y editar.
++- Usa badges de estado, cards elevadas y estado vacio premium.
++
++### Sistema
++
++- Migra a `AppShell`.
++- Conserva idioma, preferencias LIVE y accesos internos.
++- Tiles internos usan `ActionTile`.
++
++### Reportes
++
++- Migra a `AppShell`.
++- Lista de reportes usa `ActionTile`.
++- No se tocaron reportes backend.
++
++### UI Kit
++
++- Agrega preview de `reserved`/danger premium.
++- Mantiene cards, notices, inputs, badges y panel LIVE como referencia visual.
++
++## Warnings web
++
++Corregido:
++
++- `pointerEvents` en `AppShell` pasa de prop a `style.pointerEvents`.
++
++Pendiente:
++
++- Hay estilos legacy con `shadowColor`, `shadowOffset`, `shadowOpacity`, `shadowRadius` y `elevation`.
++- No se migro todo a `boxShadow` porque React Native nativo y Web no comparten exactamente el mismo contrato visual. Se recomienda PRODUCT-C2 para introducir un helper multiplataforma de sombras.
++
++## No se cambio
++
++- Backend.
++- AUTH/RBAC funcional.
++- Pagos reales.
++- Caja real.
++- Reportes backend.
++- Billing.
++- IA.
++- Reglas LIVE.
++- Permisos LIVE.
++- Contratos publicos de API.
++
++## QA visual recomendado
++
++Validar light/dark:
++
++- `/`
++- `/live`
++- `/ui-kit`
++- `/reservation-detail?id=<id valido>`
++- `/customers`
++- `/reservations`
++- `/users`
++- `/system`
++- `/reports`
++
++Usuarios:
++
++- `qa.admin@local.test`
++- `qa.vendedor.centro@local.test`
++- `qa.supervisor.centro@local.test`
++- `qa.sinpermisos@local.test`
++
++Confirmar:
++
++- shell consistente;
++- no duplicidad de usuario;
++- dark mode legible;
++- light mode limpio;
++- cards y botones con jerarquia;
++- prenda reservada en rojo premium;
++- permisos/vistas sin romper;
++- sin datos fake.
++
++## Riesgos
++
++- La migracion visual de pantallas legacy principales cambia layout y navegacion visible, aunque mantiene servicios y acciones.
++- Algunas pantallas secundarias siguen en estilo legacy.
++- Warnings web de sombras quedan parcialmente pendientes.
++
++## GO / NO-GO
++
++GO tecnico si pasan lint, TypeScript, export web y regresion backend.
++
++GO visual condicionado a QA manual en rutas principales.
++
++## Siguiente fase recomendada
++
++PRODUCT-C2:
++
++- helper de sombras multiplataforma para eliminar warnings `shadow*` en Web;
++- migracion visual de formularios y reportes individuales;
++- revisar pantallas de pagos/caja solo visualmente y con guardas estrictas;
++- checklist de contraste automatizable.
+
+diff --git a/docs/PRODUCT_C_CLIENT_VISUAL_IDENTITY_PRESETS.md b/docs/PRODUCT_C_CLIENT_VISUAL_IDENTITY_PRESETS.md
+new file mode 100644
+--- /dev/null
++++ b/docs/PRODUCT_C_CLIENT_VISUAL_IDENTITY_PRESETS.md
+@@ -0,0 +1,189 @@
++# PRODUCT-C - Client Visual Identity Presets
++
++Fecha: 2026-06-05
++Rama: `feature/product-c-premium-visual-system`
++
++## Objetivo
++
++Preparar `control-ropa-app` para identidad visual por cliente usando plantillas controladas, sin crear un editor libre de colores y sin persistir configuracion en backend.
++
++## Principio
++
++La identidad visual se aplica por **presets semanticos**, no por colores sueltos por pantalla.
++
++Esto permite:
++
++- mantener contraste minimo razonable;
++- evitar combinaciones ilegibles;
++- conservar consistencia entre AppShell, LIVE, Home, Clientes, Reservas, Usuarios, Sistema, Reportes, UI Kit y Detail;
++- preparar una futura persistencia por cliente/tenant sin cambiar cada pantalla.
++
++## Presets implementados
++
++Archivo:
++
++- `theme/designPresets.ts`
++
++Presets activos:
++
++- `retailPremium`
++- `darkConsole`
++- `blueCorporate`
++- `boutique`
++- `classicErp`
++
++Cada preset define colores para light y dark:
++
++- `primary`
++- `primarySoft`
++- `secondary`
++- `accent`
++- `accentSoft`
++- `background`
++- `backgroundElevated`
++- `surface`
++- `surfaceAlt`
++- `surfaceElevated`
++- `surfaceMuted`
++- `border`
++- `borderSubtle`
++- `borderStrong`
++- `textPrimary`
++- `textSecondary`
++- `textMuted`
++- `textOnPrimary`
++- `textOnAccent`
++- `success`
++- `successSoft`
++- `warning`
++- `warningSoft`
++- `danger`
++- `dangerSoft`
++- `info`
++- `infoSoft`
++- `inputBackground`
++- `inputBorder`
++- `inputText`
++- `inputPlaceholder`
++- `disabledBackground`
++- `disabledText`
++- `shadow`
++- `shadowSoft`
++- `focusRing`
++- `overlay`
++
++Tambien define:
++
++- radio visual (`standard`, `soft`, `compact`);
++- densidad (`NORMAL`, `COMPACT`).
++
++## Selector UI
++
++Ruta:
++
++- `/ui-kit`
++
++Se agrego seccion:
++
++- `Identidad visual`
++- `Plantilla visual activa`
++
++Desde ahi se puede seleccionar una plantilla visual activa.
++
++## Persistencia actual
++
++La seleccion se guarda localmente con `AsyncStorage`:
++
++- `controlRopa.localVisualPreset`
++
++Esto significa:
++
++- sobrevive refresh;
++- afecta toda la app autenticada;
++- no cambia backend;
++- no cambia tenant;
++- no se sincroniza entre dispositivos.
++
++## Pendiente para cliente/tenant
++
++Persistencia futura sugerida:
++
++- tabla/configuracion de branding por tenant o company;
++- endpoint administrativo seguro para asignar preset permitido;
++- no editor libre inicialmente;
++- lista blanca de presets activos;
++- auditoria de cambios de identidad visual;
++- fallback a `retailPremium` si el preset no existe o queda inactivo.
++
++Fase sugerida:
++
++- PRODUCT-E - Client Branding Configuration
++
++## Que no se puede cambiar todavia
++
++- Logo por cliente.
++- Tipografias externas.
++- Colores sueltos por componente.
++- Editor libre de tema.
++- Branding persistido en backend.
++- Configuracion diferente por sucursal.
++
++## Reglas de seguridad visual
++
++- No exponer presets incompletos.
++- No permitir elegir colores arbitrarios.
++- No permitir combinaciones sin contraste.
++- Mantener `dangerSoft` para estados bloqueantes como prenda reservada.
++- Mantener `successSoft` para disponibilidad.
++- Mantener `warningSoft` para preparacion o advertencias no bloqueantes.
++- Mantener fallback `retailPremium`.
++
++## Relacion con light/dark mode
++
++El preset no reemplaza light/dark.
++
++La resolucion es:
++
++1. modo claro/oscuro;
++2. preset visual activo;
++3. tokens semanticos finales;
++4. componentes/pantallas.
++
++Por eso cada preset define variante `light` y variante `dark`.
++
++## Validacion de un preset
++
++Validar:
++
++- `/`
++- `/live`
++- `/ui-kit`
++- `/reservation-detail?id=<id valido>`
++- `/customers`
++- `/reservations`
++- `/users`
++- `/system`
++- `/reports`
++
++En cada ruta:
++
++- texto primario visible;
++- texto secundario legible;
++- inputs legibles;
++- disabled distinguible;
++- danger no chillante;
++- reserved rojo premium;
++- dark mode sin textos perdidos;
++- mobile/tablet sin overflow.
++
++## Riesgos
++
++- Persistencia local no representa branding real por cliente.
++- Pantallas legacy fuera de AppShell pueden no reflejar el preset con la misma calidad.
++- El cambio de preset puede revelar hardcodes de color pendientes.
++
++## GO / NO-GO
++
++GO para uso interno/local y demo controlada.
++
++NO-GO para branding contractual por cliente hasta tener persistencia backend/tenant y auditoria.
+
+diff --git a/qa-reports/PRODUCT-C-global-premium-visual-system-report-20260605-091155.md b/qa-reports/PRODUCT-C-global-premium-visual-system-report-20260605-091155.md
+new file mode 100644
+--- /dev/null
++++ b/qa-reports/PRODUCT-C-global-premium-visual-system-report-20260605-091155.md
+@@ -0,0 +1,148 @@
++# PRODUCT-C / PRODUCT-C1 - Global Premium Visual System + Client Visual Identity Presets
++
++Fecha: 2026-06-05 09:11:55
++Rama: feature/product-c-premium-visual-system
++
++## Direccion visual elegida
++
++PRODUCT-C1 consolida una direccion visual enterprise retail premium: shell sobrio, cards elevadas, estados semanticos consistentes, jerarquia de botones clara, dark mode tipo consola y light mode ejecutivo. La aplicacion autenticada debe sentirse como producto comercial vendible, no como pantallas administrativas aisladas.
++
++## Presets visuales implementados
++
++Se agrego una base controlada de identidad visual local mediante presets semanticos:
++
++- retailPremium
++- darkConsole
++- blueCorporate
++- boutique
++- classicErp
++
++Los presets viven en `theme/designPresets.ts` y definen tokens semanticos para light/dark. No hay editor libre de colores, endpoints, migraciones ni persistencia backend.
++
++## Cambio de plantilla desde UI
++
++`/ui-kit` incluye la seccion "Identidad visual" con selector de plantilla visual. La seleccion se guarda localmente con AsyncStorage/local storage y afecta el tema global consumido por AppShell, pantallas y componentes base.
++
++Texto visible documentado:
++
++- Plantilla visual
++- Identidad visual
++- Configuracion local en esta fase
++
++## Persistencia local y pendiente cliente/tenant
++
++Queda local:
++
++- seleccion de preset visual;
++- modo claro/oscuro;
++- aplicacion global en frontend.
++
++Pendiente futuro:
++
++- persistencia por cliente/tenant;
++- administracion centralizada;
++- validacion backend de presets permitidos;
++- auditoria de cambios de identidad visual.
++
++## Pantallas auditadas
++
++- `/`
++- `/live`
++- `/ui-kit`
++- `/reservation-detail`
++- `/customers`
++- `/reservations`
++- `/users`
++- `/system`
++- `/reports`
++
++## Pantallas modificadas
++
++- `app/customers.tsx`
++- `app/live.tsx`
++- `app/reports.tsx`
++- `app/reservations.tsx`
++- `app/system.tsx`
++- `app/ui-kit.tsx`
++- `app/users.tsx`
++
++## Pantallas no modificadas y motivo
++
++- `app/index.tsx`: ya estaba integrada al AppShell y al sistema visual actual; no se detecto necesidad de cambio adicional en esta subfase.
++- `app/reservation-detail.tsx`: se mantuvo sin cambios nuevos en esta subfase para no tocar el manejo 403/404, RestrictedSection ni pagos.
++
++## Componentes base modificados
++
++- `components/layout/AppShell.tsx`
++- `components/layout/Sidebar.tsx`
++- `components/layout/appNavigation.ts`
++- `components/ui/ActionTile.tsx`
++- `components/ui/AppCard.tsx`
++- `components/ui/AppInfoCard.tsx`
++- `components/ui/AppText.tsx`
++- `components/ui/MetricCard.tsx`
++- `components/ui/RestrictedSection.tsx`
++- `components/ui/SectionHeader.tsx`
++- `components/ui/StatusBadge.tsx`
++
++## Tokens modificados
++
++- `theme/designTokens.ts`
++- `theme/designPresets.ts`
++- `context/AppThemeContext.tsx`
++
++Se reforzaron tokens semanticos para `primarySoft`, superficies, bordes, textos, inputs, estados, sombras, overlay, radius y density por preset.
++
++## Reglas visuales aplicadas
++
++- Sidebar como navegacion y usuario principal.
++- TopBar como contexto de pantalla y acciones globales.
++- Sin duplicidad de usuario completo en desktop.
++- Reservada usa danger/dangerSoft premium, no ambar dominante.
++- Presets no exponen colores sueltos por componente.
++- Las pantallas consumen tokens semanticos a traves del contexto de tema.
++
++## Warnings web corregidos o pendientes
++
++Corregido:
++
++- `pointerEvents` en AppShell se movio al estilo.
++
++Pendiente documentado:
++
++- Migracion completa de `shadow*` a `boxShadow` en todos los componentes multiplataforma. No se hizo una sustitucion masiva para no romper mobile; queda recomendado para PRODUCT-C2.
++
++## Validaciones ejecutadas
++
++- `git branch --show-current`: OK, `feature/product-c-premium-visual-system`.
++- `git status`: OK, cambios esperados antes del commit.
++- `git log --oneline -12`: OK.
++- `git --no-pager diff --stat`: OK.
++- `git --no-pager diff --name-only`: OK.
++- `git --no-pager diff --check`: OK, solo warnings LF/CRLF.
++- `npm.cmd run lint`: OK, 0 errores, 60 warnings existentes.
++- `npx.cmd tsc --noEmit`: OK.
++- `npx.cmd expo export --platform web --output-dir C:/tmp/control-ropa-web-export`: OK.
++- `cd backend/control-ropa; .\\mvnw.cmd test`: OK, 73 tests.
++- `cd backend/control-ropa; .\\mvnw.cmd -q -DskipTests package`: OK.
++
++## Warnings
++
++- ESLint mantiene 60 warnings historicos/preexistentes, sin errores.
++- Maven muestra warnings preexistentes de Mockito dynamic agent, MySQL 5.7 fuera de soporte comunitario y password generada por Spring Security en contexto de test.
++- Git informa conversion LF a CRLF en Windows; `diff --check` no reporta errores.
++
++## Riesgos
++
++- La seleccion de preset todavia es local, por lo que otro dispositivo/usuario no hereda la identidad visual.
++- No existe control backend de presets por tenant.
++- Los presets agregan amplitud visual; se recomienda validacion manual por preset en desktop/tablet/mobile.
++- Queda pendiente una limpieza multiplataforma cuidadosa de sombras web.
++
++## GO/NO-GO
++
++GO para commit de PRODUCT-C1 si el staged diff tambien pasa `git diff --cached --check`.
++
++## Siguiente fase recomendada
++
++PRODUCT-C2 / PRODUCT-E: persistencia de identidad visual por cliente/tenant, politica de presets permitidos, auditoria de cambios visuales, y migracion controlada de sombras web a `boxShadow` compatible.

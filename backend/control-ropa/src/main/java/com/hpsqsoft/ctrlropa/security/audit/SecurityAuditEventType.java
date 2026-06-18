@@ -1,0 +1,13 @@
+package com.hpsqsoft.ctrlropa.security.audit;
+
+public enum SecurityAuditEventType {
+    LOGIN_BLOCKED_NO_ACCESS,
+    LOGIN_BLOCKED_NO_EFFECTIVE_PERMISSIONS,
+    SESSION_REVOKED,
+    TOKEN_INVALID,
+    TOKEN_REVOKED,
+    PERMISSION_DENIED,
+    CROSS_TENANT_DENIED,
+    BRANCH_DENIED,
+    COMPANY_DENIED
+}

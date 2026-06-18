@@ -12,7 +12,10 @@ import com.hpsqsoft.ctrlropa.catalog.Size;
 import com.hpsqsoft.ctrlropa.catalog.SizeRepository;
 import com.hpsqsoft.ctrlropa.inventory.StorageLocation;
 import com.hpsqsoft.ctrlropa.inventory.StorageLocationRepository;
+import com.hpsqsoft.ctrlropa.tenant.CurrentTenantContext;
+import com.hpsqsoft.ctrlropa.tenant.TenantResolver;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +47,7 @@ public class ItemService {
     private final BrandRepository brandRepository;
     private final SizeRepository sizeRepository;
     private final StorageLocationRepository storageLocationRepository;
+    private final TenantResolver tenantResolver;
     
     private final SaleRepository saleRepository;
     private final ReservationRepository reservationRepository;
@@ -64,7 +68,8 @@ public class ItemService {
                        CustomerPackageItemRepository customerPackageItemRepository,
                        CustomerPackageRepository customerPackageRepository,
                        ShipmentPackageRepository shipmentPackageRepository,
-                       ShipmentRepository shipmentRepository) {
+                       ShipmentRepository shipmentRepository,
+                       TenantResolver tenantResolver) {
         this.repository = repository;
         this.branchRepository = branchRepository;
         this.batchRepository = batchRepository;
@@ -79,11 +84,13 @@ public class ItemService {
         this.customerPackageRepository = customerPackageRepository;
         this.shipmentPackageRepository = shipmentPackageRepository;
         this.shipmentRepository = shipmentRepository;
+        this.tenantResolver = tenantResolver;
     }
 
     @Transactional(readOnly = true)
     public List<ItemResponse> findByBranch(Long branchId) {
-        return repository.findByBranchIdOrderByCreatedAtDesc(branchId)
+        CurrentTenantContext tenant = resolveAndValidateBranch(branchId);
+        return repository.findByCompanyIdAndBranchIdOrderByCreatedAtDesc(tenant.getCompanyId(), branchId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -91,29 +98,34 @@ public class ItemService {
 
     @Transactional(readOnly = true)
     public ItemResponse findById(Long id) {
-        return toResponse(findEntityById(id));
+        Item item = findEntityById(id, currentCompanyId());
+        assertItemBelongsToCurrentTenant(item);
+        return toResponse(item);
     }
 
     @Transactional(readOnly = true)
     public ItemResponse findByCode(String code) {
-        Item entity = repository.findByCode(code)
+        Item entity = repository.findByCompanyIdAndCode(currentCompanyId(), code)
                 .orElseThrow(() -> new IllegalArgumentException("Item no encontrado con código: " + code));
+        assertItemBelongsToCurrentTenant(entity);
         return toResponse(entity);
     }
     
     @Transactional(readOnly = true)
     public ItemLookupResponse lookupByCode(String code) {
-        Item item = repository.findByCode(code)
+        Item item = repository.findByCompanyIdAndCode(currentCompanyId(), code)
                 .orElseThrow(() -> new IllegalArgumentException("Item no encontrado con código: " + code));
 
+        assertItemBelongsToCurrentTenant(item);
         return buildLookup(item);
     }
 
     @Transactional(readOnly = true)
     public ItemLookupResponse lookupByQrCode(String qrCode) {
-        Item item = repository.findByQrCode(qrCode)
+        Item item = repository.findByCompanyIdAndQrCode(currentCompanyId(), qrCode)
                 .orElseThrow(() -> new IllegalArgumentException("Item no encontrado con QR: " + qrCode));
 
+        assertItemBelongsToCurrentTenant(item);
         return buildLookup(item);
     }
 
@@ -221,10 +233,11 @@ public class ItemService {
     }
 
     public ItemResponse create(CreateItemRequest request) {
-        if (repository.existsByCode(request.getCode())) {
+        CurrentTenantContext tenant = resolveAndValidateBranch(request.getBranchId());
+        if (repository.existsByCompanyIdAndCode(tenant.getCompanyId(), request.getCode())) {
             throw new IllegalArgumentException("Ya existe un item con código: " + request.getCode());
         }
-        if (repository.existsByQrCode(request.getQrCode())) {
+        if (repository.existsByCompanyIdAndQrCode(tenant.getCompanyId(), request.getQrCode())) {
             throw new IllegalArgumentException("Ya existe un item con QR: " + request.getQrCode());
         }
 
@@ -235,6 +248,7 @@ public class ItemService {
         if (request.getBatchId() != null) {
             batch = batchRepository.findById(request.getBatchId())
                     .orElseThrow(() -> new IllegalArgumentException("Lote no encontrado"));
+            validateRelatedBranch(batch.getBranch(), tenant.getCompanyId());
         }
 
         ProductType productType = productTypeRepository.findById(request.getProductTypeId())
@@ -258,7 +272,12 @@ public class ItemService {
                     .orElseThrow(() -> new IllegalArgumentException("Ubicación no encontrada"));
         }
 
+        if (storageLocation != null) {
+            validateRelatedBranch(storageLocation.getBranch(), tenant.getCompanyId());
+        }
+
         Item entity = new Item();
+        entity.setCompany(branch.getCompany());
         entity.setCode(request.getCode());
         entity.setQrCode(request.getQrCode());
         entity.setBranch(branch);
@@ -270,24 +289,26 @@ public class ItemService {
         entity.setPrice(request.getPrice());
         entity.setStatus(request.getStatus() == null ? ItemStatus.AVAILABLE : request.getStatus());
         entity.setStorageLocation(storageLocation);
-        entity.setCreatedByUserId(request.getCreatedByUserId());
+        entity.setCreatedByUserId(request.getCreatedByUserId() == null ? tenant.getUserId() : request.getCreatedByUserId());
 
         Item saved = saveSafely(entity);
         return toResponse(saved);
     }
 
     public ItemResponse update(Long id, UpdateItemRequest request) {
-        Item existing = findEntityById(id);
+        Long companyId = currentCompanyId();
+        Item existing = findEntityById(id, companyId);
+        assertItemBelongsToCurrentTenant(existing);
 
         if (existing.getStatus() != ItemStatus.AVAILABLE) {
             throw new IllegalArgumentException("Solo se pueden editar items disponibles");
         }
 
-        if (!existing.getCode().equals(request.getCode()) && repository.existsByCode(request.getCode())) {
+        if (!existing.getCode().equals(request.getCode()) && repository.existsByCompanyIdAndCode(companyId, request.getCode())) {
             throw new IllegalArgumentException("Ya existe un item con código: " + request.getCode());
         }
 
-        if (!existing.getQrCode().equals(request.getQrCode()) && repository.existsByQrCode(request.getQrCode())) {
+        if (!existing.getQrCode().equals(request.getQrCode()) && repository.existsByCompanyIdAndQrCode(companyId, request.getQrCode())) {
             throw new IllegalArgumentException("Ya existe un item con QR: " + request.getQrCode());
         }
 
@@ -310,6 +331,10 @@ public class ItemService {
         if (request.getStorageLocationId() != null) {
             storageLocation = storageLocationRepository.findById(request.getStorageLocationId())
                     .orElseThrow(() -> new IllegalArgumentException("Ubicación no encontrada"));
+        }
+
+        if (storageLocation != null) {
+            validateRelatedBranch(storageLocation.getBranch(), companyId);
         }
 
         existing.setCode(request.getCode());
@@ -326,7 +351,9 @@ public class ItemService {
     }
 
     public ItemResponse changeLocation(Long id, Long storageLocationId) {
-        Item existing = findEntityById(id);
+        Long companyId = currentCompanyId();
+        Item existing = findEntityById(id, companyId);
+        assertItemBelongsToCurrentTenant(existing);
 
         if (existing.getStatus() != ItemStatus.AVAILABLE) {
             throw new IllegalArgumentException("Solo se pueden editar items disponibles");
@@ -335,6 +362,7 @@ public class ItemService {
         StorageLocation storageLocation = storageLocationRepository.findById(storageLocationId)
                 .orElseThrow(() -> new IllegalArgumentException("Ubicación no encontrada"));
 
+        validateRelatedBranch(storageLocation.getBranch(), companyId);
         existing.setStorageLocation(storageLocation);
 
         Item saved = repository.save(existing);
@@ -349,9 +377,32 @@ public class ItemService {
         }
     }
 
-    private Item findEntityById(Long id) {
-        return repository.findById(id)
+    private Long currentCompanyId() {
+        return tenantResolver.resolveCurrent().getCompanyId();
+    }
+
+    private CurrentTenantContext resolveAndValidateBranch(Long branchId) {
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        tenantResolver.assertBranchBelongsToCompany(branchId, tenant.getCompanyId());
+        return tenant;
+    }
+
+    private void validateRelatedBranch(Branch branch, Long companyId) {
+        tenantResolver.assertBranchBelongsToCompany(branch.getId(), companyId);
+    }
+
+    private Item findEntityById(Long id, Long companyId) {
+        return repository.findByCompanyIdAndId(companyId, id)
                 .orElseThrow(() -> new IllegalArgumentException("Item no encontrado con id: " + id));
+    }
+
+    private void assertItemBelongsToCurrentTenant(Item item) {
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        Long branchId = item.getBranch().getId();
+        tenantResolver.assertBranchBelongsToCompany(branchId, tenant.getCompanyId());
+        if (tenant.getBranchId() != null && !tenant.getBranchId().equals(branchId)) {
+            throw new AccessDeniedException("El item no pertenece a la sucursal activa");
+        }
     }
 
     private ItemResponse toResponse(Item entity) {

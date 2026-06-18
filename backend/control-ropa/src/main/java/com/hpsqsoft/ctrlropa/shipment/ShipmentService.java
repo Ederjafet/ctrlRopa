@@ -13,6 +13,7 @@ import com.hpsqsoft.ctrlropa.incident.IncidentService;
 import com.hpsqsoft.ctrlropa.payment.PaymentService;
 import com.hpsqsoft.ctrlropa.sale.Sale;
 import com.hpsqsoft.ctrlropa.sale.SaleRepository;
+import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +35,7 @@ public class ShipmentService {
     private final PaymentService paymentService;
     private final IncidentService incidentService;
     private final SaleRepository saleRepository;
+    private final TenantAccessGuard tenantAccessGuard;
 
     public ShipmentService(ShipmentRepository repository,
                            ShipmentPackageRepository shipmentPackageRepository,
@@ -43,7 +45,8 @@ public class ShipmentService {
                            BranchRepository branchRepository,
                            PaymentService paymentService,
                            IncidentService incidentService,
-                           SaleRepository saleRepository) {
+                           SaleRepository saleRepository,
+                           TenantAccessGuard tenantAccessGuard) {
         this.repository = repository;
         this.shipmentPackageRepository = shipmentPackageRepository;
         this.customerPackageRepository = customerPackageRepository;
@@ -53,11 +56,13 @@ public class ShipmentService {
         this.paymentService = paymentService;
         this.incidentService = incidentService;
         this.saleRepository = saleRepository;
+        this.tenantAccessGuard = tenantAccessGuard;
     }
 
     public ShipmentResponse create(CreateShipmentRequest request) {
         Branch branch = branchRepository.findById(request.getBranchId())
                 .orElseThrow(() -> new IllegalArgumentException("Sucursal no encontrada"));
+        tenantAccessGuard.requireBranch(branch.getId(), "La sucursal del envio no pertenece al tenant activo");
 
         if (request.getDeliveryType() == ShipmentDeliveryType.CARRIER
                 && (request.getGuideReference() == null || request.getGuideReference().trim().isBlank())) {
@@ -111,6 +116,7 @@ public class ShipmentService {
 
     @Transactional(readOnly = true)
     public List<ShipmentResponse> findByBranch(Long branchId) {
+        tenantAccessGuard.requireBranch(branchId, "La sucursal de envios no pertenece al tenant activo");
         return repository.findByBranchIdOrderByCreatedAtDesc(branchId)
                 .stream()
                 .map(this::toResponse)
@@ -126,6 +132,7 @@ public class ShipmentService {
 
         CustomerPackage customerPackage = customerPackageRepository.findById(request.getCustomerPackageId())
                 .orElseThrow(() -> new IllegalArgumentException("Paquete no encontrado"));
+        tenantAccessGuard.requireBranch(customerPackage.getBranch().getId(), "El paquete no pertenece a la sucursal activa");
 
         if (customerPackage.getStatus() != CustomerPackageStatus.READY) {
             throw new IllegalArgumentException("Solo paquetes READY pueden agregarse a un shipment");
@@ -137,6 +144,7 @@ public class ShipmentService {
 
         CustomerAddress address = customerAddressRepository.findById(request.getDeliveryAddressId())
                 .orElseThrow(() -> new IllegalArgumentException("Dirección de entrega no encontrada"));
+        tenantAccessGuard.requireBranch(address.getCustomer().getBranch().getId(), "La direccion no pertenece a la sucursal activa");
 
         if (!address.getCustomer().getId().equals(customerPackage.getCustomer().getId())) {
             throw new IllegalArgumentException("La dirección no pertenece al cliente del paquete");
@@ -393,13 +401,17 @@ public class ShipmentService {
     }
 
     private Shipment findShipment(Long shipmentId) {
-        return repository.findById(shipmentId)
+        Shipment shipment = repository.findById(shipmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Shipment no encontrado con id: " + shipmentId));
+        tenantAccessGuard.requireBranch(shipment.getBranch().getId(), "El envio no pertenece a la sucursal activa");
+        return shipment;
     }
     
     private Shipment findShipmentByFolio(String folio) {
-        return repository.findByFolio(folio)
+        Shipment shipment = repository.findByFolio(folio)
                 .orElseThrow(() -> new IllegalArgumentException("Shipment no encontrado con folio: " + folio));
+        tenantAccessGuard.requireBranch(shipment.getBranch().getId(), "El envio no pertenece a la sucursal activa");
+        return shipment;
     }
 
     private boolean hasActiveAssignment(Long customerPackageId) {
@@ -532,6 +544,7 @@ public class ShipmentService {
     private Long findSaleOrderId(Long saleId) {
         Sale sale = saleRepository.findById(saleId)
                 .orElseThrow(() -> new IllegalArgumentException("Venta no encontrada con id: " + saleId));
+        tenantAccessGuard.requireBranch(sale.getBranch().getId(), "La venta no pertenece a la sucursal activa");
         return sale.getCustomerOrderId();
     }
 

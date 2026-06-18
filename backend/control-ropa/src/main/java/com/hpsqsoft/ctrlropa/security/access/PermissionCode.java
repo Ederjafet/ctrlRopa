@@ -11,16 +11,39 @@ public final class PermissionCode {
     public static final String MANAGE_BRANCHES = "MANAGE_BRANCHES";
     public static final String MANAGE_CATALOGS = "MANAGE_CATALOGS";
     public static final String MANAGE_SECURITY_SETTINGS = "MANAGE_SECURITY_SETTINGS";
+    public static final String VIEW_SECURITY_AUDIT = "VIEW_SECURITY_AUDIT";
 
     public static final String VIEW_CUSTOMERS = "VIEW_CUSTOMERS";
+    public static final String CREATE_CUSTOMER = "CREATE_CUSTOMER";
+    public static final String EDIT_CUSTOMER = "EDIT_CUSTOMER";
     public static final String VIEW_CUSTOMER_ORDERS = "VIEW_CUSTOMER_ORDERS";
     public static final String VIEW_INVENTORY = "VIEW_INVENTORY";
     public static final String MANAGE_INVENTORY = "MANAGE_INVENTORY";
 
+    public static final String VIEW_LIVE = "VIEW_LIVE";
+    public static final String OPERATE_LIVE = "OPERATE_LIVE";
+    public static final String PREPARE_LIVE_ITEM = "PREPARE_LIVE_ITEM";
+    public static final String CHANGE_LIVE_ACTIVE_ITEM = "CHANGE_LIVE_ACTIVE_ITEM";
+    public static final String REMOVE_LIVE_ACTIVE_ITEM = "REMOVE_LIVE_ACTIVE_ITEM";
     public static final String DO_LIVE_RESERVATION = "DO_LIVE_RESERVATION";
+    public static final String REQUEST_LIVE_PRICE_CHANGE = "REQUEST_LIVE_PRICE_CHANGE";
+    public static final String APPROVE_LIVE_PRICE_CHANGE = "APPROVE_LIVE_PRICE_CHANGE";
+    public static final String APPLY_APPROVED_LIVE_PRICE_CHANGE = "APPLY_APPROVED_LIVE_PRICE_CHANGE";
+    public static final String VIEW_LIVE_PRICE_AUTHORIZATIONS = "VIEW_LIVE_PRICE_AUTHORIZATIONS";
+    public static final String CHANGE_LIVE_PRICE = "CHANGE_LIVE_PRICE";
+    public static final String REQUEST_LIVE_OPERATION_AUTHORIZATION = "REQUEST_LIVE_OPERATION_AUTHORIZATION";
+    public static final String APPROVE_LIVE_OPERATION_AUTHORIZATION = "APPROVE_LIVE_OPERATION_AUTHORIZATION";
+    public static final String VIEW_LIVE_OPERATION_AUTHORIZATIONS = "VIEW_LIVE_OPERATION_AUTHORIZATIONS";
+    public static final String APPLY_LIVE_OPERATION_AUTHORIZATION = "APPLY_LIVE_OPERATION_AUTHORIZATION";
+    public static final String CANCEL_RESERVATION_WITH_PAYMENT = "CANCEL_RESERVATION_WITH_PAYMENT";
+    public static final String RELEASE_RESERVED_ITEM = "RELEASE_RESERVED_ITEM";
+    public static final String UNDO_LIVE_OPERATIONAL_SALE = "UNDO_LIVE_OPERATIONAL_SALE";
+    public static final String REASSIGN_RESERVATION = "REASSIGN_RESERVATION";
+    public static final String EDIT_LOCKED_ITEM = "EDIT_LOCKED_ITEM";
     public static final String DO_DOOR_SALE = "DO_DOOR_SALE";
     public static final String DO_DOOR_RESERVATION = "DO_DOOR_RESERVATION";
 
+    public static final String VIEW_PAYMENTS = "VIEW_PAYMENTS";
     public static final String REGISTER_PAYMENTS = "REGISTER_PAYMENTS";
     public static final String APPLY_CUSTOMER_BALANCE = "APPLY_CUSTOMER_BALANCE";
     public static final String VOID_PAYMENT = "VOID_PAYMENT";
@@ -29,6 +52,7 @@ public final class PermissionCode {
     public static final String MANAGE_SHIPMENTS = "MANAGE_SHIPMENTS";
 
     public static final String CANCEL_RESERVATION = "CANCEL_RESERVATION";
+    public static final String VIEW_SALES = "VIEW_SALES";
     public static final String CANCEL_SALE = "CANCEL_SALE";
 
     public static final String REQUEST_REFUND = "REQUEST_REFUND";

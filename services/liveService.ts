@@ -13,11 +13,33 @@ export type Live = {
   createdAt?: string;
   startedAt?: string | null;
   endedAt?: string | null;
+  activeItemId?: number | null;
+  activeItemCode?: string | null;
+  activeItemQrCode?: string | null;
+  activeItemBranchId?: number | null;
+  activeItemProductTypeName?: string | null;
+  activeItemBrandName?: string | null;
+  activeItemSizeName?: string | null;
+  activeItemPrice?: number | null;
+  activeItemStatus?: string | null;
 };
 
 export type CreateLiveRequest = {
   notes?: string | null;
   status?: LiveStatus;
+};
+
+export type LiveEvent = {
+  id: number;
+  companyId: number;
+  branchId: number;
+  liveId: number;
+  actorUserId?: number | null;
+  eventType: string;
+  entityType?: string | null;
+  entityId?: number | null;
+  payloadJson?: string | null;
+  createdAt?: string;
 };
 
 export async function getLivesByBranch(branchId: number): Promise<Live[]> {
@@ -48,6 +70,20 @@ export async function closeLive(id: number): Promise<Live> {
   return apiRequest<Live>(`/api/lives/${id}/close`, {
     method: 'PATCH',
   });
+}
+
+export async function setLiveActiveItem(
+  liveId: number,
+  itemId: number | null
+): Promise<Live> {
+  return apiRequest<Live>(`/api/lives/${liveId}/active-item`, {
+    method: 'PATCH',
+    body: { itemId },
+  });
+}
+
+export async function getLiveEvents(liveId: number): Promise<LiveEvent[]> {
+  return apiRequest<LiveEvent[]>(`/api/lives/${liveId}/events`);
 }
 
 export function isLiveOperable(live: Live | null): boolean {

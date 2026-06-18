@@ -14,6 +14,7 @@ import com.hpsqsoft.ctrlropa.customerpackage.CustomerPackageRepository;
 import com.hpsqsoft.ctrlropa.security.access.AccessService;
 import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
 import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
+import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -30,6 +31,7 @@ public class BalanceService {
     private final CustomerPackageRepository customerPackageRepository;
     private final AccessService accessService;
     private final CurrentUser currentUser;
+    private final TenantAccessGuard tenantAccessGuard;
 
     public BalanceService(CustomerBalanceMovementRepository repository,
                           CustomerOrderRepository customerOrderRepository,
@@ -37,7 +39,8 @@ public class BalanceService {
                           CustomerRepository customerRepository,
                           CustomerPackageRepository customerPackageRepository,
                           AccessService accessService,
-                          CurrentUser currentUser) {
+                          CurrentUser currentUser,
+                          TenantAccessGuard tenantAccessGuard) {
         this.repository = repository;
         this.customerOrderRepository = customerOrderRepository;
         this.customerOrderService = customerOrderService;
@@ -45,6 +48,7 @@ public class BalanceService {
         this.customerPackageRepository = customerPackageRepository;
         this.accessService = accessService;
         this.currentUser = currentUser;
+        this.tenantAccessGuard = tenantAccessGuard;
     }
 
     public CustomerBalanceMovement registerOverage(Long customerId,
@@ -54,6 +58,7 @@ public class BalanceService {
                                                    Long createdByUserId,
                                                    String notes) {
         validatePositiveAmount(amount);
+        validateCustomerAndBranch(customerId, branchId);
 
         CustomerBalanceMovement movement = new CustomerBalanceMovement();
         movement.setCustomerId(customerId);
@@ -74,6 +79,7 @@ public class BalanceService {
                                                              Long createdByUserId,
                                                              String notes) {
         validatePositiveAmount(amount);
+        validateCustomerAndBranch(customerId, branchId);
 
         CustomerBalanceMovement movement = new CustomerBalanceMovement();
         movement.setCustomerId(customerId);
@@ -97,6 +103,7 @@ public class BalanceService {
 
         CustomerOrder order = customerOrderRepository.findById(request.getCustomerOrderId())
                 .orElseThrow(() -> new IllegalArgumentException("Orden no encontrada"));
+        tenantAccessGuard.requireBranch(order.getBranch().getId(), "La orden no pertenece a la sucursal activa");
 
         Long customerId = order.getCustomer().getId();
         BigDecimal availableBalance = getAvailableBalance(customerId);
@@ -138,6 +145,7 @@ public class BalanceService {
 
         CustomerBalanceMovement original = repository.findById(request.getMovementId())
                 .orElseThrow(() -> new IllegalArgumentException("Movimiento no encontrado"));
+        tenantAccessGuard.requireBranch(original.getBranchId(), "El movimiento de saldo no pertenece a la sucursal activa");
 
         if (original.getType() != CustomerBalanceMovementType.APPLIED_TO_ORDER) {
             throw new IllegalArgumentException("Solo se pueden revertir aplicaciones a orden");
@@ -153,6 +161,7 @@ public class BalanceService {
 
         CustomerOrder order = customerOrderRepository.findById(original.getCustomerOrderId())
                 .orElseThrow(() -> new IllegalArgumentException("Orden no encontrada"));
+        tenantAccessGuard.requireBranch(order.getBranch().getId(), "La orden no pertenece a la sucursal activa");
 
         String prefix = reversalPrefixForApplication(original.getId());
 
@@ -232,6 +241,7 @@ public class BalanceService {
 
     @Transactional(readOnly = true)
     public BigDecimal getAvailableBalance(Long customerId) {
+        validateCustomerInActiveTenant(customerId);
         List<CustomerBalanceMovement> movements = repository.findByCustomerIdOrderByCreatedAtDesc(customerId);
 
         return movements.stream()
@@ -241,11 +251,13 @@ public class BalanceService {
 
     @Transactional(readOnly = true)
     public List<CustomerBalanceMovement> history(Long customerId) {
+        validateCustomerInActiveTenant(customerId);
         return repository.findByCustomerIdOrderByCreatedAtDesc(customerId);
     }
 
     @Transactional(readOnly = true)
     public BalanceSummaryResponse getBalanceByCustomerPhone(Long branchId, String phone) {
+        tenantAccessGuard.requireBranch(branchId, "La sucursal de saldo no pertenece al tenant activo");
         Customer customer = customerRepository.findByBranchIdAndPhone(branchId, phone)
                 .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado con teléfono: " + phone));
 
@@ -259,6 +271,7 @@ public class BalanceService {
     public BalanceSummaryResponse getBalanceByPackageFolio(String folio) {
         CustomerPackage customerPackage = customerPackageRepository.findByFolio(folio)
                 .orElseThrow(() -> new IllegalArgumentException("Paquete no encontrado con folio: " + folio));
+        tenantAccessGuard.requireBranch(customerPackage.getBranch().getId(), "El paquete no pertenece a la sucursal activa");
 
         return new BalanceSummaryResponse(
                 customerPackage.getCustomer().getId(),
@@ -276,6 +289,21 @@ public class BalanceService {
     private void validatePositiveAmount(BigDecimal amount) {
         if (amount == null || amount.signum() <= 0) {
             throw new IllegalArgumentException("amount debe ser mayor a 0");
+        }
+    }
+
+    private Customer validateCustomerInActiveTenant(Long customerId) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado"));
+        tenantAccessGuard.requireBranch(customer.getBranch().getId(), "El cliente no pertenece a la sucursal activa");
+        return customer;
+    }
+
+    private void validateCustomerAndBranch(Long customerId, Long branchId) {
+        Customer customer = validateCustomerInActiveTenant(customerId);
+        tenantAccessGuard.requireBranch(branchId, "La sucursal de saldo no pertenece al tenant activo");
+        if (!customer.getBranch().getId().equals(branchId)) {
+            throw new IllegalArgumentException("El cliente no pertenece a la sucursal indicada");
         }
     }
 

@@ -1,0 +1,3 @@
+﻿ docs/LIVE_QA_C2_REMOVE_ACTIVE_ITEM_RESMOKE.md      | 124 +++++++++++++++++++++
+ ...e-active-item-resmoke-report-20260610-114507.md | 115 +++++++++++++++++++
+ 2 files changed, 239 insertions(+)

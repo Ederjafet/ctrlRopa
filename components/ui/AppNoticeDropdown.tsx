@@ -45,7 +45,9 @@ export default function AppNoticeDropdown({
     tone === 'danger'
       ? theme.colors.dangerBackground
       : tone === 'warning'
-        ? theme.colors.warningBackground
+        ? theme.isDark
+          ? theme.colors.surfaceAlt
+          : theme.colors.warningBackground
         : tone === 'success'
           ? theme.colors.successBackground
           : theme.colors.infoCardBackground;
@@ -69,6 +71,8 @@ export default function AppNoticeDropdown({
           borderColor: color,
           borderRadius: theme.radius.lg,
           padding: theme.spacing.md,
+          shadowColor: theme.isDark ? theme.colors.overlay : theme.colors.primary,
+          shadowOpacity: theme.isDark ? 0.16 : 0.1,
         },
         style,
       ]}
@@ -115,9 +119,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     elevation: 2,
     marginBottom: 12,
-    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
     shadowRadius: 5,
   },
   header: {

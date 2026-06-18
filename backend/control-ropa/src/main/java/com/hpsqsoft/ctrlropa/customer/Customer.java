@@ -1,7 +1,9 @@
 package com.hpsqsoft.ctrlropa.customer;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.hpsqsoft.ctrlropa.branch.Branch;
 import com.hpsqsoft.ctrlropa.common.Status;
+import com.hpsqsoft.ctrlropa.company.Company;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
@@ -18,6 +20,11 @@ public class Customer {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @JsonIgnore
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id", nullable = false)
+    private Company company;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "branch_id", nullable = false)
@@ -72,6 +79,14 @@ public class Customer {
 
     public Long getId() {
         return id;
+    }
+
+    public Company getCompany() {
+        return company;
+    }
+
+    public void setCompany(Company company) {
+        this.company = company;
     }
 
     public Branch getBranch() {
