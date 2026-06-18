@@ -101,7 +101,11 @@ async function redirectSessionToLogin(
 }
 
 function shouldValidateSession(path: string): boolean {
-  return !path.startsWith('/api/me') && !path.startsWith('/api/auth/');
+  return (
+    !path.startsWith('/api/me') &&
+    !path.startsWith('/api/auth/') &&
+    !path.startsWith('/api/appearance')
+  );
 }
 
 function replaceBranchPath(path: string, previousBranchId: number, nextBranchId: number): string {

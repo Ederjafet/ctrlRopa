@@ -20,9 +20,19 @@ export default function LoginScreen() {
   const router = useRouter();
 
   useEffect(() => {
+    let cancelled = false;
+
     getAppearanceSettings()
-      .then((settings) => setLogoUrl(settings.loginLogoUrl || settings.logoUrl || null))
-      .catch(() => setLogoUrl(null));
+      .then((settings) => {
+        if (!cancelled) setLogoUrl(settings.loginLogoUrl || settings.logoUrl || null);
+      })
+      .catch(() => {
+        if (!cancelled) setLogoUrl(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
