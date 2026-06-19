@@ -9,6 +9,13 @@ export type CreatePaymentRequest = {
   createdByUserId: number;
 };
 
+export type CreatePackagePaymentRequest = {
+  amount: number;
+  paymentMethodId: number;
+  reference?: string;
+  createdByUserId: number;
+};
+
 export type Payment = {
   id: number;
   saleId?: number | null;
@@ -34,6 +41,16 @@ export async function createPayment(
   payload: CreatePaymentRequest
 ): Promise<Payment> {
   return apiRequest<Payment>('/api/payments', {
+    method: 'POST',
+    body: payload,
+  });
+}
+
+export async function createPaymentByPackageFolio(
+  folio: string,
+  payload: CreatePackagePaymentRequest
+): Promise<Payment> {
+  return apiRequest<Payment>(`/api/payments/package-folio/${encodeURIComponent(folio)}`, {
     method: 'POST',
     body: payload,
   });

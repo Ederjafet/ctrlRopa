@@ -22,6 +22,7 @@ import {
   getCustomerPackageDetail,
   getCustomerPackagesByCustomer,
   prepareCustomerPackageFromReservation,
+  type CustomerPackageDetail,
 } from '@/services/customerPackageService';
 import {
   assignReservationToBox,
@@ -54,6 +55,7 @@ type PrimaryActionKind =
   | 'registerPayment'
   | 'releaseShipment'
   | 'markShipped'
+  | 'viewPackage'
   | 'detail';
 
 type OperationalTab = {
@@ -64,6 +66,14 @@ type OperationalTab = {
 };
 
 const RESERVATION_PAGE_SIZE = 25;
+
+type ReservationPackageLink = {
+  id: number;
+  folio: string;
+  status?: string;
+};
+
+type ReservationPackageMap = Record<number, ReservationPackageLink>;
 
 function getSalesChannelLabel(code?: string | null, name?: string | null) {
   if (name) return name;
@@ -175,14 +185,26 @@ function getReservationCustomerLabel(reservation: Reservation) {
   return 'Sin cliente/interesado';
 }
 
-function getPrimaryAction(reservation: Reservation): { kind: PrimaryActionKind; title: string } {
+function getPrimaryAction(
+  reservation: Reservation,
+  packageLink?: ReservationPackageLink
+): { kind: PrimaryActionKind; title: string } {
   if (!isActiveReservation(reservation)) return { kind: 'detail', title: 'Ver detalle' };
+  if (packageLink) return { kind: 'viewPackage', title: 'Ver paquete' };
   if (!reservation.customerId) return { kind: 'linkCustomer', title: 'Vincular cliente' };
 
   return { kind: 'createPackage', title: 'Crear paquete' };
 }
 
-function getPackageDisabledReason(reservation: Reservation, session: UserSession | null) {
+function getPackageDisabledReason(
+  reservation: Reservation,
+  session: UserSession | null,
+  packageLink?: ReservationPackageLink
+) {
+  if (packageLink) {
+    return `Este apartado ya esta en el paquete ${packageLink.folio}.`;
+  }
+
   if (!hasPermission(session, 'CREATE_CLOSE_CUSTOMER_PACKAGE')) {
     return 'Tu usuario no tiene permiso para crear paquetes.';
   }
@@ -240,6 +262,7 @@ export default function ReservationsScreen() {
   const [selectedLinkCustomer, setSelectedLinkCustomer] = useState<Customer | null>(null);
   const [packageReservation, setPackageReservation] = useState<Reservation | null>(null);
   const [packageCandidates, setPackageCandidates] = useState<Reservation[]>([]);
+  const [reservationPackageMap, setReservationPackageMap] = useState<ReservationPackageMap>({});
   const [selectedPackageReservationIds, setSelectedPackageReservationIds] = useState<number[]>([]);
   const [expandedReservationId, setExpandedReservationId] = useState<number | null>(null);
   const [isBoxModalVisible, setIsBoxModalVisible] = useState(false);
@@ -258,8 +281,7 @@ export default function ReservationsScreen() {
       {
         key: 'IN_PACKAGE',
         label: 'En paquete',
-        enabled: false,
-        disabledReason: 'Pendiente de resumen agregado de paquetes por apartado.',
+        enabled: true,
       },
       {
         key: 'READY_TO_SHIP',
@@ -277,6 +299,49 @@ export default function ReservationsScreen() {
     []
   );
 
+  const loadReservationPackageMap = useCallback(async (activeReservations: Reservation[]) => {
+    const customerIds = Array.from(
+      new Set(
+        activeReservations
+          .map((reservation) => reservation.customerId)
+          .filter((customerId): customerId is number => Boolean(customerId))
+      )
+    );
+
+    if (customerIds.length === 0) {
+      return {};
+    }
+
+    try {
+      const packagesByCustomer = await Promise.all(
+        customerIds.map((customerId) => getCustomerPackagesByCustomer(customerId))
+      );
+      const activePackages = packagesByCustomer
+        .flat()
+        .filter((customerPackage) => isActivePackageStatus(customerPackage.status));
+      const packageDetails: CustomerPackageDetail[] = await Promise.all(
+        activePackages.map((customerPackage) => getCustomerPackageDetail(customerPackage.id))
+      );
+
+      return packageDetails.reduce<ReservationPackageMap>((acc, customerPackage) => {
+        customerPackage.items?.forEach((packageItem) => {
+          if (packageItem.reservationId) {
+            acc[packageItem.reservationId] = {
+              id: customerPackage.id,
+              folio: customerPackage.folio,
+              status: customerPackage.status,
+            };
+          }
+        });
+
+        return acc;
+      }, {});
+    } catch (error) {
+      console.log('No se pudo cargar membresia de paquetes', error);
+      return {};
+    }
+  }, []);
+
   const loadReservations = useCallback(
     async (refreshing = false) => {
       const currentSession = await getSession();
@@ -284,6 +349,7 @@ export default function ReservationsScreen() {
 
       if (!currentSession?.branchId) {
         setReservations([]);
+        setReservationPackageMap({});
         setBoxes([]);
         setCustomers([]);
         setErrorMessage('No se encontro sucursal activa en la sesion.');
@@ -308,8 +374,10 @@ export default function ReservationsScreen() {
         ]);
 
         const active = reservationData.filter(isActiveReservation);
+        const packageMap = await loadReservationPackageMap(active);
 
         setReservations(active);
+        setReservationPackageMap(packageMap);
         setBoxes(boxData);
         setCustomers(customerData.filter(isSelectableCustomer));
       } catch (error) {
@@ -320,7 +388,7 @@ export default function ReservationsScreen() {
         setIsRefreshing(false);
       }
     },
-    [t]
+    [loadReservationPackageMap, t]
   );
 
   useFocusEffect(
@@ -340,6 +408,8 @@ export default function ReservationsScreen() {
             ? reservations.filter(hasInterestedAlias)
           : filter === 'CUSTOMERS'
             ? reservations.filter(hasFormalCustomer)
+          : filter === 'IN_PACKAGE'
+            ? reservations.filter((reservation) => Boolean(reservationPackageMap[reservation.id]))
           : reservations;
 
     if (!query) return data;
@@ -355,11 +425,12 @@ export default function ReservationsScreen() {
         ${reservation.liveId ?? ''}
         ${reservation.liveNotes ?? ''}
         ${reservation.boxCode ?? ''}
+        ${reservationPackageMap[reservation.id]?.folio ?? ''}
       `.toLowerCase();
 
       return content.includes(query);
     });
-  }, [filter, reservations, search]);
+  }, [filter, reservationPackageMap, reservations, search]);
 
   const metrics = useMemo(() => {
     const active = reservations.filter(isActiveReservation);
@@ -367,6 +438,7 @@ export default function ReservationsScreen() {
     const withBox = active.filter((reservation) => Boolean(reservation.boxId));
     const interested = active.filter(hasInterestedAlias);
     const customers = active.filter(hasFormalCustomer);
+    const inPackage = active.filter((reservation) => Boolean(reservationPackageMap[reservation.id]));
 
     return {
       active: active.length,
@@ -374,8 +446,9 @@ export default function ReservationsScreen() {
       customers: customers.length,
       withoutBox: withoutBox.length,
       withBox: withBox.length,
+      inPackage: inPackage.length,
     };
-  }, [reservations]);
+  }, [reservationPackageMap, reservations]);
 
   const visibleReservations = useMemo(
     () => filtered.slice(0, visibleLimit),
@@ -481,6 +554,13 @@ export default function ReservationsScreen() {
     } as any);
   };
 
+  const openPackageDetail = (packageLink: ReservationPackageLink) => {
+    router.push({
+      pathname: '/customer-package-detail',
+      params: { id: String(packageLink.id) },
+    } as any);
+  };
+
   const applyUpdatedReservation = (updatedReservation: Reservation) => {
     setReservations((current) =>
       current.map((reservation) =>
@@ -583,7 +663,11 @@ export default function ReservationsScreen() {
   };
 
   const openPackageModal = async (reservation: Reservation) => {
-    const disabledReason = getPackageDisabledReason(reservation, session);
+    const disabledReason = getPackageDisabledReason(
+      reservation,
+      session,
+      reservationPackageMap[reservation.id]
+    );
 
     if (disabledReason) {
       Alert.alert('Crear paquete', disabledReason);
@@ -727,8 +811,9 @@ export default function ReservationsScreen() {
   );
 
   const renderPrimaryAction = (item: Reservation) => {
-    const primaryAction = getPrimaryAction(item);
-    const packageDisabledReason = getPackageDisabledReason(item, session);
+    const packageLink = reservationPackageMap[item.id];
+    const primaryAction = getPrimaryAction(item, packageLink);
+    const packageDisabledReason = getPackageDisabledReason(item, session, packageLink);
     const assignBoxDisabledReason = getAssignBoxDisabledReason(item);
     const isCreatingPackage = workingReservationId === item.id && workingAction === 'createPackage';
     const isLinkingCurrentCustomer = workingReservationId === item.id && workingAction === 'linkCustomer';
@@ -762,6 +847,19 @@ export default function ReservationsScreen() {
       );
     }
 
+    if (primaryAction.kind === 'viewPackage' && packageLink) {
+      return (
+        <AppButton
+          title={primaryAction.title}
+          variant="operation"
+          onPress={() => openPackageDetail(packageLink)}
+          disabled={isBlockedByOtherAction}
+          disabledReason="Ya hay una accion en proceso."
+          style={styles.primaryActionButton}
+        />
+      );
+    }
+
     const usesPackageAction = primaryAction.kind === 'createPackage';
     const disabledReason = usesPackageAction ? packageDisabledReason : assignBoxDisabledReason;
     const loading = usesPackageAction ? isCreatingPackage : isAssigningCurrentBox;
@@ -782,12 +880,15 @@ export default function ReservationsScreen() {
   const renderReservation = ({ item }: { item: Reservation }) => {
     const isExpanded = expandedReservationId === item.id;
     const party = getPartyInfo(item);
+    const packageLink = reservationPackageMap[item.id];
     const channelLabel =
       item.liveId
         ? getLiveLabel(item)
         : getSalesChannelLabel(item.salesChannelCode, item.salesChannelName) || 'Canal no capturado';
     const boxLabel = item.boxCode || 'Sin caja';
-    const followUpLabel = party.needsCustomer
+    const followUpLabel = packageLink
+      ? `En paquete ${packageLink.folio}`
+      : party.needsCustomer
       ? 'Pendiente: vincular cliente'
       : item.boxCode
         ? `En caja: ${boxLabel}`
@@ -796,7 +897,7 @@ export default function ReservationsScreen() {
     const branchLabel = session?.branchName || 'Sucursal no capturada';
     const itemMetaLine = `${itemLabel} - ${branchLabel}`;
     const compactMetaLine = `${itemMetaLine} - Caja: ${boxLabel}`;
-    const primaryAction = getPrimaryAction(item);
+    const primaryAction = getPrimaryAction(item, packageLink);
 
     return (
       <AppCard
@@ -872,6 +973,7 @@ export default function ReservationsScreen() {
             <InfoPill label="Fecha" value={formatDateTime(item.createdAt)} />
             <InfoPill label="Live / canal" value={channelLabel} />
             <InfoPill label="Prenda" value={itemLabel} />
+            {packageLink ? <InfoPill label="Paquete" value={packageLink.folio} /> : null}
             <InfoPill
               label="Pagos"
               value="Abono y saldo se revisan en detalle para evitar llamadas N+1."
@@ -889,7 +991,8 @@ export default function ReservationsScreen() {
     const canViewPayments = hasPermission(session, 'VIEW_PAYMENTS');
     const canRegisterPayments = hasPermission(session, 'REGISTER_PAYMENTS');
     const canCancelReservation = hasPermission(session, 'CANCEL_RESERVATION');
-    const packageDisabledReason = getPackageDisabledReason(item, session);
+    const packageLink = reservationPackageMap[item.id];
+    const packageDisabledReason = getPackageDisabledReason(item, session, packageLink);
     const assignBoxDisabledReason = getAssignBoxDisabledReason(item);
     const isCreatingPackage = workingReservationId === item.id && workingAction === 'createPackage';
     const needsCustomerFollowUp = hasInterestedAlias(item);
@@ -915,6 +1018,16 @@ export default function ReservationsScreen() {
             variant="secondary"
             onPress={() => closeActionsAndRun(openReservationDetail)}
           />
+          {packageLink ? (
+            <AppButton
+              title={`Ver paquete ${packageLink.folio}`}
+              variant="operation"
+              onPress={() => {
+                setActionsReservation(null);
+                openPackageDetail(packageLink);
+              }}
+            />
+          ) : null}
           {needsCustomerFollowUp ? (
             <>
               <AppButton
@@ -959,7 +1072,11 @@ export default function ReservationsScreen() {
             title="Agregar a paquete"
             variant="neutral"
             disabled
-            disabledReason="Pendiente: seleccionar paquete abierto existente sin romper reglas de cliente/sucursal."
+            disabledReason={
+              packageLink
+                ? `Este apartado ya esta en el paquete ${packageLink.folio}.`
+                : 'Pendiente: seleccionar paquete abierto existente sin romper reglas de cliente/sucursal.'
+            }
           />
           <AppButton
             title="Ver pagos"
@@ -1051,6 +1168,12 @@ export default function ReservationsScreen() {
             />
           ) : null}
           <AppButton
+            title="Nuevo apartado"
+            variant="operation"
+            onPress={() => router.push('/door-reservation' as any)}
+            style={styles.headerSecondaryButton}
+          />
+          <AppButton
             title={isRefreshing ? 'Actualizando...' : 'Actualizar'}
             variant="secondary"
             onPress={handleManualRefresh}
@@ -1067,6 +1190,7 @@ export default function ReservationsScreen() {
         {renderCompactMetric('Clientes', metrics.customers)}
         {renderCompactMetric('Sin caja', metrics.withoutBox)}
         {renderCompactMetric('Con caja', metrics.withBox)}
+        {renderCompactMetric('En paquete', metrics.inPackage)}
       </View>
 
       <View style={styles.filterRow}>

@@ -7,6 +7,8 @@ import AppNoticeDropdown from '@/components/ui/AppNoticeDropdown';
 import AppOptionRow from '@/components/ui/AppOptionRow';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
+import { getBalanceByPackageFolio, type BalanceSummary } from '@/services/balanceService';
+import { getPaymentMethods, type PaymentMethod } from '@/services/catalogService';
 import {
   addCustomerPackageItemByCode,
   addCustomerPackageItemByQr,
@@ -20,6 +22,7 @@ import {
   markCustomerPackageReady,
 } from '@/services/customerPackageService';
 import { getItemsByBranch, Item } from '@/services/itemService';
+import { createPaymentByPackageFolio } from '@/services/paymentService';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
@@ -108,11 +111,17 @@ export default function CustomerPackageDetailScreen() {
   const [qrModalVisible, setQrModalVisible] = useState(false);
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [itemSearchModalVisible, setItemSearchModalVisible] = useState(false);
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [code, setCode] = useState('');
   const [qrCode, setQrCode] = useState('');
   const [itemSearch, setItemSearch] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<number | null>(null);
   const [cancelNotes, setCancelNotes] = useState('');
   const [branchItems, setBranchItems] = useState<Item[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [balanceSummary, setBalanceSummary] = useState<BalanceSummary | null>(null);
   const [notice, setNotice] = useState<{
     title: string;
     message: string;
@@ -136,7 +145,15 @@ export default function CustomerPackageDetailScreen() {
         : await getCustomerPackageDetailByFolio(String(folio || ''));
 
       setDetail(packageDetail);
-      setBranchItems(await getItemsByBranch(packageDetail.branchId));
+      const [itemsData, methodsData, balanceData] = await Promise.all([
+        getItemsByBranch(packageDetail.branchId),
+        getPaymentMethods(packageDetail.branchId),
+        getBalanceByPackageFolio(packageDetail.folio),
+      ]);
+      setBranchItems(itemsData);
+      setPaymentMethods(methodsData);
+      setSelectedPaymentMethodId((current) => current ?? methodsData[0]?.id ?? null);
+      setBalanceSummary(balanceData);
     } catch (error: any) {
       Alert.alert('Paquete', error.message || 'No se pudo cargar el paquete.');
     } finally {
@@ -256,6 +273,82 @@ export default function CustomerPackageDetailScreen() {
         message:
           error.message ||
           'Revisa que la prenda pertenezca al cliente y tenga venta o apartado activo.',
+        tone: 'danger',
+      });
+    } finally {
+      setIsWorking(false);
+    }
+  };
+
+  const openPaymentModal = () => {
+    if (!detail) return;
+
+    if (!hasPending) {
+      setNotice({
+        title: 'Paquete liquidado',
+        message: 'Este paquete no tiene saldo pendiente para registrar abono.',
+        tone: 'info',
+      });
+      return;
+    }
+
+    setPaymentAmount(String(Number(detail.pendingAmount ?? 0).toFixed(2)));
+    setPaymentReference(`Abono paquete ${detail.folio}`);
+    setSelectedPaymentMethodId((current) => current ?? paymentMethods[0]?.id ?? null);
+    setPaymentModalVisible(true);
+  };
+
+  const closePaymentModal = () => {
+    if (isWorking) return;
+
+    setPaymentModalVisible(false);
+    setPaymentAmount('');
+    setPaymentReference('');
+  };
+
+  const handleRegisterPackagePayment = async () => {
+    if (!detail || !session) return;
+
+    const amount = Number(paymentAmount.replace(',', '.'));
+
+    if (!selectedPaymentMethodId) {
+      Alert.alert('Abono paquete', 'Selecciona un metodo de pago.');
+      return;
+    }
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      Alert.alert('Abono paquete', 'Captura un monto mayor a 0.');
+      return;
+    }
+
+    try {
+      setIsWorking(true);
+      await createPaymentByPackageFolio(detail.folio, {
+        amount,
+        paymentMethodId: selectedPaymentMethodId,
+        reference: paymentReference.trim() || `Abono paquete ${detail.folio}`,
+        createdByUserId: session.userId,
+      });
+
+      const [updatedDetail, updatedBalance] = await Promise.all([
+        getCustomerPackageDetail(detail.id),
+        getBalanceByPackageFolio(detail.folio),
+      ]);
+
+      setDetail(updatedDetail);
+      setBalanceSummary(updatedBalance);
+      setPaymentModalVisible(false);
+      setPaymentAmount('');
+      setPaymentReference('');
+      setNotice({
+        title: 'Abono registrado',
+        message: 'El pago se aplico al paquete. Si hubo sobrepago, quedo como saldo a favor del cliente.',
+        tone: 'success',
+      });
+    } catch (error: any) {
+      setNotice({
+        title: 'No se pudo registrar',
+        message: error.message || 'No se pudo registrar el abono del paquete.',
         tone: 'danger',
       });
     } finally {
@@ -413,6 +506,31 @@ export default function CustomerPackageDetailScreen() {
             {money(detail.pendingAmount)}
           </AppText>
         </View>
+        <View style={styles.summaryRow}>
+          <AppText>Saldo a favor cliente</AppText>
+          <AppText bold color={Number(balanceSummary?.balance ?? 0) > 0 ? theme.colors.success : theme.colors.mutedText}>
+            {money(balanceSummary?.balance)}
+          </AppText>
+        </View>
+        <View style={styles.actions}>
+          <AppButton
+            title="Registrar abono"
+            variant="operation"
+            onPress={openPaymentModal}
+            disabled={!hasPending || isWorking}
+            disabledReason={
+              !hasPending
+                ? 'El paquete ya esta liquidado.'
+                : 'Ya hay una accion en proceso.'
+            }
+          />
+          <AppButton
+            title="Aplicar saldo a favor"
+            variant="neutral"
+            disabled
+            disabledReason="Pendiente: el saldo a favor ya se consulta por cliente, pero aplicarlo directamente a paquete requiere trazabilidad especifica paquete-saldo."
+          />
+        </View>
       </AppCard>
 
       <AppCard>
@@ -435,6 +553,12 @@ export default function CustomerPackageDetailScreen() {
             <AppButton title="Buscar prenda" onPress={() => setItemSearchModalVisible(true)} />
             <AppButton title="Agregar por código" variant="secondary" onPress={() => setCodeModalVisible(true)} />
             <AppButton title="Agregar por QR" variant="secondary" onPress={() => setQrModalVisible(true)} />
+            <AppButton
+              title="Alta rapida"
+              variant="neutral"
+              disabled
+              disabledReason="Para agregar una prenda nueva al paquete, primero crea su apartado o venta del cliente y despues agregala por codigo o QR."
+            />
           </View>
         </AppCard>
       ) : null}
@@ -558,6 +682,74 @@ export default function CustomerPackageDetailScreen() {
       </AppBottomModal>
 
       <AppBottomModal
+        visible={paymentModalVisible}
+        title="Registrar abono"
+        onClose={closePaymentModal}
+      >
+        <AppCard variant="subtle">
+          <View style={styles.summaryRow}>
+            <AppText>Paquete</AppText>
+            <AppText bold>{detail.folio}</AppText>
+          </View>
+          <View style={styles.summaryRow}>
+            <AppText>Pendiente actual</AppText>
+            <AppText bold color={theme.colors.danger}>{money(detail.pendingAmount)}</AppText>
+          </View>
+          <View style={styles.summaryRow}>
+            <AppText>Saldo a favor</AppText>
+            <AppText>{money(balanceSummary?.balance)}</AppText>
+          </View>
+        </AppCard>
+
+        <AppInput
+          label="Monto"
+          value={paymentAmount}
+          onChangeText={setPaymentAmount}
+          placeholder="0.00"
+          keyboardType="decimal-pad"
+        />
+        <AppInput
+          label="Referencia"
+          value={paymentReference}
+          onChangeText={setPaymentReference}
+          placeholder="Referencia opcional"
+        />
+
+        <AppText variant="subtitle" bold>
+          Metodo de pago
+        </AppText>
+        <View style={styles.paymentMethodsList}>
+          {paymentMethods.length > 0 ? (
+            paymentMethods.map((method) => {
+              const selected = selectedPaymentMethodId === method.id;
+
+              return (
+                <AppOptionRow
+                  key={method.id}
+                  title={`${selected ? '[x] ' : ''}${method.name}`}
+                  subtitle={method.code || 'Metodo activo'}
+                  onPress={() => setSelectedPaymentMethodId(method.id)}
+                />
+              );
+            })
+          ) : (
+            <AppText color={theme.colors.mutedText}>
+              No hay metodos de pago activos para esta sucursal.
+            </AppText>
+          )}
+        </View>
+
+        <AppButton
+          title="Registrar abono"
+          variant="operation"
+          onPress={handleRegisterPackagePayment}
+          loading={isWorking}
+          disabled={isWorking || !selectedPaymentMethodId}
+          disabledReason="Selecciona metodo de pago y captura un monto valido."
+        />
+      </AppBottomModal>
+
+      <AppBottomModal
         visible={cancelModalVisible}
         title="Cancelar paquete"
         onClose={() => setCancelModalVisible(false)}
@@ -601,6 +793,11 @@ const styles = StyleSheet.create({
   },
   modalList: {
     maxHeight: 420,
+  },
+  paymentMethodsList: {
+    gap: 8,
+    marginBottom: 12,
+    marginTop: 8,
   },
   labelBox: {
     alignItems: 'center',

@@ -5,6 +5,9 @@ import com.hpsqsoft.ctrlropa.branch.Branch;
 import com.hpsqsoft.ctrlropa.catalog.PaymentMethodRepository;
 import com.hpsqsoft.ctrlropa.catalog.PaymentMethod;
 import com.hpsqsoft.ctrlropa.customer.Customer;
+import com.hpsqsoft.ctrlropa.customerpackage.CustomerPackage;
+import com.hpsqsoft.ctrlropa.customerpackage.CustomerPackageItem;
+import com.hpsqsoft.ctrlropa.customerpackage.CustomerPackageStatus;
 import com.hpsqsoft.ctrlropa.customerpackage.CustomerPackageItemRepository;
 import com.hpsqsoft.ctrlropa.customerpackage.CustomerPackageRepository;
 import com.hpsqsoft.ctrlropa.item.ItemRepository;
@@ -203,6 +206,52 @@ class PaymentServiceAccessTests {
         verify(allocationRepository, never()).save(any());
     }
 
+    @Test
+    void createPaymentByPackageFolioAllocatesPaymentToReservationItem() {
+        List<PaymentAllocation> savedAllocations = new ArrayList<>();
+        Reservation reservation = liveReservation(45L, 20L, 6L, BigDecimal.valueOf(250));
+        CustomerPackage customerPackage = customerPackage(900L, "PKG-900", reservation);
+        CustomerPackageItem packageItem = packageReservationItem(901L, 900L, 45L);
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(customerPackageRepository.findByFolio("PKG-900")).thenReturn(Optional.of(customerPackage));
+        when(customerPackageItemRepository.findByCustomerPackageIdOrderByCreatedAtAsc(900L)).thenReturn(List.of(packageItem));
+        when(paymentMethodRepository.findById(10L)).thenReturn(Optional.of(paymentMethod(10L)));
+        when(reservationRepository.findById(45L)).thenReturn(Optional.of(reservation));
+        when(tenantResolver.resolveCurrent()).thenReturn(tenant(2L, 6L));
+        when(customerOrderService.findOrderIdByReservationId(45L)).thenReturn(14L);
+        when(allocationRepository.findByReservationIdOrderByCreatedAtAsc(45L)).thenReturn(List.of());
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> {
+            Payment payment = invocation.getArgument(0);
+            ReflectionTestUtils.setField(payment, "id", 502L);
+            ReflectionTestUtils.setField(payment, "createdAt", LocalDateTime.now());
+            return payment;
+        });
+        when(allocationRepository.save(any(PaymentAllocation.class))).thenAnswer(invocation -> {
+            PaymentAllocation allocation = invocation.getArgument(0);
+            ReflectionTestUtils.setField(allocation, "id", 702L);
+            ReflectionTestUtils.setField(allocation, "createdAt", LocalDateTime.now());
+            savedAllocations.add(allocation);
+            return allocation;
+        });
+        when(allocationRepository.findByPaymentIdOrderByCreatedAtAsc(502L)).thenAnswer(invocation -> savedAllocations);
+
+        PaymentResponse response = service.createByPackageFolio(
+                "PKG-900",
+                packagePaymentRequest(BigDecimal.valueOf(120))
+        );
+
+        assertEquals(502L, response.getId());
+        assertEquals(20L, response.getCustomerId());
+        assertEquals(6L, response.getBranchId());
+        assertEquals(1, response.getAllocations().size());
+        assertEquals(45L, response.getAllocations().get(0).getReservationId());
+        assertEquals(null, response.getAllocations().get(0).getSaleId());
+        assertEquals(0, BigDecimal.valueOf(120).compareTo(response.getAllocations().get(0).getAmount()));
+        verify(customerOrderService).refreshStatus(14L);
+        verify(balanceService, never()).registerOverage(anyLong(), anyLong(), any(), anyLong(), anyLong(), any());
+    }
+
     private static CurrentTenantContext tenant(Long companyId, Long branchId) {
         return new CurrentTenantContext(companyId, "QA_A", "Empresa QA A", branchId, "QA_A_CTR", "QA A Centro", 99L);
     }
@@ -239,6 +288,15 @@ class PaymentServiceAccessTests {
         return request;
     }
 
+    private static CreatePaymentByPackageFolioRequest packagePaymentRequest(BigDecimal amount) {
+        CreatePaymentByPackageFolioRequest request = new CreatePaymentByPackageFolioRequest();
+        request.setAmount(amount);
+        request.setPaymentMethodId(10L);
+        request.setCreatedByUserId(99L);
+        request.setReference("FLOW-FAST-1 QA");
+        return request;
+    }
+
     private static Reservation liveReservation(Long id, Long customerId, Long branchId, BigDecimal price) {
         Branch branch = new Branch();
         branch.setId(branchId);
@@ -259,5 +317,26 @@ class PaymentServiceAccessTests {
         reservation.setPrice(price);
         reservation.setStatus(ReservationStatus.ACTIVE);
         return reservation;
+    }
+
+    private static CustomerPackage customerPackage(Long id, String folio, Reservation reservation) {
+        CustomerPackage customerPackage = new CustomerPackage();
+        ReflectionTestUtils.setField(customerPackage, "id", id);
+        customerPackage.setFolio(folio);
+        customerPackage.setCustomer(reservation.getCustomer());
+        customerPackage.setBranch(reservation.getBranch());
+        customerPackage.setStatus(CustomerPackageStatus.OPEN);
+        customerPackage.setCreatedByUserId(99L);
+        ReflectionTestUtils.setField(customerPackage, "createdAt", LocalDateTime.now());
+        return customerPackage;
+    }
+
+    private static CustomerPackageItem packageReservationItem(Long id, Long packageId, Long reservationId) {
+        CustomerPackageItem packageItem = new CustomerPackageItem();
+        ReflectionTestUtils.setField(packageItem, "id", id);
+        packageItem.setCustomerPackageId(packageId);
+        packageItem.setReservationId(reservationId);
+        ReflectionTestUtils.setField(packageItem, "createdAt", LocalDateTime.now());
+        return packageItem;
     }
 }

@@ -162,6 +162,10 @@ public class PaymentService {
 
         CustomerPackage customerPackage = customerPackageRepository.findByFolio(folio)
                 .orElseThrow(() -> new IllegalArgumentException("Paquete no encontrado con folio: " + folio));
+        assertBranchIdBelongsToCurrentTenant(
+                customerPackage.getBranch().getId(),
+                "El paquete no pertenece a la sucursal activa"
+        );
 
         List<CustomerPackageItem> packageItems =
                 customerPackageItemRepository.findByCustomerPackageIdOrderByCreatedAtAsc(customerPackage.getId());
@@ -170,23 +174,15 @@ public class PaymentService {
             throw new IllegalArgumentException("El paquete no tiene items");
         }
 
-        List<Long> saleIds = packageItems.stream()
-                .map(CustomerPackageItem::getSaleId)
-                .filter(id -> id != null)
-                .toList();
-
-        boolean hasReservations = packageItems.stream().anyMatch(item -> item.getReservationId() != null);
-
-        if (hasReservations) {
-            throw new IllegalArgumentException("No se puede pagar por folio un paquete que contiene reservas");
+        if (customerPackage.getStatus().name().equals("CANCELLED") ||
+                customerPackage.getStatus().name().equals("SHIPPED") ||
+                customerPackage.getStatus().name().equals("DELIVERED")) {
+            throw new IllegalArgumentException("No se puede registrar pago a un paquete cerrado, enviado o cancelado");
         }
 
-        if (saleIds.isEmpty()) {
-            throw new IllegalArgumentException("El paquete no contiene ventas para pagar");
-        }
-
-        return createForSales(
-                saleIds,
+        return createForPackageItems(
+                customerPackage,
+                packageItems,
                 request.getAmount(),
                 request.getPaymentMethodId(),
                 request.getCreatedByUserId(),
@@ -291,6 +287,93 @@ public class PaymentService {
             balanceService.registerOverage(
                     firstSale.getCustomer().getId(),
                     firstSale.getBranch().getId(),
+                    remaining,
+                    savedPayment.getId(),
+                    createdByUserId,
+                    "Sobrepago generado desde pago " + savedPayment.getId()
+            );
+        }
+
+        for (Long saleId : affectedSaleIds) {
+            syncSalePaymentStatusById(saleId);
+        }
+
+        for (Long orderId : affectedOrderIds) {
+            customerOrderService.refreshStatus(orderId);
+        }
+
+        return toResponse(savedPayment, paymentMethod);
+    }
+
+    private PaymentResponse createForPackageItems(CustomerPackage customerPackage,
+                                                  List<CustomerPackageItem> packageItems,
+                                                  BigDecimal amount,
+                                                  Long paymentMethodId,
+                                                  Long createdByUserId,
+                                                  String reference) {
+        PaymentMethod paymentMethod = paymentMethodRepository.findById(paymentMethodId)
+                .orElseThrow(() -> new IllegalArgumentException("Metodo de pago no encontrado"));
+
+        List<PackagePaymentTarget> targets = packageItems.stream()
+                .map(item -> resolvePackagePaymentTarget(customerPackage, item))
+                .toList();
+
+        BigDecimal totalPending = targets.stream()
+                .map(PackagePaymentTarget::pendingAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        if (totalPending.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("El paquete ya esta liquidado");
+        }
+
+        Payment payment = new Payment();
+        payment.setCustomerId(customerPackage.getCustomer().getId());
+        payment.setBranchId(customerPackage.getBranch().getId());
+        payment.setReceivedAmount(amount);
+        payment.setPaymentMethodId(paymentMethod.getId());
+        payment.setReference(reference);
+        payment.setStatus(PaymentStatus.ACTIVE);
+        payment.setCreatedByUserId(createdByUserId);
+
+        Payment savedPayment = paymentRepository.save(payment);
+
+        BigDecimal remaining = amount;
+        Set<Long> affectedOrderIds = new LinkedHashSet<>();
+        Set<Long> affectedSaleIds = new LinkedHashSet<>();
+
+        for (PackagePaymentTarget target : targets) {
+            if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
+                break;
+            }
+
+            if (target.pendingAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+
+            BigDecimal appliedAmount = remaining.min(target.pendingAmount());
+
+            PaymentAllocation allocation = new PaymentAllocation();
+            allocation.setPaymentId(savedPayment.getId());
+            allocation.setSaleId(target.saleId());
+            allocation.setReservationId(target.reservationId());
+            allocation.setAmount(appliedAmount);
+            allocationRepository.save(allocation);
+
+            remaining = remaining.subtract(appliedAmount);
+
+            if (target.saleId() != null) {
+                affectedSaleIds.add(target.saleId());
+            }
+
+            if (target.customerOrderId() != null) {
+                affectedOrderIds.add(target.customerOrderId());
+            }
+        }
+
+        if (remaining.compareTo(BigDecimal.ZERO) > 0) {
+            balanceService.registerOverage(
+                    customerPackage.getCustomer().getId(),
+                    customerPackage.getBranch().getId(),
                     remaining,
                     savedPayment.getId(),
                     createdByUserId,
@@ -528,6 +611,78 @@ public class PaymentService {
         return pending.signum() < 0 ? BigDecimal.ZERO : pending;
     }
 
+    private BigDecimal getReservationPending(Reservation reservation) {
+        BigDecimal alreadyApplied = getAlreadyApplied(null, reservation.getId());
+        BigDecimal pending = reservation.getPrice().subtract(alreadyApplied);
+        return pending.signum() < 0 ? BigDecimal.ZERO : pending;
+    }
+
+    private PackagePaymentTarget resolvePackagePaymentTarget(CustomerPackage customerPackage,
+                                                             CustomerPackageItem packageItem) {
+        if (packageItem.getSaleId() != null) {
+            Sale sale = saleRepository.findById(packageItem.getSaleId())
+                    .orElseThrow(() -> new IllegalArgumentException("Venta no encontrada con id: " + packageItem.getSaleId()));
+
+            if (sale.getStatus() != SaleStatus.ACTIVE) {
+                throw new IllegalArgumentException("Solo se pueden cobrar ventas activas dentro del paquete");
+            }
+
+            assertBranchIdBelongsToCurrentTenant(sale.getBranch().getId(), "La venta no pertenece a la sucursal activa");
+
+            if (!sale.getCustomer().getId().equals(customerPackage.getCustomer().getId())) {
+                throw new IllegalArgumentException("La venta no pertenece al cliente del paquete");
+            }
+
+            if (!sale.getBranch().getId().equals(customerPackage.getBranch().getId())) {
+                throw new IllegalArgumentException("La venta no pertenece a la sucursal del paquete");
+            }
+
+            return new PackagePaymentTarget(
+                    sale.getId(),
+                    null,
+                    getSalePending(sale),
+                    sale.getCustomerOrderId()
+            );
+        }
+
+        if (packageItem.getReservationId() == null) {
+            throw new IllegalArgumentException("El item del paquete no tiene venta ni apartado asociado");
+        }
+
+        Reservation reservation = reservationRepository.findById(packageItem.getReservationId())
+                .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada con id: " + packageItem.getReservationId()));
+
+        if (reservation.getStatus() != ReservationStatus.ACTIVE) {
+            throw new IllegalArgumentException("Solo se pueden cobrar apartados activos dentro del paquete");
+        }
+
+        assertBranchIdBelongsToCurrentTenant(reservation.getBranch().getId(), "La reserva no pertenece a la sucursal activa");
+
+        if (reservation.getCustomer() == null) {
+            throw new IllegalArgumentException("La reserva debe tener cliente formal para cobrarse dentro del paquete");
+        }
+
+        if (!reservation.getCustomer().getId().equals(customerPackage.getCustomer().getId())) {
+            throw new IllegalArgumentException("La reserva no pertenece al cliente del paquete");
+        }
+
+        if (!reservation.getBranch().getId().equals(customerPackage.getBranch().getId())) {
+            throw new IllegalArgumentException("La reserva no pertenece a la sucursal del paquete");
+        }
+
+        Long customerOrderId = customerOrderService.findOrderIdByReservationId(reservation.getId());
+        if (customerOrderId == null) {
+            customerOrderId = customerOrderService.addReservationToOpenOrder(reservation).getId();
+        }
+
+        return new PackagePaymentTarget(
+                null,
+                reservation.getId(),
+                getReservationPending(reservation),
+                customerOrderId
+        );
+    }
+
     private BigDecimal calculateActiveAppliedToSale(Long saleId) {
         return allocationRepository.findBySaleIdOrderByCreatedAtAsc(saleId)
                 .stream()
@@ -642,5 +797,13 @@ public class PaymentService {
             this.totalAmount = totalAmount;
             this.customerOrderId = customerOrderId;
         }
+    }
+
+    private record PackagePaymentTarget(
+            Long saleId,
+            Long reservationId,
+            BigDecimal pendingAmount,
+            Long customerOrderId
+    ) {
     }
 }
