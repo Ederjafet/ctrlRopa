@@ -1162,115 +1162,59 @@ export default function LiveScreen() {
       ? t('live.liveNumber', { id: reservation.liveId })
       : t('live.noReservationLive');
     const isInterested = hasInterestedAlias(reservation);
-    const partyBadge = isInterested
-      ? t('live.interestedBadge')
+    const partyType = isInterested
+      ? t('live.interestedLabel')
       : reservation.customerId
-        ? t('live.customerBadge')
-        : t('live.noCustomerBadge');
+        ? t('live.customerLabel')
+        : t('live.noCustomerLabel');
     const partyLabel = isInterested
       ? reservation.interestedAlias || customerName.replace(/^Interesado:\s*/i, '')
       : customerName;
     const itemLabel = item?.productTypeName || itemCode;
     const branchLabel = session?.branchName || selectedLive?.branchName || t('live.notCaptured');
-    const compactMeta = [
-      itemLabel,
-      branchLabel,
-    ].join(' · ');
-    const partyToneColor = isInterested
-      ? theme.colors.warning
-      : reservation.customerId
-        ? theme.colors.accent
-        : theme.colors.danger;
-    const partyToneBackground = isInterested
-      ? theme.colors.surfaceAlt
-      : reservation.customerId
-        ? theme.colors.infoCardBackground
-        : theme.colors.dangerBackground;
+    const compactMeta = [itemLabel, branchLabel].join(' · ');
+    const followUpLabel = isInterested
+      ? t('live.interestedFollowUpPending')
+      : operationalSold && !settled
+        ? t('live.operationalSoldSavedShort')
+        : '';
+    const followUpColor = isInterested ? theme.colors.accent : theme.colors.warning;
 
     return (
-      <View
-        style={[
-          styles.recentReservationInfoPanel,
-          isInterested
-            ? {
-                backgroundColor: theme.colors.surfaceAlt,
-                borderColor: theme.colors.border,
-                borderRadius: theme.radius.md,
-                borderWidth: 1,
-                padding: 9,
-              }
-            : null,
-        ]}
-      >
-        <View style={styles.recentReservationHeader}>
-          <View style={styles.recentReservationText}>
-            <View style={styles.recentReservationBadgeRow}>
-              <View
-                style={[
-                  styles.operatorItemBadge,
-                  {
-                    backgroundColor: theme.colors.infoCardBackground,
-                    borderColor: theme.colors.accent,
-                    borderRadius: theme.radius.sm,
-                  },
-                ]}
-              >
-                <AppText variant="caption" color={theme.colors.accent} bold>
-                  {t('live.liveReservationBadge')}
-                </AppText>
-              </View>
-              <AppText variant="caption" color={theme.colors.mutedText}>
-                {liveLabel}
-              </AppText>
-            </View>
-            <View style={styles.recentReservationPartyRow}>
-              <View
-                style={[
-                  styles.recentReservationPartyBadge,
-                  {
-                    backgroundColor: partyToneBackground,
-                    borderColor: partyToneColor,
-                    borderRadius: theme.radius.sm,
-                  },
-                ]}
-              >
-                <AppText variant="caption" color={partyToneColor} bold>
-                  {partyBadge}
-                </AppText>
-              </View>
-              <AppText
-                bold
-                numberOfLines={1}
-                color={isInterested ? theme.colors.warning : theme.colors.text}
-                style={styles.recentReservationPartyName}
-              >
-                {partyLabel}
-              </AppText>
-            </View>
-            {isInterested ? (
-              <AppText variant="caption" color={theme.colors.warning} bold>
-                {t('live.interestedFollowUpPending')}
-              </AppText>
-            ) : null}
-            <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={2}>
-              {compactMeta}
-            </AppText>
-          </View>
-          <View style={styles.recentReservationAmountBlock}>
-            <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
-              {paymentStatusLabel}
-            </AppText>
-            <AppText color={theme.colors.accent} bold numberOfLines={1}>
-              {formatMoney(Number(reservation.price || 0))}
-            </AppText>
-          </View>
+      <View style={[styles.recentReservationInfoPanel, !isPhone ? styles.recentReservationInfoPanelDesktop : null]}>
+        <View style={styles.recentReservationIdentityColumn}>
+          <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+            {t('live.liveReservationBadge')} · {liveLabel}
+          </AppText>
+          <AppText
+            bold
+            numberOfLines={1}
+            color={isInterested ? theme.colors.accent : theme.colors.text}
+            style={styles.recentReservationPartyName}
+          >
+            {partyType} · {partyLabel}
+          </AppText>
         </View>
 
-        {operationalSold && !settled ? (
-          <AppText variant="caption" color={theme.colors.warning}>
-            {t('live.operationalSoldPersistedNoPaymentHelp')}
+        <View style={styles.recentReservationMetaColumn}>
+          {followUpLabel ? (
+            <AppText variant="caption" color={followUpColor} numberOfLines={1}>
+              {followUpLabel}
+            </AppText>
+          ) : null}
+          <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={2}>
+            {compactMeta}
           </AppText>
-        ) : null}
+        </View>
+
+        <View style={styles.recentReservationAmountBlock}>
+          <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+            {paymentStatusLabel}
+          </AppText>
+          <AppText color={theme.colors.accent} bold numberOfLines={1}>
+            {formatMoney(Number(reservation.price || 0))}
+          </AppText>
+        </View>
       </View>
     );
   };
@@ -1475,15 +1419,6 @@ export default function LiveScreen() {
 
   const renderRecentReservationPrimaryActions = (reservation: Reservation) => (
     <View style={styles.recentReservationActionRow}>
-      {hasInterestedAlias(reservation) ? (
-        <AppButton
-          title={t('live.linkCustomer')}
-          variant="warning"
-          disabled
-          disabledReason={t('live.linkCustomerPendingReason')}
-          style={styles.recentReservationActionButton}
-        />
-      ) : null}
       <AppButton
         title={t('live.detailShort')}
         variant="neutral"
@@ -2101,7 +2036,7 @@ export default function LiveScreen() {
               title={t('live.linkCustomer')}
               variant="warning"
               disabled
-              disabledReason={t('live.linkCustomerPendingReason')}
+              disabledReason={t('live.linkCustomerUnavailableReason')}
             />
           ) : null}
           {canMarkImmediateLiveSale ? (
@@ -4225,7 +4160,12 @@ export default function LiveScreen() {
                     styles.recentRow,
                     !isPhone ? styles.recentRowDesktop : null,
                     {
+                      backgroundColor: theme.colors.surface,
                       borderColor: theme.colors.border,
+                      borderLeftColor: hasInterestedAlias(reservation)
+                        ? theme.colors.accent
+                        : theme.colors.border,
+                      borderRadius: theme.radius.md,
                       opacity: pressed ? 0.75 : 1,
                     },
                   ]}
@@ -4820,7 +4760,12 @@ export default function LiveScreen() {
                               styles.recentRow,
                               !isPhone ? styles.recentRowDesktop : null,
                               {
+                                backgroundColor: theme.colors.surface,
                                 borderColor: theme.colors.border,
+                                borderLeftColor: hasInterestedAlias(reservation)
+                                  ? theme.colors.accent
+                                  : theme.colors.border,
+                                borderRadius: theme.radius.md,
                                 opacity: pressed ? 0.75 : 1,
                               },
                             ]}
@@ -4848,9 +4793,25 @@ export default function LiveScreen() {
                 </AppCard>
 
                 {mayCloseLive ? (
-                  <>
+                  <View
+                    style={[
+                      styles.operatorFinishLiveFooter,
+                      isPhone ? styles.operatorFinishLiveFooterMobile : null,
+                      { borderColor: theme.colors.border },
+                    ]}
+                  >
+                    <AppText
+                      variant="caption"
+                      color={theme.colors.mutedText}
+                      style={[
+                        styles.operatorFinishLiveFooterText,
+                        isPhone ? styles.operatorFinishLiveFooterTextMobile : null,
+                      ]}
+                    >
+                      {t('live.closeLiveHelp')}
+                    </AppText>
                     <AppButton
-                      title={t('live.operatorFinishLive')}
+                      title={t('live.operatorFinishLiveCompact')}
                       variant="danger"
                       onPress={() => (selectedLive ? handleCloseLive(selectedLive) : undefined)}
                       loading={isSavingLive}
@@ -4861,18 +4822,7 @@ export default function LiveScreen() {
                         isPhone ? styles.operatorFinishLiveButtonMobile : null,
                       ]}
                     />
-                    <AppText
-                      variant="caption"
-                      color={theme.colors.mutedText}
-                      style={[
-                        styles.actionHelperText,
-                        styles.operatorFinishLiveHelp,
-                        isPhone ? styles.operatorFinishLiveHelpMobile : null,
-                      ]}
-                    >
-                      {t('live.closeLiveHelp')}
-                    </AppText>
-                  </>
+                  </View>
                 ) : null}
               </>
             )}
@@ -5829,7 +5779,12 @@ export default function LiveScreen() {
                     styles.recentRow,
                     !isPhone ? styles.recentRowDesktop : null,
                     {
+                      backgroundColor: theme.colors.surface,
                       borderColor: theme.colors.border,
+                      borderLeftColor: hasInterestedAlias(reservation)
+                        ? theme.colors.accent
+                        : theme.colors.border,
+                      borderRadius: theme.radius.md,
                       opacity: pressed ? 0.75 : 1,
                     },
                   ]}
@@ -6326,13 +6281,25 @@ const styles = StyleSheet.create({
   operatorFinishLiveButtonMobile: {
     alignSelf: 'stretch',
   },
-  operatorFinishLiveHelp: {
-    alignSelf: 'flex-end',
-    maxWidth: 320,
+  operatorFinishLiveFooter: {
+    alignItems: 'center',
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'flex-end',
+    marginTop: 2,
+    paddingTop: 8,
+  },
+  operatorFinishLiveFooterMobile: {
+    alignItems: 'stretch',
+    flexDirection: 'column',
+  },
+  operatorFinishLiveFooterText: {
+    flex: 1,
+    maxWidth: 420,
     textAlign: 'right',
   },
-  operatorFinishLiveHelpMobile: {
-    alignSelf: 'stretch',
+  operatorFinishLiveFooterTextMobile: {
     maxWidth: '100%',
     textAlign: 'left',
   },
@@ -7023,9 +6990,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   recentRow: {
-    borderBottomWidth: 1,
-    gap: 8,
-    paddingVertical: 8,
+    borderWidth: 1,
+    borderLeftWidth: 3,
+    gap: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
   },
   recentRowDesktop: {
     alignItems: 'center',
@@ -7040,8 +7009,23 @@ const styles = StyleSheet.create({
   },
   recentReservationInfoPanel: {
     flex: 1,
-    gap: 8,
+    gap: 6,
     minWidth: 0,
+  },
+  recentReservationInfoPanelDesktop: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  recentReservationIdentityColumn: {
+    flex: 1.15,
+    gap: 3,
+    minWidth: 170,
+  },
+  recentReservationMetaColumn: {
+    flex: 1,
+    gap: 3,
+    minWidth: 140,
   },
   recentReservationPartyBadge: {
     borderWidth: 1,
@@ -7088,7 +7072,7 @@ const styles = StyleSheet.create({
   recentReservationAmountBlock: {
     alignItems: 'flex-end',
     gap: 2,
-    minWidth: 92,
+    minWidth: 104,
   },
   recentReservationActionRow: {
     alignItems: 'center',
@@ -7096,6 +7080,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
     justifyContent: 'flex-end',
+    minWidth: 136,
   },
   recentReservationActionButton: {
     minHeight: 30,
