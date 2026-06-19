@@ -577,6 +577,8 @@
     "reservedBy": "Reservó: {{seller}}",
     "date": "Fecha: {{date}}",
     "viewDetail": "Ver detalle",
+    "detailShort": "Detalle",
+    "moreShort": "Más",
     "charge": "Cobrar",
     "paymentRegistered": "Pago registrado",
     "pendingBalance": "Saldo pendiente",

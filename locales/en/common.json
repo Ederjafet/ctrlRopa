@@ -577,6 +577,8 @@
     "reservedBy": "Reserved by: {{seller}}",
     "date": "Date: {{date}}",
     "viewDetail": "View detail",
+    "detailShort": "Detail",
+    "moreShort": "More",
     "charge": "Charge",
     "paymentRegistered": "Payment registered",
     "pendingBalance": "Pending balance",
