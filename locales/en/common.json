@@ -98,6 +98,7 @@
     "refresh": "Refresh",
     "refreshing": "Refreshing...",
     "lastUpdatedAt": "Last updated: {{time}}",
+    "lastUpdatedCompact": "Updated {{time}}",
     "noRecentUpdate": "No recent update",
     "liveRefreshErrorTitle": "Could not refresh",
     "liveRefreshError": "Could not refresh live information.",

@@ -4328,17 +4328,16 @@ export default function LiveScreen() {
   const preparedItem =
     selectedItem && activeItem?.id !== selectedItem.id ? selectedItem : null;
   const navSections = useMemo(() => buildMainNavSections(session), [session]);
-  const liveShellSubtitle = isTablet
-    ? t('live.tabletHeaderHelp')
-    : isDesktop
-      ? t('live.desktopHeaderHelp')
-      : t('live.mobileHeaderHelp');
   const liveShellContextSubtitle = selectedLive
     ? operatorHeaderMeta.join(' · ')
     : t('live.noActiveTransmission');
-  const liveRefreshStatusLabel = lastLiveRefreshAt
-    ? t('live.lastUpdatedAt', { time: formatLiveRefreshTime(lastLiveRefreshAt) })
+  const liveUpdatedAtLabel = lastLiveRefreshAt
+    ? t('live.lastUpdatedCompact', { time: formatLiveRefreshTime(lastLiveRefreshAt) })
     : t('live.noRecentUpdate');
+  const liveHeaderMetadata = [
+    liveShellContextSubtitle,
+    liveRefreshIssue || liveUpdatedAtLabel,
+  ].join(' · ');
   const shouldShowLiveRefreshControls =
     isAllowed === true &&
     liveCapabilities.canViewLive &&
@@ -4347,13 +4346,14 @@ export default function LiveScreen() {
   if (isAllowed === null || isLoading) {
     return (
       <AppShell
-        title={t('live.title')}
-        subtitle={liveShellSubtitle}
+        title={t('live.liveOperationTitle')}
+        subtitle={liveHeaderMetadata}
         contextTitle={t('live.liveOperationTitle')}
-        contextSubtitle={liveShellContextSubtitle}
+        contextSubtitle={liveHeaderMetadata}
         activeRoute="live"
         session={session}
         navSections={navSections}
+        compactHeader
       >
         <ActivityIndicator />
       </AppShell>
@@ -4363,13 +4363,26 @@ export default function LiveScreen() {
   return (
     <>
       <AppShell
-        title={t('live.title')}
-        subtitle={liveShellSubtitle}
+        title={t('live.liveOperationTitle')}
+        subtitle={liveHeaderMetadata}
         contextTitle={t('live.liveOperationTitle')}
-        contextSubtitle={liveShellContextSubtitle}
+        contextSubtitle={liveHeaderMetadata}
         activeRoute="live"
         session={session}
         navSections={navSections}
+        compactHeader
+        rightContent={
+          shouldShowLiveRefreshControls ? (
+            <AppButton
+              title={isRefreshingLiveView ? t('live.refreshing') : t('live.refresh')}
+              variant="secondary"
+              onPress={handleRefreshLiveView}
+              loading={isRefreshingLiveView}
+              disabled={isRefreshingLiveView}
+              style={styles.liveHeaderRefreshButton}
+            />
+          ) : null
+        }
       >
         {liveLoadIssue ? (
           <AppInfoCard title={t('live.liveLoadIssueTitle')}>
@@ -4380,29 +4393,6 @@ export default function LiveScreen() {
           <AppInfoCard title={t('live.reservationLoadIssueTitle')}>
             <AppText>{reservationLoadIssue}</AppText>
           </AppInfoCard>
-        ) : null}
-        {shouldShowLiveRefreshControls ? (
-          <AppCard style={styles.liveRefreshCard}>
-            <View style={styles.liveRefreshRow}>
-              <View style={styles.liveRefreshText}>
-                <AppText variant="caption" color={theme.colors.mutedText} bold>
-                  {liveRefreshStatusLabel}
-                </AppText>
-                {liveRefreshIssue ? (
-                  <AppText variant="caption" color={theme.colors.warning}>
-                    {liveRefreshIssue}
-                  </AppText>
-                ) : null}
-              </View>
-              <AppButton
-                title={isRefreshingLiveView ? t('live.refreshing') : t('live.refresh')}
-                variant="neutral"
-                onPress={handleRefreshLiveView}
-                loading={isRefreshingLiveView}
-                disabled={isRefreshingLiveView}
-              />
-            </View>
-          </AppCard>
         ) : null}
         {newReservationNotice ? (
           <AppCard variant="success" style={styles.newReservationNoticeCard}>
@@ -6507,20 +6497,11 @@ const styles = StyleSheet.create({
   liveButtonGrid: {
     marginTop: 8,
   },
-  liveRefreshCard: {
-    marginBottom: 10,
-  },
-  liveRefreshRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    justifyContent: 'space-between',
-  },
-  liveRefreshText: {
-    flex: 1,
-    gap: 3,
-    minWidth: 180,
+  liveHeaderRefreshButton: {
+    minHeight: 32,
+    minWidth: 112,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
   },
   newReservationNoticeCard: {
     marginBottom: 10,
