@@ -876,6 +876,8 @@
       "doorSale": "Door sale",
       "doorHold": "Door hold",
       "holds": "Holds",
+      "packages": "Packages",
+      "shipments": "Shipments",
       "customers": "Customers",
       "itemsInventory": "Items / Inventory",
       "createItems": "Create items",

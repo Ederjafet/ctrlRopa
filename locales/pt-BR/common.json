@@ -827,6 +827,8 @@
       "doorSale": "Venda porta",
       "doorHold": "Apartado porta",
       "holds": "Apartados",
+      "packages": "Pacotes",
+      "shipments": "Envios",
       "customers": "Clientes",
       "itemsInventory": "Peças / Inventário",
       "createItems": "Criar peças",

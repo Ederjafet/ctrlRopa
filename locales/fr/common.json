@@ -827,6 +827,8 @@
       "doorSale": "Vente porte",
       "doorHold": "Mise de côté porte",
       "holds": "Mises de côté",
+      "packages": "Colis",
+      "shipments": "Expéditions",
       "customers": "Clients",
       "itemsInventory": "Articles / Inventaire",
       "createItems": "Créer des articles",

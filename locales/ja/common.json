@@ -827,6 +827,8 @@
       "doorSale": "店頭販売",
       "doorHold": "店頭取り置き",
       "holds": "取り置き",
+      "packages": "パッケージ",
+      "shipments": "発送",
       "customers": "顧客",
       "itemsInventory": "商品 / 在庫",
       "createItems": "商品作成",

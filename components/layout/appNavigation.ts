@@ -19,6 +19,8 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
   const doorReservationAllowed = canAccess(session, 'DOOR_RESERVATION', 'DO_DOOR_RESERVATION');
   const customersAllowed = canAccessByPermission(session, 'VIEW_CUSTOMERS');
   const reservationsAllowed = doorReservationAllowed || liveAllowed;
+  const packagesAllowed = canAccessByPermission(session, 'CREATE_CLOSE_CUSTOMER_PACKAGE');
+  const shipmentsAllowed = canAccessByPermission(session, 'MANAGE_SHIPMENTS');
   const operationalAuthorizationsAllowed = hasAnyPermission(session, [
     'VIEW_LIVE_OPERATION_AUTHORIZATIONS',
     'REQUEST_LIVE_OPERATION_AUTHORIZATION',
@@ -59,6 +61,12 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
       : null,
     reservationsAllowed
       ? { key: 'reservations', label: 'Apartados', labelKey: 'navigation.items.holds', route: '/reservations', activeFor: ['reservations', '/reservations', 'reservation-detail', '/reservation-detail'], icon: 'bookmark' as const }
+      : null,
+    packagesAllowed
+      ? { key: 'customer-packages', label: 'Paquetes', labelKey: 'navigation.items.packages', route: '/customer-packages', activeFor: ['customer-packages', '/customer-packages', 'customer-package-detail', '/customer-package-detail'], icon: 'inventory' as const }
+      : null,
+    shipmentsAllowed
+      ? { key: 'shipments', label: 'Envios', labelKey: 'navigation.items.shipments', route: '/shipments', activeFor: ['shipments', '/shipments', 'shipment-detail', '/shipment-detail'], icon: 'local-shipping' as const }
       : null,
     operationalAuthorizationsAllowed
       ? {

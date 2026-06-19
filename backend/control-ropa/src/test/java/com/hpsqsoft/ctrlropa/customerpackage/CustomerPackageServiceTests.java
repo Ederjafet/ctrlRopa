@@ -111,16 +111,47 @@ class CustomerPackageServiceTests {
     }
 
     @Test
-    void prepareFromReservationWithoutBoxIsRejectedBeforeCreatingPackage() {
+    void prepareFromReservationWithoutBoxCreatesOpenPackageAndAddsReservationItem() {
         Reservation reservation = activeReservation(false);
+        CustomerPackage[] savedPackage = new CustomerPackage[1];
+        CustomerPackageItem[] savedItem = new CustomerPackageItem[1];
+
         when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
+        when(itemRepository.existsByReservationId(10L)).thenReturn(false);
+        when(repository.existsByFolio(anyString())).thenReturn(false);
+        when(repository.save(any(CustomerPackage.class))).thenAnswer(invocation -> {
+            CustomerPackage customerPackage = invocation.getArgument(0);
+            ReflectionTestUtils.setField(customerPackage, "id", 501L);
+            ReflectionTestUtils.setField(customerPackage, "createdAt", LocalDateTime.now());
+            savedPackage[0] = customerPackage;
+            return customerPackage;
+        });
+        when(repository.findById(501L)).thenAnswer(invocation -> Optional.of(savedPackage[0]));
+        when(itemEntityRepository.findById(8L)).thenReturn(Optional.of(reservation.getItem()));
+        when(itemRepository.existsByCustomerPackageIdAndItemId(501L, 8L)).thenReturn(false);
+        when(itemRepository.save(any(CustomerPackageItem.class))).thenAnswer(invocation -> {
+            CustomerPackageItem packageItem = invocation.getArgument(0);
+            ReflectionTestUtils.setField(packageItem, "id", 700L);
+            ReflectionTestUtils.setField(packageItem, "createdAt", LocalDateTime.now());
+            savedItem[0] = packageItem;
+            return packageItem;
+        });
+        when(itemRepository.findByCustomerPackageIdOrderByCreatedAtAsc(501L))
+                .thenAnswer(invocation -> List.of(savedItem[0]));
+        stubFinancialSummary();
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(501L))).thenReturn(List.of());
 
         PrepareCustomerPackageFromReservationRequest request = new PrepareCustomerPackageFromReservationRequest();
         request.setCreatedByUserId(99L);
 
-        assertThrows(IllegalArgumentException.class, () -> service.prepareFromReservation(10L, request));
-        verify(repository, never()).save(any(CustomerPackage.class));
-        verify(itemRepository, never()).save(any(CustomerPackageItem.class));
+        CustomerPackageDetailResponse response = service.prepareFromReservation(10L, request);
+
+        assertEquals(501L, response.getId());
+        assertEquals("OPEN", response.getStatus());
+        assertEquals(1, response.getTotalItems());
+        assertEquals(10L, response.getItems().get(0).getReservationId());
+        verify(repository).save(any(CustomerPackage.class));
+        verify(itemRepository).save(any(CustomerPackageItem.class));
     }
 
     @Test
@@ -134,6 +165,25 @@ class CustomerPackageServiceTests {
 
         assertThrows(IllegalArgumentException.class, () -> service.prepareFromReservation(10L, request));
         verify(repository, never()).save(any(CustomerPackage.class));
+        verify(itemRepository, never()).save(any(CustomerPackageItem.class));
+    }
+
+    @Test
+    void addItemRejectsInactiveReservationBeforeSavingPackageItem() {
+        Reservation reservation = activeReservation(true);
+        reservation.setStatus(ReservationStatus.CANCELLED);
+        CustomerPackage customerPackage = customerPackage(reservation);
+
+        when(repository.findById(501L)).thenReturn(Optional.of(customerPackage));
+        when(itemEntityRepository.findById(8L)).thenReturn(Optional.of(reservation.getItem()));
+        when(itemRepository.existsByCustomerPackageIdAndItemId(501L, 8L)).thenReturn(false);
+        when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
+
+        AddCustomerPackageItemRequest request = new AddCustomerPackageItemRequest();
+        request.setItemId(8L);
+        request.setReservationId(10L);
+
+        assertThrows(IllegalArgumentException.class, () -> service.addItem(501L, request));
         verify(itemRepository, never()).save(any(CustomerPackageItem.class));
     }
 
@@ -166,6 +216,18 @@ class CustomerPackageServiceTests {
         }
         ReflectionTestUtils.setField(reservation, "createdAt", LocalDateTime.now());
         return reservation;
+    }
+
+    private CustomerPackage customerPackage(Reservation reservation) {
+        CustomerPackage customerPackage = new CustomerPackage();
+        ReflectionTestUtils.setField(customerPackage, "id", 501L);
+        customerPackage.setFolio("PKG-501");
+        customerPackage.setBranch(reservation.getBranch());
+        customerPackage.setCustomer(reservation.getCustomer());
+        customerPackage.setStatus(CustomerPackageStatus.OPEN);
+        customerPackage.setCreatedByUserId(99L);
+        ReflectionTestUtils.setField(customerPackage, "createdAt", LocalDateTime.now());
+        return customerPackage;
     }
 
     private Branch branch() {
