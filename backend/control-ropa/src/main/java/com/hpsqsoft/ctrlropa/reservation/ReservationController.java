@@ -55,6 +55,12 @@ public class ReservationController {
         return service.removeBox(reservationId);
     }
 
+    @PatchMapping("/{reservationId}/customer")
+    public ReservationResponse linkCustomer(@PathVariable Long reservationId,
+                                            @RequestBody LinkCustomerRequest request) {
+        return service.linkCustomer(reservationId, request.getCustomerId());
+    }
+
     @PatchMapping("/{reservationId}/cancel")
     public ReservationResponse cancel(@PathVariable Long reservationId,
                                       @RequestBody CancelReservationRequest request) {
@@ -78,6 +84,18 @@ public class ReservationController {
 
         public void setReason(String reason) {
             this.reason = reason;
+        }
+    }
+
+    public static class LinkCustomerRequest {
+        private Long customerId;
+
+        public Long getCustomerId() {
+            return customerId;
+        }
+
+        public void setCustomerId(Long customerId) {
+            this.customerId = customerId;
         }
     }
 }

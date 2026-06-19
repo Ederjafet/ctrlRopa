@@ -773,6 +773,34 @@ public class ReservationService {
         return toResponse(repository.save(existing));
     }
 
+    public ReservationResponse linkCustomer(Long reservationId, Long customerId) {
+        Long userId = currentUser.getUserId();
+
+        if (customerId == null) {
+            throw new IllegalArgumentException("Cliente requerido para vincular el apartado");
+        }
+
+        Reservation existing = findEntityById(reservationId);
+
+        validateReservationManagementAccess(userId, existing);
+
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado"));
+        tenantAccessGuard.requireBranch(customer.getBranch().getId(), "El cliente no pertenece a la sucursal activa");
+
+        if (!customer.getBranch().getId().equals(existing.getBranch().getId())) {
+            throw new IllegalArgumentException("El cliente no pertenece a la misma sucursal del apartado");
+        }
+
+        existing.setCustomer(customer);
+        Reservation saved = repository.save(existing);
+
+        CustomerOrder order = customerOrderService.addReservationToOpenOrder(saved);
+        customerOrderService.refreshStatus(order.getId());
+
+        return toResponse(saved);
+    }
+
     public ReservationResponse cancel(Long reservationId, String reason) {
         Long userId = currentUser.getUserId();
 
