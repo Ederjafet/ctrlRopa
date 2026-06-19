@@ -8,7 +8,6 @@ import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
 import AppText from '@/components/ui/AppText';
 import EmptyState from '@/components/ui/EmptyState';
-import StatusBadge from '@/components/ui/StatusBadge';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { hasPermission } from '@/services/accessControl';
@@ -66,21 +65,6 @@ type OperationalTab = {
 
 const RESERVATION_PAGE_SIZE = 25;
 
-function getReservationStatusLabel(status?: string) {
-  switch (status) {
-    case 'ACTIVE':
-      return 'Activa';
-    case 'CANCELLED':
-      return 'Cancelada';
-    case 'COMPLETED':
-      return 'Completada';
-    case 'CONVERTED_TO_SALE':
-      return 'Convertida a venta';
-    default:
-      return status || 'Sin estado';
-  }
-}
-
 function getSalesChannelLabel(code?: string | null, name?: string | null) {
   if (name) return name;
 
@@ -110,20 +94,6 @@ function formatMoney(value?: number | null) {
   return `$${Number(value).toFixed(2)}`;
 }
 
-function getReservationTone(status?: string): 'success' | 'warning' | 'danger' | 'info' | 'neutral' {
-  switch (status) {
-    case 'ACTIVE':
-      return 'success';
-    case 'CANCELLED':
-      return 'danger';
-    case 'COMPLETED':
-    case 'CONVERTED_TO_SALE':
-      return 'info';
-    default:
-      return 'neutral';
-  }
-}
-
 function formatDateTime(value?: string | null) {
   if (!value) return 'Sin fecha';
 
@@ -139,16 +109,6 @@ function formatDateTime(value?: string | null) {
 function isActiveReservation(reservation: Reservation) {
   if (!reservation.status) return true;
   return reservation.status === 'ACTIVE';
-}
-
-function getHoldStateLabel(reservation: Reservation) {
-  if (!isActiveReservation(reservation)) {
-    return getReservationStatusLabel(reservation.status);
-  }
-
-  if (!reservation.boxId) return 'Sin caja';
-
-  return 'En caja';
 }
 
 function hasFormalCustomer(reservation: Reservation) {
@@ -827,93 +787,82 @@ export default function ReservationsScreen() {
         ? getLiveLabel(item)
         : getSalesChannelLabel(item.salesChannelCode, item.salesChannelName) || 'Canal no capturado';
     const boxLabel = item.boxCode || 'Sin caja';
-    const followUpLabel = party.needsCustomer ? 'Pendiente: vincular cliente' : getHoldStateLabel(item);
-    const compactMetaLine = `${followUpLabel} · Caja: ${boxLabel} · Monto: ${formatMoney(item.price)} · Canal: ${channelLabel}`;
+    const followUpLabel = party.needsCustomer
+      ? 'Pendiente: vincular cliente'
+      : item.boxCode
+        ? `En caja: ${boxLabel}`
+        : 'Caja: Sin caja';
     const itemLabel = item.itemCode || `ID ${item.itemId}`;
+    const branchLabel = session?.branchName || 'Sucursal no capturada';
+    const itemMetaLine = `${itemLabel} - ${branchLabel}`;
+    const compactMetaLine = `${itemMetaLine} - Caja: ${boxLabel}`;
+    const primaryAction = getPrimaryAction(item);
 
     return (
       <AppCard
         variant="elevated"
         style={[styles.compactReservationCard, isPhone ? styles.mobileReservationCard : styles.desktopReservationCard]}
       >
-        <View style={[styles.compactCardHeader, !isPhone && styles.compactCardHeaderDesktop]}>
-          <View style={styles.reservationIdentity}>
-            <View style={styles.compactTitleLine}>
-              <AppText bold numberOfLines={1} style={styles.folioText}>
-                Apartado #{item.id}
-              </AppText>
-              <AppText variant="caption" color={theme.colors.mutedText} bold numberOfLines={1}>
-                · {party.displayType}
-              </AppText>
-            </View>
-            <View
-              style={[
-                styles.partyLine,
-                party.needsCustomer
-                  ? {
-                      backgroundColor: theme.colors.warningBackground,
-                      borderColor: theme.colors.warning,
-                    }
-                  : {
-                      backgroundColor: theme.colors.surfaceAlt,
-                      borderColor: theme.colors.border,
-                    },
-              ]}
+        <View style={[styles.holdRow, !isPhone && styles.holdRowDesktop]}>
+          <View style={styles.holdIdentityColumn}>
+            <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+              Apartado #{item.id} - {channelLabel}
+            </AppText>
+            <AppText
+              bold
+              numberOfLines={1}
+              color={party.needsCustomer ? theme.colors.accent : theme.colors.text}
+              style={styles.holdPartyName}
             >
-              <AppText
-                numberOfLines={1}
-                style={styles.customerText}
-                color={party.needsCustomer ? theme.colors.warning : theme.colors.text}
-                bold
-              >
-                {party.label}
-              </AppText>
-            </View>
+              {party.displayType} - {party.label}
+            </AppText>
+          </View>
+
+          <View style={styles.holdMetaColumn}>
             <AppText
               variant="caption"
-              color={party.needsCustomer ? theme.colors.warning : theme.colors.mutedText}
-              numberOfLines={2}
-              style={styles.compactMetaLine}
+              color={party.needsCustomer ? theme.colors.accent : theme.colors.mutedText}
+              numberOfLines={1}
             >
+              {followUpLabel}
+            </AppText>
+            <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={2}>
               {compactMetaLine}
             </AppText>
           </View>
 
-          <StatusBadge
-            label={getReservationStatusLabel(item.status)}
-            tone={getReservationTone(item.status)}
-            style={styles.compactBadge}
-          />
-        </View>
-
-        <View style={[styles.compactBody, !isPhone && styles.compactBodyDesktop]}>
-          {!isPhone ? (
-            <>
-              <View style={[styles.compactField, styles.itemField]}>
-                <AppText variant="caption" color={theme.colors.mutedText} bold numberOfLines={1}>
-                  Prenda
-                </AppText>
-                <AppText numberOfLines={1}>{itemLabel}</AppText>
-              </View>
-            </>
-          ) : null}
-
-          <View style={[styles.compactActions, isPhone && styles.mobileCompactActions]}>
-            {renderPrimaryAction(item)}
-            <AppButton
-              title="Mas acciones"
-              variant="secondary"
-              onPress={() => openActionsModal(item)}
-              style={styles.moreActionButton}
-            />
-            {isPhone ? (
+          <View style={[styles.holdAmountActions, isPhone && styles.holdAmountActionsMobile]}>
+            <View style={styles.holdAmountBlock}>
+              <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+                Pago en detalle
+              </AppText>
+              <AppText color={theme.colors.accent} bold numberOfLines={1}>
+                {formatMoney(item.price)}
+              </AppText>
+            </View>
+            <View style={[styles.compactActions, isPhone && styles.mobileCompactActions]}>
+              {primaryAction.kind !== 'detail' ? renderPrimaryAction(item) : null}
               <AppButton
-                title={isExpanded ? 'Ocultar' : 'Detalle'}
-                variant="ghost"
-                onPress={() => toggleExpandedReservation(item.id)}
-                style={styles.expandButton}
+                title="Detalle"
+                variant="secondary"
+                onPress={() => openReservationDetail(item)}
+                style={styles.detailActionButton}
               />
-            ) : null}
+              <AppButton
+                title="Mas"
+                variant="secondary"
+                onPress={() => openActionsModal(item)}
+                style={styles.moreActionButton}
+              />
+              {isPhone ? (
+                <AppButton
+                  title={isExpanded ? 'Ocultar' : 'Info'}
+                  variant="ghost"
+                  onPress={() => toggleExpandedReservation(item.id)}
+                  style={styles.expandButton}
+                />
+              ) : null}
+            </View>
           </View>
         </View>
 
@@ -1447,10 +1396,11 @@ const styles = StyleSheet.create({
   compactActions: {
     alignItems: 'center',
     flexDirection: 'row',
-    flexBasis: 250,
     flexGrow: 0,
+    flexShrink: 1,
     gap: 8,
     justifyContent: 'flex-end',
+    minWidth: 0,
   },
   compactBadge: {
     maxWidth: 160,
@@ -1483,6 +1433,12 @@ const styles = StyleSheet.create({
   },
   compactReservationCard: {
     marginBottom: 0,
+  },
+  detailActionButton: {
+    minHeight: 30,
+    minWidth: 70,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   compactTitleLine: {
     alignItems: 'center',
@@ -1568,8 +1524,10 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
   },
   moreActionButton: {
-    minWidth: 116,
+    minHeight: 30,
+    minWidth: 64,
     paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   partyLine: {
     alignSelf: 'flex-start',
@@ -1581,8 +1539,10 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   primaryActionButton: {
-    minWidth: 128,
+    minHeight: 30,
+    minWidth: 118,
     paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   reservationIdentity: {
     flex: 1,
@@ -1600,6 +1560,50 @@ const styles = StyleSheet.create({
     minWidth: 108,
     paddingHorizontal: 12,
     paddingVertical: 7,
+  },
+  holdAmountActions: {
+    alignItems: 'flex-end',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    flex: 1.2,
+    gap: 8,
+    justifyContent: 'flex-end',
+    minWidth: 220,
+  },
+  holdAmountActionsMobile: {
+    alignItems: 'stretch',
+    flexDirection: 'column',
+    minWidth: 0,
+    width: '100%',
+  },
+  holdAmountBlock: {
+    alignItems: 'flex-end',
+    gap: 2,
+    minWidth: 100,
+  },
+  holdIdentityColumn: {
+    flex: 1.15,
+    gap: 3,
+    minWidth: 170,
+  },
+  holdMetaColumn: {
+    flex: 1,
+    gap: 3,
+    minWidth: 140,
+  },
+  holdPartyName: {
+    flex: 1,
+    minWidth: 120,
+  },
+  holdRow: {
+    flex: 1,
+    gap: 8,
+    minWidth: 0,
+  },
+  holdRowDesktop: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
   },
   filterButton: {
     minWidth: 96,
