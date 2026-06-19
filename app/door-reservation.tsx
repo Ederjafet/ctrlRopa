@@ -479,18 +479,19 @@ export default function DoorReservationScreen() {
         rightContent={renderHeaderActions()}
       >
 
-      <AppCard>
-        <AppText variant="subtitle" bold>
-          {t('operationalScreens.shared.customer')}
-        </AppText>
+      <AppCard style={styles.sectionCard}>
+        <View style={styles.sectionHeaderRow}>
+          <View style={styles.sectionText}>
+            <AppText variant="subtitle" bold>
+              {t('operationalScreens.shared.customer')}
+            </AppText>
+            <AppText color={theme.colors.mutedText} numberOfLines={1}>
+              {selectedCustomer
+                ? selectedCustomer.name
+                : t('operationalScreens.doorReservation.selectRealCustomer')}
+            </AppText>
+          </View>
 
-        <AppText>
-          {selectedCustomer
-            ? selectedCustomer.name
-            : t('operationalScreens.doorReservation.selectRealCustomer')}
-        </AppText>
-
-        <View style={styles.actionSpacing}>
           <AppButton
             title={
               selectedCustomer
@@ -499,140 +500,173 @@ export default function DoorReservationScreen() {
             }
             variant="operation"
             onPress={() => setIsCustomerModalVisible(true)}
+            style={styles.compactButton}
           />
         </View>
       </AppCard>
 
-      <AppCard>
-        <AppText variant="subtitle" bold>
-          {t('operationalScreens.shared.addItem')}
-        </AppText>
-        <AppText color={theme.colors.mutedText}>
-          {t('operationalScreens.doorReservation.addItemHelp')}
-        </AppText>
+      <AppCard style={styles.sectionCard}>
+        <View style={styles.sectionHeaderRow}>
+          <View style={styles.sectionText}>
+            <AppText variant="subtitle" bold>
+              {t('operationalScreens.shared.addItem')}
+            </AppText>
+            <AppText color={theme.colors.mutedText}>
+              {t('operationalScreens.doorReservation.addItemHelp')}
+            </AppText>
+          </View>
+        </View>
 
-        <AppInput
-          placeholder={t('operationalScreens.shared.scanOrCodePlaceholder')}
-          value={scanInput}
-          onChangeText={setScanInput}
-          onSubmitEditing={() => addItemByCode(scanInput)}
-        />
+        <View style={styles.scanRow}>
+          <View style={styles.scanInput}>
+            <AppInput
+              placeholder={t('operationalScreens.shared.scanOrCodePlaceholder')}
+              value={scanInput}
+              onChangeText={setScanInput}
+              onSubmitEditing={() => addItemByCode(scanInput)}
+            />
+          </View>
+          <AppButton
+            title={t('operationalScreens.shared.addByCode')}
+            variant="operation"
+            onPress={() => addItemByCode(scanInput)}
+            style={styles.compactButton}
+          />
+        </View>
 
-        <AppButton
-          title={t('operationalScreens.shared.addByCode')}
-          variant="operation"
-          onPress={() => addItemByCode(scanInput)}
-        />
-
-        <View style={styles.actionSpacing}>
+        <View style={styles.inlineActions}>
           <AppButton
             title={t('operationalScreens.shared.searchItem')}
-            variant="operation"
+            variant="secondary"
             onPress={() => setIsItemModalVisible(true)}
+            style={styles.compactButton}
           />
-        </View>
-
-        <View style={styles.actionSpacing}>
           <AppButton
             title={t('operationalScreens.shared.scanWithCamera')}
-            variant="operation"
+            variant="secondary"
             onPress={() => setIsScannerVisible(true)}
+            style={styles.compactButton}
           />
         </View>
       </AppCard>
 
-      <AppCard>
-        <AppText variant="subtitle" bold>
-          {t('operationalScreens.shared.items')}
-        </AppText>
+      <AppCard style={styles.sectionCard}>
+        <View style={styles.sectionHeaderRow}>
+          <View style={styles.sectionText}>
+            <AppText variant="subtitle" bold>
+              {t('operationalScreens.shared.items')}
+            </AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {cart.length === 0
+                ? t('operationalScreens.shared.noItemsAdded')
+                : `${cart.length} prenda${cart.length === 1 ? '' : 's'} en apartado`}
+            </AppText>
+          </View>
+
+          <View style={styles.inlineActions}>
+            <AppButton
+              title={t('operationalScreens.shared.addItem')}
+              variant="secondary"
+              onPress={() => setIsItemModalVisible(true)}
+              style={styles.compactButton}
+            />
+            <AppButton
+              title={t('operationalScreens.doorReservation.quickItem')}
+              variant="secondary"
+              onPress={() =>
+                router.push('/items-create?returnTo=/door-reservation' as any)
+              }
+              style={styles.compactButton}
+            />
+          </View>
+        </View>
 
         {cart.length === 0 ? (
           <AppText color={theme.colors.mutedText}>
-            {t('operationalScreens.shared.noItemsAdded')}
+            No hay prendas agregadas. Escanea o busca una prenda para continuar.
           </AppText>
         ) : (
           cart.map((line) => (
             <View
               key={line.item.id}
-              style={[styles.cartLine, { borderBottomColor: theme.colors.borderSubtle }]}
+              style={[
+                styles.cartLine,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border,
+                },
+              ]}
             >
-              <AppText bold>{line.item.code}</AppText>
+              <View style={styles.cartLineMain}>
+                <AppText bold numberOfLines={1}>{line.item.code}</AppText>
+                <AppText color={theme.colors.mutedText} numberOfLines={1}>
+                  {line.item.productTypeName || t('operationalScreens.shared.noType')} ·{' '}
+                  {line.item.brandName || t('operationalScreens.shared.noBrand')} ·{' '}
+                  {line.item.sizeName || t('operationalScreens.shared.noSize')}
+                </AppText>
+              </View>
 
-              <AppText>
-                {line.item.productTypeName || t('operationalScreens.shared.noType')} ·{' '}
-                {line.item.brandName || t('operationalScreens.shared.noBrand')} ·{' '}
-                {line.item.sizeName || t('operationalScreens.shared.noSize')}
-              </AppText>
+              <View style={styles.cartLineActions}>
+                <View style={styles.priceInputWrap}>
+                  <AppInput
+                    label={t('operationalScreens.doorReservation.holdPrice')}
+                    value={line.priceText}
+                    onChangeText={(value) => updateLinePrice(line.item.id, value)}
+                    keyboardType="numeric"
+                    placeholder={t('operationalScreens.doorReservation.pricePlaceholder')}
+                  />
+                </View>
 
-              <AppInput
-                label={t('operationalScreens.doorReservation.holdPrice')}
-                value={line.priceText}
-                onChangeText={(value) => updateLinePrice(line.item.id, value)}
-                keyboardType="numeric"
-                placeholder={t('operationalScreens.doorReservation.pricePlaceholder')}
-              />
-
-              <AppButton
-                title={t('operationalScreens.shared.remove')}
-                variant="danger"
-                onPress={() => removeItemFromCart(line.item.id)}
-              />
+                <AppButton
+                  title={t('operationalScreens.shared.remove')}
+                  variant="danger"
+                  onPress={() => removeItemFromCart(line.item.id)}
+                  style={styles.compactButton}
+                />
+              </View>
             </View>
           ))
         )}
-
-        <AppButton
-          title={t('operationalScreens.shared.addItem')}
-          variant="operation"
-          onPress={() => setIsItemModalVisible(true)}
-        />
-
-        <View style={styles.actionSpacing}>
-          <AppButton
-            title={t('operationalScreens.doorReservation.quickItem')}
-            variant="operation"
-            onPress={() =>
-              router.push('/items-create?returnTo=/door-reservation' as any)
-            }
-          />
-        </View>
       </AppCard>
 
-      <AppCard>
-        <AppText variant="subtitle" bold>
-          {t('operationalScreens.doorReservation.advance')}
-        </AppText>
-
-        <AppInput
-          label={t('operationalScreens.doorReservation.optionalAdvance')}
-          value={advanceText}
-          onChangeText={setAdvanceText}
-          keyboardType="numeric"
-          placeholder={t('operationalScreens.doorReservation.advancePlaceholder')}
-        />
-
-        {getAdvance() > 0 ? (
-          <>
-            <AppText>
-              {t('operationalScreens.shared.paymentMethod')}:{' '}
-              {selectedPaymentMethod
-                ? selectedPaymentMethod.name
-                : t('operationalScreens.shared.noSelection')}
+      <AppCard style={styles.sectionCard}>
+        <View style={styles.sectionHeaderRow}>
+          <View style={styles.sectionText}>
+            <AppText variant="subtitle" bold>
+              {t('operationalScreens.doorReservation.advance')}
             </AppText>
+            <AppText color={theme.colors.mutedText}>
+              {getAdvance() > 0
+                ? `${t('operationalScreens.shared.paymentMethod')}: ${
+                    selectedPaymentMethod
+                      ? selectedPaymentMethod.name
+                      : t('operationalScreens.shared.noSelection')
+                  }`
+                : t('operationalScreens.doorReservation.advanceHelp')}
+            </AppText>
+          </View>
 
-            <View style={styles.actionSpacing}>
-              <AppButton
-                title={t('operationalScreens.shared.selectPaymentMethod')}
-                variant="operation"
-                onPress={() => setIsPaymentModalVisible(true)}
-              />
-            </View>
-          </>
-        ) : (
-          <AppText color={theme.colors.mutedText}>
-            {t('operationalScreens.doorReservation.advanceHelp')}
-          </AppText>
-        )}
+          {getAdvance() > 0 ? (
+            <AppButton
+              title={t('operationalScreens.shared.selectPaymentMethod')}
+              variant="operation"
+              onPress={() => setIsPaymentModalVisible(true)}
+              style={styles.compactButton}
+            />
+          ) : null}
+        </View>
+
+        <View style={styles.scanRow}>
+          <View style={styles.scanInput}>
+            <AppInput
+              label={t('operationalScreens.doorReservation.optionalAdvance')}
+              value={advanceText}
+              onChangeText={setAdvanceText}
+              keyboardType="numeric"
+              placeholder={t('operationalScreens.doorReservation.advancePlaceholder')}
+            />
+          </View>
+        </View>
 
         <View style={styles.totalRow}>
           <AppText bold>{t('operationalScreens.doorReservation.holdTotal')}</AppText>
@@ -647,12 +681,15 @@ export default function DoorReservationScreen() {
         </View>
       </AppCard>
 
-      <AppButton
-        title={t('operationalScreens.doorReservation.createHold')}
-        onPress={handleSave}
-        loading={isSaving}
-        disabled={isSaving}
-      />
+      <View style={styles.footerActions}>
+        <AppButton
+          title={t('operationalScreens.doorReservation.createHold')}
+          onPress={handleSave}
+          loading={isSaving}
+          disabled={isSaving}
+          style={styles.footerPrimaryButton}
+        />
+      </View>
       </AppShellPage>
 
       <QRScannerModal
@@ -804,6 +841,41 @@ const styles = StyleSheet.create({
   actionSpacing: {
     marginTop: 10,
   },
+  cartLineActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'flex-end',
+  },
+  cartLineMain: {
+    flex: 1,
+    gap: 3,
+    minWidth: 160,
+  },
+  compactButton: {
+    minHeight: 30,
+    minWidth: 74,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  footerActions: {
+    alignItems: 'flex-end',
+    marginTop: 2,
+  },
+  footerPrimaryButton: {
+    minHeight: 34,
+    minWidth: 210,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  inlineActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'flex-end',
+  },
   modalActions: {
     flexDirection: 'row',
     gap: 8,
@@ -813,9 +885,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cartLine: {
-    marginTop: 12,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 10,
+    padding: 10,
   },
   headerActions: {
     alignItems: 'center',
@@ -832,6 +909,36 @@ const styles = StyleSheet.create({
   },
   modalList: {
     maxHeight: 420,
+  },
+  priceInputWrap: {
+    minWidth: 126,
+    width: 150,
+  },
+  scanInput: {
+    flex: 1,
+    minWidth: 210,
+  },
+  scanRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  sectionCard: {
+    gap: 10,
+  },
+  sectionHeaderRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
+  sectionText: {
+    flex: 1,
+    gap: 3,
+    minWidth: 180,
   },
   totalRow: {
     marginTop: 14,
