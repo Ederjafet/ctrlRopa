@@ -66,6 +66,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import {
   createReservation,
   getReservationsByBranch,
+  linkReservationCustomer,
   LiveReservationOperationalStatus,
   Reservation,
   updateLiveReservationOperationalStatus,
@@ -435,6 +436,10 @@ export default function LiveScreen() {
   const [operationalSoldToConfirm, setOperationalSoldToConfirm] = useState<number | null>(null);
   const [cancelReservationToConfirm, setCancelReservationToConfirm] = useState<number | null>(null);
   const [recentReservationActions, setRecentReservationActions] = useState<Reservation | null>(null);
+  const [linkCustomerReservation, setLinkCustomerReservation] = useState<Reservation | null>(null);
+  const [linkCustomerSearch, setLinkCustomerSearch] = useState('');
+  const [selectedLinkCustomer, setSelectedLinkCustomer] = useState<Customer | null>(null);
+  const [isLinkingCustomer, setIsLinkingCustomer] = useState(false);
   const [reservationIssue, setReservationIssue] = useState<LiveReservationIssue | null>(null);
   const [showDemoMetrics, setShowDemoMetrics] = useState(true);
   const [liveLayoutPreferences, setLiveLayoutPreferences] =
@@ -764,6 +769,19 @@ export default function LiveScreen() {
       )
       .slice(0, 25);
   }, [customers, customerSearch]);
+  const filteredLinkCustomers = useMemo(() => {
+    const term = normalize(linkCustomerSearch);
+
+    if (!term) return customers.slice(0, 12);
+
+    return customers
+      .filter((customer) =>
+        `${customer.name ?? ''} ${customer.phone ?? ''} ${customer.email ?? ''}`
+          .toLowerCase()
+          .includes(term)
+      )
+      .slice(0, 12);
+  }, [customers, linkCustomerSearch]);
 
   const selectedLiveIsOperable = isLiveOperable(selectedLive);
   const operatorLiveIsActive = selectedLiveStatus === 'ACTIVE';
@@ -1417,8 +1435,76 @@ export default function LiveScreen() {
     callback(reservationId);
   };
 
+  const openLinkCustomerModal = (reservation: Reservation) => {
+    setRecentReservationActions(null);
+    setLinkCustomerReservation(reservation);
+    setSelectedLinkCustomer(null);
+    setLinkCustomerSearch(reservation.interestedAlias ?? '');
+  };
+
+  const closeLinkCustomerModal = () => {
+    if (isLinkingCustomer) return;
+
+    setLinkCustomerReservation(null);
+    setSelectedLinkCustomer(null);
+    setLinkCustomerSearch('');
+  };
+
+  const applyUpdatedReservation = (updatedReservation: Reservation) => {
+    setBranchReservations((current) =>
+      current.map((reservation) =>
+        reservation.id === updatedReservation.id ? updatedReservation : reservation
+      )
+    );
+    setRecentReservations((current) =>
+      current.map((entry) =>
+        entry.reservation.id === updatedReservation.id
+          ? { ...entry, reservation: updatedReservation }
+          : entry
+      )
+    );
+  };
+
+  const handleLinkCustomer = async () => {
+    if (!linkCustomerReservation || !selectedLinkCustomer) return;
+
+    setIsLinkingCustomer(true);
+
+    try {
+      const updatedReservation = await linkReservationCustomer(
+        linkCustomerReservation.id,
+        selectedLinkCustomer.id
+      );
+      applyUpdatedReservation(updatedReservation);
+      setLinkCustomerReservation(null);
+      setSelectedLinkCustomer(null);
+      setLinkCustomerSearch('');
+      setLiveNotice({
+        title: t('live.linkCustomerSuccessTitle'),
+        message: t('live.linkCustomerSuccessMessage'),
+        tone: 'success',
+      });
+    } catch (error) {
+      setLiveNotice({
+        title: t('live.linkCustomerErrorTitle'),
+        message: getActionableMessage(error),
+        tone: 'warning',
+      });
+    } finally {
+      setIsLinkingCustomer(false);
+    }
+  };
+
   const renderRecentReservationPrimaryActions = (reservation: Reservation) => (
     <View style={styles.recentReservationActionRow}>
+      {hasInterestedAlias(reservation) && maySelectCustomer ? (
+        <AppButton
+          title={t('live.linkCustomer')}
+          variant="warning"
+          onPress={() => openLinkCustomerModal(reservation)}
+          style={styles.recentReservationActionButton}
+        />
+      ) : null}
       <AppButton
         title={t('live.detailShort')}
         variant="neutral"
@@ -2032,12 +2118,21 @@ export default function LiveScreen() {
             onPress={() => closeRecentReservationActionsAndRun(goToReservationDetail)}
           />
           {!reservation.customerId && reservation.interestedAlias ? (
-            <AppButton
-              title={t('live.linkCustomer')}
-              variant="warning"
-              disabled
-              disabledReason={t('live.linkCustomerUnavailableReason')}
-            />
+            <>
+              <AppButton
+                title={t('live.linkCustomer')}
+                variant="warning"
+                onPress={() => openLinkCustomerModal(reservation)}
+                disabled={!maySelectCustomer}
+                disabledReason={t('live.customerPermissionError')}
+              />
+              <AppButton
+                title={t('live.convertAliasToCustomer')}
+                variant="secondary"
+                disabled
+                disabledReason={t('live.convertAliasToCustomerPendingReason')}
+              />
+            </>
           ) : null}
           {canMarkImmediateLiveSale ? (
             <>
@@ -4674,51 +4769,59 @@ export default function LiveScreen() {
                       {t('live.reserveActiveItemHelp')}
                     </AppText>
                     {activeItemBlockingReservationForValidation ? (
-                      <LiveWarningCard style={styles.reservationRiskCard}>
-                        <AppText variant="caption" color={theme.colors.warning} bold>
-                          {t('live.activeItemAlreadyReservedTitle')}
-                        </AppText>
-                        <AppText variant="caption" color={theme.colors.mutedText}>
-                          {t('live.activeItemAlreadyReservedReason')}
-                        </AppText>
-                      </LiveWarningCard>
-                    ) : (
-                      <AppText variant="caption" color={theme.colors.mutedText}>
-                        {t('live.reservationRiskHelp')}
-                      </AppText>
-                    )}
-                    {reservationPendingReason || activeItemBlockingReservationForValidation ? (
-                      <AppText
-                        variant="caption"
-                        color={
-                          activeItemBlockingReservationForValidation
-                            ? theme.colors.warning
-                            : theme.colors.mutedText
-                        }
+                      <View
+                        style={[
+                          styles.activeHoldCompactNotice,
+                          {
+                            backgroundColor: theme.colors.surfaceMuted,
+                            borderColor: theme.colors.border,
+                            borderRadius: theme.radius.md,
+                          },
+                        ]}
                       >
-                        {activeItemBlockingReservationForValidation
-                          ? t('live.activeItemAlreadyReservedReason')
-                          : reservationPendingReason}
-                      </AppText>
-                    ) : null}
-                    {renderReservationIssuePanel()}
-                    <AppButton
-                      title={t('live.operatorReserveNow')}
-                      variant={activeItemBlockingReservationForValidation ? 'neutral' : 'primary'}
-                      onPress={handleCreateReservation}
-                      loading={isSavingReservation}
-                      disabled={
-                        isSavingReservation ||
-                        !mayReserveLive ||
-                        !!activeItemBlockingReservationForValidation
-                      }
-                      disabledReason={
-                        activeItemBlockingReservationForValidation
-                          ? t('live.activeItemAlreadyReservedReason')
-                          : reservationPendingReason || t('live.liveOperatePermissionError')
-                      }
-                      style={styles.operatorPrimaryButton}
-                    />
+                        <View style={styles.activeHoldCompactText}>
+                          <AppText variant="caption" color={theme.colors.warning} bold>
+                            {t('live.activeItemAlreadyReservedCompactTitle', {
+                              id: activeItemBlockingReservationForValidation.id,
+                            })}
+                          </AppText>
+                          <AppText variant="caption" color={theme.colors.mutedText}>
+                            {t('live.activeItemReservedCompactHelp')}
+                          </AppText>
+                        </View>
+                        <AppButton
+                          title={t('live.viewReservation')}
+                          variant="neutral"
+                          onPress={() =>
+                            goToReservationDetail(activeItemBlockingReservationForValidation.id)
+                          }
+                          style={styles.activeHoldCompactAction}
+                        />
+                      </View>
+                    ) : (
+                      <>
+                        <AppText variant="caption" color={theme.colors.mutedText}>
+                          {t('live.reservationRiskHelp')}
+                        </AppText>
+                        {reservationPendingReason ? (
+                          <AppText variant="caption" color={theme.colors.mutedText}>
+                            {reservationPendingReason}
+                          </AppText>
+                        ) : null}
+                        {renderReservationIssuePanel()}
+                        <AppButton
+                          title={t('live.operatorReserveNow')}
+                          variant="primary"
+                          onPress={handleCreateReservation}
+                          loading={isSavingReservation}
+                          disabled={isSavingReservation || !mayReserveLive}
+                          disabledReason={
+                            reservationPendingReason || t('live.liveOperatePermissionError')
+                          }
+                          style={styles.operatorPrimaryButton}
+                        />
+                      </>
+                    )}
                   </LiveCompactCard>
                 </View>
 
@@ -5960,6 +6063,102 @@ export default function LiveScreen() {
       </AppBottomModal>
 
       <AppBottomModal
+        visible={Boolean(linkCustomerReservation)}
+        title={t('live.linkCustomerModalTitle')}
+        onClose={closeLinkCustomerModal}
+        scroll={false}
+        footer={
+          <View style={styles.linkCustomerFooter}>
+            <AppButton
+              title={t('common.cancel')}
+              variant="cancel"
+              onPress={closeLinkCustomerModal}
+              disabled={isLinkingCustomer}
+              style={styles.linkCustomerFooterAction}
+            />
+            <AppButton
+              title={t('live.linkCustomer')}
+              variant="warning"
+              onPress={handleLinkCustomer}
+              loading={isLinkingCustomer}
+              disabled={!selectedLinkCustomer || isLinkingCustomer}
+              disabledReason={t('live.linkCustomerSelectRequired')}
+              style={styles.linkCustomerFooterAction}
+            />
+          </View>
+        }
+      >
+        <View style={styles.linkCustomerModalContent}>
+          <View
+            style={[
+              styles.linkCustomerAliasPanel,
+              {
+                borderColor: theme.colors.border,
+                borderRadius: theme.radius.md,
+              },
+            ]}
+          >
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {t('live.linkCustomerCurrentAliasLabel')}
+            </AppText>
+            <AppText bold numberOfLines={1}>
+              {linkCustomerReservation?.interestedAlias || t('live.noCustomerLabel')}
+            </AppText>
+          </View>
+          <AppInput
+            label={t('live.linkCustomerSearchLabel')}
+            placeholder={t('live.linkCustomerSearchPlaceholder')}
+            value={linkCustomerSearch}
+            onChangeText={(value) => {
+              setLinkCustomerSearch(value);
+              setSelectedLinkCustomer(null);
+            }}
+          />
+          <FlatList
+            data={filteredLinkCustomers}
+            style={styles.modalList}
+            keyboardShouldPersistTaps="handled"
+            keyExtractor={(item) => String(item.id)}
+            renderItem={({ item }) => {
+              const selected = selectedLinkCustomer?.id === item.id;
+
+              return (
+                <AppOptionRow
+                  title={item.name}
+                  subtitle={`${item.phone || t('live.noPhone')}${
+                    item.isGeneric ? ` - ${t('live.generic')}` : ''
+                  }`}
+                  onPress={() => setSelectedLinkCustomer(item)}
+                >
+                  {selected ? (
+                    <AppText variant="caption" color={theme.colors.accent} bold>
+                      {t('live.linkCustomerSelected', { name: item.name })}
+                    </AppText>
+                  ) : null}
+                </AppOptionRow>
+              );
+            }}
+            ListEmptyComponent={
+              <AppText color={theme.colors.mutedText}>
+                {customerLoadIssue || t('live.linkCustomerNoResults')}
+              </AppText>
+            }
+          />
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            {selectedLinkCustomer
+              ? t('live.linkCustomerSelected', { name: selectedLinkCustomer.name })
+              : t('live.linkCustomerSelectHelp')}
+          </AppText>
+          <AppButton
+            title={t('live.convertAliasToCustomer')}
+            variant="secondary"
+            disabled
+            disabledReason={t('live.convertAliasToCustomerPendingReason')}
+          />
+        </View>
+      </AppBottomModal>
+
+      <AppBottomModal
         visible={isItemModalVisible}
         title={t('live.selectItemModal')}
         onClose={() => setIsItemModalVisible(false)}
@@ -6336,6 +6535,28 @@ const styles = StyleSheet.create({
   buttonSpacing: {
     marginTop: 10,
   },
+  activeHoldCompactAction: {
+    minHeight: 30,
+    minWidth: 0,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  activeHoldCompactNotice: {
+    alignItems: 'center',
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'space-between',
+    marginTop: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  activeHoldCompactText: {
+    flex: 1,
+    gap: 2,
+    minWidth: 180,
+  },
   commerceColumn: {
     gap: 10,
     minWidth: 0,
@@ -6524,6 +6745,24 @@ const styles = StyleSheet.create({
   },
   modalList: {
     maxHeight: 420,
+  },
+  linkCustomerAliasPanel: {
+    borderWidth: 1,
+    gap: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  linkCustomerFooter: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'flex-end',
+  },
+  linkCustomerFooterAction: {
+    minWidth: 130,
+  },
+  linkCustomerModalContent: {
+    gap: 10,
   },
   minimalModeCard: {
     marginBottom: 10,

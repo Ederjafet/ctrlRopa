@@ -118,6 +118,16 @@ export async function removeReservationFromBox(
   });
 }
 
+export async function linkReservationCustomer(
+  reservationId: number,
+  customerId: number
+): Promise<Reservation> {
+  return apiRequest<Reservation>(`/api/reservations/${reservationId}/customer`, {
+    method: 'PATCH',
+    body: { customerId },
+  });
+}
+
 export async function cancelReservation(
   reservationId: number,
   reason: string,

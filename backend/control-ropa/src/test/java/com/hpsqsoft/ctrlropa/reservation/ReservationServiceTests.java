@@ -138,6 +138,42 @@ class ReservationServiceTests {
         );
     }
 
+    @Test
+    void linkCustomerAssignsExistingCustomerAndPreservesInterestedAlias() {
+        Branch branch = branch();
+        Item item = item(ItemStatus.RESERVED, branch);
+        Customer customer = customer(branch);
+        SalesChannel channel = channel(1L, ChannelCode.LIVE);
+        Reservation reservation = reservation(10L, item, null, branch, channel);
+        reservation.setInterestedAlias("@maria_live");
+        reservation.setLive(live(branch));
+        reservation.setLiveOperationalStatus(LiveReservationOperationalStatus.RESERVED);
+        CustomerOrder order = order(55L);
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(10L)).thenReturn(Optional.of(reservation));
+        when(customerRepository.findById(27L)).thenReturn(Optional.of(customer));
+        when(repository.save(reservation)).thenReturn(reservation);
+        when(customerOrderService.addReservationToOpenOrder(reservation)).thenReturn(order);
+        when(customerOrderService.findOrderIdByReservationId(10L)).thenReturn(55L);
+        stubSellerName();
+
+        ReservationResponse response = service.linkCustomer(10L, 27L);
+
+        assertEquals(27L, response.getCustomerId());
+        assertEquals("Damaris", response.getCustomerName());
+        assertEquals("@maria_live", response.getInterestedAlias());
+        assertEquals(55L, response.getCustomerOrderId());
+        verify(accessService).assertCan(
+                99L,
+                PermissionCode.DO_LIVE_RESERVATION,
+                ChannelCode.LIVE,
+                6L
+        );
+        verify(repository).save(reservation);
+        verify(customerOrderService).refreshStatus(55L);
+    }
+
     @ParameterizedTest
     @EnumSource(value = ItemStatus.class, names = {"RESERVED", "SOLD", "DISABLED", "ON_CONSIGNMENT"})
     void createRejectsUnavailableItemStatusesBeforeAtomicUpdate(ItemStatus status) {
