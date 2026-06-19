@@ -156,6 +156,7 @@ function getPartyInfo(reservation: Reservation) {
   if (reservation.customerName) {
     return {
       badge: 'CLIENTE',
+      displayType: 'Cliente',
       label: reservation.customerName,
       tone: 'info' as const,
       needsCustomer: false,
@@ -165,6 +166,7 @@ function getPartyInfo(reservation: Reservation) {
   if (reservation.customerId) {
     return {
       badge: 'CLIENTE',
+      displayType: 'Cliente',
       label: `#${reservation.customerId}`,
       tone: 'info' as const,
       needsCustomer: false,
@@ -174,6 +176,7 @@ function getPartyInfo(reservation: Reservation) {
   if (reservation.interestedAlias) {
     return {
       badge: 'INTERESADO',
+      displayType: 'Interesado',
       label: reservation.interestedAlias,
       tone: 'warning' as const,
       needsCustomer: true,
@@ -182,6 +185,7 @@ function getPartyInfo(reservation: Reservation) {
 
   return {
     badge: 'SIN CLIENTE',
+    displayType: 'Sin cliente',
     label: 'Requiere seguimiento',
     tone: 'danger' as const,
     needsCustomer: true,
@@ -617,6 +621,10 @@ export default function ReservationsScreen() {
       item.liveId
         ? getLiveLabel(item)
         : getSalesChannelLabel(item.salesChannelCode, item.salesChannelName) || 'Canal no capturado';
+    const boxLabel = item.boxCode || 'Sin caja';
+    const followUpLabel = party.needsCustomer ? 'Pendiente: vincular cliente' : getHoldStateLabel(item);
+    const compactMetaLine = `${followUpLabel} · Caja: ${boxLabel} · Monto: ${formatMoney(item.price)} · Canal: ${channelLabel}`;
+    const itemLabel = item.itemCode || `ID ${item.itemId}`;
 
     return (
       <AppCard
@@ -629,19 +637,9 @@ export default function ReservationsScreen() {
               <AppText bold numberOfLines={1} style={styles.folioText}>
                 Apartado #{item.id}
               </AppText>
-              <StatusBadge
-                label={party.badge}
-                tone={party.tone}
-                style={styles.compactBadge}
-              />
-              <StatusBadge
-                label={getHoldStateLabel(item)}
-                tone={item.boxId ? 'info' : 'warning'}
-                style={styles.compactBadge}
-              />
-              {party.needsCustomer ? (
-                <StatusBadge label="Falta cliente" tone="warning" style={styles.compactBadge} />
-              ) : null}
+              <AppText variant="caption" color={theme.colors.mutedText} bold numberOfLines={1}>
+                · {party.displayType}
+              </AppText>
             </View>
             <View
               style={[
@@ -666,6 +664,14 @@ export default function ReservationsScreen() {
                 {party.label}
               </AppText>
             </View>
+            <AppText
+              variant="caption"
+              color={party.needsCustomer ? theme.colors.warning : theme.colors.mutedText}
+              numberOfLines={2}
+              style={styles.compactMetaLine}
+            >
+              {compactMetaLine}
+            </AppText>
           </View>
 
           <StatusBadge
@@ -682,33 +688,10 @@ export default function ReservationsScreen() {
                 <AppText variant="caption" color={theme.colors.mutedText} bold numberOfLines={1}>
                   Prenda
                 </AppText>
-                <AppText numberOfLines={1}>{item.itemCode || `ID ${item.itemId}`}</AppText>
-              </View>
-
-              <View style={[styles.compactField, styles.channelField]}>
-                <AppText variant="caption" color={theme.colors.mutedText} bold numberOfLines={1}>
-                  Canal
-                </AppText>
-                <AppText numberOfLines={1}>{channelLabel}</AppText>
+                <AppText numberOfLines={1}>{itemLabel}</AppText>
               </View>
             </>
           ) : null}
-
-          <View style={styles.compactField}>
-            <AppText variant="caption" color={theme.colors.mutedText} bold numberOfLines={1}>
-              Caja
-            </AppText>
-            <AppText color={!item.boxId ? theme.colors.warning : theme.colors.text} bold numberOfLines={1}>
-              {item.boxCode || 'Sin caja'}
-            </AppText>
-          </View>
-
-          <View style={styles.compactField}>
-            <AppText variant="caption" color={theme.colors.mutedText} bold numberOfLines={1}>
-              Monto
-            </AppText>
-            <AppText bold numberOfLines={1}>{formatMoney(item.price)}</AppText>
-          </View>
 
           <View style={[styles.compactActions, isPhone && styles.mobileCompactActions]}>
             {renderPrimaryAction(item)}
@@ -734,6 +717,7 @@ export default function ReservationsScreen() {
             <InfoPill label="Responsable" value={item.sellerUserName || 'No capturado'} />
             <InfoPill label="Fecha" value={formatDateTime(item.createdAt)} />
             <InfoPill label="Live / canal" value={channelLabel} />
+            <InfoPill label="Prenda" value={itemLabel} />
             <InfoPill
               label="Pagos"
               value="Abono y saldo se revisan en detalle para evitar llamadas N+1."
@@ -1110,6 +1094,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
   },
+  compactMetaLine: {
+    marginTop: 5,
+  },
   customerText: {
     flexShrink: 1,
   },
@@ -1173,10 +1160,10 @@ const styles = StyleSheet.create({
   partyLine: {
     alignSelf: 'flex-start',
     borderRadius: 8,
-    borderWidth: 1,
+    borderWidth: 0,
     marginTop: 4,
     maxWidth: '100%',
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 4,
   },
   primaryActionButton: {

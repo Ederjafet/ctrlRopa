@@ -451,6 +451,7 @@ export default function LiveScreen() {
   const [activateLiveToConfirm, setActivateLiveToConfirm] = useState<Live | null>(null);
   const [operationalSoldToConfirm, setOperationalSoldToConfirm] = useState<number | null>(null);
   const [cancelReservationToConfirm, setCancelReservationToConfirm] = useState<number | null>(null);
+  const [recentReservationActions, setRecentReservationActions] = useState<Reservation | null>(null);
   const [reservationIssue, setReservationIssue] = useState<LiveReservationIssue | null>(null);
   const [showDemoMetrics, setShowDemoMetrics] = useState(true);
   const [liveLayoutPreferences, setLiveLayoutPreferences] =
@@ -1500,6 +1501,41 @@ export default function LiveScreen() {
     });
   };
 
+  const openRecentReservationActions = (reservation: Reservation) => {
+    setRecentReservationActions(reservation);
+  };
+
+  const closeRecentReservationActions = () => {
+    setRecentReservationActions(null);
+  };
+
+  const closeRecentReservationActionsAndRun = (callback: (reservationId: number) => void) => {
+    if (!recentReservationActions) return;
+
+    const reservationId = recentReservationActions.id;
+    setRecentReservationActions(null);
+    callback(reservationId);
+  };
+
+  const renderRecentReservationPrimaryActions = (reservation: Reservation) => (
+    <View style={styles.buttonRow}>
+      <View style={styles.buttonFill}>
+        <AppButton
+          title={t('live.viewDetail')}
+          variant="neutral"
+          onPress={() => goToReservationDetail(reservation.id)}
+        />
+      </View>
+      <View style={styles.buttonFill}>
+        <AppButton
+          title="Mas acciones"
+          variant="secondary"
+          onPress={() => openRecentReservationActions(reservation)}
+        />
+      </View>
+    </View>
+  );
+
   const handleViewNewReservations = () => {
     const reservationId = newReservationNotice?.latestReservationId;
     setNewReservationNotice(null);
@@ -2054,6 +2090,136 @@ export default function LiveScreen() {
 
     setCancelReservationToConfirm(null);
     await handleUpdateReservationOperationalStatus(reservationId, 'CANCELLED', reason);
+  };
+
+  const renderRecentReservationActionsModal = () => {
+    if (!recentReservationActions) return null;
+
+    const reservation = recentReservationActions;
+    const paid = paidByReservationId[reservation.id] ?? 0;
+    const settled = isReservationSettled(reservation, paid);
+    const operationalStatus = getLiveReservationOperationalStatus(reservation);
+    const operationalSold = operationalStatus === 'OPERATIONAL_SOLD';
+    const operationalCancelled = operationalStatus === 'CANCELLED';
+    const isUpdatingOperationalStatus = updatingOperationalReservationId === reservation.id;
+    const canMarkImmediateLiveSale =
+      !settled && !operationalSold && !operationalCancelled && mayMarkLiveOperationalSold;
+    const canReturnToReserved =
+      (operationalStatus === 'PENDING' || operationalCancelled) && mayChangeLiveReservationStatus;
+    const canUndoImmediateLiveSale = operationalSold && mayChangeLiveReservationStatus;
+    const canCancelHold = !operationalCancelled && mayCancelLiveReservation;
+    const canChargeHold = !settled && !operationalCancelled && canViewPayments && canAccessCashbox;
+    const itemCode = reservation.itemCode || `Prenda #${reservation.itemId}`;
+    const statusLabel = getLiveReservationOperationalStatusLabel(operationalStatus, t);
+
+    return (
+      <AppBottomModal
+        visible={Boolean(recentReservationActions)}
+        title={`Apartado #${reservation.id}`}
+        onClose={closeRecentReservationActions}
+      >
+        <AppCard variant="subtle" style={styles.recentReservationActionsSummary}>
+          <AppText bold numberOfLines={1}>
+            {getReservationCustomerLabel(reservation)}
+          </AppText>
+          <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={2}>
+            {itemCode} - {statusLabel} - {formatMoney(Number(reservation.price || 0))}
+          </AppText>
+        </AppCard>
+
+        <View style={styles.recentReservationActionsStack}>
+          <AppButton
+            title={t('live.viewDetail')}
+            variant="secondary"
+            onPress={() => closeRecentReservationActionsAndRun(goToReservationDetail)}
+          />
+          {!reservation.customerId && reservation.interestedAlias ? (
+            <AppButton
+              title="Vincular cliente"
+              variant="warning"
+              disabled
+              disabledReason="Pendiente: vincular alias a cliente existente sin crear clientes automaticamente."
+            />
+          ) : null}
+          {canMarkImmediateLiveSale ? (
+            <>
+              <AppButton
+                title={t('live.markOperationalSold')}
+                variant="neutral"
+                loading={isUpdatingOperationalStatus}
+                onPress={() => closeRecentReservationActionsAndRun(handleConfirmOperationalSold)}
+              />
+              <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+                {t('live.markOperationalSoldHelp')}
+              </AppText>
+            </>
+          ) : null}
+          {canUndoImmediateLiveSale ? (
+            <>
+              <AppButton
+                title={t('live.undoOperationalSold')}
+                variant="warning"
+                loading={isUpdatingOperationalStatus}
+                onPress={() => closeRecentReservationActionsAndRun(handleUndoOperationalSold)}
+              />
+              <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+                {t('live.undoOperationalSoldHelp')}
+              </AppText>
+            </>
+          ) : null}
+          {canReturnToReserved ? (
+            <>
+              <AppButton
+                title={t('live.returnToReserved')}
+                variant="secondary"
+                loading={isUpdatingOperationalStatus}
+                onPress={() =>
+                  closeRecentReservationActionsAndRun((reservationId) =>
+                    handleUpdateReservationOperationalStatus(reservationId, 'RESERVED')
+                  )
+                }
+              />
+              <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+                {t('live.returnToReservedHelp')}
+              </AppText>
+            </>
+          ) : null}
+          {canChargeHold ? (
+            <AppButton
+              title={t('live.charge')}
+              variant="secondary"
+              onPress={() => closeRecentReservationActionsAndRun(goToReservationPayment)}
+            />
+          ) : null}
+          {canCancelHold ? (
+            <>
+              <AppButton
+                title={t('live.cancelOperational')}
+                variant="danger"
+                loading={isUpdatingOperationalStatus}
+                onPress={() => closeRecentReservationActionsAndRun(handleCancelLiveReservation)}
+              />
+              <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+                {t('live.cancelOperationalHelp')}
+              </AppText>
+            </>
+          ) : !operationalCancelled && !mayCancelLiveReservation && !isSellerLiveActor ? (
+            <AuthorizationRequestPanel
+              actionLabel={t('live.authorizationActionCancelHold')}
+              requiredCapability="canCancelReservation"
+              reason={t('live.authorizationCancelHelp')}
+              entityContext={t('live.reservationNumber', {
+                id: reservation.id,
+              })}
+              pendingBackendLabel={t('live.authorizationUnavailableMessage', {
+                action: t('live.authorizationActionCancelHold'),
+              })}
+              style={styles.authorizationInlinePanel}
+            />
+          ) : null}
+        </View>
+      </AppBottomModal>
+    );
   };
 
   const handleCreateLive = async () => {
@@ -4696,9 +4862,6 @@ export default function LiveScreen() {
                         const settled = isReservationSettled(reservation, paid);
                         const operationalStatus = getLiveReservationOperationalStatus(reservation);
                         const operationalSold = operationalStatus === 'OPERATIONAL_SOLD';
-                        const operationalCancelled = operationalStatus === 'CANCELLED';
-                        const isUpdatingOperationalStatus =
-                          updatingOperationalReservationId === reservation.id;
 
                         return (
                           <Pressable
@@ -4720,101 +4883,7 @@ export default function LiveScreen() {
                               settled,
                               operationalSold
                             )}
-                            <View style={styles.buttonRow}>
-                              <View style={styles.buttonFill}>
-                                <AppButton
-                                  title={t('live.viewDetail')}
-                                  variant="neutral"
-                                  onPress={() => goToReservationDetail(reservation.id)}
-                                />
-                              </View>
-                              {!settled && !operationalSold && !operationalCancelled && mayMarkLiveOperationalSold ? (
-                                <View style={styles.buttonFill}>
-                                  <AppButton
-                                    title={t('live.markOperationalSold')}
-                                    variant="primary"
-                                    loading={isUpdatingOperationalStatus}
-                                    onPress={() => handleConfirmOperationalSold(reservation.id)}
-                                  />
-                                  <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
-                                    {t('live.markOperationalSoldHelp')}
-                                  </AppText>
-                                </View>
-                              ) : null}
-                              {(operationalStatus === 'PENDING' || operationalSold) &&
-                              mayChangeLiveReservationStatus ? (
-                                <View style={styles.buttonFill}>
-                                  <AppButton
-                                    title={
-                                      operationalSold
-                                        ? t('live.undoOperationalSold')
-                                        : t('live.returnToReserved')
-                                    }
-                                    variant={operationalSold ? 'warning' : 'secondary'}
-                                    loading={isUpdatingOperationalStatus}
-                                    onPress={() =>
-                                      operationalSold
-                                        ? handleUndoOperationalSold(reservation.id)
-                                        : handleUpdateReservationOperationalStatus(
-                                            reservation.id,
-                                            'RESERVED'
-                                          )
-                                    }
-                                  />
-                                  <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
-                                    {operationalSold
-                                      ? t('live.undoOperationalSoldHelp')
-                                      : t('live.returnToReservedHelp')}
-                                  </AppText>
-                                </View>
-                              ) : null}
-                              {!operationalCancelled && mayCancelLiveReservation ? (
-                                <View style={styles.buttonFill}>
-                                  <AppButton
-                                    title={t('live.cancelOperational')}
-                                    variant="danger"
-                                    loading={isUpdatingOperationalStatus}
-                                    onPress={() => handleCancelLiveReservation(reservation.id)}
-                                  />
-                                  <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
-                                    {t('live.cancelOperationalHelp')}
-                                  </AppText>
-                                </View>
-                              ) : !operationalCancelled &&
-                                !mayCancelLiveReservation &&
-                                !isSellerLiveActor ? (
-                                <AuthorizationRequestPanel
-                                  actionLabel={t('live.authorizationActionCancelHold')}
-                                  requiredCapability="canCancelReservation"
-                                  reason={t('live.authorizationCancelHelp')}
-                                  entityContext={t('live.reservationNumber', {
-                                    id: reservation.id,
-                                  })}
-                                  pendingBackendLabel={t('live.authorizationUnavailableMessage', {
-                                    action: t('live.authorizationActionCancelHold'),
-                                  })}
-                                  style={styles.authorizationInlinePanel}
-                                />
-                              ) : null}
-                              {operationalCancelled && mayChangeLiveReservationStatus ? (
-                                <View style={styles.buttonFill}>
-                                  <AppButton
-                                    title={t('live.returnToReserved')}
-                                    variant="secondary"
-                                    loading={isUpdatingOperationalStatus}
-                                    onPress={() =>
-                                      handleUpdateReservationOperationalStatus(
-                                        reservation.id,
-                                        'RESERVED'
-                                      )
-                                    }
-                                  />
-                                  <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
-                                    {t('live.returnToReservedHelp')}
-                                  </AppText>
-                                </View>
-                              ) : null}
-                            </View>
+                            {renderRecentReservationPrimaryActions(reservation)}
                           </Pressable>
                         );
                       })}
@@ -5790,9 +5859,6 @@ export default function LiveScreen() {
               const settled = isReservationSettled(reservation, paid);
               const operationalStatus = getLiveReservationOperationalStatus(reservation);
               const operationalSold = operationalStatus === 'OPERATIONAL_SOLD';
-              const operationalCancelled = operationalStatus === 'CANCELLED';
-              const isUpdatingOperationalStatus =
-                updatingOperationalReservationId === reservation.id;
 
               return (
                 <Pressable
@@ -5814,98 +5880,7 @@ export default function LiveScreen() {
                     settled,
                     operationalSold
                   )}
-                  <View style={styles.buttonRow}>
-                    <View style={styles.buttonFill}>
-                      <AppButton
-                        title={t('live.viewDetail')}
-                        variant="neutral"
-                        onPress={() => goToReservationDetail(reservation.id)}
-                      />
-                    </View>
-                    {!settled && !operationalSold && !operationalCancelled && mayMarkLiveOperationalSold ? (
-                      <View style={styles.buttonFill}>
-                      <AppButton
-                        title={t('live.markOperationalSold')}
-                        variant="primary"
-                        loading={isUpdatingOperationalStatus}
-                        onPress={() => handleConfirmOperationalSold(reservation.id)}
-                      />
-                      <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
-                        {t('live.markOperationalSoldHelp')}
-                      </AppText>
-                    </View>
-                  ) : null}
-                    {operationalStatus === 'PENDING' && mayChangeLiveReservationStatus ? (
-                      <View style={styles.buttonFill}>
-                        <AppButton
-                          title={t('live.returnToReserved')}
-                          variant="neutral"
-                          loading={isUpdatingOperationalStatus}
-                          onPress={() =>
-                            handleUpdateReservationOperationalStatus(
-                              reservation.id,
-                              'RESERVED'
-                            )
-                          }
-                        />
-                        <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
-                          {t('live.returnToReservedHelp')}
-                        </AppText>
-                      </View>
-                    ) : null}
-                    {operationalSold && mayChangeLiveReservationStatus ? (
-                      <View style={styles.buttonFill}>
-                        <AppButton
-                          title={t('live.undoOperationalSold')}
-                          variant="warning"
-                          loading={isUpdatingOperationalStatus}
-                          onPress={() => handleUndoOperationalSold(reservation.id)}
-                        />
-                        <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
-                          {t('live.undoOperationalSoldHelp')}
-                        </AppText>
-                      </View>
-                    ) : null}
-                    {!operationalCancelled && mayCancelLiveReservation ? (
-                      <View style={styles.buttonFill}>
-                      <AppButton
-                        title={t('live.cancelOperational')}
-                        variant="danger"
-                        loading={isUpdatingOperationalStatus}
-                        onPress={() => handleCancelLiveReservation(reservation.id)}
-                      />
-                      <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
-                        {t('live.cancelOperationalHelp')}
-                      </AppText>
-                    </View>
-                  ) : null}
-                    {operationalCancelled && mayChangeLiveReservationStatus ? (
-                      <View style={styles.buttonFill}>
-                        <AppButton
-                          title={t('live.returnToReserved')}
-                          variant="secondary"
-                          loading={isUpdatingOperationalStatus}
-                          onPress={() =>
-                            handleUpdateReservationOperationalStatus(
-                              reservation.id,
-                              'RESERVED'
-                            )
-                          }
-                        />
-                        <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
-                          {t('live.returnToReservedHelp')}
-                        </AppText>
-                      </View>
-                    ) : null}
-                    {!settled && !operationalCancelled && canViewPayments && canAccessCashbox ? (
-                      <View style={styles.buttonFill}>
-                        <AppButton
-                          title={t('live.charge')}
-                          onPress={() => goToReservationPayment(reservation.id)}
-                        />
-                      </View>
-                    ) : null}
-                  </View>
+                  {renderRecentReservationPrimaryActions(reservation)}
                 </Pressable>
               );
             })}
@@ -6200,6 +6175,8 @@ export default function LiveScreen() {
           }
         />
       </AppBottomModal>
+
+      {renderRecentReservationActionsModal()}
 
       <AppBottomModal
         visible={operationalSoldToConfirm !== null}
@@ -7077,6 +7054,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     gap: 8,
     paddingVertical: 8,
+  },
+  recentReservationActionsStack: {
+    gap: 8,
+  },
+  recentReservationActionsSummary: {
+    marginBottom: 10,
   },
   recentReservationInfoPanel: {
     gap: 8,
