@@ -10,6 +10,7 @@ import AppText from '@/components/ui/AppText';
 import EmptyState from '@/components/ui/EmptyState';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { useAppTheme } from '@/context/AppThemeContext';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { hasPermission } from '@/services/accessControl';
 import {
   getActionableApiError,
@@ -26,9 +27,10 @@ import { getSession, UserSession } from '@/services/sessionStorage';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, StyleSheet, View } from 'react-native';
 
 type ReservationFilter =
+  | 'ALL'
   | 'ACTIVE'
   | 'WITHOUT_BOX'
   | 'WITH_BOX'
@@ -174,13 +176,14 @@ export default function ReservationsScreen() {
   const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
   const { t } = useTranslation('common');
   const { theme } = useAppTheme();
+  const { isPhone } = useResponsiveLayout();
   const returnTo = Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo;
   const isLiveContext = returnTo === '/live';
 
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<ReservationFilter>('ACTIVE');
+  const [filter, setFilter] = useState<ReservationFilter>('ALL');
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isAssigningBox, setIsAssigningBox] = useState(false);
@@ -188,12 +191,15 @@ export default function ReservationsScreen() {
   const [workingAction, setWorkingAction] = useState<ReservationAction | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
+  const [actionsReservation, setActionsReservation] = useState<Reservation | null>(null);
+  const [expandedReservationId, setExpandedReservationId] = useState<number | null>(null);
   const [isBoxModalVisible, setIsBoxModalVisible] = useState(false);
   const [session, setSession] = useState<UserSession | null>(null);
   const navSections = useMemo(() => buildMainNavSections(session), [session]);
 
   const operationalTabs: OperationalTab[] = useMemo(
     () => [
+      { key: 'ALL', label: 'Todas', enabled: true },
       { key: 'ACTIVE', label: 'Activas', enabled: true },
       { key: 'WITHOUT_BOX', label: 'Sin caja', enabled: true },
       { key: 'WITH_BOX', label: 'Con caja', enabled: true },
@@ -434,166 +440,293 @@ export default function ReservationsScreen() {
     );
   };
 
+  const openActionsModal = (reservation: Reservation) => {
+    setActionsReservation(reservation);
+  };
+
+  const closeActionsModal = () => {
+    setActionsReservation(null);
+  };
+
+  const closeActionsAndRun = (callback: (reservation: Reservation) => void) => {
+    if (!actionsReservation) return;
+
+    const reservation = actionsReservation;
+    setActionsReservation(null);
+    callback(reservation);
+  };
+
+  const toggleExpandedReservation = (reservationId: number) => {
+    setExpandedReservationId((current) => (current === reservationId ? null : reservationId));
+  };
+
   const renderMetric = (label: string, value: number, helper: string) => (
     <View
       style={[
-        styles.metricCard,
+        styles.kpiChip,
         {
-          backgroundColor: theme.colors.surfaceElevated,
+          backgroundColor: theme.colors.surfaceAlt,
           borderColor: theme.colors.border,
         },
       ]}
     >
-      <AppText variant="caption" color={theme.colors.mutedText} bold>
+      <AppText variant="caption" color={theme.colors.mutedText} bold numberOfLines={1}>
         {label}
       </AppText>
-      <AppText variant="title" bold style={styles.metricValue}>
+      <AppText variant="subtitle" bold style={styles.kpiValue}>
         {value}
       </AppText>
-      <AppText variant="caption" color={theme.colors.mutedText}>
+      <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
         {helper}
       </AppText>
     </View>
   );
 
-  const renderReservation = ({ item }: { item: Reservation }) => {
-    const nextAction = getNextActionLabel(item);
+  const renderPrimaryAction = (item: Reservation) => {
     const packageDisabledReason = getPackageDisabledReason(item, session);
     const assignBoxDisabledReason = getAssignBoxDisabledReason(item);
-    const canViewPayments = hasPermission(session, 'VIEW_PAYMENTS');
-    const canRegisterPayments = hasPermission(session, 'REGISTER_PAYMENTS');
     const isCreatingPackage = workingReservationId === item.id && workingAction === 'createPackage';
     const isAssigningCurrentBox = workingReservationId === item.id && workingAction === 'assignBox';
+    const isBlockedByOtherAction = Boolean(workingReservationId && workingReservationId !== item.id);
+    const usesPackageAction = Boolean(item.boxId);
+    const title = usesPackageAction ? 'Crear paquete' : 'Asignar caja';
+    const disabledReason = usesPackageAction ? packageDisabledReason : assignBoxDisabledReason;
+    const loading = usesPackageAction ? isCreatingPackage : isAssigningCurrentBox;
 
     return (
-      <Pressable onPress={() => openReservationDetail(item)}>
-        <AppCard variant="elevated">
-          <View style={styles.cardHeader}>
-            <View style={styles.cardTitle}>
-              <AppText bold>Apartado #{item.id}</AppText>
-              <AppText variant="caption" color={theme.colors.mutedText}>
-                {getSalesChannelLabel(item.salesChannelCode, item.salesChannelName) || 'Canal no capturado'}
+      <AppButton
+        title={title}
+        variant="operation"
+        onPress={() => (usesPackageAction ? handleCreatePackage(item) : openBoxModal(item))}
+        loading={loading}
+        disabled={Boolean(disabledReason) || isBlockedByOtherAction}
+        disabledReason={disabledReason || 'Ya hay una accion en proceso.'}
+        style={styles.primaryActionButton}
+      />
+    );
+  };
+
+  const renderReservation = ({ item }: { item: Reservation }) => {
+    const nextAction = getNextActionLabel(item);
+    const isExpanded = expandedReservationId === item.id;
+    const channelLabel =
+      item.liveId
+        ? getLiveLabel(item)
+        : getSalesChannelLabel(item.salesChannelCode, item.salesChannelName) || 'Canal no capturado';
+
+    return (
+      <AppCard
+        variant="elevated"
+        style={[styles.compactReservationCard, isPhone ? styles.mobileReservationCard : styles.desktopReservationCard]}
+      >
+        <View style={[styles.compactCardHeader, !isPhone && styles.compactCardHeaderDesktop]}>
+          <View style={styles.reservationIdentity}>
+            <View style={styles.compactTitleLine}>
+              <AppText bold numberOfLines={1} style={styles.folioText}>
+                Apartado #{item.id}
               </AppText>
+              <StatusBadge
+                label={getHoldStateLabel(item)}
+                tone={item.boxId ? 'info' : 'warning'}
+                style={styles.compactBadge}
+              />
             </View>
-            <View style={styles.badgeStack}>
-              <StatusBadge label={getHoldStateLabel(item)} tone={item.boxId ? 'info' : 'warning'} />
-              <StatusBadge label={getReservationStatusLabel(item.status)} tone={getReservationTone(item.status)} />
-            </View>
+            <AppText numberOfLines={1} style={styles.customerText}>
+              {item.customerName || `Cliente #${item.customerId}`}
+            </AppText>
           </View>
 
-          <View style={styles.cardGrid}>
-            <InfoPill label="Cliente" value={item.customerName || `ID ${item.customerId}`} />
-            <InfoPill label="Prenda" value={item.itemCode || `ID ${item.itemId}`} />
-            <InfoPill
-              label="Live / canal"
-              value={item.liveId ? getLiveLabel(item) : getSalesChannelLabel(item.salesChannelCode, item.salesChannelName) || 'No capturado'}
-            />
-            <InfoPill label="Caja / ubicacion" value={item.boxCode || 'Sin caja'} tone={!item.boxId ? 'warning' : 'neutral'} />
-            <InfoPill label="Monto" value={formatMoney(item.price)} />
-            <InfoPill label="Fecha" value={formatDateTime(item.createdAt)} />
+          <StatusBadge
+            label={getReservationStatusLabel(item.status)}
+            tone={getReservationTone(item.status)}
+            style={styles.compactBadge}
+          />
+        </View>
+
+        <View style={[styles.compactBody, !isPhone && styles.compactBodyDesktop]}>
+          {!isPhone ? (
+            <>
+              <View style={[styles.compactField, styles.itemField]}>
+                <AppText variant="caption" color={theme.colors.mutedText} bold numberOfLines={1}>
+                  Prenda
+                </AppText>
+                <AppText numberOfLines={1}>{item.itemCode || `ID ${item.itemId}`}</AppText>
+              </View>
+
+              <View style={[styles.compactField, styles.channelField]}>
+                <AppText variant="caption" color={theme.colors.mutedText} bold numberOfLines={1}>
+                  Canal
+                </AppText>
+                <AppText numberOfLines={1}>{channelLabel}</AppText>
+              </View>
+            </>
+          ) : null}
+
+          <View style={styles.compactField}>
+            <AppText variant="caption" color={theme.colors.mutedText} bold numberOfLines={1}>
+              Caja
+            </AppText>
+            <AppText color={!item.boxId ? theme.colors.warning : theme.colors.text} bold numberOfLines={1}>
+              {item.boxCode || 'Sin caja'}
+            </AppText>
+          </View>
+
+          <View style={styles.compactField}>
+            <AppText variant="caption" color={theme.colors.mutedText} bold numberOfLines={1}>
+              Monto
+            </AppText>
+            <AppText bold numberOfLines={1}>{formatMoney(item.price)}</AppText>
           </View>
 
           <View
             style={[
-              styles.nextActionBox,
+              styles.nextActionInline,
               {
                 backgroundColor: theme.colors.infoCardBackground,
                 borderColor: theme.colors.infoCardBorder,
               },
             ]}
           >
-            <AppText variant="caption" color={theme.colors.infoCardText} bold>
+            <AppText variant="caption" color={theme.colors.infoCardText} bold numberOfLines={1}>
               Siguiente accion
             </AppText>
-            <AppText color={theme.colors.infoCardText} bold>
+            <AppText color={theme.colors.infoCardText} bold numberOfLines={1}>
               {nextAction}
-            </AppText>
-            <AppText variant="caption" color={theme.colors.infoCardText}>
-              Abonado y saldo se validan en detalle para evitar llamadas N+1 de pagos.
             </AppText>
           </View>
 
-          <View style={styles.actionsGrid}>
+          <View style={[styles.compactActions, isPhone && styles.mobileCompactActions]}>
+            {renderPrimaryAction(item)}
             <AppButton
-              title="Ver detalle"
+              title="Mas acciones"
               variant="secondary"
-              onPress={() => openReservationDetail(item)}
-              style={styles.actionButton}
+              onPress={() => openActionsModal(item)}
+              style={styles.moreActionButton}
             />
-            <AppButton
-              title={item.boxId ? 'Cambiar caja' : 'Asignar caja'}
-              variant={item.boxId ? 'neutral' : 'operation'}
-              onPress={() => (item.boxId ? openReservationDetail(item) : openBoxModal(item))}
-              loading={isAssigningCurrentBox}
-              disabled={Boolean(assignBoxDisabledReason)}
-              disabledReason={assignBoxDisabledReason || undefined}
-              style={styles.actionButton}
-            />
-            <AppButton
-              title="Crear paquete"
-              variant="operation"
-              onPress={() => handleCreatePackage(item)}
-              loading={isCreatingPackage}
-              disabled={Boolean(packageDisabledReason) || Boolean(workingReservationId)}
-              disabledReason={packageDisabledReason || 'Ya hay una accion en proceso.'}
-              style={styles.actionButton}
-            />
-            <AppButton
-              title="Agregar a paquete"
-              variant="neutral"
-              disabled
-              disabledReason="Pendiente: seleccionar paquete abierto existente sin romper reglas de cliente/sucursal."
-              style={styles.actionButton}
-            />
-            <AppButton
-              title="Ver pagos"
-              variant="secondary"
-              onPress={() => openReservationDetail(item)}
-              disabled={!canViewPayments}
-              disabledReason="Tu usuario no tiene permiso para ver pagos."
-              style={styles.actionButton}
-            />
-            <AppButton
-              title="Registrar abono"
-              variant="secondary"
-              onPress={() => openPaymentFlow(item)}
-              disabled={!canRegisterPayments || !isActiveReservation(item)}
-              disabledReason={
-                !canRegisterPayments
-                  ? 'Tu usuario no tiene permiso para registrar pagos.'
-                  : 'Solo se puede abonar sobre apartados activos.'
-              }
-              style={styles.actionButton}
-            />
-            <AppButton
-              title="Liberar envio"
-              variant="neutral"
-              disabled
-              disabledReason="Pendiente: requiere resumen de paquete pagado y validacion backend de saldo completo."
-              style={styles.actionButton}
-            />
-            <AppButton
-              title="Marcar enviado"
-              variant="neutral"
-              disabled
-              disabledReason="Pendiente: requiere paquete liberado y datos de envio."
-              style={styles.actionButton}
-            />
-            <AppButton
-              title="Cancelar apartado"
-              variant="danger"
-              onPress={() => openReservationDetail(item)}
-              disabled={!hasPermission(session, 'CANCEL_RESERVATION') || !isActiveReservation(item)}
-              disabledReason={
-                !hasPermission(session, 'CANCEL_RESERVATION')
-                  ? 'Tu usuario no tiene permiso para cancelar apartados.'
-                  : 'Solo se puede cancelar desde apartados activos.'
-              }
-              style={styles.actionButton}
+            {isPhone ? (
+              <AppButton
+                title={isExpanded ? 'Ocultar' : 'Detalle'}
+                variant="ghost"
+                onPress={() => toggleExpandedReservation(item.id)}
+                style={styles.expandButton}
+              />
+            ) : null}
+          </View>
+        </View>
+
+        {isPhone && isExpanded ? (
+          <View style={styles.expandedDetails}>
+            <InfoPill label="Responsable" value={item.sellerUserName || 'No capturado'} />
+            <InfoPill label="Fecha" value={formatDateTime(item.createdAt)} />
+            <InfoPill label="Live / canal" value={channelLabel} />
+            <InfoPill
+              label="Pagos"
+              value="Abono y saldo se revisan en detalle para evitar llamadas N+1."
             />
           </View>
+        ) : null}
+      </AppCard>
+    );
+  };
+
+  const renderActionsModal = () => {
+    if (!actionsReservation) return null;
+
+    const item = actionsReservation;
+    const canViewPayments = hasPermission(session, 'VIEW_PAYMENTS');
+    const canRegisterPayments = hasPermission(session, 'REGISTER_PAYMENTS');
+    const canCancelReservation = hasPermission(session, 'CANCEL_RESERVATION');
+    const packageDisabledReason = getPackageDisabledReason(item, session);
+    const assignBoxDisabledReason = getAssignBoxDisabledReason(item);
+    const isCreatingPackage = workingReservationId === item.id && workingAction === 'createPackage';
+
+    return (
+      <AppBottomModal
+        visible={Boolean(actionsReservation)}
+        title={`Apartado #${item.id}`}
+        onClose={closeActionsModal}
+      >
+        <AppCard variant="subtle" style={styles.actionModalSummary}>
+          <AppText bold numberOfLines={1}>
+            {item.customerName || `Cliente #${item.customerId}`}
+          </AppText>
+          <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+            {item.itemCode || `Prenda #${item.itemId}`} - {item.boxCode || 'Sin caja'} - {formatMoney(item.price)}
+          </AppText>
         </AppCard>
-      </Pressable>
+
+        <View style={styles.modalActionsStack}>
+          <AppButton
+            title="Ver detalle"
+            variant="secondary"
+            onPress={() => closeActionsAndRun(openReservationDetail)}
+          />
+          <AppButton
+            title={item.boxId ? 'Cambiar caja' : 'Asignar caja'}
+            variant={item.boxId ? 'neutral' : 'operation'}
+            onPress={() =>
+              item.boxId ? closeActionsAndRun(openReservationDetail) : closeActionsAndRun(openBoxModal)
+            }
+            disabled={Boolean(assignBoxDisabledReason)}
+            disabledReason={assignBoxDisabledReason || undefined}
+          />
+          <AppButton
+            title="Crear paquete"
+            variant="operation"
+            onPress={() => closeActionsAndRun(handleCreatePackage)}
+            loading={isCreatingPackage}
+            disabled={Boolean(packageDisabledReason) || Boolean(workingReservationId)}
+            disabledReason={packageDisabledReason || 'Ya hay una accion en proceso.'}
+          />
+          <AppButton
+            title="Agregar a paquete"
+            variant="neutral"
+            disabled
+            disabledReason="Pendiente: seleccionar paquete abierto existente sin romper reglas de cliente/sucursal."
+          />
+          <AppButton
+            title="Ver pagos"
+            variant="secondary"
+            onPress={() => closeActionsAndRun(openReservationDetail)}
+            disabled={!canViewPayments}
+            disabledReason="Tu usuario no tiene permiso para ver pagos."
+          />
+          <AppButton
+            title="Registrar abono"
+            variant="secondary"
+            onPress={() => closeActionsAndRun(openPaymentFlow)}
+            disabled={!canRegisterPayments || !isActiveReservation(item)}
+            disabledReason={
+              !canRegisterPayments
+                ? 'Tu usuario no tiene permiso para registrar pagos.'
+                : 'Solo se puede abonar sobre apartados activos.'
+            }
+          />
+          <AppButton
+            title="Liberar envio"
+            variant="neutral"
+            disabled
+            disabledReason="Pendiente: requiere resumen de paquete pagado y validacion backend de saldo completo."
+          />
+          <AppButton
+            title="Marcar enviado"
+            variant="neutral"
+            disabled
+            disabledReason="Pendiente: requiere paquete liberado y datos de envio."
+          />
+          <AppButton
+            title="Cancelar apartado"
+            variant="danger"
+            onPress={() => closeActionsAndRun(openReservationDetail)}
+            disabled={!canCancelReservation || !isActiveReservation(item)}
+            disabledReason={
+              !canCancelReservation
+                ? 'Tu usuario no tiene permiso para cancelar apartados.'
+                : 'Solo se puede cancelar desde apartados activos.'
+            }
+          />
+        </View>
+      </AppBottomModal>
     );
   };
 
@@ -747,6 +880,8 @@ export default function ReservationsScreen() {
 
         {isAssigningBox ? <AppText style={styles.savingText}>Asignando caja...</AppText> : null}
       </AppBottomModal>
+
+      {renderActionsModal()}
     </AppShell>
   );
 }
@@ -780,61 +915,153 @@ function InfoPill({ label, value, tone = 'neutral' }: InfoPillProps) {
 }
 
 const styles = StyleSheet.create({
-  actionButton: {
-    minWidth: 150,
+  actionModalSummary: {
+    marginBottom: 10,
   },
-  actionsGrid: {
+  channelField: {
+    flexBasis: 150,
+  },
+  compactActions: {
+    alignItems: 'center',
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexBasis: 250,
+    flexGrow: 0,
     gap: 8,
-    marginTop: 12,
+    justifyContent: 'flex-end',
   },
-  badgeStack: {
-    alignItems: 'flex-end',
-    gap: 6,
+  compactBadge: {
+    maxWidth: 160,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
-  cardHeader: {
+  compactBody: {
+    gap: 10,
+  },
+  compactBodyDesktop: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+  },
+  compactCardHeader: {
     alignItems: 'flex-start',
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  cardTitle: {
-    flex: 1,
+  compactCardHeaderDesktop: {
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  compactField: {
+    flexBasis: 96,
+    flexGrow: 1,
     minWidth: 0,
   },
-  cardGrid: {
+  compactReservationCard: {
+    marginBottom: 0,
+  },
+  compactTitleLine: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  customerText: {
+    marginTop: 1,
+  },
+  desktopReservationCard: {
+    paddingBottom: 12,
+    paddingTop: 12,
+  },
+  expandButton: {
+    minWidth: 86,
+    paddingHorizontal: 10,
+  },
+  expandedDetails: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    marginTop: 10,
+  },
+  folioText: {
+    flexShrink: 1,
+  },
+  itemField: {
+    flexBasis: 110,
+  },
+  kpiChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    flexBasis: 150,
+    flexGrow: 1,
+    minHeight: 48,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  kpiValue: {
+    marginBottom: 0,
+  },
+  mobileCompactActions: {
+    alignItems: 'stretch',
+    flexBasis: 'auto',
+    flexGrow: 1,
+    justifyContent: 'flex-start',
+  },
+  mobileReservationCard: {
+    paddingBottom: 12,
+    paddingTop: 12,
+  },
+  modalActionsStack: {
+    gap: 8,
+  },
+  moreActionButton: {
+    minWidth: 116,
+    paddingHorizontal: 10,
+  },
+  nextActionInline: {
+    borderRadius: 10,
+    borderWidth: 1,
+    flexBasis: 150,
+    flexGrow: 1,
+    minWidth: 0,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  primaryActionButton: {
+    minWidth: 128,
+    paddingHorizontal: 10,
+  },
+  reservationIdentity: {
+    flex: 1,
+    minWidth: 0,
   },
   filterButton: {
-    minWidth: 126,
+    minWidth: 96,
   },
   filterRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
+    gap: 6,
+    marginBottom: 10,
   },
   headerTextBlock: {
     flex: 1,
     minWidth: 240,
   },
   infoPill: {
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
-    flexBasis: 190,
+    flexBasis: 150,
     flexGrow: 1,
     gap: 2,
-    padding: 10,
+    padding: 8,
   },
   list: {
     flex: 1,
   },
   listContent: {
-    gap: 12,
+    gap: 8,
     paddingBottom: 24,
   },
   loadingContainer: {
@@ -845,37 +1072,21 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
   },
-  metricCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    flexBasis: 170,
-    flexGrow: 1,
-    padding: 12,
-  },
-  metricValue: {
-    marginBottom: 2,
-  },
   metricsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 12,
-  },
-  nextActionBox: {
-    borderRadius: 12,
-    borderWidth: 1,
-    marginTop: 12,
-    padding: 12,
+    gap: 8,
+    marginBottom: 10,
   },
   operationalHeader: {
     alignItems: 'center',
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
-    marginBottom: 12,
-    padding: 16,
+    marginBottom: 10,
+    padding: 12,
   },
   refreshButton: {
     minWidth: 150,
