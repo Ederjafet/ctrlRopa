@@ -876,16 +876,24 @@ export default function ReservationsScreen() {
   return (
     <AppShell
       title="Apartados y reservas"
-      subtitle={`Control de apartados, cliente/interesado, paquete, caja, pago y envio\n${sessionScopeLabel}`}
+      subtitle="Gestión operativa de apartados y envíos"
+      metadata={sessionScopeLabel}
       contextTitle="Apartados y reservas"
-      contextSubtitle={`Control de apartados, cliente/interesado, paquete, caja, pago y envio\n${sessionScopeLabel}`}
+      contextSubtitle="Gestión operativa de apartados y envíos"
+      contextMetadata={sessionScopeLabel}
       activeRoute="reservations"
       session={session}
       navSections={navSections}
+      compactHeader
       rightContent={
         <View style={styles.headerActions}>
           {isLiveContext ? (
-            <AppButton title="Volver al live" variant="secondary" onPress={() => router.replace('/live' as any)} />
+            <AppButton
+              title="Volver al live"
+              variant="secondary"
+              onPress={() => router.replace('/live' as any)}
+              style={styles.headerSecondaryButton}
+            />
           ) : null}
           <AppButton
             title={isRefreshing ? 'Actualizando...' : 'Actualizar'}
@@ -1178,8 +1186,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
     justifyContent: 'flex-end',
+  },
+  headerSecondaryButton: {
+    minHeight: 32,
+    minWidth: 108,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
   },
   filterButton: {
     minWidth: 96,
@@ -1221,7 +1235,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   refreshButton: {
-    minWidth: 150,
+    minHeight: 32,
+    minWidth: 118,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
   },
   retryButton: {
     marginTop: 12,

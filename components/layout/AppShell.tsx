@@ -14,24 +14,30 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 type Props = {
   title: string;
   subtitle?: string;
+  metadata?: string;
   contextTitle?: string;
   contextSubtitle?: string;
+  contextMetadata?: string;
   activeRoute?: string;
   session?: UserSession | null;
   navSections: SidebarSection[];
   rightContent?: ReactNode;
+  compactHeader?: boolean;
   children: ReactNode;
 };
 
 export default function AppShell({
   title,
   subtitle,
+  metadata,
   contextTitle,
   contextSubtitle,
+  contextMetadata,
   activeRoute,
   session,
   navSections,
   rightContent,
+  compactHeader,
   children,
 }: Props) {
   const router = useRouter();
@@ -46,6 +52,7 @@ export default function AppShell({
     : designTokens.layout.drawerWidthTablet;
   const topBarTitle = showSidebar && contextTitle ? contextTitle : title;
   const topBarSubtitle = showSidebar && contextTitle ? contextSubtitle : subtitle;
+  const topBarMetadata = showSidebar && contextTitle ? contextMetadata : metadata;
 
   const navigate = (item: SidebarNavItemConfig) => {
     if (!item.route || item.disabled) return;
@@ -102,10 +109,12 @@ export default function AppShell({
           <TopBar
             title={topBarTitle}
             subtitle={topBarSubtitle}
+            metadata={topBarMetadata}
             session={session}
             rightContent={rightContent}
             showMenuButton={!showSidebar}
             onMenuPress={() => setMenuOpen(true)}
+            compact={compactHeader}
           />
           {children}
         </ScrollView>

@@ -12,19 +12,23 @@ import { Pressable, StyleSheet, View } from 'react-native';
 type Props = {
   title: string;
   subtitle?: string;
+  metadata?: string;
   session?: UserSession | null;
   rightContent?: ReactNode;
   onMenuPress?: () => void;
   showMenuButton?: boolean;
+  compact?: boolean;
 };
 
 export default function TopBar({
   title,
   subtitle,
+  metadata,
   session,
   rightContent,
   onMenuPress,
   showMenuButton,
+  compact = false,
 }: Props) {
   const { theme, toggleThemeMode } = useAppTheme();
   const { isPhone, isWideDesktop } = useResponsiveLayout();
@@ -37,12 +41,14 @@ export default function TopBar({
     <View
       style={[
         styles.topBar,
+        compact ? styles.topBarCompact : null,
+        compact && isPhone ? styles.topBarCompactPhone : null,
         {
           backgroundColor: theme.colors.surface,
           borderColor: theme.colors.borderSubtle,
-          borderRadius: designTokens.radius.xl,
+          borderRadius: compact ? designTokens.radius.lg : designTokens.radius.xl,
           shadowColor: theme.isDark ? theme.colors.overlay : theme.colors.primary,
-          shadowOpacity: theme.isDark ? 0.2 : 0.1,
+          shadowOpacity: compact ? (theme.isDark ? 0.14 : 0.05) : theme.isDark ? 0.2 : 0.1,
         },
       ]}
     >
@@ -62,26 +68,54 @@ export default function TopBar({
           <MaterialIcons name="menu" size={22} color={theme.colors.accent} />
         </Pressable>
       ) : null}
-      <View style={styles.titleBlock}>
-        <AppText variant="caption" color={theme.colors.accent} bold style={styles.eyebrow}>
+      <View style={[styles.titleBlock, compact ? styles.titleBlockCompact : null]}>
+        <AppText
+          variant="caption"
+          color={theme.colors.accent}
+          bold
+          style={[styles.eyebrow, compact ? styles.eyebrowCompact : null]}
+        >
           {t('topBar.operationalPanel')}
         </AppText>
-        <AppText variant="title" bold style={styles.title}>
+        <AppText variant="title" bold style={[styles.title, compact ? styles.titleCompact : null]} numberOfLines={1}>
           {title}
         </AppText>
         {subtitle ? (
-          <AppText color={theme.colors.mutedText} numberOfLines={2}>
+          <AppText
+            variant={compact ? 'caption' : 'body'}
+            color={theme.colors.mutedText}
+            numberOfLines={compact ? 1 : 2}
+            style={compact ? styles.subtitleCompact : null}
+          >
             {subtitle}
           </AppText>
         ) : null}
+        {metadata ? (
+          <AppText
+            variant="caption"
+            color={theme.colors.mutedText}
+            numberOfLines={1}
+            style={compact ? styles.metadataCompact : null}
+          >
+            {metadata}
+          </AppText>
+        ) : null}
       </View>
-      <View style={[styles.actionBlock, isPhone ? styles.actionBlockCompact : null]}>
+      <View
+        style={[
+          styles.actionBlock,
+          isPhone ? styles.actionBlockCompact : null,
+          compact ? styles.actionBlockMinimal : null,
+          compact && isPhone ? styles.actionBlockMinimalPhone : null,
+        ]}
+      >
         <Pressable
           onPress={toggleThemeMode}
           accessibilityRole="button"
           accessibilityLabel={nextThemeLabel}
           style={({ pressed }) => [
             styles.themeButton,
+            compact ? styles.themeButtonCompact : null,
             {
               backgroundColor: theme.colors.neutralButtonBackground,
               borderColor: theme.colors.borderStrong,
@@ -96,7 +130,12 @@ export default function TopBar({
             color={theme.colors.neutralButtonText}
           />
           {!isPhone ? (
-            <AppText variant="caption" color={theme.colors.neutralButtonText} bold>
+            <AppText
+              variant="caption"
+              color={theme.colors.neutralButtonText}
+              bold
+              style={compact ? styles.themeButtonTextCompact : null}
+            >
               {nextThemeLabel}
             </AppText>
           ) : null}
@@ -122,12 +161,33 @@ const styles = StyleSheet.create({
     marginBottom: 2,
     textTransform: 'uppercase',
   },
+  eyebrowCompact: {
+    fontSize: 11,
+    lineHeight: 14,
+    marginBottom: 1,
+  },
   titleBlock: {
     flex: 1,
     minWidth: 0,
   },
+  titleBlockCompact: {
+    gap: 1,
+  },
   title: {
     marginBottom: 2,
+  },
+  titleCompact: {
+    fontSize: 21,
+    lineHeight: 26,
+    marginBottom: 0,
+  },
+  subtitleCompact: {
+    lineHeight: 17,
+  },
+  metadataCompact: {
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 1,
   },
   themeButton: {
     alignItems: 'center',
@@ -137,6 +197,15 @@ const styles = StyleSheet.create({
     gap: designTokens.spacing.xs,
     paddingHorizontal: designTokens.spacing.sm,
     paddingVertical: designTokens.spacing.xs,
+  },
+  themeButtonCompact: {
+    minHeight: 30,
+    paddingHorizontal: designTokens.spacing.sm,
+    paddingVertical: 4,
+  },
+  themeButtonTextCompact: {
+    fontSize: 11,
+    lineHeight: 14,
   },
   topBar: {
     alignItems: 'center',
@@ -149,6 +218,18 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     shadowRadius: 22,
   },
+  topBarCompact: {
+    gap: designTokens.spacing.sm,
+    marginBottom: designTokens.spacing.sm,
+    paddingHorizontal: designTokens.spacing.md,
+    paddingVertical: designTokens.spacing.sm,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+  },
+  topBarCompactPhone: {
+    alignItems: 'flex-start',
+    flexWrap: 'wrap',
+  },
   actionBlock: {
     alignItems: 'flex-end',
     flexDirection: 'row',
@@ -156,6 +237,17 @@ const styles = StyleSheet.create({
     gap: designTokens.spacing.sm,
     justifyContent: 'flex-end',
     maxWidth: 280,
+  },
+  actionBlockMinimal: {
+    gap: designTokens.spacing.xs,
+    maxWidth: 240,
+  },
+  actionBlockMinimalPhone: {
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    marginTop: 2,
+    maxWidth: '100%',
+    width: '100%',
   },
   actionBlockCompact: {
     maxWidth: 220,
