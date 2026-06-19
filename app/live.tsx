@@ -4800,9 +4800,6 @@ export default function LiveScreen() {
                       </View>
                     ) : (
                       <>
-                        <AppText variant="caption" color={theme.colors.mutedText}>
-                          {t('live.reservationRiskHelp')}
-                        </AppText>
                         {reservationPendingReason ? (
                           <AppText variant="caption" color={theme.colors.mutedText}>
                             {reservationPendingReason}
@@ -7138,6 +7135,7 @@ const styles = StyleSheet.create({
     minWidth: 280,
   },
   operatorReservePanel: {
+    gap: 6,
     minWidth: 0,
   },
   operatorStepCard: {

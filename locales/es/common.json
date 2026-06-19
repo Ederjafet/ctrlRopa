@@ -253,7 +253,7 @@
     "itemStatus": "Estado",
     "customerNeedsActiveItem": "Primero pon una prenda al aire.",
     "customerNeedsPrice": "Primero confirma el precio de la prenda al aire.",
-    "reserveActiveItemHelp": "Confirma el precio y registra el apartado de la prenda al aire.",
+    "reserveActiveItemHelp": "Confirma el precio y registra el apartado.",
     "reserveNeedsActiveItem": "Primero pon una prenda al aire para registrar un apartado.",
     "reserveMissingActiveItem": "Primero pon una prenda al aire.",
     "priceUsesActiveItemHelp": "Este precio aplica solo al apartado de la prenda al aire actual. Si lo ajustas, no modifica el precio base de la prenda.",
