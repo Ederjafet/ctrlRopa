@@ -134,9 +134,16 @@ function getHoldStateLabel(reservation: Reservation) {
 
 function getNextActionLabel(reservation: Reservation) {
   if (!isActiveReservation(reservation)) return 'Sin accion pendiente';
-  if (!reservation.customerId) return 'Validar cliente';
   if (!reservation.boxId) return 'Asignar caja';
+  if (!reservation.customerId) return 'Vincular cliente';
   return 'Crear paquete';
+}
+
+function getReservationCustomerLabel(reservation: Reservation) {
+  if (reservation.customerName) return `Cliente: ${reservation.customerName}`;
+  if (reservation.customerId) return `Cliente: #${reservation.customerId}`;
+  if (reservation.interestedAlias) return `Interesado: ${reservation.interestedAlias}`;
+  return 'Sin cliente/interesado';
 }
 
 function getPackageDisabledReason(reservation: Reservation, session: UserSession | null) {
@@ -290,6 +297,7 @@ export default function ReservationsScreen() {
         ${reservation.id ?? ''}
         ${reservation.itemCode ?? ''}
         ${reservation.customerName ?? ''}
+        ${reservation.interestedAlias ?? ''}
         ${reservation.status ?? ''}
         ${reservation.salesChannelName ?? ''}
         ${reservation.liveId ?? ''}
@@ -306,7 +314,7 @@ export default function ReservationsScreen() {
     const withoutBox = active.filter((reservation) => !reservation.boxId);
     const withBox = active.filter((reservation) => Boolean(reservation.boxId));
     const readyForNextAction = active.filter((reservation) => {
-      if (!reservation.customerId) return false;
+      if (!reservation.customerId && !reservation.interestedAlias) return false;
       if (!reservation.boxId) return true;
       return Boolean(reservation.itemId);
     });
@@ -532,7 +540,7 @@ export default function ReservationsScreen() {
               />
             </View>
             <AppText numberOfLines={1} style={styles.customerText}>
-              {item.customerName || `Cliente #${item.customerId}`}
+              {getReservationCustomerLabel(item)}
             </AppText>
           </View>
 
@@ -648,7 +656,7 @@ export default function ReservationsScreen() {
       >
         <AppCard variant="subtle" style={styles.actionModalSummary}>
           <AppText bold numberOfLines={1}>
-            {item.customerName || `Cliente #${item.customerId}`}
+            {getReservationCustomerLabel(item)}
           </AppText>
           <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
             {item.itemCode || `Prenda #${item.itemId}`} - {item.boxCode || 'Sin caja'} - {formatMoney(item.price)}
@@ -859,7 +867,7 @@ export default function ReservationsScreen() {
           <AppCard variant="subtle">
             <AppText bold>Apartado #{selectedReservation.id}</AppText>
             <AppText>
-              Cliente: {selectedReservation.customerName || `ID ${selectedReservation.customerId}`}
+              {getReservationCustomerLabel(selectedReservation)}
             </AppText>
             <AppText>Prenda: {selectedReservation.itemCode || `ID ${selectedReservation.itemId}`}</AppText>
           </AppCard>

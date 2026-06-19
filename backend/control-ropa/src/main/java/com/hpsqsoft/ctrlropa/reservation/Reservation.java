@@ -23,9 +23,12 @@ public class Reservation {
     @JoinColumn(name = "item_id", nullable = false)
     private Item item;
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "customer_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_id")
     private Customer customer;
+
+    @Column(name = "interested_alias", length = 80)
+    private String interestedAlias;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "branch_id", nullable = false)
@@ -107,6 +110,14 @@ public class Reservation {
 
     public void setCustomer(Customer customer) {
         this.customer = customer;
+    }
+
+    public String getInterestedAlias() {
+        return interestedAlias;
+    }
+
+    public void setInterestedAlias(String interestedAlias) {
+        this.interestedAlias = interestedAlias;
     }
 
     public Branch getBranch() {
