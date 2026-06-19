@@ -827,6 +827,8 @@
       "doorSale": "매장 판매",
       "doorHold": "매장 홀드",
       "holds": "홀드",
+      "packages": "패키지",
+      "shipments": "배송",
       "customers": "고객",
       "itemsInventory": "상품 / 재고",
       "createItems": "상품 생성",

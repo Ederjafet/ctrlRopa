@@ -876,6 +876,8 @@
       "doorSale": "Venta puerta",
       "doorHold": "Apartado puerta",
       "holds": "Apartados",
+      "packages": "Paquetes",
+      "shipments": "Envios",
       "customers": "Clientes",
       "itemsInventory": "Prendas / Inventario",
       "createItems": "Alta de prendas",

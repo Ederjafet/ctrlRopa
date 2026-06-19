@@ -141,10 +141,6 @@ public class CustomerPackageService {
             throw new IllegalArgumentException("Solo se puede crear paquete desde apartados activos");
         }
 
-        if (reservation.getBox() == null) {
-            throw new IllegalArgumentException("Primero asigna una caja o ubicacion fisica al apartado");
-        }
-
         if (reservation.getCustomer() == null) {
             throw new IllegalArgumentException("El apartado debe tener cliente formal antes de crear paquete");
         }
@@ -516,6 +512,10 @@ public class CustomerPackageService {
         tenantAccessGuard.requireBranch(reservation.getBranch().getId(), "La reserva no pertenece a la sucursal activa");
         if (reservation.getCustomer() == null) {
             throw new IllegalArgumentException("La reserva debe tener cliente formal para agregarse al paquete");
+        }
+
+        if (reservation.getStatus() != ReservationStatus.ACTIVE) {
+            throw new IllegalArgumentException("Solo reservas activas pueden agregarse al paquete");
         }
 
         if (!reservation.getCustomer().getId().equals(customerPackage.getCustomer().getId())) {

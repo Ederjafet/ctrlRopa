@@ -827,6 +827,8 @@
       "doorSale": "门店销售",
       "doorHold": "门店预留",
       "holds": "预留",
+      "packages": "包裹",
+      "shipments": "发货",
       "customers": "客户",
       "itemsInventory": "商品 / 库存",
       "createItems": "创建商品",
