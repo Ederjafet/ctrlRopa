@@ -34,11 +34,21 @@ type ReservationFilter =
   | 'ACTIVE'
   | 'WITHOUT_BOX'
   | 'WITH_BOX'
+  | 'INTERESTED'
+  | 'CUSTOMERS'
   | 'IN_PACKAGE'
   | 'READY_TO_SHIP'
   | 'SHIPPED';
 
 type ReservationAction = 'assignBox' | 'createPackage';
+type PrimaryActionKind =
+  | 'linkCustomer'
+  | 'createPackage'
+  | 'assignBox'
+  | 'registerPayment'
+  | 'releaseShipment'
+  | 'markShipped'
+  | 'detail';
 
 type OperationalTab = {
   key: ReservationFilter;
@@ -46,6 +56,8 @@ type OperationalTab = {
   enabled: boolean;
   disabledReason?: string;
 };
+
+const RESERVATION_PAGE_SIZE = 25;
 
 function getReservationStatusLabel(status?: string) {
   switch (status) {
@@ -127,23 +139,68 @@ function getHoldStateLabel(reservation: Reservation) {
     return getReservationStatusLabel(reservation.status);
   }
 
-  if (!reservation.boxId) return 'Apartado sin caja';
+  if (!reservation.boxId) return 'Sin caja';
 
-  return 'Apartado en caja';
+  return 'En caja';
 }
 
-function getNextActionLabel(reservation: Reservation) {
-  if (!isActiveReservation(reservation)) return 'Sin accion pendiente';
-  if (!reservation.boxId) return 'Asignar caja';
-  if (!reservation.customerId) return 'Vincular cliente';
-  return 'Crear paquete';
+function hasFormalCustomer(reservation: Reservation) {
+  return Boolean(reservation.customerId);
+}
+
+function hasInterestedAlias(reservation: Reservation) {
+  return !reservation.customerId && Boolean(reservation.interestedAlias);
+}
+
+function getPartyInfo(reservation: Reservation) {
+  if (reservation.customerName) {
+    return {
+      badge: 'CLIENTE',
+      label: reservation.customerName,
+      tone: 'info' as const,
+      needsCustomer: false,
+    };
+  }
+
+  if (reservation.customerId) {
+    return {
+      badge: 'CLIENTE',
+      label: `#${reservation.customerId}`,
+      tone: 'info' as const,
+      needsCustomer: false,
+    };
+  }
+
+  if (reservation.interestedAlias) {
+    return {
+      badge: 'INTERESADO',
+      label: reservation.interestedAlias,
+      tone: 'warning' as const,
+      needsCustomer: true,
+    };
+  }
+
+  return {
+    badge: 'SIN CLIENTE',
+    label: 'Requiere seguimiento',
+    tone: 'danger' as const,
+    needsCustomer: true,
+  };
 }
 
 function getReservationCustomerLabel(reservation: Reservation) {
-  if (reservation.customerName) return `Cliente: ${reservation.customerName}`;
-  if (reservation.customerId) return `Cliente: #${reservation.customerId}`;
-  if (reservation.interestedAlias) return `Interesado: ${reservation.interestedAlias}`;
+  const party = getPartyInfo(reservation);
+
+  if (party.badge === 'CLIENTE') return `Cliente: ${party.label}`;
+  if (party.badge === 'INTERESADO') return `Interesado: ${party.label}`;
   return 'Sin cliente/interesado';
+}
+
+function getPrimaryAction(reservation: Reservation): { kind: PrimaryActionKind; title: string } {
+  if (!isActiveReservation(reservation)) return { kind: 'detail', title: 'Ver detalle' };
+  if (!reservation.customerId) return { kind: 'linkCustomer', title: 'Vincular cliente' };
+
+  return { kind: 'createPackage', title: 'Crear paquete' };
 }
 
 function getPackageDisabledReason(reservation: Reservation, session: UserSession | null) {
@@ -191,6 +248,7 @@ export default function ReservationsScreen() {
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<ReservationFilter>('ALL');
+  const [visibleLimit, setVisibleLimit] = useState(RESERVATION_PAGE_SIZE);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isAssigningBox, setIsAssigningBox] = useState(false);
@@ -203,6 +261,7 @@ export default function ReservationsScreen() {
   const [isBoxModalVisible, setIsBoxModalVisible] = useState(false);
   const [session, setSession] = useState<UserSession | null>(null);
   const navSections = useMemo(() => buildMainNavSections(session), [session]);
+  const sessionScopeLabel = getSessionScopeLabel(session);
 
   const operationalTabs: OperationalTab[] = useMemo(
     () => [
@@ -210,6 +269,8 @@ export default function ReservationsScreen() {
       { key: 'ACTIVE', label: 'Activas', enabled: true },
       { key: 'WITHOUT_BOX', label: 'Sin caja', enabled: true },
       { key: 'WITH_BOX', label: 'Con caja', enabled: true },
+      { key: 'INTERESTED', label: 'Interesados', enabled: true },
+      { key: 'CUSTOMERS', label: 'Clientes', enabled: true },
       {
         key: 'IN_PACKAGE',
         label: 'En paquete',
@@ -288,6 +349,10 @@ export default function ReservationsScreen() {
         ? reservations.filter((reservation) => !reservation.boxId)
         : filter === 'WITH_BOX'
           ? reservations.filter((reservation) => Boolean(reservation.boxId))
+          : filter === 'INTERESTED'
+            ? reservations.filter(hasInterestedAlias)
+          : filter === 'CUSTOMERS'
+            ? reservations.filter(hasFormalCustomer)
           : reservations;
 
     if (!query) return data;
@@ -313,22 +378,33 @@ export default function ReservationsScreen() {
     const active = reservations.filter(isActiveReservation);
     const withoutBox = active.filter((reservation) => !reservation.boxId);
     const withBox = active.filter((reservation) => Boolean(reservation.boxId));
-    const readyForNextAction = active.filter((reservation) => {
-      if (!reservation.customerId && !reservation.interestedAlias) return false;
-      if (!reservation.boxId) return true;
-      return Boolean(reservation.itemId);
-    });
+    const interested = active.filter(hasInterestedAlias);
+    const customers = active.filter(hasFormalCustomer);
 
     return {
       active: active.length,
+      interested: interested.length,
+      customers: customers.length,
       withoutBox: withoutBox.length,
       withBox: withBox.length,
-      readyForNextAction: readyForNextAction.length,
     };
   }, [reservations]);
 
+  const visibleReservations = useMemo(
+    () => filtered.slice(0, visibleLimit),
+    [filtered, visibleLimit]
+  );
+  const visibleCount = Math.min(visibleLimit, filtered.length);
+  const canLoadMore = visibleCount < filtered.length;
+
   const changeFilter = (nextFilter: ReservationFilter) => {
     setFilter(nextFilter);
+    setVisibleLimit(RESERVATION_PAGE_SIZE);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setVisibleLimit(RESERVATION_PAGE_SIZE);
   };
 
   const openBoxModal = (reservation: Reservation) => {
@@ -468,10 +544,10 @@ export default function ReservationsScreen() {
     setExpandedReservationId((current) => (current === reservationId ? null : reservationId));
   };
 
-  const renderMetric = (label: string, value: number, helper: string) => (
+  const renderCompactMetric = (label: string, value: number) => (
     <View
       style={[
-        styles.kpiChip,
+        styles.kpiPill,
         {
           backgroundColor: theme.colors.surfaceAlt,
           borderColor: theme.colors.border,
@@ -479,31 +555,51 @@ export default function ReservationsScreen() {
       ]}
     >
       <AppText variant="caption" color={theme.colors.mutedText} bold numberOfLines={1}>
-        {label}
-      </AppText>
-      <AppText variant="subtitle" bold style={styles.kpiValue}>
-        {value}
-      </AppText>
-      <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
-        {helper}
+        {label}: <AppText variant="caption" bold>{value}</AppText>
       </AppText>
     </View>
   );
 
   const renderPrimaryAction = (item: Reservation) => {
+    const primaryAction = getPrimaryAction(item);
     const packageDisabledReason = getPackageDisabledReason(item, session);
     const assignBoxDisabledReason = getAssignBoxDisabledReason(item);
     const isCreatingPackage = workingReservationId === item.id && workingAction === 'createPackage';
     const isAssigningCurrentBox = workingReservationId === item.id && workingAction === 'assignBox';
     const isBlockedByOtherAction = Boolean(workingReservationId && workingReservationId !== item.id);
-    const usesPackageAction = Boolean(item.boxId);
-    const title = usesPackageAction ? 'Crear paquete' : 'Asignar caja';
+
+    if (primaryAction.kind === 'linkCustomer') {
+      return (
+        <AppButton
+          title={primaryAction.title}
+          variant="warning"
+          disabled
+          disabledReason="Pendiente: vincular alias a cliente existente o convertirlo a cliente formal."
+          style={styles.primaryActionButton}
+        />
+      );
+    }
+
+    if (primaryAction.kind === 'detail') {
+      return (
+        <AppButton
+          title={primaryAction.title}
+          variant="secondary"
+          onPress={() => openReservationDetail(item)}
+          disabled={isBlockedByOtherAction}
+          disabledReason="Ya hay una accion en proceso."
+          style={styles.primaryActionButton}
+        />
+      );
+    }
+
+    const usesPackageAction = primaryAction.kind === 'createPackage';
     const disabledReason = usesPackageAction ? packageDisabledReason : assignBoxDisabledReason;
     const loading = usesPackageAction ? isCreatingPackage : isAssigningCurrentBox;
 
     return (
       <AppButton
-        title={title}
+        title={primaryAction.title}
         variant="operation"
         onPress={() => (usesPackageAction ? handleCreatePackage(item) : openBoxModal(item))}
         loading={loading}
@@ -515,8 +611,8 @@ export default function ReservationsScreen() {
   };
 
   const renderReservation = ({ item }: { item: Reservation }) => {
-    const nextAction = getNextActionLabel(item);
     const isExpanded = expandedReservationId === item.id;
+    const party = getPartyInfo(item);
     const channelLabel =
       item.liveId
         ? getLiveLabel(item)
@@ -534,14 +630,42 @@ export default function ReservationsScreen() {
                 Apartado #{item.id}
               </AppText>
               <StatusBadge
+                label={party.badge}
+                tone={party.tone}
+                style={styles.compactBadge}
+              />
+              <StatusBadge
                 label={getHoldStateLabel(item)}
                 tone={item.boxId ? 'info' : 'warning'}
                 style={styles.compactBadge}
               />
+              {party.needsCustomer ? (
+                <StatusBadge label="Falta cliente" tone="warning" style={styles.compactBadge} />
+              ) : null}
             </View>
-            <AppText numberOfLines={1} style={styles.customerText}>
-              {getReservationCustomerLabel(item)}
-            </AppText>
+            <View
+              style={[
+                styles.partyLine,
+                party.needsCustomer
+                  ? {
+                      backgroundColor: theme.colors.warningBackground,
+                      borderColor: theme.colors.warning,
+                    }
+                  : {
+                      backgroundColor: theme.colors.surfaceAlt,
+                      borderColor: theme.colors.border,
+                    },
+              ]}
+            >
+              <AppText
+                numberOfLines={1}
+                style={styles.customerText}
+                color={party.needsCustomer ? theme.colors.warning : theme.colors.text}
+                bold
+              >
+                {party.label}
+              </AppText>
+            </View>
           </View>
 
           <StatusBadge
@@ -584,23 +708,6 @@ export default function ReservationsScreen() {
               Monto
             </AppText>
             <AppText bold numberOfLines={1}>{formatMoney(item.price)}</AppText>
-          </View>
-
-          <View
-            style={[
-              styles.nextActionInline,
-              {
-                backgroundColor: theme.colors.infoCardBackground,
-                borderColor: theme.colors.infoCardBorder,
-              },
-            ]}
-          >
-            <AppText variant="caption" color={theme.colors.infoCardText} bold numberOfLines={1}>
-              Siguiente accion
-            </AppText>
-            <AppText color={theme.colors.infoCardText} bold numberOfLines={1}>
-              {nextAction}
-            </AppText>
           </View>
 
           <View style={[styles.compactActions, isPhone && styles.mobileCompactActions]}>
@@ -647,6 +754,7 @@ export default function ReservationsScreen() {
     const packageDisabledReason = getPackageDisabledReason(item, session);
     const assignBoxDisabledReason = getAssignBoxDisabledReason(item);
     const isCreatingPackage = workingReservationId === item.id && workingAction === 'createPackage';
+    const needsCustomerFollowUp = hasInterestedAlias(item);
 
     return (
       <AppBottomModal
@@ -669,6 +777,28 @@ export default function ReservationsScreen() {
             variant="secondary"
             onPress={() => closeActionsAndRun(openReservationDetail)}
           />
+          {needsCustomerFollowUp ? (
+            <>
+              <AppButton
+                title="Vincular alias a cliente existente"
+                variant="warning"
+                disabled
+                disabledReason="Pendiente: seleccionar cliente existente y conservar auditoria del alias."
+              />
+              <AppButton
+                title="Convertir alias en cliente formal"
+                variant="neutral"
+                disabled
+                disabledReason="Pendiente: crear cliente con decision explicita del usuario, sin clientes fake."
+              />
+              <AppButton
+                title="Editar alias"
+                variant="neutral"
+                disabled
+                disabledReason="Pendiente: requiere endpoint auditado para modificar el alias del interesado."
+              />
+            </>
+          ) : null}
           <AppButton
             title={item.boxId ? 'Cambiar caja' : 'Asignar caja'}
             variant={item.boxId ? 'neutral' : 'operation'}
@@ -709,6 +839,12 @@ export default function ReservationsScreen() {
                 ? 'Tu usuario no tiene permiso para registrar pagos.'
                 : 'Solo se puede abonar sobre apartados activos.'
             }
+          />
+          <AppButton
+            title="Venta inmediata LIVE"
+            variant="neutral"
+            disabled
+            disabledReason="Usar solo si la venta se cierra directamente desde LIVE, sin continuar flujo de paquete/envio."
           />
           <AppButton
             title="Liberar envio"
@@ -755,57 +891,35 @@ export default function ReservationsScreen() {
 
   return (
     <AppShell
-      title="Reservas"
-      subtitle="Apartados activos, cajas y seguimiento"
+      title="Apartados y reservas"
+      subtitle={`Control de apartados, cliente/interesado, paquete, caja, pago y envio\n${sessionScopeLabel}`}
       contextTitle="Apartados y reservas"
-      contextSubtitle={getSessionScopeLabel(session)}
+      contextSubtitle={`Control de apartados, cliente/interesado, paquete, caja, pago y envio\n${sessionScopeLabel}`}
       activeRoute="reservations"
       session={session}
       navSections={navSections}
       rightContent={
-        isLiveContext ? (
-          <AppButton title="Volver al live" variant="secondary" onPress={() => router.replace('/live' as any)} />
-        ) : null
+        <View style={styles.headerActions}>
+          {isLiveContext ? (
+            <AppButton title="Volver al live" variant="secondary" onPress={() => router.replace('/live' as any)} />
+          ) : null}
+          <AppButton
+            title={isRefreshing ? 'Actualizando...' : 'Actualizar'}
+            variant="secondary"
+            onPress={handleManualRefresh}
+            loading={isRefreshing}
+            disabled={isRefreshing}
+            style={styles.refreshButton}
+          />
+        </View>
       }
     >
-      <View
-        style={[
-          styles.operationalHeader,
-          {
-            backgroundColor: theme.colors.surfaceElevated,
-            borderColor: theme.colors.border,
-          },
-        ]}
-      >
-        <View style={styles.headerTextBlock}>
-          <AppText variant="caption" color={theme.colors.accent} bold>
-            PANEL OPERATIVO
-          </AppText>
-          <AppText variant="title" bold>
-            Apartados y reservas
-          </AppText>
-          <AppText color={theme.colors.mutedText}>
-            Control de apartados, caja, paquete, cobro y envio
-          </AppText>
-          <AppText variant="caption" color={theme.colors.mutedText}>
-            {getSessionScopeLabel(session)}
-          </AppText>
-        </View>
-        <AppButton
-          title={isRefreshing ? 'Actualizando...' : 'Actualizar'}
-          variant="secondary"
-          onPress={handleManualRefresh}
-          loading={isRefreshing}
-          disabled={isRefreshing}
-          style={styles.refreshButton}
-        />
-      </View>
-
-      <View style={styles.metricsGrid}>
-        {renderMetric('Apartados activos', metrics.active, 'Reservas activas cargadas')}
-        {renderMetric('Sin caja', metrics.withoutBox, 'Requieren ubicacion fisica')}
-        {renderMetric('Con caja', metrics.withBox, 'Listas para preparar paquete')}
-        {renderMetric('Siguiente accion', metrics.readyForNextAction, 'Con accion operativa visible')}
+      <View style={styles.metricsStrip}>
+        {renderCompactMetric('Activas', metrics.active)}
+        {renderCompactMetric('Interesados', metrics.interested)}
+        {renderCompactMetric('Clientes', metrics.customers)}
+        {renderCompactMetric('Sin caja', metrics.withoutBox)}
+        {renderCompactMetric('Con caja', metrics.withBox)}
       </View>
 
       <View style={styles.filterRow}>
@@ -823,9 +937,9 @@ export default function ReservationsScreen() {
       </View>
 
       <AppInput
-        placeholder="Buscar por cliente, prenda, caja o canal"
+        placeholder="Buscar por cliente, interesado, prenda, caja o canal"
         value={search}
-        onChangeText={setSearch}
+        onChangeText={handleSearchChange}
       />
 
       {errorMessage ? (
@@ -842,12 +956,29 @@ export default function ReservationsScreen() {
 
       <FlatList
         style={styles.list}
-        data={filtered}
+        data={visibleReservations}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderReservation}
         refreshing={isRefreshing}
         onRefresh={handleManualRefresh}
         contentContainerStyle={styles.listContent}
+        ListFooterComponent={
+          filtered.length > 0 ? (
+            <View style={styles.listFooter}>
+              <AppText variant="caption" color={theme.colors.mutedText} bold>
+                Mostrando {visibleCount} de {filtered.length} apartados
+              </AppText>
+              {canLoadMore ? (
+                <AppButton
+                  title="Cargar mas"
+                  variant="secondary"
+                  onPress={() => setVisibleLimit((current) => current + RESERVATION_PAGE_SIZE)}
+                  style={styles.loadMoreButton}
+                />
+              ) : null}
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           <EmptyState
             title={
@@ -855,6 +986,10 @@ export default function ReservationsScreen() {
                 ? 'No hay apartados activos sin caja'
                 : filter === 'WITH_BOX'
                   ? 'No hay apartados activos con caja'
+                  : filter === 'INTERESTED'
+                    ? 'No hay apartados con interesado'
+                    : filter === 'CUSTOMERS'
+                      ? 'No hay apartados con cliente formal'
                   : 'No hay apartados activos'
             }
             message="Cuando existan reservas para este filtro, apareceran aqui."
@@ -976,7 +1111,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   customerText: {
-    marginTop: 1,
+    flexShrink: 1,
   },
   desktopReservationCard: {
     paddingBottom: 12,
@@ -998,22 +1133,30 @@ const styles = StyleSheet.create({
   itemField: {
     flexBasis: 110,
   },
-  kpiChip: {
+  kpiPill: {
+    alignItems: 'center',
     borderRadius: 999,
     borderWidth: 1,
-    flexBasis: 150,
-    flexGrow: 1,
-    minHeight: 48,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    flexDirection: 'row',
+    minHeight: 32,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
-  kpiValue: {
-    marginBottom: 0,
+  listFooter: {
+    alignItems: 'center',
+    gap: 8,
+    paddingBottom: 8,
+    paddingTop: 10,
+  },
+  loadMoreButton: {
+    minWidth: 150,
   },
   mobileCompactActions: {
     alignItems: 'stretch',
     flexBasis: 'auto',
+    flexDirection: 'row',
     flexGrow: 1,
+    flexWrap: 'wrap',
     justifyContent: 'flex-start',
   },
   mobileReservationCard: {
@@ -1027,14 +1170,14 @@ const styles = StyleSheet.create({
     minWidth: 116,
     paddingHorizontal: 10,
   },
-  nextActionInline: {
-    borderRadius: 10,
+  partyLine: {
+    alignSelf: 'flex-start',
+    borderRadius: 8,
     borderWidth: 1,
-    flexBasis: 150,
-    flexGrow: 1,
-    minWidth: 0,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    marginTop: 4,
+    maxWidth: '100%',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   primaryActionButton: {
     minWidth: 128,
@@ -1044,6 +1187,13 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
+  headerActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'flex-end',
+  },
   filterButton: {
     minWidth: 96,
   },
@@ -1052,10 +1202,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
     marginBottom: 10,
-  },
-  headerTextBlock: {
-    flex: 1,
-    minWidth: 240,
   },
   infoPill: {
     borderRadius: 8,
@@ -1080,21 +1226,12 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
   },
-  metricsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 10,
-  },
-  operationalHeader: {
+  metricsStrip: {
     alignItems: 'center',
-    borderRadius: 12,
-    borderWidth: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 10,
-    padding: 12,
+    gap: 6,
+    marginBottom: 8,
   },
   refreshButton: {
     minWidth: 150,

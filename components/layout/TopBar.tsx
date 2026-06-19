@@ -158,6 +158,6 @@ const styles = StyleSheet.create({
     maxWidth: 280,
   },
   actionBlockCompact: {
-    maxWidth: 120,
+    maxWidth: 220,
   },
 });
