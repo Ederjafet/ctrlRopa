@@ -281,25 +281,8 @@ function getReservationCustomerLabel(reservation: Reservation) {
   return 'Sin cliente';
 }
 
-function getReservationSellerLabel(reservation: Reservation) {
-  return reservation.sellerUserName || `Usuario #${reservation.sellerUserId || '-'}`;
-}
-
-function getSalesChannelLabel(code?: string | null, name?: string | null) {
-  if (name) return name;
-
-  switch (code) {
-    case 'LIVE':
-      return 'Live';
-    case 'DOOR_RESERVATION':
-      return 'Apartado puerta';
-    case 'DOOR_SALE':
-      return 'Venta puerta';
-    case 'CONSIGNMENT':
-      return 'Consignacion';
-    default:
-      return code || 'No capturado';
-  }
+function hasInterestedAlias(reservation: Reservation) {
+  return !reservation.customerId && Boolean(reservation.interestedAlias);
 }
 
 function isReservationSettled(reservation: Reservation, paid: number) {
@@ -1159,44 +1142,68 @@ export default function LiveScreen() {
       frequent: customerReservations.length >= 3,
     };
   }, [branchReservations, paidByReservationId, selectedCustomer]);
-  const getReservationCustomerInfo = (reservation: Reservation) =>
-    customers.find((customer) => customer.id === reservation.customerId);
   const getReservationItemInfo = (reservation: Reservation) =>
     items.find((item) => item.id === reservation.itemId);
   const renderRecentReservationInfo = (
     reservation: Reservation,
     customerName: string,
     itemCode: string,
-    operationalStatus: LiveReservationOperationalStatus,
     settled: boolean,
     operationalSold: boolean
   ) => {
-    const customer = getReservationCustomerInfo(reservation);
     const item = getReservationItemInfo(reservation);
     const paid = paidByReservationId[reservation.id] ?? 0;
-    const pending = Math.max(Number(reservation.price || 0) - paid, 0);
     const paymentStatusLabel = !canViewPayments
       ? t('live.paymentStatusUnavailable')
       : paid > 0
         ? t('live.paymentStatusPaid')
         : t('live.paymentStatusUnpaid');
-    const paymentStatusColor = !canViewPayments
-      ? theme.colors.mutedText
-      : paid > 0
-        ? theme.colors.warning
-        : theme.colors.success;
     const liveLabel = reservation.liveId
       ? t('live.liveNumber', { id: reservation.liveId })
       : t('live.noReservationLive');
-    const createdAt = formatLiveDateTime(reservation.createdAt) || t('live.noReservationDate');
-    const statusLabel = settled
-      ? t('live.settled')
-      : operationalSold
-        ? t('live.operationalSoldStatus')
-        : getLiveReservationOperationalStatusLabel(operationalStatus, t);
+    const isInterested = hasInterestedAlias(reservation);
+    const partyBadge = isInterested
+      ? t('live.interestedBadge')
+      : reservation.customerId
+        ? t('live.customerBadge')
+        : t('live.noCustomerBadge');
+    const partyLabel = isInterested
+      ? reservation.interestedAlias || customerName.replace(/^Interesado:\s*/i, '')
+      : customerName;
+    const itemLabel = item?.productTypeName || itemCode;
+    const branchLabel = session?.branchName || selectedLive?.branchName || t('live.notCaptured');
+    const compactMeta = [
+      itemLabel,
+      formatMoney(Number(reservation.price || 0)),
+      paymentStatusLabel,
+      branchLabel,
+    ].join(' · ');
+    const partyToneColor = isInterested
+      ? theme.colors.warning
+      : reservation.customerId
+        ? theme.colors.accent
+        : theme.colors.danger;
+    const partyToneBackground = isInterested
+      ? theme.colors.warningBackground
+      : reservation.customerId
+        ? theme.colors.infoCardBackground
+        : theme.colors.dangerBackground;
 
     return (
-      <View style={styles.recentReservationInfoPanel}>
+      <View
+        style={[
+          styles.recentReservationInfoPanel,
+          isInterested
+            ? {
+                backgroundColor: theme.colors.warningBackground,
+                borderColor: theme.colors.warning,
+                borderRadius: theme.radius.md,
+                borderWidth: 1,
+                padding: 10,
+              }
+            : null,
+        ]}
+      >
         <View style={styles.recentReservationHeader}>
           <View style={styles.recentReservationText}>
             <View style={styles.recentReservationBadgeRow}>
@@ -1218,94 +1225,37 @@ export default function LiveScreen() {
                 {liveLabel}
               </AppText>
             </View>
-            <AppText bold numberOfLines={1}>{customerName}</AppText>
-            <AppText variant="caption" color={theme.colors.mutedText}>
-              {customer?.phone || t('live.noPhone')}
-            </AppText>
-          </View>
-          <View style={styles.recentReservationPriceBlock}>
-            <AppText variant="caption" color={theme.colors.mutedText}>
-              {t('live.price')}
-            </AppText>
-            <AppText color={theme.colors.accent} bold>
-              {formatMoney(Number(reservation.price || 0))}
-            </AppText>
-          </View>
-        </View>
-
-        <View style={styles.recentReservationGrid}>
-          <View style={styles.recentReservationMeta}>
-            <AppText variant="caption" color={theme.colors.mutedText}>
-              {t('live.item')}
-            </AppText>
-            <AppText bold numberOfLines={1}>
-              {item?.productTypeName || itemCode}
-            </AppText>
-            <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
-              {itemCode}
-            </AppText>
-          </View>
-          <View style={styles.recentReservationMeta}>
-            <AppText variant="caption" color={theme.colors.mutedText}>
-              {t('live.operationalStatusTitle')}
-            </AppText>
-            <AppText bold>{statusLabel}</AppText>
-          </View>
-          <View style={styles.recentReservationMeta}>
-            <AppText variant="caption" color={theme.colors.mutedText}>
-              {t('live.paymentRegistered')}
-            </AppText>
-            <AppText bold>
-              {canViewPayments ? formatMoney(paid) : t('live.paymentStatusUnavailable')}
-            </AppText>
-          </View>
-          <View style={styles.recentReservationMeta}>
-            <AppText variant="caption" color={theme.colors.mutedText}>
-              {t('live.pendingBalance')}
-            </AppText>
-            <AppText bold>
-              {canViewPayments ? formatMoney(pending) : t('live.paymentStatusUnavailable')}
-            </AppText>
-          </View>
-          <View style={styles.recentReservationMeta}>
-            <AppText variant="caption" color={theme.colors.mutedText}>
-              {t('live.paymentStatus')}
-            </AppText>
-            <AppText bold color={paymentStatusColor}>
-              {paymentStatusLabel}
-            </AppText>
-          </View>
-          <View style={styles.recentReservationMeta}>
-            <AppText variant="caption" color={theme.colors.mutedText}>
-              {t('live.liveChannel')}
-            </AppText>
-            <AppText bold>
-              {getSalesChannelLabel(
-                reservation.salesChannelCode,
-                reservation.salesChannelName
-              )}
-            </AppText>
-          </View>
-          <View style={styles.recentReservationMeta}>
-            <AppText variant="caption" color={theme.colors.mutedText}>
-              {t('live.reservationDate')}
-            </AppText>
-            <AppText bold>{createdAt}</AppText>
-          </View>
-          <View style={styles.recentReservationMeta}>
-            <AppText variant="caption" color={theme.colors.mutedText}>
-              {t('live.branchLabel')}
-            </AppText>
-            <AppText bold numberOfLines={1}>
-              {session?.branchName || selectedLive?.branchName || t('live.notCaptured')}
-            </AppText>
-          </View>
-          <View style={styles.recentReservationMeta}>
-            <AppText variant="caption" color={theme.colors.mutedText}>
-              {t('live.reservationSeller')}
-            </AppText>
-            <AppText bold numberOfLines={1}>
-              {getReservationSellerLabel(reservation)}
+            <View style={styles.recentReservationPartyRow}>
+              <View
+                style={[
+                  styles.recentReservationPartyBadge,
+                  {
+                    backgroundColor: partyToneBackground,
+                    borderColor: partyToneColor,
+                    borderRadius: theme.radius.sm,
+                  },
+                ]}
+              >
+                <AppText variant="caption" color={partyToneColor} bold>
+                  {partyBadge}
+                </AppText>
+              </View>
+              <AppText
+                bold
+                numberOfLines={1}
+                color={isInterested ? theme.colors.warning : theme.colors.text}
+                style={styles.recentReservationPartyName}
+              >
+                {partyLabel}
+              </AppText>
+            </View>
+            {isInterested ? (
+              <AppText variant="caption" color={theme.colors.warning} bold>
+                {t('live.interestedFollowUpPending')}
+              </AppText>
+            ) : null}
+            <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={2}>
+              {compactMeta}
             </AppText>
           </View>
         </View>
@@ -1519,6 +1469,16 @@ export default function LiveScreen() {
 
   const renderRecentReservationPrimaryActions = (reservation: Reservation) => (
     <View style={styles.buttonRow}>
+      {hasInterestedAlias(reservation) ? (
+        <View style={styles.buttonFill}>
+          <AppButton
+            title={t('live.linkCustomer')}
+            variant="warning"
+            disabled
+            disabledReason={t('live.linkCustomerPendingReason')}
+          />
+        </View>
+      ) : null}
       <View style={styles.buttonFill}>
         <AppButton
           title={t('live.viewDetail')}
@@ -2135,10 +2095,10 @@ export default function LiveScreen() {
           />
           {!reservation.customerId && reservation.interestedAlias ? (
             <AppButton
-              title="Vincular cliente"
+              title={t('live.linkCustomer')}
               variant="warning"
               disabled
-              disabledReason="Pendiente: vincular alias a cliente existente sin crear clientes automaticamente."
+              disabledReason={t('live.linkCustomerPendingReason')}
             />
           ) : null}
           {canMarkImmediateLiveSale ? (
@@ -4270,7 +4230,6 @@ export default function LiveScreen() {
                     reservation,
                     customerName,
                     itemCode,
-                    operationalStatus,
                     isReservationSettled(reservation, paid),
                     operationalSold
                   )}
@@ -4869,7 +4828,6 @@ export default function LiveScreen() {
                               reservation,
                               customerName,
                               itemCode,
-                              operationalStatus,
                               settled,
                               operationalSold
                             )}
@@ -5866,7 +5824,6 @@ export default function LiveScreen() {
                     reservation,
                     customerName,
                     itemCode,
-                    operationalStatus,
                     settled,
                     operationalSold
                   )}
@@ -7043,6 +7000,21 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   recentReservationInfoPanel: {
+    gap: 8,
+  },
+  recentReservationPartyBadge: {
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  recentReservationPartyName: {
+    flex: 1,
+    minWidth: 120,
+  },
+  recentReservationPartyRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
   recentReservationHeader: {
