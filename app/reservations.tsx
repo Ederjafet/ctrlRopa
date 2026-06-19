@@ -19,11 +19,14 @@ import { Box, getActiveBoxesByBranch } from '@/services/boxService';
 import { Customer, getCustomersByBranch } from '@/services/customerService';
 import {
   addCustomerPackageItem,
+  createCustomerPackage,
+  getCustomerPackageDetailsByCustomer,
   getCustomerPackageDetail,
   getCustomerPackagesByCustomer,
   prepareCustomerPackageFromReservation,
   type CustomerPackageDetail,
 } from '@/services/customerPackageService';
+import { getItemsByBranch, type Item } from '@/services/itemService';
 import {
   assignReservationToBox,
   getReservationsByBranch,
@@ -262,8 +265,13 @@ export default function ReservationsScreen() {
   const [selectedLinkCustomer, setSelectedLinkCustomer] = useState<Customer | null>(null);
   const [packageReservation, setPackageReservation] = useState<Reservation | null>(null);
   const [packageCandidates, setPackageCandidates] = useState<Reservation[]>([]);
+  const [packageFreeItems, setPackageFreeItems] = useState<Item[]>([]);
+  const [packageActivePackages, setPackageActivePackages] = useState<CustomerPackageDetail[]>([]);
   const [reservationPackageMap, setReservationPackageMap] = useState<ReservationPackageMap>({});
   const [selectedPackageReservationIds, setSelectedPackageReservationIds] = useState<number[]>([]);
+  const [selectedPackageItemIds, setSelectedPackageItemIds] = useState<number[]>([]);
+  const [selectedExistingPackageId, setSelectedExistingPackageId] = useState<number | null>(null);
+  const [packageItemSearch, setPackageItemSearch] = useState('');
   const [expandedReservationId, setExpandedReservationId] = useState<number | null>(null);
   const [isBoxModalVisible, setIsBoxModalVisible] = useState(false);
   const [session, setSession] = useState<UserSession | null>(null);
@@ -474,14 +482,33 @@ export default function ReservationsScreen() {
       ),
     [packageCandidates, selectedPackageReservationIds]
   );
+  const selectedPackageItems = useMemo(
+    () => packageFreeItems.filter((item) => selectedPackageItemIds.includes(item.id)),
+    [packageFreeItems, selectedPackageItemIds]
+  );
   const packageSubtotal = useMemo(
     () =>
       selectedPackageReservations.reduce(
         (total, reservation) => total + Number(reservation.price || 0),
         0
-      ),
-    [selectedPackageReservations]
+      ) +
+      selectedPackageItems.reduce((total, item) => total + Number(item.price || 0), 0),
+    [selectedPackageItems, selectedPackageReservations]
   );
+  const filteredPackageFreeItems = useMemo(() => {
+    const term = packageItemSearch.trim().toLowerCase();
+    const data = term
+      ? packageFreeItems.filter((item) =>
+          `${item.code || ''} ${item.qrCode || ''} ${item.productTypeName || ''} ${
+            item.brandName || ''
+          } ${item.sizeName || ''}`
+            .toLowerCase()
+            .includes(term)
+        )
+      : packageFreeItems;
+
+    return data.slice(0, 40);
+  }, [packageFreeItems, packageItemSearch]);
 
   const changeFilter = (nextFilter: ReservationFilter) => {
     setFilter(nextFilter);
@@ -587,7 +614,7 @@ export default function ReservationsScreen() {
     }
 
     setLinkCustomerReservation(reservation);
-    setLinkCustomerSearch(reservation.interestedAlias || '');
+    setLinkCustomerSearch('');
     setSelectedLinkCustomer(null);
   };
 
@@ -629,26 +656,32 @@ export default function ReservationsScreen() {
   };
 
   const getPackageCandidates = async (reservation: Reservation) => {
-    if (!reservation.customerId) return [];
+    if (!reservation.customerId || !session) {
+      return { reservations: [], freeItems: [], activePackages: [] };
+    }
 
-    const packageData = await getCustomerPackagesByCustomer(reservation.customerId);
+    const [packageData, itemData] = await Promise.all([
+      getCustomerPackageDetailsByCustomer(reservation.customerId),
+      getItemsByBranch(session.branchId),
+    ]);
     const activePackages = packageData.filter((customerPackage) =>
       isActivePackageStatus(customerPackage.status)
     );
-    const packageDetails = await Promise.all(
-      activePackages.map((customerPackage) => getCustomerPackageDetail(customerPackage.id))
-    );
     const packagedReservationIds = new Set<number>();
+    const packagedItemIds = new Set<number>();
 
-    packageDetails.forEach((customerPackage) => {
+    activePackages.forEach((customerPackage) => {
       customerPackage.items?.forEach((item) => {
         if (item.reservationId) {
           packagedReservationIds.add(item.reservationId);
         }
+        if (item.itemId) {
+          packagedItemIds.add(item.itemId);
+        }
       });
     });
 
-    return reservations
+    const reservationCandidates = reservations
       .filter((candidate) => {
         if (!isActiveReservation(candidate)) return false;
         if (!candidate.customerId || candidate.customerId !== reservation.customerId) return false;
@@ -660,6 +693,17 @@ export default function ReservationsScreen() {
         if (b.id === reservation.id) return 1;
         return b.id - a.id;
       });
+
+    const freeItems = itemData
+      .filter((item) => item.status === 'AVAILABLE')
+      .filter((item) => !packagedItemIds.has(item.id))
+      .sort((a, b) => b.id - a.id);
+
+    return {
+      reservations: reservationCandidates,
+      freeItems,
+      activePackages,
+    };
   };
 
   const openPackageModal = async (reservation: Reservation) => {
@@ -676,13 +720,18 @@ export default function ReservationsScreen() {
 
     setPackageReservation(reservation);
     setPackageCandidates([]);
+    setPackageFreeItems([]);
+    setPackageActivePackages([]);
     setSelectedPackageReservationIds([reservation.id]);
+    setSelectedPackageItemIds([]);
+    setSelectedExistingPackageId(null);
+    setPackageItemSearch('');
     setIsLoadingPackageCandidates(true);
 
     try {
       const candidates = await getPackageCandidates(reservation);
 
-      if (!candidates.some((candidate) => candidate.id === reservation.id)) {
+      if (!candidates.reservations.some((candidate) => candidate.id === reservation.id)) {
         setPackageReservation(null);
         setSelectedPackageReservationIds([]);
         Alert.alert(
@@ -692,11 +741,15 @@ export default function ReservationsScreen() {
         return;
       }
 
-      setPackageCandidates(candidates);
+      setPackageCandidates(candidates.reservations);
+      setPackageFreeItems(candidates.freeItems);
+      setPackageActivePackages(candidates.activePackages);
     } catch (error: any) {
       const copy = getActionableApiError(error, t);
       setPackageReservation(null);
       setSelectedPackageReservationIds([]);
+      setSelectedPackageItemIds([]);
+      setSelectedExistingPackageId(null);
       Alert.alert(copy.title, copy.message, [{ text: copy.primaryActionLabel }]);
     } finally {
       setIsLoadingPackageCandidates(false);
@@ -708,7 +761,12 @@ export default function ReservationsScreen() {
 
     setPackageReservation(null);
     setPackageCandidates([]);
+    setPackageFreeItems([]);
+    setPackageActivePackages([]);
     setSelectedPackageReservationIds([]);
+    setSelectedPackageItemIds([]);
+    setSelectedExistingPackageId(null);
+    setPackageItemSearch('');
   };
 
   const togglePackageReservationSelection = (reservationId: number) => {
@@ -719,38 +777,81 @@ export default function ReservationsScreen() {
     );
   };
 
+  const togglePackageItemSelection = (itemId: number) => {
+    setSelectedPackageItemIds((current) =>
+      current.includes(itemId) ? current.filter((id) => id !== itemId) : [...current, itemId]
+    );
+  };
+
   const handleCreatePackage = async () => {
     if (!session || !packageReservation) return;
 
-    if (selectedPackageReservations.length === 0) {
-      Alert.alert('Crear paquete', 'Selecciona al menos un apartado para crear paquete.');
+    if (selectedPackageReservations.length === 0 && selectedPackageItems.length === 0) {
+      Alert.alert('Crear paquete', 'Selecciona al menos un apartado o una prenda libre.');
       return;
     }
-
-    const [firstReservation, ...extraReservations] = selectedPackageReservations;
 
     try {
       setWorkingReservationId(packageReservation.id);
       setWorkingAction('createPackage');
 
-      let detail = await prepareCustomerPackageFromReservation(firstReservation.id, {
-        createdByUserId: session.userId,
-      });
+      let detail: CustomerPackageDetail;
+      const [firstReservation, ...extraReservations] = selectedPackageReservations;
 
-      for (const reservation of extraReservations) {
+      if (selectedExistingPackageId) {
+        const existingDetail = packageActivePackages.find((item) => item.id === selectedExistingPackageId);
+        if (!existingDetail) {
+          Alert.alert('Agregar a paquete', 'Selecciona un paquete activo valido.');
+          return;
+        }
+        detail = existingDetail;
+
+        for (const reservation of selectedPackageReservations) {
+          detail = await addCustomerPackageItem(selectedExistingPackageId, {
+            itemId: reservation.itemId,
+            reservationId: reservation.id,
+          });
+        }
+      } else if (firstReservation) {
+        detail = await prepareCustomerPackageFromReservation(firstReservation.id, {
+          createdByUserId: session.userId,
+        });
+
+        for (const reservation of extraReservations) {
+          detail = await addCustomerPackageItem(detail.id, {
+            itemId: reservation.itemId,
+            reservationId: reservation.id,
+          });
+        }
+      } else {
+        detail = await createCustomerPackage({
+          customerId: packageReservation.customerId!,
+          branchId: session.branchId,
+          notes: `Creado desde apartados para cliente #${packageReservation.customerId}`,
+          createdByUserId: session.userId,
+        }) as CustomerPackageDetail;
+      }
+
+      for (const item of selectedPackageItems) {
         detail = await addCustomerPackageItem(detail.id, {
-          itemId: reservation.itemId,
-          reservationId: reservation.id,
+          itemId: item.id,
         });
       }
 
       setPackageReservation(null);
       setPackageCandidates([]);
+      setPackageFreeItems([]);
+      setPackageActivePackages([]);
       setSelectedPackageReservationIds([]);
+      setSelectedPackageItemIds([]);
+      setSelectedExistingPackageId(null);
+      setPackageItemSearch('');
 
       Alert.alert(
-        'Paquete creado',
-        `Paquete ${detail.folio || `#${detail.id}`} creado correctamente.`,
+        selectedExistingPackageId ? 'Paquete actualizado' : 'Paquete creado',
+        selectedExistingPackageId
+          ? `Las prendas se agregaron al paquete ${detail.folio || `#${detail.id}`}.`
+          : `Paquete ${detail.folio || `#${detail.id}`} creado correctamente.`,
         [
           {
             text: 'Ver paquete',
@@ -1071,11 +1172,12 @@ export default function ReservationsScreen() {
           <AppButton
             title="Agregar a paquete"
             variant="neutral"
-            disabled
+            onPress={() => closeActionsAndRun(openPackageModal)}
+            loading={isCreatingPackage}
+            disabled={Boolean(packageDisabledReason) || Boolean(workingReservationId)}
             disabledReason={
-              packageLink
-                ? `Este apartado ya esta en el paquete ${packageLink.folio}.`
-                : 'Pendiente: seleccionar paquete abierto existente sin romper reglas de cliente/sucursal.'
+              packageDisabledReason ||
+              'Selecciona un paquete activo del mismo cliente o crea uno nuevo.'
             }
           />
           <AppButton
@@ -1393,18 +1495,18 @@ export default function ReservationsScreen() {
               style={styles.modalFooterButton}
             />
             <AppButton
-              title="Crear paquete"
+              title={selectedExistingPackageId ? 'Agregar al paquete' : 'Crear paquete'}
               variant="operation"
               onPress={handleCreatePackage}
               loading={workingAction === 'createPackage'}
               disabled={
-                selectedPackageReservations.length === 0 ||
+                (selectedPackageReservations.length === 0 && selectedPackageItems.length === 0) ||
                 isLoadingPackageCandidates ||
                 workingAction === 'createPackage'
               }
               disabledReason={
-                selectedPackageReservations.length === 0
-                  ? 'Selecciona al menos un apartado.'
+                selectedPackageReservations.length === 0 && selectedPackageItems.length === 0
+                  ? 'Selecciona al menos un apartado o una prenda libre.'
                   : 'Ya hay una accion en proceso.'
               }
               style={styles.modalFooterButton}
@@ -1422,7 +1524,7 @@ export default function ReservationsScreen() {
                 {packageReservation.customerName || `Cliente #${packageReservation.customerId}`}
               </AppText>
               <AppText variant="caption" color={theme.colors.mutedText}>
-                Selecciona apartados activos del mismo cliente. Los apartados con alias sin cliente formal no aparecen aqui.
+                Selecciona apartados activos, prendas libres o un paquete abierto del mismo cliente. Los interesados sin cliente formal no aparecen aqui.
               </AppText>
             </AppCard>
 
@@ -1436,16 +1538,45 @@ export default function ReservationsScreen() {
                 <View style={styles.packageSummaryRow}>
                   <InfoPill
                     label="Prendas seleccionadas"
-                    value={String(selectedPackageReservations.length)}
+                    value={String(selectedPackageReservations.length + selectedPackageItems.length)}
                   />
                   <InfoPill label="Subtotal" value={formatMoney(packageSubtotal)} />
                   <InfoPill
-                    label="Envio"
-                    value="Pendiente de cobro/envio"
+                    label="Destino"
+                    value={selectedExistingPackageId ? 'Paquete activo' : 'Paquete nuevo'}
                     tone="warning"
                   />
                 </View>
 
+                {packageActivePackages.length > 0 ? (
+                  <View style={styles.packageSection}>
+                    <AppText variant="caption" color={theme.colors.mutedText} bold>
+                      Paquetes activos
+                    </AppText>
+                    <AppOptionRow
+                      title={`${selectedExistingPackageId ? '( )' : '(x)'} Crear paquete nuevo`}
+                      subtitle="Abre un paquete nuevo para la seleccion actual."
+                      onPress={() => setSelectedExistingPackageId(null)}
+                    />
+                    {packageActivePackages.map((customerPackage) => {
+                      const selected = selectedExistingPackageId === customerPackage.id;
+
+                      return (
+                        <AppOptionRow
+                          key={customerPackage.id}
+                          title={`${selected ? '(x)' : '( )'} ${customerPackage.folio}`}
+                          subtitle={`${customerPackage.status} - ${customerPackage.totalItems || 0} prendas - Saldo ${formatMoney(customerPackage.pendingAmount)}`}
+                          onPress={() => setSelectedExistingPackageId(customerPackage.id)}
+                        />
+                      );
+                    })}
+                  </View>
+                ) : null}
+
+                <View style={styles.packageSection}>
+                  <AppText variant="caption" color={theme.colors.mutedText} bold>
+                    Apartados disponibles
+                  </AppText>
                 {packageCandidates.length > 0 ? (
                   packageCandidates.map((reservation) => {
                     const selected = selectedPackageReservationIds.includes(reservation.id);
@@ -1471,6 +1602,37 @@ export default function ReservationsScreen() {
                     No hay apartados disponibles para este cliente.
                   </AppText>
                 )}
+                </View>
+
+                <View style={styles.packageSection}>
+                  <AppText variant="caption" color={theme.colors.mutedText} bold>
+                    Prendas libres
+                  </AppText>
+                  <AppInput
+                    label="Buscar prenda libre"
+                    placeholder="Codigo, QR, tipo, marca o talla"
+                    value={packageItemSearch}
+                    onChangeText={setPackageItemSearch}
+                  />
+                  {filteredPackageFreeItems.length > 0 ? (
+                    filteredPackageFreeItems.map((item) => {
+                      const selected = selectedPackageItemIds.includes(item.id);
+
+                      return (
+                        <AppOptionRow
+                          key={item.id}
+                          title={`${selected ? '[x]' : '[ ]'} ${item.code || `Prenda #${item.id}`}`}
+                          subtitle={`${item.productTypeName || 'Sin tipo'} - ${formatMoney(item.price)} - Disponible`}
+                          onPress={() => togglePackageItemSelection(item.id)}
+                        />
+                      );
+                    })
+                  ) : (
+                    <AppText color={theme.colors.mutedText}>
+                      No hay prendas libres disponibles para esta busqueda.
+                    </AppText>
+                  )}
+                </View>
               </>
             )}
           </View>
@@ -1778,6 +1940,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  packageSection: {
+    gap: 8,
+    marginTop: 12,
   },
   refreshButton: {
     minHeight: 32,

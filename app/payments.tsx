@@ -1,15 +1,16 @@
 ﻿import AppBackButton from '@/components/ui/AppBackButton';
 import AppBottomModal from '@/components/ui/AppBottomModal';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
 import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { canAccessByPermission } from '@/services/accessControl';
 import { apiRequest } from '@/services/apiClient';
+import { getCustomerBalance, type BalanceSummary } from '@/services/balanceService';
 import { getPaymentMethods, PaymentMethod } from '@/services/catalogService';
 import {
   CustomerOrderDetail,
@@ -179,6 +180,7 @@ export default function PaymentsScreen() {
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [reservation, setReservation] = useState<ReservationSummary | null>(null);
+  const [customerBalance, setCustomerBalance] = useState<BalanceSummary | null>(null);
   const [orderDetail, setOrderDetail] = useState<CustomerOrderDetail | null>(null);
   const [orderSettlement, setOrderSettlement] =
     useState<CustomerOrderSettlement | null>(null);
@@ -318,6 +320,7 @@ export default function PaymentsScreen() {
       setOrderSettlement(null);
       setPayableOrderReservations([]);
       setPayments([]);
+      setCustomerBalance(null);
       return;
     }
 
@@ -335,6 +338,11 @@ export default function PaymentsScreen() {
         setOrderSettlement(null);
         setPayableOrderReservations([]);
         setPayments(Array.isArray(paymentsData) ? paymentsData : []);
+        setCustomerBalance(
+          reservationData.customerId
+            ? await getCustomerBalance(reservationData.customerId)
+            : null
+        );
       } else if (targetType === 'order') {
         const [detailData, settlementData] = await Promise.all([
           getCustomerOrderDetail(targetId),
@@ -369,6 +377,9 @@ export default function PaymentsScreen() {
         setPayableOrderReservations(payableReservations);
         setReservation(null);
         setPayments(reservationPayments.flatMap((entry) => entry.payments));
+        setCustomerBalance(
+          detailData.customerId ? await getCustomerBalance(detailData.customerId) : null
+        );
       }
     } catch (e: any) {
       setReservation(null);
@@ -376,6 +387,7 @@ export default function PaymentsScreen() {
       setOrderSettlement(null);
       setPayableOrderReservations([]);
       setPayments([]);
+      setCustomerBalance(null);
       Alert.alert(
         'Pagos',
         e.message || 'No se pudo cargar la información del cobro.'
@@ -586,17 +598,27 @@ export default function PaymentsScreen() {
 
   if (isLoading) {
     return (
-      <AppScreen scroll={false}>
+      <AppShellPage
+        title="Pagos"
+        subtitle="Cobros, abonos y saldo a favor"
+        activeRoute="payments"
+        compactHeader
+      >
         <View style={styles.loadingContainer}>
           <ActivityIndicator />
           <AppText style={styles.loadingText}>Cargando pagos...</AppText>
         </View>
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   return (
-    <AppScreen>
+    <AppShellPage
+      title="Pagos"
+      subtitle="Cobros, abonos y saldo a favor"
+      activeRoute="payments"
+      compactHeader
+    >
       <AppBackButton
         fallbackRoute={fallbackRoute}
         onPress={hasSelectedPendingOrder ? clearSelectedPendingOrder : undefined}
@@ -758,6 +780,11 @@ export default function PaymentsScreen() {
                   value={formatMoney(overpaidAmount)}
                 />
               ) : null}
+              <PaymentSummaryTile
+                label="Saldo a favor disponible"
+                value={formatMoney(customerBalance?.balance)}
+                tone={Number(customerBalance?.balance ?? 0) > 0 ? 'success' : 'default'}
+              />
             </AppResponsiveGrid>
 
             {isReservationSettled ? (
@@ -777,6 +804,7 @@ export default function PaymentsScreen() {
             <InfoRow label="Total" value={formatMoney(total)} />
             <InfoRow label="Pagado" value={formatMoney(effectivePaid)} />
             <InfoRow label="Pendiente" value={formatMoney(remaining)} />
+            <InfoRow label="Saldo a favor disponible" value={formatMoney(customerBalance?.balance)} />
             <InfoRow
               label="Prendas activas"
               value={String(payableOrderReservations.filter((entry) => entry.pending > 0).length)}
@@ -823,6 +851,22 @@ export default function PaymentsScreen() {
               onChangeText={setReference}
               placeholder="Opcional"
             />
+
+            <View style={styles.creditNotice}>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Saldo a favor disponible
+              </AppText>
+              <AppText bold color={Number(customerBalance?.balance ?? 0) > 0 ? theme.colors.success : theme.colors.mutedText}>
+                {formatMoney(customerBalance?.balance)}
+              </AppText>
+              <AppButton
+                title="Aplicar saldo a favor"
+                variant="neutral"
+                disabled
+                disabledReason="Disponible en siguiente fase con confirmacion y trazabilidad de aplicacion al apartado."
+                style={styles.creditButton}
+              />
+            </View>
 
             <AppText variant="caption" color={theme.colors.mutedText}>
               Metodo de pago
@@ -918,7 +962,7 @@ export default function PaymentsScreen() {
           </AppOptionRow>
         ))}
       </AppBottomModal>
-    </AppScreen>
+    </AppShellPage>
   );
 }
 
@@ -1028,6 +1072,14 @@ const styles = StyleSheet.create({
   },
   detailGrid: {
     marginTop: 12,
+  },
+  creditButton: {
+    marginTop: 8,
+    minHeight: 32,
+  },
+  creditNotice: {
+    gap: 4,
+    marginBottom: 12,
   },
   detailTile: {
     borderWidth: 1,

@@ -15,6 +15,7 @@ import { buildMainNavSections } from '@/components/layout/appNavigation';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { hasEffectivePermission } from '@/services/accessControl';
 import { apiRequest } from '@/services/apiClient';
+import { getCustomerBalance, type BalanceSummary } from '@/services/balanceService';
 import {
   isNotFoundError,
   normalizeApiError,
@@ -228,6 +229,7 @@ export default function ReservationDetailScreen() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [item, setItem] = useState<Item | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [customerBalance, setCustomerBalance] = useState<BalanceSummary | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [session, setSession] = useState<UserSession | null>(null);
@@ -263,7 +265,7 @@ export default function ReservationDetailScreen() {
         message: 'Acceso restringido',
       });
 
-      const [paymentsResult, paymentMethodsResult, boxesResult, customerResult, itemResult] =
+      const [paymentsResult, paymentMethodsResult, boxesResult, customerResult, itemResult, balanceResult] =
         await Promise.allSettled([
           canViewPayments
             ? apiRequest<Payment[]>(`/api/payments/reservation/${reservationId}`)
@@ -277,6 +279,9 @@ export default function ReservationDetailScreen() {
             : Promise.resolve(null),
           reservationData.itemId
             ? getItemById(reservationData.itemId)
+            : Promise.resolve(null),
+          reservationData.customerId
+            ? getCustomerBalance(reservationData.customerId)
             : Promise.resolve(null),
         ]);
 
@@ -305,6 +310,9 @@ export default function ReservationDetailScreen() {
           ? boxesResult.value
           : []
       );
+      setCustomerBalance(
+        balanceResult.status === 'fulfilled' && balanceResult.value ? balanceResult.value : null
+      );
 
       if (paymentsResult.status === 'rejected') {
         setPaymentSectionError(normalizeApiError(paymentsResult.reason));
@@ -318,6 +326,7 @@ export default function ReservationDetailScreen() {
       setReservation(null);
       setCustomer(null);
       setItem(null);
+      setCustomerBalance(null);
     } finally {
       setIsLoading(false);
     }
@@ -574,6 +583,10 @@ export default function ReservationDetailScreen() {
                 <SectionHeader title="Pagos" subtitle="Resumen de pago del apartado" />
                 <InfoRow label="Total" value={`$${total.toFixed(2)}`} />
                 <InfoRow label="Pagado" value={`$${totalPaid.toFixed(2)}`} />
+                <InfoRow
+                  label="Saldo a favor disponible"
+                  value={formatMoney(customerBalance?.balance)}
+                />
                 <View
                   style={[
                     styles.remainingBox,
@@ -630,7 +643,7 @@ export default function ReservationDetailScreen() {
                 { label: 'Email', value: customer?.email || 'No capturado' },
                 { label: 'Compras pasadas', value: 'No disponible' },
                 { label: 'Compras activas', value: 'No disponible' },
-                { label: 'Saldo pendiente', value: 'No disponible' },
+                { label: 'Saldo a favor', value: formatMoney(customerBalance?.balance) },
               ]}
             />
 
@@ -710,6 +723,11 @@ export default function ReservationDetailScreen() {
                   <AppText color={theme.colors.mutedText}>
                     Restante por cobrar: ${remaining.toFixed(2)}
                   </AppText>
+                  {Number(customerBalance?.balance ?? 0) > 0 ? (
+                    <AppText variant="caption" color={theme.colors.success}>
+                      Saldo a favor disponible: {formatMoney(customerBalance?.balance)}. Aplicacion directa pendiente de confirmacion auditada.
+                    </AppText>
+                  ) : null}
                   <AppButton
                     title="Cobrar apartado"
                     onPress={() =>

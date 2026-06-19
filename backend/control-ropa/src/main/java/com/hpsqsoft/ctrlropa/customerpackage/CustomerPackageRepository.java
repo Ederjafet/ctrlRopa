@@ -11,5 +11,7 @@ public interface CustomerPackageRepository extends JpaRepository<CustomerPackage
 
     List<CustomerPackage> findByCustomerIdOrderByCreatedAtDesc(Long customerId);
 
+    List<CustomerPackage> findByBranchIdOrderByCreatedAtDesc(Long branchId);
+
     boolean existsByFolio(String folio);
 }

@@ -5,44 +5,47 @@ import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
-import { Customer, getCustomerById, getCustomersByBranch } from '@/services/customerService';
+import { getCustomerBalance } from '@/services/balanceService';
+import { Customer, getCustomerById } from '@/services/customerService';
 import {
   createCustomerPackage,
   CustomerPackage,
-  getCustomerPackagesByCustomer,
+  CustomerPackageDetail,
+  getCustomerPackageDetailsByBranch,
+  getCustomerPackageDetailsByCustomer,
 } from '@/services/customerPackageService';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 
-function formatDate(value?: string) {
-  if (!value) return 'Sin fecha';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString();
+function formatMoney(value?: number | null) {
+  return `$${Number(value ?? 0).toFixed(2)}`;
 }
 
 function statusLabel(status?: string) {
   if (status === 'OPEN') return 'Abierto';
-  if (status === 'READY') return 'Preparación cerrada';
+  if (status === 'READY') return 'Listo para envio';
   if (status === 'SHIPPED') return 'Enviado';
   if (status === 'DELIVERED') return 'Entregado';
   if (status === 'CANCELLED') return 'Cancelado';
   return status || 'Sin estado';
 }
 
-function getPackageNextAction(status?: string) {
-  if (status === 'OPEN') return 'Preparar paquete';
-  if (status === 'READY') return 'Listo para envio';
-  if (status === 'SHIPPED') return 'Seguimiento de envio';
-  if (status === 'DELIVERED') return 'Entregado';
-  if (status === 'CANCELLED') return 'Cancelado';
-  return 'Ver detalle';
+function paymentLabel(status?: string) {
+  if (status === 'PAID') return 'Pagado';
+  if (status === 'PARTIALLY_PAID' || status === 'PARTIAL') return 'Parcial';
+  if (status === 'UNPAID' || status === 'PENDING') return 'Sin pago';
+  return status || 'Sin pago';
 }
 
-function isActiveCustomer(customer: Customer) {
-  return customer.status !== 'INACTIVE' && !customer.isGeneric;
+function nextActionForPackage(item: CustomerPackageDetail) {
+  if (item.status === 'CANCELLED') return 'Sin accion';
+  if (item.status === 'SHIPPED' || item.status === 'DELIVERED') return 'Seguimiento';
+  if (Number(item.pendingAmount ?? 0) > 0) return 'Registrar abono';
+  if (item.status === 'OPEN') return 'Liberar envio';
+  if (item.status === 'READY') return 'Marcar enviado';
+  return 'Detalle';
 }
 
 export default function CustomerPackagesScreen() {
@@ -53,24 +56,32 @@ export default function CustomerPackagesScreen() {
   const selectedCustomerId = customerId ? Number(customerId) : null;
 
   const [session, setSession] = useState<UserSession | null>(null);
-  const [customers, setCustomers] = useState<Customer[]>([]);
   const [customer, setCustomer] = useState<Customer | null>(null);
-  const [packages, setPackages] = useState<CustomerPackage[]>([]);
+  const [packages, setPackages] = useState<CustomerPackageDetail[]>([]);
+  const [customerBalances, setCustomerBalances] = useState<Record<number, number>>({});
   const [search, setSearch] = useState('');
   const [notes, setNotes] = useState('');
-  const [actionsCustomer, setActionsCustomer] = useState<Customer | null>(null);
-  const [actionsPackage, setActionsPackage] = useState<CustomerPackage | null>(null);
+  const [actionsPackage, setActionsPackage] = useState<CustomerPackageDetail | null>(null);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadData();
-    }, [customerId])
-  );
+  const loadBalances = async (packageData: CustomerPackageDetail[]) => {
+    const customerIds = Array.from(new Set(packageData.map((item) => item.customerId)));
+    const entries = await Promise.all(
+      customerIds.map(async (id) => {
+        try {
+          const balance = await getCustomerBalance(id);
+          return [id, Number(balance.balance ?? 0)] as const;
+        } catch {
+          return [id, 0] as const;
+        }
+      })
+    );
+    setCustomerBalances(Object.fromEntries(entries));
+  };
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
       const currentSession = await getSession();
@@ -85,44 +96,52 @@ export default function CustomerPackagesScreen() {
       if (selectedCustomerId) {
         const [customerData, packageData] = await Promise.all([
           getCustomerById(selectedCustomerId),
-          getCustomerPackagesByCustomer(selectedCustomerId),
+          getCustomerPackageDetailsByCustomer(selectedCustomerId),
         ]);
 
         setCustomer(customerData);
         setPackages(packageData);
-        setCustomers([]);
+        await loadBalances(packageData);
         return;
       }
 
-      const customerData = await getCustomersByBranch(currentSession.branchId);
-      setCustomers(customerData.filter(isActiveCustomer));
+      const packageData = await getCustomerPackageDetailsByBranch(currentSession.branchId);
       setCustomer(null);
-      setPackages([]);
+      setPackages(packageData);
+      await loadBalances(packageData);
     } catch (error: any) {
-      Alert.alert('Paquetes', error.message || 'No se pudo cargar la información.');
+      Alert.alert('Paquetes', error.message || 'No se pudo cargar la informacion.');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [router, selectedCustomerId]);
 
-  const filteredCustomers = useMemo(() => {
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
+
+  const filteredPackages = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return customers;
+    if (!term) return packages;
 
-    return customers.filter((item) => {
-      const text = `${item.name || ''} ${item.phone || ''}`.toLowerCase();
+    return packages.filter((item) => {
+      const text = `${item.folio || ''} ${item.id} ${item.customerName || ''} ${
+        item.customerPhone || ''
+      } ${item.status || ''} ${item.paymentStatus || ''}`.toLowerCase();
       return text.includes(term);
     });
-  }, [customers, search]);
+  }, [packages, search]);
 
   const openPackages = useMemo(
-    () => packages.filter((item) => item.status === 'OPEN'),
-    [packages]
+    () => filteredPackages.filter((item) => item.status === 'OPEN' || item.status === 'READY'),
+    [filteredPackages]
   );
 
   const historicalPackages = useMemo(
-    () => packages.filter((item) => item.status !== 'OPEN'),
-    [packages]
+    () => filteredPackages.filter((item) => item.status !== 'OPEN' && item.status !== 'READY'),
+    [filteredPackages]
   );
 
   const handleCreatePackage = async () => {
@@ -130,7 +149,7 @@ export default function CustomerPackagesScreen() {
 
     try {
       setIsCreating(true);
-      const created = await createCustomerPackage({
+      const created: CustomerPackage = await createCustomerPackage({
         customerId: selectedCustomerId,
         branchId: session.branchId,
         notes: notes.trim() || null,
@@ -158,7 +177,7 @@ export default function CustomerPackagesScreen() {
       ) : null}
       {selectedCustomerId ? (
         <AppButton
-          title="Volver"
+          title="Ver todos"
           variant="secondary"
           onPress={() => router.replace('/customer-packages' as any)}
           style={styles.headerButton}
@@ -175,11 +194,79 @@ export default function CustomerPackagesScreen() {
     </View>
   );
 
+  const renderPackage = (item: CustomerPackageDetail) => {
+    const balance = customerBalances[item.customerId] ?? 0;
+    const pending = Number(item.pendingAmount ?? 0);
+
+    return (
+      <View
+        key={item.id}
+        style={[
+          styles.packageRow,
+          {
+            borderColor: theme.colors.border,
+            backgroundColor: theme.colors.surface,
+          },
+        ]}
+      >
+        <View style={styles.packageIdentity}>
+          <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+            Paquete {item.folio || `#${item.id}`} - Cliente
+          </AppText>
+          <AppText bold numberOfLines={1}>
+            {item.customerName || `Cliente #${item.customerId}`}
+          </AppText>
+          <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+            {item.customerPhone || 'Sin telefono'} - {item.totalItems || 0} prendas
+          </AppText>
+        </View>
+
+        <View style={styles.packageMeta}>
+          <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+            {paymentLabel(item.paymentStatus)} - Total {formatMoney(item.totalAmount)}
+          </AppText>
+          <AppText variant="caption" color={pending > 0 ? theme.colors.warning : theme.colors.success} numberOfLines={1}>
+            Abonado {formatMoney(item.paidAmount)} - Saldo {formatMoney(item.pendingAmount)}
+          </AppText>
+          {balance > 0 ? (
+            <AppText variant="caption" color={theme.colors.success} numberOfLines={1}>
+              Saldo a favor cliente: {formatMoney(balance)}
+            </AppText>
+          ) : null}
+        </View>
+
+        <View style={styles.packageMeta}>
+          <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+            Estado: {statusLabel(item.status)}
+          </AppText>
+          <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+            Siguiente: {nextActionForPackage(item)}
+          </AppText>
+        </View>
+
+        <View style={styles.packageActions}>
+          <AppButton
+            title="Detalle"
+            variant="secondary"
+            onPress={() => router.push(`/customer-package-detail?id=${item.id}` as any)}
+            style={styles.compactButton}
+          />
+          <AppButton
+            title="Mas"
+            variant="secondary"
+            onPress={() => setActionsPackage(item)}
+            style={styles.compactButton}
+          />
+        </View>
+      </View>
+    );
+  };
+
   if (isLoading) {
     return (
       <AppShellPage
         title="Paquetes"
-        subtitle="Gestion de paquetes, pago y preparacion de envio"
+        subtitle="Bandeja operativa de paquetes, pagos y envio"
         activeRoute="customer-packages"
         compactHeader
         rightContent={renderHeaderActions()}
@@ -189,182 +276,44 @@ export default function CustomerPackagesScreen() {
     );
   }
 
-  if (!selectedCustomerId) {
-    return (
-      <AppShellPage
-        title="Paquetes"
-        subtitle="Gestion de paquetes, pago y preparacion de envio"
-        metadata="Selecciona un cliente para ver sus paquetes"
-        activeRoute="customer-packages"
-        compactHeader
-        rightContent={renderHeaderActions()}
-      >
-        <AppCard>
-          <AppText variant="subtitle" bold>
-            Clientes con paquetes
-          </AppText>
-          <AppText color={theme.colors.mutedText}>
-            Gestión por cliente mientras queda pendiente el read-model global por sucursal.
-          </AppText>
-
-          <AppInput
-            label="Buscar cliente"
-            placeholder="Nombre o teléfono"
-            value={search}
-            onChangeText={setSearch}
-          />
-        </AppCard>
-
-        <AppCard>
-          {filteredCustomers.length === 0 ? (
-            <AppText color={theme.colors.mutedText}>
-              No hay clientes que coincidan con la búsqueda.
-            </AppText>
-          ) : (
-            filteredCustomers.map((item) => (
-              <View
-                key={item.id}
-                style={[
-                  styles.customerRow,
-                  {
-                    backgroundColor: theme.colors.surface,
-                    borderColor: theme.colors.border,
-                  },
-                ]}
-              >
-                <View style={styles.customerIdentity}>
-                  <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
-                    Cliente · {item.name}
-                  </AppText>
-                  <AppText bold numberOfLines={1}>
-                    {item.phone || 'Sin teléfono'}
-                  </AppText>
-                  <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
-                    Paquetes disponibles por cliente
-                  </AppText>
-                </View>
-
-                <View style={styles.customerActions}>
-                  <AppButton
-                    title="Ver paquetes"
-                    variant="secondary"
-                    onPress={() => router.push(`/customer-packages?customerId=${item.id}` as any)}
-                    style={styles.compactButton}
-                  />
-                  <AppButton
-                    title="Más"
-                    variant="secondary"
-                    onPress={() => setActionsCustomer(item)}
-                    style={styles.compactButton}
-                  />
-                </View>
-              </View>
-            ))
-          )}
-        </AppCard>
-
-        <AppBottomModal
-          visible={Boolean(actionsCustomer)}
-          title={actionsCustomer ? `Cliente ${actionsCustomer.name}` : 'Cliente'}
-          onClose={() => setActionsCustomer(null)}
-        >
-          {actionsCustomer ? (
-            <View style={styles.modalActionsStack}>
-              <AppCard variant="subtle" style={styles.actionSummary}>
-                <AppText bold>{actionsCustomer.name}</AppText>
-                <AppText variant="caption" color={theme.colors.mutedText}>
-                  {actionsCustomer.phone || 'Sin teléfono'}
-                </AppText>
-              </AppCard>
-              <AppButton
-                title="Ver paquetes"
-                variant="secondary"
-                onPress={() => {
-                  const id = actionsCustomer.id;
-                  setActionsCustomer(null);
-                  router.push(`/customer-packages?customerId=${id}` as any);
-                }}
-              />
-              <AppButton
-                title="Crear paquete"
-                variant="neutral"
-                disabled
-                disabledReason="Crea paquetes desde Apartados o abre el cliente para continuar."
-              />
-            </View>
-          ) : null}
-        </AppBottomModal>
-      </AppShellPage>
-    );
-  }
-
-  const renderPackage = (item: CustomerPackage) => (
-    <View
-      key={item.id}
-      style={[
-        styles.packageRow,
-        {
-          borderColor: theme.colors.border,
-          backgroundColor: theme.colors.surface,
-        },
-      ]}
-    >
-      <View style={styles.packageIdentity}>
-        <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
-          Paquete #{item.id} · {item.folio}
-        </AppText>
-        <AppText bold numberOfLines={1}>
-          Cliente · {customer?.name || item.customerName || `#${item.customerId}`}
-        </AppText>
-      </View>
-      <View style={styles.packageMeta}>
-        <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
-          {statusLabel(item.status)} · {getPackageNextAction(item.status)}
-        </AppText>
-        <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
-          Creado: {formatDate(item.createdAt)}
-        </AppText>
-      </View>
-      <View style={styles.packageActions}>
-        <AppButton
-          title="Detalle"
-          variant="secondary"
-          onPress={() => router.push(`/customer-package-detail?id=${item.id}` as any)}
-          style={styles.compactButton}
-        />
-        <AppButton
-          title="Más"
-          variant="secondary"
-          onPress={() => setActionsPackage(item)}
-          style={styles.compactButton}
-        />
-      </View>
-    </View>
-  );
-
   return (
     <AppShellPage
       title="Paquetes"
-      subtitle="Gestion de paquetes, pago y preparacion de envio"
-      metadata={customer?.name ? `Cliente: ${customer.name}` : undefined}
+      subtitle="Bandeja operativa de paquetes, pagos y envio"
+      metadata={customer?.name ? `Cliente: ${customer.name}` : 'Paquetes por sucursal'}
       activeRoute="customer-packages"
       compactHeader
       rightContent={renderHeaderActions()}
     >
       <AppCard>
-        <AppText variant="subtitle" bold>
-          Cliente · {customer?.name || 'Cliente'}
-        </AppText>
-        <AppText color={theme.colors.mutedText}>{customer?.phone || 'Sin teléfono'}</AppText>
+        <View style={styles.searchHeader}>
+          <View style={styles.searchTitle}>
+            <AppText variant="subtitle" bold>
+              {selectedCustomerId ? 'Paquetes del cliente' : 'Bandeja de paquetes'}
+            </AppText>
+            <AppText color={theme.colors.mutedText}>
+              {selectedCustomerId
+                ? `${customer?.name || 'Cliente'} - ${customer?.phone || 'Sin telefono'}`
+                : 'Busca por folio, cliente, telefono o estado.'}
+            </AppText>
+          </View>
+          <AppInput
+            label="Buscar"
+            placeholder="Cliente, folio o estado"
+            value={search}
+            onChangeText={setSearch}
+            style={styles.searchInput}
+          />
+        </View>
       </AppCard>
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Paquetes abiertos
+          Activos
         </AppText>
         {openPackages.length === 0 ? (
           <AppText color={theme.colors.mutedText}>
-            Este cliente no tiene paquetes abiertos.
+            No hay paquetes activos para mostrar.
           </AppText>
         ) : (
           openPackages.map(renderPackage)
@@ -373,11 +322,11 @@ export default function CustomerPackagesScreen() {
 
       <AppCard>
         <AppText variant="subtitle" bold>
-          Historial de paquetes
+          Historial
         </AppText>
         {historicalPackages.length === 0 ? (
           <AppText color={theme.colors.mutedText}>
-            Este cliente todavía no tiene paquetes cerrados, enviados o cancelados.
+            No hay paquetes cerrados, enviados o cancelados con los filtros actuales.
           </AppText>
         ) : (
           historicalPackages.map(renderPackage)
@@ -390,7 +339,7 @@ export default function CustomerPackagesScreen() {
         onClose={() => setCreateModalVisible(false)}
       >
         <AppText color={theme.colors.mutedText}>
-          Crea un paquete abierto para agrupar prendas pagadas de este cliente.
+          Crea un paquete vacio solo para cliente formal. Agrega prendas desde Apartados o desde el detalle del paquete.
         </AppText>
 
         <AppInput
@@ -418,10 +367,10 @@ export default function CustomerPackagesScreen() {
           <>
             <AppCard variant="subtle" style={styles.actionSummary}>
               <AppText bold>
-                {customer?.name || actionsPackage.customerName || `Cliente #${actionsPackage.customerId}`}
+                {actionsPackage.customerName || `Cliente #${actionsPackage.customerId}`}
               </AppText>
               <AppText variant="caption" color={theme.colors.mutedText}>
-                {statusLabel(actionsPackage.status)} - {getPackageNextAction(actionsPackage.status)}
+                Total {formatMoney(actionsPackage.totalAmount)} - Saldo {formatMoney(actionsPackage.pendingAmount)}
               </AppText>
             </AppCard>
             <View style={styles.modalActionsStack}>
@@ -435,16 +384,21 @@ export default function CustomerPackagesScreen() {
                 }}
               />
               <AppButton
-                title="Preparar para envio"
-                variant="neutral"
-                disabled
-                disabledReason="Disponible desde el detalle cuando el paquete este pagado y listo."
+                title="Registrar abono"
+                variant="operation"
+                onPress={() => {
+                  const id = actionsPackage.id;
+                  setActionsPackage(null);
+                  router.push(`/customer-package-detail?id=${id}` as any);
+                }}
+                disabled={Number(actionsPackage.pendingAmount ?? 0) <= 0}
+                disabledReason="El paquete ya esta liquidado."
               />
               <AppButton
-                title="Registrar pago"
+                title="Liberar envio"
                 variant="neutral"
-                disabled
-                disabledReason="El pago de paquete queda pendiente de flujo agregado."
+                disabled={Number(actionsPackage.pendingAmount ?? 0) > 0}
+                disabledReason="Este paquete tiene saldo pendiente."
               />
             </View>
           </>
@@ -463,28 +417,6 @@ const styles = StyleSheet.create({
     minWidth: 66,
     paddingHorizontal: 10,
     paddingVertical: 6,
-  },
-  customerActions: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    justifyContent: 'flex-end',
-  },
-  customerIdentity: {
-    flex: 1,
-    gap: 3,
-    minWidth: 180,
-  },
-  customerRow: {
-    alignItems: 'center',
-    borderRadius: 10,
-    borderWidth: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 10,
-    padding: 12,
   },
   headerActions: {
     alignItems: 'center',
@@ -510,14 +442,14 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   packageIdentity: {
-    flex: 1.15,
+    flex: 1.2,
     gap: 3,
-    minWidth: 160,
+    minWidth: 170,
   },
   packageMeta: {
     flex: 1,
     gap: 3,
-    minWidth: 140,
+    minWidth: 150,
   },
   packageRow: {
     alignItems: 'center',
@@ -528,5 +460,20 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 10,
     padding: 12,
+  },
+  searchHeader: {
+    alignItems: 'flex-end',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  searchInput: {
+    flex: 1,
+    minWidth: 220,
+  },
+  searchTitle: {
+    flex: 1.2,
+    minWidth: 220,
   },
 });

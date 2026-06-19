@@ -112,6 +112,7 @@ export default function CustomerPackageDetailScreen() {
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [itemSearchModalVisible, setItemSearchModalVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [paymentMethodPickerVisible, setPaymentMethodPickerVisible] = useState(false);
   const [code, setCode] = useState('');
   const [qrCode, setQrCode] = useState('');
   const [itemSearch, setItemSearch] = useState('');
@@ -181,7 +182,7 @@ export default function CustomerPackageDetailScreen() {
 
     return branchItems
       .filter((item) => !existingItemIds.has(item.id))
-      .filter((item) => item.status === 'SOLD' || item.status === 'RESERVED')
+      .filter((item) => item.status === 'SOLD' || item.status === 'RESERVED' || item.status === 'AVAILABLE')
       .filter((item) => {
         if (!term) return true;
         return `${item.code ?? ''} ${item.qrCode ?? ''} ${item.productTypeName ?? ''} ${item.brandName ?? ''} ${item.sizeName ?? ''}`
@@ -272,7 +273,7 @@ export default function CustomerPackageDetailScreen() {
         title: 'No se pudo agregar',
         message:
           error.message ||
-          'Revisa que la prenda pertenezca al cliente y tenga venta o apartado activo.',
+          'Revisa que la prenda pertenezca a la sucursal y este libre, vendida o apartada de forma valida.',
         tone: 'danger',
       });
     } finally {
@@ -302,6 +303,7 @@ export default function CustomerPackageDetailScreen() {
     if (isWorking) return;
 
     setPaymentModalVisible(false);
+    setPaymentMethodPickerVisible(false);
     setPaymentAmount('');
     setPaymentReference('');
   };
@@ -345,7 +347,12 @@ export default function CustomerPackageDetailScreen() {
         message: 'El pago se aplico al paquete. Si hubo sobrepago, quedo como saldo a favor del cliente.',
         tone: 'success',
       });
+      Alert.alert(
+        'Abono registrado',
+        'El pago se aplico al paquete. Si hubo sobrepago, quedo como saldo a favor del cliente.'
+      );
     } catch (error: any) {
+      Alert.alert('No se pudo registrar', error.message || 'No se pudo registrar el abono del paquete.');
       setNotice({
         title: 'No se pudo registrar',
         message: error.message || 'No se pudo registrar el abono del paquete.',
@@ -424,7 +431,7 @@ export default function CustomerPackageDetailScreen() {
       <AppShellPage
         title="Detalle de paquete"
         subtitle="Preparacion, etiqueta y prendas"
-        activeRoute="customers"
+        activeRoute="customer-packages"
       >
         <ActivityIndicator />
       </AppShellPage>
@@ -438,7 +445,7 @@ export default function CustomerPackageDetailScreen() {
     <AppShellPage
       title={`Paquete ${detail.folio}`}
       subtitle="Preparacion, etiqueta y prendas"
-      activeRoute="customers"
+      activeRoute="customer-packages"
       rightContent={
         <AppButton
           title="Volver"
@@ -455,6 +462,49 @@ export default function CustomerPackageDetailScreen() {
           onClose={() => setNotice(null)}
         />
       ) : null}
+
+      <AppCard style={styles.actionBarCard}>
+        <View style={styles.actionBarHeader}>
+          <View style={styles.actionBarIdentity}>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              Paquete {detail.folio} - Cliente
+            </AppText>
+            <AppText variant="subtitle" bold numberOfLines={1}>
+              {detail.customerName || 'Sin cliente'}
+            </AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              Total {money(detail.totalAmount)} - Abonado {money(detail.paidAmount)} - Saldo {money(detail.pendingAmount)}
+            </AppText>
+            <AppText
+              variant="caption"
+              color={Number(balanceSummary?.balance ?? 0) > 0 ? theme.colors.success : theme.colors.mutedText}
+            >
+              Saldo a favor cliente: {money(balanceSummary?.balance)}
+            </AppText>
+          </View>
+          <View style={styles.actionBarButtons}>
+            <AppButton
+              title="Registrar abono"
+              variant="operation"
+              onPress={openPaymentModal}
+              disabled={!hasPending || isWorking}
+              disabledReason={
+                !hasPending
+                  ? 'El paquete ya esta liquidado.'
+                  : 'Ya hay una accion en proceso.'
+              }
+              style={styles.compactActionButton}
+            />
+            <AppButton
+              title="Aplicar saldo a favor"
+              variant="neutral"
+              disabled
+              disabledReason="Pendiente: aplicar saldo a paquete requiere trazabilidad especifica paquete-saldo."
+              style={styles.compactActionButton}
+            />
+          </View>
+        </View>
+      </AppCard>
 
       <AppCard>
         <View style={styles.summaryRow}>
@@ -512,25 +562,6 @@ export default function CustomerPackageDetailScreen() {
             {money(balanceSummary?.balance)}
           </AppText>
         </View>
-        <View style={styles.actions}>
-          <AppButton
-            title="Registrar abono"
-            variant="operation"
-            onPress={openPaymentModal}
-            disabled={!hasPending || isWorking}
-            disabledReason={
-              !hasPending
-                ? 'El paquete ya esta liquidado.'
-                : 'Ya hay una accion en proceso.'
-            }
-          />
-          <AppButton
-            title="Aplicar saldo a favor"
-            variant="neutral"
-            disabled
-            disabledReason="Pendiente: el saldo a favor ya se consulta por cliente, pero aplicarlo directamente a paquete requiere trazabilidad especifica paquete-saldo."
-          />
-        </View>
       </AppCard>
 
       <AppCard>
@@ -546,7 +577,7 @@ export default function CustomerPackageDetailScreen() {
             Agregar prendas
           </AppText>
           <AppText color={theme.colors.mutedText}>
-            Agrega prendas pagadas o apartadas del cliente por búsqueda, código o QR. El sistema valida que pertenezcan al cliente y sucursal del paquete.
+            Agrega prendas pagadas, apartadas o libres por búsqueda, código o QR. Si la prenda está libre, queda apartada para este cliente y bloqueada contra venta doble.
           </AppText>
 
           <View style={styles.actions}>
@@ -557,7 +588,7 @@ export default function CustomerPackageDetailScreen() {
               title="Alta rapida"
               variant="neutral"
               disabled
-              disabledReason="Para agregar una prenda nueva al paquete, primero crea su apartado o venta del cliente y despues agregala por codigo o QR."
+              disabledReason="Disponible en siguiente fase: alta rapida directa desde paquete con cliente formal."
             />
           </View>
         </AppCard>
@@ -715,28 +746,39 @@ export default function CustomerPackageDetailScreen() {
           placeholder="Referencia opcional"
         />
 
-        <AppText variant="subtitle" bold>
-          Metodo de pago
-        </AppText>
-        <View style={styles.paymentMethodsList}>
-          {paymentMethods.length > 0 ? (
-            paymentMethods.map((method) => {
-              const selected = selectedPaymentMethodId === method.id;
+        <View style={styles.compactSelector}>
+          <AppText variant="caption" color={theme.colors.mutedText} bold>
+            Método de pago
+          </AppText>
+          <AppButton
+            title={
+              paymentMethods.find((method) => method.id === selectedPaymentMethodId)?.name ||
+              'Seleccionar método'
+            }
+            variant="secondary"
+            onPress={() => setPaymentMethodPickerVisible((current) => !current)}
+            disabled={paymentMethods.length === 0 || isWorking}
+            disabledReason="No hay métodos de pago activos para esta sucursal."
+          />
+          {paymentMethodPickerVisible ? (
+            <View style={styles.paymentMethodsList}>
+              {paymentMethods.map((method) => {
+                const selected = selectedPaymentMethodId === method.id;
 
-              return (
-                <AppOptionRow
-                  key={method.id}
-                  title={`${selected ? '[x] ' : ''}${method.name}`}
-                  subtitle={method.code || 'Metodo activo'}
-                  onPress={() => setSelectedPaymentMethodId(method.id)}
-                />
-              );
-            })
-          ) : (
-            <AppText color={theme.colors.mutedText}>
-              No hay metodos de pago activos para esta sucursal.
-            </AppText>
-          )}
+                return (
+                  <AppOptionRow
+                    key={method.id}
+                    title={`${selected ? '[x] ' : ''}${method.name}`}
+                    subtitle={method.code || 'Método activo'}
+                    onPress={() => {
+                      setSelectedPaymentMethodId(method.id);
+                      setPaymentMethodPickerVisible(false);
+                    }}
+                  />
+                );
+              })}
+            </View>
+          ) : null}
         </View>
 
         <AppButton
@@ -774,6 +816,28 @@ export default function CustomerPackageDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  actionBarButtons: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'flex-end',
+  },
+  actionBarCard: {
+    marginBottom: 12,
+  },
+  actionBarHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  actionBarIdentity: {
+    flex: 1,
+    gap: 3,
+    minWidth: 220,
+  },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -783,6 +847,16 @@ const styles = StyleSheet.create({
   actions: {
     gap: 10,
     marginTop: 12,
+  },
+  compactActionButton: {
+    minHeight: 32,
+    minWidth: 124,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  compactSelector: {
+    gap: 8,
+    marginBottom: 12,
   },
   bottomActions: {
     gap: 10,

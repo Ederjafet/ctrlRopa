@@ -37,6 +37,16 @@ public class CustomerPackageController {
         return service.findByCustomer(customerId);
     }
 
+    @GetMapping("/branch/{branchId}/details")
+    public List<CustomerPackageDetailResponse> findDetailsByBranch(@PathVariable Long branchId) {
+        return service.findDetailsByBranch(branchId);
+    }
+
+    @GetMapping("/customer/{customerId}/details")
+    public List<CustomerPackageDetailResponse> findDetailsByCustomer(@PathVariable Long customerId) {
+        return service.findDetailsByCustomer(customerId);
+    }
+
     @GetMapping("/{id}")
     public CustomerPackageDetailResponse findDetail(@PathVariable Long id) {
         return service.findDetail(id);

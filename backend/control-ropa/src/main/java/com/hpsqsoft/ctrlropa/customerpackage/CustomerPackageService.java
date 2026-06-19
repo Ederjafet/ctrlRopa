@@ -2,10 +2,13 @@ package com.hpsqsoft.ctrlropa.customerpackage;
 
 import com.hpsqsoft.ctrlropa.branch.Branch;
 import com.hpsqsoft.ctrlropa.branch.BranchRepository;
+import com.hpsqsoft.ctrlropa.catalog.SalesChannel;
+import com.hpsqsoft.ctrlropa.catalog.SalesChannelRepository;
 import com.hpsqsoft.ctrlropa.customer.Customer;
 import com.hpsqsoft.ctrlropa.customer.CustomerRepository;
 import com.hpsqsoft.ctrlropa.item.Item;
 import com.hpsqsoft.ctrlropa.item.ItemRepository;
+import com.hpsqsoft.ctrlropa.item.ItemStatus;
 import com.hpsqsoft.ctrlropa.order.CustomerOrder;
 import com.hpsqsoft.ctrlropa.order.CustomerOrderItem;
 import com.hpsqsoft.ctrlropa.order.CustomerOrderItemRepository;
@@ -17,6 +20,7 @@ import com.hpsqsoft.ctrlropa.reservation.ReservationStatus;
 import com.hpsqsoft.ctrlropa.sale.Sale;
 import com.hpsqsoft.ctrlropa.sale.SaleRepository;
 import com.hpsqsoft.ctrlropa.sale.SaleStatus;
+import com.hpsqsoft.ctrlropa.security.access.ChannelCode;
 import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -39,6 +43,7 @@ public class CustomerPackageService {
     private final SaleRepository saleRepository;
     private final ReservationRepository reservationRepository;
     private final ItemRepository itemEntityRepository;
+    private final SalesChannelRepository salesChannelRepository;
     private final CustomerOrderService customerOrderService;
     private final CustomerOrderItemRepository customerOrderItemRepository;
     private final JdbcTemplate jdbcTemplate;
@@ -51,6 +56,7 @@ public class CustomerPackageService {
                                   SaleRepository saleRepository,
                                   ReservationRepository reservationRepository,
                                   ItemRepository itemEntityRepository,
+                                  SalesChannelRepository salesChannelRepository,
                                   CustomerOrderService customerOrderService,
                                   CustomerOrderItemRepository customerOrderItemRepository,
                                   JdbcTemplate jdbcTemplate,
@@ -62,6 +68,7 @@ public class CustomerPackageService {
         this.saleRepository = saleRepository;
         this.reservationRepository = reservationRepository;
         this.itemEntityRepository = itemEntityRepository;
+        this.salesChannelRepository = salesChannelRepository;
         this.customerOrderService = customerOrderService;
         this.customerOrderItemRepository = customerOrderItemRepository;
         this.jdbcTemplate = jdbcTemplate;
@@ -176,6 +183,24 @@ public class CustomerPackageService {
     }
 
     @Transactional(readOnly = true)
+    public List<CustomerPackageDetailResponse> findDetailsByCustomer(Long customerId) {
+        validateCustomerInActiveTenant(customerId);
+        return repository.findByCustomerIdOrderByCreatedAtDesc(customerId)
+                .stream()
+                .map(this::toDetail)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CustomerPackageDetailResponse> findDetailsByBranch(Long branchId) {
+        tenantAccessGuard.requireBranch(branchId, "La sucursal de paquetes no pertenece al tenant activo");
+        return repository.findByBranchIdOrderByCreatedAtDesc(branchId)
+                .stream()
+                .map(this::toDetail)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public CustomerPackageDetailResponse findDetail(Long packageId) {
         CustomerPackage customerPackage = findEntity(packageId);
         return toDetail(customerPackage);
@@ -222,7 +247,7 @@ public class CustomerPackageService {
             }
 
             packageItem.setSaleId(sale.getId());
-        } else {
+        } else if (request.getReservationId() != null) {
             Reservation reservation = reservationRepository.findById(request.getReservationId())
                     .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada"));
 
@@ -232,6 +257,9 @@ public class CustomerPackageService {
                 throw new IllegalArgumentException("La reserva ya está en otro paquete");
             }
 
+            packageItem.setReservationId(reservation.getId());
+        } else {
+            Reservation reservation = createReservationForAvailablePackageItem(customerPackage, item);
             packageItem.setReservationId(reservation.getId());
         }
 
@@ -388,7 +416,14 @@ public class CustomerPackageService {
         }
 
         Reservation reservation = reservationRepository.findByItemIdAndStatus(item.getId(), ReservationStatus.ACTIVE)
-                .orElseThrow(() -> new IllegalArgumentException("No existe venta ni reserva activa para este item"));
+                .orElse(null);
+
+        if (reservation == null) {
+            if (item.getStatus() == ItemStatus.AVAILABLE) {
+                return request;
+            }
+            throw new IllegalArgumentException("No existe venta ni reserva activa para este item");
+        }
 
         request.setReservationId(reservation.getId());
         return request;
@@ -488,9 +523,55 @@ public class CustomerPackageService {
         boolean hasSale = request.getSaleId() != null;
         boolean hasReservation = request.getReservationId() != null;
 
-        if (hasSale == hasReservation) {
-            throw new IllegalArgumentException("Debes enviar exactamente uno de saleId o reservationId");
+        if (hasSale && hasReservation) {
+            throw new IllegalArgumentException("Debes enviar solo uno de saleId o reservationId");
         }
+    }
+
+    private Reservation createReservationForAvailablePackageItem(CustomerPackage customerPackage, Item item) {
+        if (item.getStatus() != ItemStatus.AVAILABLE) {
+            throw new IllegalArgumentException("Solo prendas libres disponibles pueden agregarse directo al paquete");
+        }
+
+        Reservation activeReservation = reservationRepository.findByItemIdAndStatus(item.getId(), ReservationStatus.ACTIVE)
+                .orElse(null);
+        if (activeReservation != null) {
+            throw new IllegalArgumentException("La prenda ya tiene un apartado activo");
+        }
+
+        if (item.getPrice() == null || item.getPrice().signum() <= 0) {
+            throw new IllegalArgumentException("La prenda libre debe tener precio antes de agregarse al paquete");
+        }
+
+        int reservedRows = itemEntityRepository.reserveIfAvailable(
+                item.getCompany().getId(),
+                item.getBranch().getId(),
+                item.getId(),
+                ItemStatus.AVAILABLE,
+                ItemStatus.RESERVED
+        );
+
+        if (reservedRows != 1) {
+            throw new IllegalArgumentException("La prenda ya no esta disponible para agregar al paquete");
+        }
+
+        SalesChannel salesChannel = salesChannelRepository.findByCode(ChannelCode.DOOR_RESERVATION)
+                .orElseThrow(() -> new IllegalArgumentException("Canal Apartado puerta no configurado"));
+
+        item.setStatus(ItemStatus.RESERVED);
+        itemEntityRepository.save(item);
+
+        Reservation reservation = new Reservation();
+        reservation.setItem(item);
+        reservation.setCustomer(customerPackage.getCustomer());
+        reservation.setBranch(customerPackage.getBranch());
+        reservation.setSalesChannel(salesChannel);
+        reservation.setSellerUserId(customerPackage.getCreatedByUserId());
+        reservation.setPrice(item.getPrice());
+        reservation.setNotes("Apartado creado al agregar prenda libre al paquete " + customerPackage.getFolio());
+        reservation.setStatus(ReservationStatus.ACTIVE);
+
+        return reservationRepository.save(reservation);
     }
 
     private void validateSaleAgainstPackage(CustomerPackage customerPackage, Sale sale, Item item) {

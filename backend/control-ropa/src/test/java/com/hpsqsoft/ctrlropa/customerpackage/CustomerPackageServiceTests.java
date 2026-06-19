@@ -3,6 +3,9 @@ package com.hpsqsoft.ctrlropa.customerpackage;
 import com.hpsqsoft.ctrlropa.branch.Branch;
 import com.hpsqsoft.ctrlropa.branch.BranchRepository;
 import com.hpsqsoft.ctrlropa.catalog.ProductType;
+import com.hpsqsoft.ctrlropa.catalog.SalesChannel;
+import com.hpsqsoft.ctrlropa.catalog.SalesChannelRepository;
+import com.hpsqsoft.ctrlropa.company.Company;
 import com.hpsqsoft.ctrlropa.customer.Customer;
 import com.hpsqsoft.ctrlropa.customer.CustomerRepository;
 import com.hpsqsoft.ctrlropa.inventory.Box;
@@ -46,6 +49,7 @@ class CustomerPackageServiceTests {
     private final SaleRepository saleRepository = mock(SaleRepository.class);
     private final ReservationRepository reservationRepository = mock(ReservationRepository.class);
     private final ItemRepository itemEntityRepository = mock(ItemRepository.class);
+    private final SalesChannelRepository salesChannelRepository = mock(SalesChannelRepository.class);
     private final CustomerOrderService customerOrderService = mock(CustomerOrderService.class);
     private final CustomerOrderItemRepository customerOrderItemRepository = mock(CustomerOrderItemRepository.class);
     private final JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
@@ -59,6 +63,7 @@ class CustomerPackageServiceTests {
             saleRepository,
             reservationRepository,
             itemEntityRepository,
+            salesChannelRepository,
             customerOrderService,
             customerOrderItemRepository,
             jdbcTemplate,
@@ -187,8 +192,64 @@ class CustomerPackageServiceTests {
         verify(itemRepository, never()).save(any(CustomerPackageItem.class));
     }
 
+    @Test
+    void addItemCreatesReservationForAvailableItemBeforeSavingPackageItem() {
+        Reservation reservationTemplate = activeReservation(false);
+        CustomerPackage customerPackage = customerPackage(reservationTemplate);
+        Item availableItem = reservationTemplate.getItem();
+        availableItem.setStatus(ItemStatus.AVAILABLE);
+        CustomerPackageItem[] savedItem = new CustomerPackageItem[1];
+
+        when(repository.findById(501L)).thenReturn(Optional.of(customerPackage));
+        when(itemEntityRepository.findById(8L)).thenReturn(Optional.of(availableItem));
+        when(itemRepository.existsByCustomerPackageIdAndItemId(501L, 8L)).thenReturn(false);
+        when(reservationRepository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+        when(itemEntityRepository.reserveIfAvailable(
+                eq(1L),
+                eq(6L),
+                eq(8L),
+                eq(ItemStatus.AVAILABLE),
+                eq(ItemStatus.RESERVED)
+        )).thenReturn(1);
+        when(salesChannelRepository.findByCode("DOOR_RESERVATION"))
+                .thenReturn(Optional.of(salesChannel()));
+        when(itemEntityRepository.save(any(Item.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(reservationRepository.save(any(Reservation.class))).thenAnswer(invocation -> {
+            Reservation reservation = invocation.getArgument(0);
+            ReflectionTestUtils.setField(reservation, "id", 88L);
+            ReflectionTestUtils.setField(reservation, "createdAt", LocalDateTime.now());
+            return reservation;
+        });
+        when(itemRepository.save(any(CustomerPackageItem.class))).thenAnswer(invocation -> {
+            CustomerPackageItem packageItem = invocation.getArgument(0);
+            ReflectionTestUtils.setField(packageItem, "id", 701L);
+            ReflectionTestUtils.setField(packageItem, "createdAt", LocalDateTime.now());
+            savedItem[0] = packageItem;
+            return packageItem;
+        });
+        when(itemRepository.findByCustomerPackageIdOrderByCreatedAtAsc(501L))
+                .thenAnswer(invocation -> List.of(savedItem[0]));
+        stubFinancialSummary(88L);
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(501L))).thenReturn(List.of());
+
+        AddCustomerPackageItemRequest request = new AddCustomerPackageItemRequest();
+        request.setItemId(8L);
+
+        CustomerPackageDetailResponse response = service.addItem(501L, request);
+
+        assertEquals(1, response.getTotalItems());
+        assertEquals(88L, response.getItems().get(0).getReservationId());
+        verify(reservationRepository).save(any(Reservation.class));
+        verify(itemRepository).save(any(CustomerPackageItem.class));
+    }
+
     private void stubFinancialSummary() {
-        when(jdbcTemplate.queryForObject(anyString(), any(RowMapper.class), eq(10L))).thenAnswer(invocation -> {
+        stubFinancialSummary(10L);
+    }
+
+    private void stubFinancialSummary(Long reservationId) {
+        when(jdbcTemplate.queryForObject(anyString(), any(RowMapper.class), eq(reservationId))).thenAnswer(invocation -> {
             @SuppressWarnings("unchecked")
             RowMapper<Object> mapper = invocation.getArgument(1);
             ResultSet resultSet = mock(ResultSet.class);
@@ -231,8 +292,14 @@ class CustomerPackageServiceTests {
     }
 
     private Branch branch() {
+        Company company = new Company();
+        company.setId(1L);
+        company.setCode("QA");
+        company.setName("QA Company");
+
         Branch branch = new Branch();
         branch.setId(6L);
+        branch.setCompany(company);
         branch.setCode("QA");
         branch.setName("QA Centro");
         return branch;
@@ -253,6 +320,7 @@ class CustomerPackageServiceTests {
 
         Item item = new Item();
         ReflectionTestUtils.setField(item, "id", 8L);
+        item.setCompany(branch.getCompany());
         item.setBranch(branch);
         item.setCode("IT-8");
         item.setQrCode("QR-8");
@@ -260,6 +328,14 @@ class CustomerPackageServiceTests {
         item.setPrice(BigDecimal.valueOf(300).setScale(2));
         item.setStatus(ItemStatus.RESERVED);
         return item;
+    }
+
+    private SalesChannel salesChannel() {
+        SalesChannel salesChannel = new SalesChannel();
+        salesChannel.setId(3L);
+        salesChannel.setCode("DOOR_RESERVATION");
+        salesChannel.setName("Apartado puerta");
+        return salesChannel;
     }
 
     private Box box(Branch branch) {

@@ -101,6 +101,18 @@ export async function getCustomerPackagesByCustomer(
   return apiRequest<CustomerPackage[]>(`/api/customer-packages/customer/${customerId}`);
 }
 
+export async function getCustomerPackageDetailsByBranch(
+  branchId: number
+): Promise<CustomerPackageDetail[]> {
+  return apiRequest<CustomerPackageDetail[]>(`/api/customer-packages/branch/${branchId}/details`);
+}
+
+export async function getCustomerPackageDetailsByCustomer(
+  customerId: number
+): Promise<CustomerPackageDetail[]> {
+  return apiRequest<CustomerPackageDetail[]>(`/api/customer-packages/customer/${customerId}/details`);
+}
+
 export async function getCustomerPackageDetail(
   id: number
 ): Promise<CustomerPackageDetail> {
