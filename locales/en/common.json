@@ -253,7 +253,7 @@
     "itemStatus": "Status",
     "customerNeedsActiveItem": "Put an item on air first.",
     "customerNeedsPrice": "Confirm the price of the item on air first.",
-    "reserveActiveItemHelp": "Confirm the price and create the hold for the item on air.",
+    "reserveActiveItemHelp": "Confirm the price and create the hold.",
     "reserveNeedsActiveItem": "Put an item on air before creating a hold.",
     "reserveMissingActiveItem": "Put an item on air first.",
     "priceUsesActiveItemHelp": "This price applies only to the hold for the current live item. If adjusted, it does not change the item base price.",
