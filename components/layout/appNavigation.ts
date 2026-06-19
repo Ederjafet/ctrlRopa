@@ -66,7 +66,7 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
       ? { key: 'customer-packages', label: 'Paquetes', labelKey: 'navigation.items.packages', route: '/customer-packages', activeFor: ['customer-packages', '/customer-packages', 'customer-package-detail', '/customer-package-detail'], icon: 'inventory' as const }
       : null,
     shipmentsAllowed
-      ? { key: 'shipments', label: 'Envios', labelKey: 'navigation.items.shipments', route: '/shipments', activeFor: ['shipments', '/shipments', 'shipment-detail', '/shipment-detail'], icon: 'local-shipping' as const }
+      ? { key: 'shipments', label: 'Envíos', labelKey: 'navigation.items.shipments', route: '/shipments', activeFor: ['shipments', '/shipments', 'shipment-detail', '/shipment-detail'], icon: 'local-shipping' as const }
       : null,
     operationalAuthorizationsAllowed
       ? {

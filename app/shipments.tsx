@@ -88,7 +88,7 @@ export default function ShipmentsScreen() {
     if (!session) return;
 
     if (deliveryType === 'CARRIER' && !guideReference.trim()) {
-      Alert.alert('Envíos', 'Captura la guia o referencia para envíos por paqueteria.');
+      Alert.alert('Envíos', 'Captura la guía o referencia para envíos por paquetería.');
       return;
     }
 
@@ -115,7 +115,7 @@ export default function ShipmentsScreen() {
   const renderHeaderActions = () => (
     <View style={styles.headerActions}>
       <AppButton
-        title="Nuevo envio"
+        title="Nuevo envío"
         onPress={() => setCreateModalVisible(true)}
         style={styles.headerButton}
       />
@@ -133,7 +133,7 @@ export default function ShipmentsScreen() {
   return (
     <>
       <AppShellPage
-        title="Envios"
+        title="Envíos"
         subtitle="Seguimiento de paquetes listos para enviar"
         activeRoute="shipments"
         session={session}
@@ -151,7 +151,7 @@ export default function ShipmentsScreen() {
             ]}
           >
             <AppText variant="caption" color={theme.colors.mutedText} bold>
-              Envios: {shipments.length}
+              Envíos: {shipments.length}
             </AppText>
           </View>
           <View
@@ -181,7 +181,9 @@ export default function ShipmentsScreen() {
 
         {!isLoading && filteredShipments.length === 0 ? (
           <AppCard>
-            <AppText color={theme.colors.mutedText}>No hay envíos para mostrar.</AppText>
+            <AppText color={theme.colors.mutedText}>
+              No hay envíos pendientes. Los paquetes listos para enviar aparecerán aquí.
+            </AppText>
           </AppCard>
         ) : null}
 
@@ -198,10 +200,10 @@ export default function ShipmentsScreen() {
           >
             <View style={styles.shipmentIdentity}>
               <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
-                Envio #{shipment.id} - {shipment.folio}
+                Envío #{shipment.id} · {shipment.folio}
               </AppText>
               <AppText bold numberOfLines={1}>
-                {shipmentDeliveryTypeLabel(shipment.deliveryType)} - {shipmentStatusLabel(shipment.status)}
+                {shipmentDeliveryTypeLabel(shipment.deliveryType)} · {shipmentStatusLabel(shipment.status)}
               </AppText>
             </View>
 
@@ -212,7 +214,7 @@ export default function ShipmentsScreen() {
                   : 'Sin paquetes'}
               </AppText>
               <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
-                {shipment.guideReference ? `Guia: ${shipment.guideReference}` : 'Sin guia'}
+                {shipment.guideReference ? `Guía: ${shipment.guideReference}` : 'Sin guía'}
               </AppText>
             </View>
 
@@ -234,7 +236,7 @@ export default function ShipmentsScreen() {
                 style={styles.compactButton}
               />
               <AppButton
-                title="Mas"
+                title="Más"
                 variant="secondary"
                 onPress={() => setActionsShipment(shipment)}
                 style={styles.compactButton}
@@ -300,7 +302,7 @@ export default function ShipmentsScreen() {
 
       <AppBottomModal
         visible={Boolean(actionsShipment)}
-        title={actionsShipment ? `Envio ${actionsShipment.folio}` : 'Envio'}
+        title={actionsShipment ? `Envío ${actionsShipment.folio}` : 'Envío'}
         onClose={() => setActionsShipment(null)}
       >
         {actionsShipment ? (
@@ -327,7 +329,7 @@ export default function ShipmentsScreen() {
               title="Marcar enviado"
               variant="neutral"
               disabled
-              disabledReason="Disponible desde el detalle cuando el envio tenga paquetes listos."
+              disabledReason="Disponible desde el detalle cuando el envío tenga paquetes listos."
             />
           </View>
         ) : null}

@@ -3,7 +3,6 @@ import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
-import AppOptionRow from '@/components/ui/AppOptionRow';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { Customer, getCustomerById, getCustomersByBranch } from '@/services/customerService';
@@ -59,6 +58,7 @@ export default function CustomerPackagesScreen() {
   const [packages, setPackages] = useState<CustomerPackage[]>([]);
   const [search, setSearch] = useState('');
   const [notes, setNotes] = useState('');
+  const [actionsCustomer, setActionsCustomer] = useState<Customer | null>(null);
   const [actionsPackage, setActionsPackage] = useState<CustomerPackage | null>(null);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -204,7 +204,7 @@ export default function CustomerPackagesScreen() {
             Clientes con paquetes
           </AppText>
           <AppText color={theme.colors.mutedText}>
-            Los paquetes se consultan por cliente porque el backend actual expone este read-model.
+            Gestión por cliente mientras queda pendiente el read-model global por sucursal.
           </AppText>
 
           <AppInput
@@ -222,15 +222,78 @@ export default function CustomerPackagesScreen() {
             </AppText>
           ) : (
             filteredCustomers.map((item) => (
-              <AppOptionRow
+              <View
                 key={item.id}
-                title={item.name}
-                subtitle={item.phone || 'Sin teléfono'}
-                onPress={() => router.push(`/customer-packages?customerId=${item.id}` as any)}
-              />
+                style={[
+                  styles.customerRow,
+                  {
+                    backgroundColor: theme.colors.surface,
+                    borderColor: theme.colors.border,
+                  },
+                ]}
+              >
+                <View style={styles.customerIdentity}>
+                  <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+                    Cliente · {item.name}
+                  </AppText>
+                  <AppText bold numberOfLines={1}>
+                    {item.phone || 'Sin teléfono'}
+                  </AppText>
+                  <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+                    Paquetes disponibles por cliente
+                  </AppText>
+                </View>
+
+                <View style={styles.customerActions}>
+                  <AppButton
+                    title="Ver paquetes"
+                    variant="secondary"
+                    onPress={() => router.push(`/customer-packages?customerId=${item.id}` as any)}
+                    style={styles.compactButton}
+                  />
+                  <AppButton
+                    title="Más"
+                    variant="secondary"
+                    onPress={() => setActionsCustomer(item)}
+                    style={styles.compactButton}
+                  />
+                </View>
+              </View>
             ))
           )}
         </AppCard>
+
+        <AppBottomModal
+          visible={Boolean(actionsCustomer)}
+          title={actionsCustomer ? `Cliente ${actionsCustomer.name}` : 'Cliente'}
+          onClose={() => setActionsCustomer(null)}
+        >
+          {actionsCustomer ? (
+            <View style={styles.modalActionsStack}>
+              <AppCard variant="subtle" style={styles.actionSummary}>
+                <AppText bold>{actionsCustomer.name}</AppText>
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  {actionsCustomer.phone || 'Sin teléfono'}
+                </AppText>
+              </AppCard>
+              <AppButton
+                title="Ver paquetes"
+                variant="secondary"
+                onPress={() => {
+                  const id = actionsCustomer.id;
+                  setActionsCustomer(null);
+                  router.push(`/customer-packages?customerId=${id}` as any);
+                }}
+              />
+              <AppButton
+                title="Crear paquete"
+                variant="neutral"
+                disabled
+                disabledReason="Crea paquetes desde Apartados o abre el cliente para continuar."
+              />
+            </View>
+          ) : null}
+        </AppBottomModal>
       </AppShellPage>
     );
   }
@@ -248,15 +311,15 @@ export default function CustomerPackagesScreen() {
     >
       <View style={styles.packageIdentity}>
         <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
-          Paquete #{item.id} - {item.folio}
+          Paquete #{item.id} · {item.folio}
         </AppText>
         <AppText bold numberOfLines={1}>
-          Cliente - {customer?.name || item.customerName || `#${item.customerId}`}
+          Cliente · {customer?.name || item.customerName || `#${item.customerId}`}
         </AppText>
       </View>
       <View style={styles.packageMeta}>
         <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
-          {statusLabel(item.status)} - {getPackageNextAction(item.status)}
+          {statusLabel(item.status)} · {getPackageNextAction(item.status)}
         </AppText>
         <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
           Creado: {formatDate(item.createdAt)}
@@ -270,7 +333,7 @@ export default function CustomerPackagesScreen() {
           style={styles.compactButton}
         />
         <AppButton
-          title="Mas"
+          title="Más"
           variant="secondary"
           onPress={() => setActionsPackage(item)}
           style={styles.compactButton}
@@ -290,7 +353,7 @@ export default function CustomerPackagesScreen() {
     >
       <AppCard>
         <AppText variant="subtitle" bold>
-          {customer?.name || 'Cliente'}
+          Cliente · {customer?.name || 'Cliente'}
         </AppText>
         <AppText color={theme.colors.mutedText}>{customer?.phone || 'Sin teléfono'}</AppText>
       </AppCard>
@@ -400,6 +463,28 @@ const styles = StyleSheet.create({
     minWidth: 66,
     paddingHorizontal: 10,
     paddingVertical: 6,
+  },
+  customerActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    justifyContent: 'flex-end',
+  },
+  customerIdentity: {
+    flex: 1,
+    gap: 3,
+    minWidth: 180,
+  },
+  customerRow: {
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 10,
+    padding: 12,
   },
   headerActions: {
     alignItems: 'center',
