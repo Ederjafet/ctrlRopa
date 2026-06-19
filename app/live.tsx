@@ -1174,8 +1174,6 @@ export default function LiveScreen() {
     const branchLabel = session?.branchName || selectedLive?.branchName || t('live.notCaptured');
     const compactMeta = [
       itemLabel,
-      formatMoney(Number(reservation.price || 0)),
-      paymentStatusLabel,
       branchLabel,
     ].join(' · ');
     const partyToneColor = isInterested
@@ -1184,7 +1182,7 @@ export default function LiveScreen() {
         ? theme.colors.accent
         : theme.colors.danger;
     const partyToneBackground = isInterested
-      ? theme.colors.warningBackground
+      ? theme.colors.surfaceAlt
       : reservation.customerId
         ? theme.colors.infoCardBackground
         : theme.colors.dangerBackground;
@@ -1195,11 +1193,11 @@ export default function LiveScreen() {
           styles.recentReservationInfoPanel,
           isInterested
             ? {
-                backgroundColor: theme.colors.warningBackground,
-                borderColor: theme.colors.warning,
+                backgroundColor: theme.colors.surfaceAlt,
+                borderColor: theme.colors.border,
                 borderRadius: theme.radius.md,
                 borderWidth: 1,
-                padding: 10,
+                padding: 9,
               }
             : null,
         ]}
@@ -1256,6 +1254,14 @@ export default function LiveScreen() {
             ) : null}
             <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={2}>
               {compactMeta}
+            </AppText>
+          </View>
+          <View style={styles.recentReservationAmountBlock}>
+            <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+              {paymentStatusLabel}
+            </AppText>
+            <AppText color={theme.colors.accent} bold numberOfLines={1}>
+              {formatMoney(Number(reservation.price || 0))}
             </AppText>
           </View>
         </View>
@@ -1468,31 +1474,28 @@ export default function LiveScreen() {
   };
 
   const renderRecentReservationPrimaryActions = (reservation: Reservation) => (
-    <View style={styles.buttonRow}>
+    <View style={styles.recentReservationActionRow}>
       {hasInterestedAlias(reservation) ? (
-        <View style={styles.buttonFill}>
-          <AppButton
-            title={t('live.linkCustomer')}
-            variant="warning"
-            disabled
-            disabledReason={t('live.linkCustomerPendingReason')}
-          />
-        </View>
+        <AppButton
+          title={t('live.linkCustomer')}
+          variant="warning"
+          disabled
+          disabledReason={t('live.linkCustomerPendingReason')}
+          style={styles.recentReservationActionButton}
+        />
       ) : null}
-      <View style={styles.buttonFill}>
-        <AppButton
-          title={t('live.viewDetail')}
-          variant="neutral"
-          onPress={() => goToReservationDetail(reservation.id)}
-        />
-      </View>
-      <View style={styles.buttonFill}>
-        <AppButton
-          title="Mas acciones"
-          variant="secondary"
-          onPress={() => openRecentReservationActions(reservation)}
-        />
-      </View>
+      <AppButton
+        title={t('live.detailShort')}
+        variant="neutral"
+        onPress={() => goToReservationDetail(reservation.id)}
+        style={styles.recentReservationActionButton}
+      />
+      <AppButton
+        title={t('live.moreShort')}
+        variant="secondary"
+        onPress={() => openRecentReservationActions(reservation)}
+        style={styles.recentReservationMoreButton}
+      />
     </View>
   );
 
@@ -4220,6 +4223,7 @@ export default function LiveScreen() {
                   onPress={() => goToReservationDetail(reservation.id)}
                   style={({ pressed }) => [
                     styles.recentRow,
+                    !isPhone ? styles.recentRowDesktop : null,
                     {
                       borderColor: theme.colors.border,
                       opacity: pressed ? 0.75 : 1,
@@ -4233,11 +4237,7 @@ export default function LiveScreen() {
                     isReservationSettled(reservation, paid),
                     operationalSold
                   )}
-                  <AppButton
-                    title={t('live.viewDetail')}
-                    variant="neutral"
-                    onPress={() => goToReservationDetail(reservation.id)}
-                  />
+                  {renderRecentReservationPrimaryActions(reservation)}
                 </Pressable>
               );
             })
@@ -4818,6 +4818,7 @@ export default function LiveScreen() {
                             onPress={() => goToReservationDetail(reservation.id)}
                             style={({ pressed }) => [
                               styles.recentRow,
+                              !isPhone ? styles.recentRowDesktop : null,
                               {
                                 borderColor: theme.colors.border,
                                 opacity: pressed ? 0.75 : 1,
@@ -4855,8 +4856,20 @@ export default function LiveScreen() {
                       loading={isSavingLive}
                       disabled={isSavingLive || !selectedLiveIsOperable}
                       disabledReason={operatorFinishDisabledReason}
+                      style={[
+                        styles.operatorFinishLiveButton,
+                        isPhone ? styles.operatorFinishLiveButtonMobile : null,
+                      ]}
                     />
-                    <AppText variant="caption" color={theme.colors.mutedText} style={styles.actionHelperText}>
+                    <AppText
+                      variant="caption"
+                      color={theme.colors.mutedText}
+                      style={[
+                        styles.actionHelperText,
+                        styles.operatorFinishLiveHelp,
+                        isPhone ? styles.operatorFinishLiveHelpMobile : null,
+                      ]}
+                    >
                       {t('live.closeLiveHelp')}
                     </AppText>
                   </>
@@ -5814,6 +5827,7 @@ export default function LiveScreen() {
                   onPress={() => goToReservationDetail(reservation.id)}
                   style={({ pressed }) => [
                     styles.recentRow,
+                    !isPhone ? styles.recentRowDesktop : null,
                     {
                       borderColor: theme.colors.border,
                       opacity: pressed ? 0.75 : 1,
@@ -6301,6 +6315,26 @@ const styles = StyleSheet.create({
   },
   actionHelperText: {
     marginTop: 4,
+  },
+  operatorFinishLiveButton: {
+    alignSelf: 'flex-end',
+    minHeight: 34,
+    minWidth: 150,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  operatorFinishLiveButtonMobile: {
+    alignSelf: 'stretch',
+  },
+  operatorFinishLiveHelp: {
+    alignSelf: 'flex-end',
+    maxWidth: 320,
+    textAlign: 'right',
+  },
+  operatorFinishLiveHelpMobile: {
+    alignSelf: 'stretch',
+    maxWidth: '100%',
+    textAlign: 'left',
   },
   preparedItemActions: {
     gap: 8,
@@ -6993,6 +7027,11 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 8,
   },
+  recentRowDesktop: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
   recentReservationActionsStack: {
     gap: 8,
   },
@@ -7000,7 +7039,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   recentReservationInfoPanel: {
+    flex: 1,
     gap: 8,
+    minWidth: 0,
   },
   recentReservationPartyBadge: {
     borderWidth: 1,
@@ -7043,6 +7084,30 @@ const styles = StyleSheet.create({
   recentReservationPriceBlock: {
     alignItems: 'flex-end',
     gap: 2,
+  },
+  recentReservationAmountBlock: {
+    alignItems: 'flex-end',
+    gap: 2,
+    minWidth: 92,
+  },
+  recentReservationActionRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    justifyContent: 'flex-end',
+  },
+  recentReservationActionButton: {
+    minHeight: 30,
+    minWidth: 0,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  recentReservationMoreButton: {
+    minHeight: 30,
+    minWidth: 64,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   recentReservationText: {
     flex: 1,
