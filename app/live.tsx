@@ -269,9 +269,16 @@ function mapLiveReservations(
     .slice(0, 10)
     .map((reservation) => ({
       reservation,
-      customerName: reservation.customerName || `Cliente #${reservation.customerId}`,
+      customerName: getReservationCustomerLabel(reservation),
       itemCode: reservation.itemCode || `Prenda #${reservation.itemId}`,
     }));
+}
+
+function getReservationCustomerLabel(reservation: Reservation) {
+  if (reservation.customerName) return reservation.customerName;
+  if (reservation.customerId) return `Cliente #${reservation.customerId}`;
+  if (reservation.interestedAlias) return `Interesado: ${reservation.interestedAlias}`;
+  return 'Sin cliente';
 }
 
 function getReservationSellerLabel(reservation: Reservation) {
@@ -484,6 +491,7 @@ export default function LiveScreen() {
   const [isLoadingClosedLiveEvents, setIsLoadingClosedLiveEvents] = useState(false);
 
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [interestedAliasText, setInterestedAliasText] = useState('');
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [activeItem, setActiveItem] = useState<Item | null>(null);
   const [priceText, setPriceText] = useState('');
@@ -779,6 +787,16 @@ export default function LiveScreen() {
 
   const hasValidReservationPrice =
     !!priceText.trim() && !Number.isNaN(Number(priceText)) && Number(priceText) > 0;
+  const interestedAlias = interestedAliasText.trim();
+  const interestedAliasValidationReason =
+    interestedAlias.length > 0 && interestedAlias.length < 2
+      ? t('live.interestedAliasTooShort')
+      : interestedAlias.length > 80
+        ? t('live.interestedAliasTooLong')
+        : '';
+  const hasValidInterestedAlias =
+    interestedAlias.length >= 2 && interestedAlias.length <= 80;
+  const hasCustomerOrInterestedAlias = Boolean(selectedCustomer) || hasValidInterestedAlias;
   const reservationSourcesForActiveItem = [
     ...recentReservations.map((entry) => entry.reservation),
     ...branchReservations,
@@ -801,7 +819,9 @@ export default function LiveScreen() {
       ? t('live.activeItemAlreadyReservedReason')
     : !hasValidReservationPrice
       ? t('live.reserveMissingPrice')
-    : !selectedCustomer
+    : interestedAliasValidationReason
+      ? interestedAliasValidationReason
+    : !hasCustomerOrInterestedAlias
       ? t('live.reserveMissingCustomer')
     : !liveChannelId
       ? t('live.channelReason')
@@ -1079,7 +1099,9 @@ export default function LiveScreen() {
       ? t('live.operatorNextChangeReservedItem')
     : !hasValidReservationPrice
       ? t('live.operatorNextPrice')
-    : !selectedCustomer
+    : interestedAliasValidationReason
+      ? interestedAliasValidationReason
+    : !hasCustomerOrInterestedAlias
       ? t('live.operatorNextCustomer')
     : t('live.operatorReadyToReserve');
   const operatorLatestReservation = recentReservations[0];
@@ -1631,6 +1653,7 @@ export default function LiveScreen() {
         liveActorContext.actor === 'OPERATOR' &&
         Boolean(
           selectedCustomer ||
+          interestedAliasText.trim() ||
           selectedItem ||
           priceText.trim() ||
           isCustomerModalVisible ||
@@ -1742,6 +1765,7 @@ export default function LiveScreen() {
     isCustomerModalVisible,
     isItemModalVisible,
     isScannerVisible,
+    interestedAliasText,
     lastLiveRefreshAt,
     liveActorContext.actor,
     priceText,
@@ -2586,7 +2610,12 @@ export default function LiveScreen() {
       return;
     }
 
-    if (!selectedCustomer) {
+    if (interestedAliasValidationReason) {
+      openReservationIssue(interestedAliasValidationReason, 'customer');
+      return;
+    }
+
+    if (!hasCustomerOrInterestedAlias) {
       openReservationIssue(t('live.reserveMissingCustomer'), 'customer');
       return;
     }
@@ -2648,7 +2677,12 @@ export default function LiveScreen() {
       return false;
     }
 
-    if (!selectedCustomer) {
+    if (interestedAliasValidationReason) {
+      openReservationIssue(interestedAliasValidationReason, 'customer');
+      return false;
+    }
+
+    if (!hasCustomerOrInterestedAlias) {
       openReservationIssue(t('live.reserveMissingCustomer'), 'customer');
       return false;
     }
@@ -2665,7 +2699,7 @@ export default function LiveScreen() {
     if (
       !validateReservation() ||
       !session ||
-      !selectedCustomer ||
+      !hasCustomerOrInterestedAlias ||
       !activeItem ||
       !selectedLive ||
       !liveChannelId
@@ -2696,7 +2730,7 @@ export default function LiveScreen() {
           {
             text: t('live.confirmLivePriceChange'),
             onPress: () => {
-              void persistReservation(price);
+              void persistReservation(price, interestedAlias);
             },
           },
         ]
@@ -2704,11 +2738,11 @@ export default function LiveScreen() {
       return;
     }
 
-    await persistReservation(price);
+    await persistReservation(price, interestedAlias);
   };
 
-  const persistReservation = async (price: number) => {
-    if (!session || !selectedCustomer || !activeItem || !selectedLive || !liveChannelId) {
+  const persistReservation = async (price: number, alias: string) => {
+    if (!session || !hasCustomerOrInterestedAlias || !activeItem || !selectedLive || !liveChannelId) {
       return;
     }
 
@@ -2717,7 +2751,8 @@ export default function LiveScreen() {
     try {
       const reservation = await createReservation({
         itemId: activeItem.id,
-        customerId: selectedCustomer.id,
+        customerId: selectedCustomer?.id ?? null,
+        interestedAlias: alias || null,
         branchId: session.branchId,
         liveId: selectedLive.id,
         salesChannelId: liveChannelId,
@@ -2728,7 +2763,7 @@ export default function LiveScreen() {
       setRecentReservations((current) => [
         {
           reservation,
-          customerName: selectedCustomer.name,
+          customerName: selectedCustomer?.name || `Interesado: ${alias}`,
           itemCode: activeItem.code,
         },
         ...current,
@@ -2748,13 +2783,16 @@ export default function LiveScreen() {
       );
       setReservationIssue(null);
       setSelectedCustomer(null);
+      setInterestedAliasText('');
       setScanInput('');
 
       await loadData();
 
       setLiveNotice({
         title: t('live.reservationCreatedTitle'),
-        message: t('live.reservationCreated', { id: reservation.id }),
+        message: selectedCustomer
+          ? t('live.reservationCreatedForCustomer')
+          : t('live.reservationCreatedForAlias', { alias }),
         tone: 'success',
       });
     } catch (err: any) {
@@ -3521,7 +3559,7 @@ export default function LiveScreen() {
             >
               <View style={styles.closedLiveExpandedText}>
                 <AppText bold numberOfLines={1}>
-                  {reservation.customerName || t('live.noCustomerSelected')}
+                  {getReservationCustomerLabel(reservation)}
                 </AppText>
                 <AppText variant="caption" color={theme.colors.mutedText}>
                   {reservation.itemCode || t('live.noActiveProductCode')}
@@ -4439,7 +4477,9 @@ export default function LiveScreen() {
                     <AppText bold>
                       {selectedCustomer
                         ? selectedCustomer.name
-                        : t('live.operatorStepCustomerEmpty')}
+                        : interestedAlias
+                          ? t('live.interestedAliasSelected', { alias: interestedAlias })
+                          : t('live.operatorStepCustomerEmpty')}
                     </AppText>
                     {selectedCustomer && selectedCustomerSummary ? (
                       <View
@@ -4554,6 +4594,19 @@ export default function LiveScreen() {
                         </View>
                       ) : null}
                     </View>
+                    <AppInput
+                      label={t('live.interestedAliasLabel')}
+                      placeholder={t('live.interestedAliasPlaceholder')}
+                      value={interestedAliasText}
+                      onChangeText={setInterestedAliasText}
+                      editable={!!activeItem && hasValidReservationPrice}
+                    />
+                    <AppText
+                      variant="caption"
+                      color={interestedAliasValidationReason ? theme.colors.danger : theme.colors.mutedText}
+                    >
+                      {interestedAliasValidationReason || t('live.interestedAliasHelp')}
+                    </AppText>
                   </LiveCompactCard>
 
                   </View>
@@ -5510,7 +5563,9 @@ export default function LiveScreen() {
             <AppText>
               {selectedCustomer
                 ? selectedCustomer.name
-                : t('live.selectCustomerHelp')}
+                : interestedAlias
+                  ? t('live.interestedAliasSelected', { alias: interestedAlias })
+                  : t('live.selectCustomerHelp')}
             </AppText>
             {maySelectCustomer ? (
               <AppButton
@@ -5528,6 +5583,20 @@ export default function LiveScreen() {
               </AppText>
             )}
             </LiveCompactCard>
+
+            <AppInput
+              label={t('live.interestedAliasLabel')}
+              placeholder={t('live.interestedAliasPlaceholder')}
+              value={interestedAliasText}
+              onChangeText={setInterestedAliasText}
+              editable={!!activeItem && hasValidReservationPrice}
+            />
+            <AppText
+              variant="caption"
+              color={interestedAliasValidationReason ? theme.colors.danger : theme.colors.mutedText}
+            >
+              {interestedAliasValidationReason || t('live.interestedAliasHelp')}
+            </AppText>
 
             {mayCreateCustomer ? (
             <View style={styles.secondaryFlowGroup}>

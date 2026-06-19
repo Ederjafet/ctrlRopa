@@ -50,6 +50,8 @@ public class ReservationService {
     private static final Logger log = LoggerFactory.getLogger(ReservationService.class);
     private static final String RESERVATION_CREATE_OPERATION = "RESERVATION_CREATE";
     private static final int IDEMPOTENCY_KEY_MAX_LENGTH = 120;
+    private static final int INTERESTED_ALIAS_MIN_LENGTH = 2;
+    private static final int INTERESTED_ALIAS_MAX_LENGTH = 80;
 
     private final ReservationRepository repository;
     private final ItemRepository itemRepository;
@@ -158,6 +160,25 @@ public class ReservationService {
             throw new IllegalArgumentException("El item no pertenece a la sucursal indicada");
         }
 
+        String interestedAlias = normalizeInterestedAlias(request.getInterestedAlias());
+        request.setInterestedAlias(interestedAlias);
+
+        if (request.getCustomerId() == null && interestedAlias == null) {
+            traceReservationRejection(
+                    item.getCompany().getId(),
+                    branch.getId(),
+                    userId,
+                    item.getId(),
+                    request.getLiveId(),
+                    null,
+                    ReservationRejectionReason.VALIDATION_REJECTED,
+                    "Selecciona un cliente o escribe un alias/nick del interesado.",
+                    idempotencyKey,
+                    request
+            );
+            throw new IllegalArgumentException("Selecciona un cliente o escribe un alias/nick del interesado.");
+        }
+
         ReservationIdempotencyRecord existingIdempotency = findExistingIdempotency(
                 item.getCompany().getId(),
                 branch.getId(),
@@ -182,14 +203,17 @@ public class ReservationService {
             throw new IllegalArgumentException("El item no esta disponible");
         }
 
-        Customer customer = customerRepository.findById(request.getCustomerId())
-                .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado"));
-        tenantAccessGuard.requireBranch(customer.getBranch().getId(), "El cliente no pertenece a la sucursal activa");
+        Customer customer = null;
+        if (request.getCustomerId() != null) {
+            customer = customerRepository.findById(request.getCustomerId())
+                    .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado"));
+            tenantAccessGuard.requireBranch(customer.getBranch().getId(), "El cliente no pertenece a la sucursal activa");
+        }
 
         SalesChannel salesChannel = salesChannelRepository.findById(request.getSalesChannelId())
                 .orElseThrow(() -> new IllegalArgumentException("Canal de venta no encontrado"));
 
-        if (!customer.getBranch().getId().equals(branch.getId())) {
+        if (customer != null && !customer.getBranch().getId().equals(branch.getId())) {
             throw new IllegalArgumentException("El cliente no pertenece a la sucursal indicada");
         }
 
@@ -352,6 +376,7 @@ public class ReservationService {
         Reservation entity = new Reservation();
         entity.setItem(item);
         entity.setCustomer(customer);
+        entity.setInterestedAlias(interestedAlias);
         entity.setBranch(branch);
         entity.setLive(live);
         entity.setSalesChannel(salesChannel);
@@ -367,8 +392,10 @@ public class ReservationService {
 
         Reservation saved = saveCreatedReservation(entity, idempotencyKey, request);
 
-        CustomerOrder order = customerOrderService.addReservationToOpenOrder(saved);
-        customerOrderService.refreshStatus(order.getId());
+        if (saved.getCustomer() != null) {
+            CustomerOrder order = customerOrderService.addReservationToOpenOrder(saved);
+            customerOrderService.refreshStatus(order.getId());
+        }
 
         if (saved.getLive() != null) {
             liveEventService.record(
@@ -379,7 +406,7 @@ public class ReservationService {
                     saved.getId(),
                     "{\"reservationId\":" + saved.getId()
                             + ",\"itemId\":" + saved.getItem().getId()
-                            + ",\"customerId\":" + saved.getCustomer().getId()
+                            + liveReservationPartyJson(saved)
                             + ",\"operationalStatus\":\"" + saved.getLiveOperationalStatus().name() + "\"}"
             );
         }
@@ -634,9 +661,13 @@ public class ReservationService {
     }
 
     private String hashReservationRequest(CreateReservationRequest request) {
+        String aliasPart = request.getInterestedAlias() == null
+                ? ""
+                : "interestedAlias=" + valuePart(request.getInterestedAlias()) + "\n";
         return sha256(
                 "itemId=" + valuePart(request.getItemId()) + "\n"
                         + "customerId=" + valuePart(request.getCustomerId()) + "\n"
+                        + aliasPart
                         + "branchId=" + valuePart(request.getBranchId()) + "\n"
                         + "liveId=" + valuePart(request.getLiveId()) + "\n"
                         + "salesChannelId=" + valuePart(request.getSalesChannelId()) + "\n"
@@ -644,6 +675,41 @@ public class ReservationService {
                         + "price=" + amountPart(request.getPrice()) + "\n"
                         + "notes=" + valuePart(request.getNotes())
         );
+    }
+
+    private String normalizeInterestedAlias(String alias) {
+        if (alias == null || alias.isBlank()) {
+            return null;
+        }
+
+        String normalized = alias.trim();
+        if (normalized.length() < INTERESTED_ALIAS_MIN_LENGTH) {
+            throw new IllegalArgumentException("El alias debe tener al menos 2 caracteres.");
+        }
+
+        if (normalized.length() > INTERESTED_ALIAS_MAX_LENGTH) {
+            throw new IllegalArgumentException("El alias no debe superar 80 caracteres.");
+        }
+
+        return normalized;
+    }
+
+    private String liveReservationPartyJson(Reservation reservation) {
+        if (reservation.getCustomer() != null) {
+            return ",\"customerId\":" + reservation.getCustomer().getId();
+        }
+
+        if (reservation.getInterestedAlias() != null) {
+            return ",\"interestedAlias\":\"" + escapeJson(reservation.getInterestedAlias()) + "\"";
+        }
+
+        return "";
+    }
+
+    private String escapeJson(String value) {
+        return value
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"");
     }
 
     private String valuePart(Object value) {
@@ -1015,8 +1081,9 @@ public class ReservationService {
                 entity.getId(),
                 entity.getItem().getId(),
                 entity.getItem().getCode(),
-                entity.getCustomer().getId(),
-                entity.getCustomer().getName(),
+                entity.getCustomer() != null ? entity.getCustomer().getId() : null,
+                entity.getCustomer() != null ? entity.getCustomer().getName() : null,
+                entity.getInterestedAlias(),
                 entity.getBranch().getId(),
                 entity.getBranch().getCode(),
                 customerOrderService.findOrderIdByReservationId(entity.getId()),
@@ -1060,6 +1127,7 @@ public class ReservationService {
     public static class CreateReservationRequest {
         private Long itemId;
         private Long customerId;
+        private String interestedAlias;
         private Long branchId;
         private Long liveId;
         private Long salesChannelId;
@@ -1081,6 +1149,14 @@ public class ReservationService {
 
         public void setCustomerId(Long customerId) {
             this.customerId = customerId;
+        }
+
+        public String getInterestedAlias() {
+            return interestedAlias;
+        }
+
+        public void setInterestedAlias(String interestedAlias) {
+            this.interestedAlias = interestedAlias;
         }
 
         public Long getBranchId() {

@@ -38,6 +38,7 @@ type Reservation = {
   id: number;
   customerId?: number;
   customerName?: string;
+  interestedAlias?: string | null;
   itemId?: number;
   itemCode?: string;
   price?: number;
@@ -348,7 +349,10 @@ export default function ReservationDetailScreen() {
     reservation?.salesChannelCode === 'LIVE' ||
     reservation?.salesChannelName?.toUpperCase() === 'LIVE';
   const reservationBadge = isLiveContext ? 'Reserva LIVE' : 'Apartado';
-  const customerName = reservation?.customerName || customer?.name || 'Sin cliente';
+  const customerName =
+    reservation?.customerName ||
+    customer?.name ||
+    (reservation?.interestedAlias ? `Interesado: ${reservation.interestedAlias}` : 'Sin cliente');
   const customerPhone = customer?.phone || 'Sin telefono';
   const branchName =
     reservation?.branchName || customer?.branchName || 'No capturado';

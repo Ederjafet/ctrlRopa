@@ -14,7 +14,8 @@ export type LiveReservationOperationalStatus =
 
 export type CreateReservationRequest = {
   itemId: number;
-  customerId: number;
+  customerId?: number | null;
+  interestedAlias?: string | null;
   branchId: number;
   liveId?: number;
   salesChannelId: number;
@@ -30,8 +31,9 @@ export type Reservation = {
   id: number;
   itemId: number;
   itemCode?: string;
-  customerId: number;
+  customerId?: number | null;
   customerName?: string;
+  interestedAlias?: string | null;
   branchId: number;
   liveId?: number | null;
   liveStatus?: string | null;

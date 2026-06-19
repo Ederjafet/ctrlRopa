@@ -46,6 +46,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -523,6 +524,114 @@ class ReservationServiceTests {
     }
 
     @Test
+    void createLiveReservationWithInterestedAliasDoesNotCreateFakeCustomerOrCustomerOrder() {
+        Branch branch = branch();
+        Item item = item(ItemStatus.AVAILABLE, branch);
+        SalesChannel channel = channel(3L, ChannelCode.LIVE);
+        Live live = live(branch);
+        ReservationService.CreateReservationRequest request = request(channel.getId(), live.getId());
+        request.setCustomerId(null);
+        request.setInterestedAlias("  @maria_live  ");
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(itemRepository.findById(8L)).thenReturn(Optional.of(item));
+        when(branchRepository.findById(6L)).thenReturn(Optional.of(branch));
+        when(salesChannelRepository.findById(channel.getId())).thenReturn(Optional.of(channel));
+        when(liveRepository.findById(4L)).thenReturn(Optional.of(live));
+        when(repository.findByItemIdAndStatus(8L, ReservationStatus.ACTIVE)).thenReturn(Optional.empty());
+        when(itemRepository.reserveIfAvailable(2L, 6L, 8L, ItemStatus.AVAILABLE, ItemStatus.RESERVED))
+                .thenReturn(1);
+        when(repository.saveAndFlush(any(Reservation.class))).thenAnswer(invocation -> {
+            Reservation reservation = invocation.getArgument(0);
+            ReflectionTestUtils.setField(reservation, "id", 10L);
+            return reservation;
+        });
+        stubSellerName();
+
+        ReservationResponse response = service.create(request);
+
+        assertEquals(10L, response.getId());
+        assertNull(response.getCustomerId());
+        assertNull(response.getCustomerName());
+        assertEquals("@maria_live", response.getInterestedAlias());
+        assertEquals("RESERVED", response.getLiveOperationalStatus());
+        verify(customerRepository, never()).findById(any());
+        verify(customerOrderService, never()).addReservationToOpenOrder(any(Reservation.class));
+        verify(customerOrderService, never()).refreshStatus(any());
+        verify(accessService).assertCan(
+                99L,
+                PermissionCode.DO_LIVE_RESERVATION,
+                ChannelCode.LIVE,
+                6L
+        );
+        verify(liveEventService).record(
+                live,
+                LiveEventType.LIVE_RESERVATION_CREATED,
+                99L,
+                "RESERVATION",
+                10L,
+                "{\"reservationId\":10,\"itemId\":8,\"interestedAlias\":\"@maria_live\",\"operationalStatus\":\"RESERVED\"}"
+        );
+    }
+
+    @Test
+    void createRejectsWhenCustomerAndInterestedAliasAreMissing() {
+        Branch branch = branch();
+        Item item = item(ItemStatus.AVAILABLE, branch);
+        SalesChannel channel = channel(3L, ChannelCode.LIVE);
+        ReservationService.CreateReservationRequest request = request(channel.getId(), 4L);
+        request.setCustomerId(null);
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(itemRepository.findById(8L)).thenReturn(Optional.of(item));
+        when(branchRepository.findById(6L)).thenReturn(Optional.of(branch));
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.create(request)
+        );
+
+        assertEquals("Selecciona un cliente o escribe un alias/nick del interesado.", exception.getMessage());
+        verify(customerRepository, never()).findById(any());
+        verify(repository, never()).saveAndFlush(any(Reservation.class));
+        verify(rejectionTraceService).record(
+                eq(2L),
+                eq(6L),
+                eq(99L),
+                eq(8L),
+                eq(4L),
+                any(),
+                eq(ReservationRejectionReason.VALIDATION_REJECTED),
+                eq("Selecciona un cliente o escribe un alias/nick del interesado."),
+                any(),
+                any()
+        );
+    }
+
+    @Test
+    void createRejectsShortInterestedAlias() {
+        Branch branch = branch();
+        Item item = item(ItemStatus.AVAILABLE, branch);
+        SalesChannel channel = channel(3L, ChannelCode.LIVE);
+        ReservationService.CreateReservationRequest request = request(channel.getId(), 4L);
+        request.setCustomerId(null);
+        request.setInterestedAlias("x");
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(itemRepository.findById(8L)).thenReturn(Optional.of(item));
+        when(branchRepository.findById(6L)).thenReturn(Optional.of(branch));
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.create(request)
+        );
+
+        assertEquals("El alias debe tener al menos 2 caracteres.", exception.getMessage());
+        verify(customerRepository, never()).findById(any());
+        verify(repository, never()).saveAndFlush(any(Reservation.class));
+    }
+
+    @Test
     void createLiveReservationWithIdempotencyKeyKeepsLivePermissionAndUsesAtomicUpdate() {
         Branch branch = branch();
         Item item = item(ItemStatus.AVAILABLE, branch);
@@ -837,9 +946,13 @@ class ReservationServiceTests {
     }
 
     private static String hashReservationRequest(ReservationService.CreateReservationRequest request) {
+        String aliasPart = request.getInterestedAlias() == null
+                ? ""
+                : "interestedAlias=" + valuePart(request.getInterestedAlias()) + "\n";
         return sha256(
                 "itemId=" + valuePart(request.getItemId()) + "\n"
                         + "customerId=" + valuePart(request.getCustomerId()) + "\n"
+                        + aliasPart
                         + "branchId=" + valuePart(request.getBranchId()) + "\n"
                         + "liveId=" + valuePart(request.getLiveId()) + "\n"
                         + "salesChannelId=" + valuePart(request.getSalesChannelId()) + "\n"

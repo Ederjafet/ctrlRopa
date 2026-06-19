@@ -145,6 +145,10 @@ public class CustomerPackageService {
             throw new IllegalArgumentException("Primero asigna una caja o ubicacion fisica al apartado");
         }
 
+        if (reservation.getCustomer() == null) {
+            throw new IllegalArgumentException("El apartado debe tener cliente formal antes de crear paquete");
+        }
+
         if (itemRepository.existsByReservationId(reservation.getId())) {
             throw new IllegalArgumentException("La reserva ya esta en otro paquete");
         }
@@ -510,6 +514,10 @@ public class CustomerPackageService {
 
     private void validateReservationAgainstPackage(CustomerPackage customerPackage, Reservation reservation, Item item) {
         tenantAccessGuard.requireBranch(reservation.getBranch().getId(), "La reserva no pertenece a la sucursal activa");
+        if (reservation.getCustomer() == null) {
+            throw new IllegalArgumentException("La reserva debe tener cliente formal para agregarse al paquete");
+        }
+
         if (!reservation.getCustomer().getId().equals(customerPackage.getCustomer().getId())) {
             throw new IllegalArgumentException("La reserva no pertenece al cliente del paquete");
         }

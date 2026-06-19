@@ -10,6 +10,7 @@ public class ReservationResponse {
     private String itemCode;
     private Long customerId;
     private String customerName;
+    private String interestedAlias;
     private Long branchId;
     private String branchCode;
     private Long customerOrderId;
@@ -42,6 +43,7 @@ public class ReservationResponse {
                                String itemCode,
                                Long customerId,
                                String customerName,
+                               String interestedAlias,
                                Long branchId,
                                String branchCode,
                                Long customerOrderId,
@@ -70,6 +72,7 @@ public class ReservationResponse {
         this.itemCode = itemCode;
         this.customerId = customerId;
         this.customerName = customerName;
+        this.interestedAlias = interestedAlias;
         this.branchId = branchId;
         this.branchCode = branchCode;
         this.customerOrderId = customerOrderId;
@@ -100,6 +103,7 @@ public class ReservationResponse {
     public String getItemCode() { return itemCode; }
     public Long getCustomerId() { return customerId; }
     public String getCustomerName() { return customerName; }
+    public String getInterestedAlias() { return interestedAlias; }
     public Long getBranchId() { return branchId; }
     public String getBranchCode() { return branchCode; }
     public Long getCustomerOrderId() { return customerOrderId; }
