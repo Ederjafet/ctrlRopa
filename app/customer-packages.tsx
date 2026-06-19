@@ -15,7 +15,7 @@ import {
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 
 function formatDate(value?: string) {
   if (!value) return 'Sin fecha';
@@ -31,6 +31,15 @@ function statusLabel(status?: string) {
   if (status === 'DELIVERED') return 'Entregado';
   if (status === 'CANCELLED') return 'Cancelado';
   return status || 'Sin estado';
+}
+
+function getPackageNextAction(status?: string) {
+  if (status === 'OPEN') return 'Preparar paquete';
+  if (status === 'READY') return 'Listo para envio';
+  if (status === 'SHIPPED') return 'Seguimiento de envio';
+  if (status === 'DELIVERED') return 'Entregado';
+  if (status === 'CANCELLED') return 'Cancelado';
+  return 'Ver detalle';
 }
 
 function isActiveCustomer(customer: Customer) {
@@ -50,6 +59,7 @@ export default function CustomerPackagesScreen() {
   const [packages, setPackages] = useState<CustomerPackage[]>([]);
   const [search, setSearch] = useState('');
   const [notes, setNotes] = useState('');
+  const [actionsPackage, setActionsPackage] = useState<CustomerPackage | null>(null);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -137,12 +147,42 @@ export default function CustomerPackagesScreen() {
     }
   };
 
+  const renderHeaderActions = () => (
+    <View style={styles.headerActions}>
+      {selectedCustomerId ? (
+        <AppButton
+          title="Nuevo paquete"
+          onPress={() => setCreateModalVisible(true)}
+          style={styles.headerButton}
+        />
+      ) : null}
+      {selectedCustomerId ? (
+        <AppButton
+          title="Volver"
+          variant="secondary"
+          onPress={() => router.replace('/customer-packages' as any)}
+          style={styles.headerButton}
+        />
+      ) : null}
+      <AppButton
+        title="Actualizar"
+        variant="secondary"
+        onPress={loadData}
+        loading={isLoading}
+        disabled={isLoading}
+        style={styles.headerButton}
+      />
+    </View>
+  );
+
   if (isLoading) {
     return (
       <AppShellPage
         title="Paquetes"
-        subtitle="Preparacion y seguimiento por cliente"
-        activeRoute="customers"
+        subtitle="Gestion de paquetes, pago y preparacion de envio"
+        activeRoute="customer-packages"
+        compactHeader
+        rightContent={renderHeaderActions()}
       >
         <ActivityIndicator />
       </AppShellPage>
@@ -153,15 +193,18 @@ export default function CustomerPackagesScreen() {
     return (
       <AppShellPage
         title="Paquetes"
-        subtitle="Preparacion y seguimiento por cliente"
-        activeRoute="customers"
+        subtitle="Gestion de paquetes, pago y preparacion de envio"
+        metadata="Selecciona un cliente para ver sus paquetes"
+        activeRoute="customer-packages"
+        compactHeader
+        rightContent={renderHeaderActions()}
       >
         <AppCard>
           <AppText variant="subtitle" bold>
-            Selecciona cliente
+            Clientes con paquetes
           </AppText>
           <AppText color={theme.colors.mutedText}>
-            Los paquetes se preparan por cliente para entrega o envío. Venta puerta no genera paquete porque se entrega de inmediato.
+            Los paquetes se consultan por cliente porque el backend actual expone este read-model.
           </AppText>
 
           <AppInput
@@ -193,39 +236,57 @@ export default function CustomerPackagesScreen() {
   }
 
   const renderPackage = (item: CustomerPackage) => (
-    <Pressable
+    <View
       key={item.id}
-      onPress={() => router.push(`/customer-package-detail?id=${item.id}` as any)}
-      style={({ pressed }) => [
+      style={[
         styles.packageRow,
         {
-          borderBottomColor: theme.colors.border,
-          opacity: pressed ? 0.75 : 1,
+          borderColor: theme.colors.border,
+          backgroundColor: theme.colors.surface,
         },
       ]}
     >
-      <View style={styles.packageText}>
-        <AppText bold>{item.folio}</AppText>
-        <AppText>Estado: {statusLabel(item.status)}</AppText>
-        <AppText color={theme.colors.mutedText}>Fecha: {formatDate(item.createdAt)}</AppText>
-        {item.notes ? <AppText>Notas: {item.notes}</AppText> : null}
+      <View style={styles.packageIdentity}>
+        <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+          Paquete #{item.id} - {item.folio}
+        </AppText>
+        <AppText bold numberOfLines={1}>
+          Cliente - {customer?.name || item.customerName || `#${item.customerId}`}
+        </AppText>
       </View>
-      <AppButton title="Ver" variant="secondary" onPress={() => router.push(`/customer-package-detail?id=${item.id}` as any)} />
-    </Pressable>
+      <View style={styles.packageMeta}>
+        <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+          {statusLabel(item.status)} - {getPackageNextAction(item.status)}
+        </AppText>
+        <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+          Creado: {formatDate(item.createdAt)}
+        </AppText>
+      </View>
+      <View style={styles.packageActions}>
+        <AppButton
+          title="Detalle"
+          variant="secondary"
+          onPress={() => router.push(`/customer-package-detail?id=${item.id}` as any)}
+          style={styles.compactButton}
+        />
+        <AppButton
+          title="Mas"
+          variant="secondary"
+          onPress={() => setActionsPackage(item)}
+          style={styles.compactButton}
+        />
+      </View>
+    </View>
   );
 
   return (
     <AppShellPage
-      title="Paquetes del cliente"
-      subtitle="Preparacion e historial de entrega"
-      activeRoute="customers"
-      rightContent={
-        <AppButton
-          title="Volver"
-          variant="secondary"
-          onPress={() => router.replace('/customer-packages' as any)}
-        />
-      }
+      title="Paquetes"
+      subtitle="Gestion de paquetes, pago y preparacion de envio"
+      metadata={customer?.name ? `Cliente: ${customer.name}` : undefined}
+      activeRoute="customer-packages"
+      compactHeader
+      rightContent={renderHeaderActions()}
     >
       <AppCard>
         <AppText variant="subtitle" bold>
@@ -233,8 +294,6 @@ export default function CustomerPackagesScreen() {
         </AppText>
         <AppText color={theme.colors.mutedText}>{customer?.phone || 'Sin teléfono'}</AppText>
       </AppCard>
-
-      <AppButton title="+ Nuevo paquete" onPress={() => setCreateModalVisible(true)} />
 
       <AppCard>
         <AppText variant="subtitle" bold>
@@ -286,16 +345,103 @@ export default function CustomerPackagesScreen() {
           disabled={isCreating}
         />
       </AppBottomModal>
+
+      <AppBottomModal
+        visible={Boolean(actionsPackage)}
+        title={actionsPackage ? `Paquete ${actionsPackage.folio}` : 'Paquete'}
+        onClose={() => setActionsPackage(null)}
+      >
+        {actionsPackage ? (
+          <>
+            <AppCard variant="subtle" style={styles.actionSummary}>
+              <AppText bold>
+                {customer?.name || actionsPackage.customerName || `Cliente #${actionsPackage.customerId}`}
+              </AppText>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                {statusLabel(actionsPackage.status)} - {getPackageNextAction(actionsPackage.status)}
+              </AppText>
+            </AppCard>
+            <View style={styles.modalActionsStack}>
+              <AppButton
+                title="Detalle"
+                variant="secondary"
+                onPress={() => {
+                  const id = actionsPackage.id;
+                  setActionsPackage(null);
+                  router.push(`/customer-package-detail?id=${id}` as any);
+                }}
+              />
+              <AppButton
+                title="Preparar para envio"
+                variant="neutral"
+                disabled
+                disabledReason="Disponible desde el detalle cuando el paquete este pagado y listo."
+              />
+              <AppButton
+                title="Registrar pago"
+                variant="neutral"
+                disabled
+                disabledReason="El pago de paquete queda pendiente de flujo agregado."
+              />
+            </View>
+          </>
+        ) : null}
+      </AppBottomModal>
     </AppShellPage>
   );
 }
 
 const styles = StyleSheet.create({
-  packageRow: {
-    borderBottomWidth: 1,
-    paddingVertical: 12,
+  actionSummary: {
+    marginBottom: 10,
   },
-  packageText: {
-    marginBottom: 8,
+  compactButton: {
+    minHeight: 30,
+    minWidth: 66,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  headerActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    justifyContent: 'flex-end',
+  },
+  headerButton: {
+    minHeight: 30,
+    minWidth: 94,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  modalActionsStack: {
+    gap: 8,
+  },
+  packageActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    justifyContent: 'flex-end',
+  },
+  packageIdentity: {
+    flex: 1.15,
+    gap: 3,
+    minWidth: 160,
+  },
+  packageMeta: {
+    flex: 1,
+    gap: 3,
+    minWidth: 140,
+  },
+  packageRow: {
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 10,
+    padding: 12,
   },
 });

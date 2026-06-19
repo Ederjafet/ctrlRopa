@@ -442,12 +442,27 @@ export default function DoorReservationScreen() {
     }
   };
 
+  const renderHeaderActions = () => (
+    <View style={styles.headerActions}>
+      <AppButton
+        title="Actualizar"
+        variant="secondary"
+        onPress={loadData}
+        loading={isLoading}
+        disabled={isLoading || isSaving}
+        style={styles.headerButton}
+      />
+    </View>
+  );
+
   if (isAllowed === null || isLoading) {
     return (
       <AppShellPage
         title={t('navigation.items.doorHold')}
         subtitle={t('operationalScreens.doorReservation.subtitle')}
         activeRoute="door-reservation"
+        compactHeader
+        rightContent={renderHeaderActions()}
       >
         <ActivityIndicator />
       </AppShellPage>
@@ -460,6 +475,8 @@ export default function DoorReservationScreen() {
         title={t('navigation.items.doorHold')}
         subtitle={t('operationalScreens.doorReservation.subtitle')}
         activeRoute="door-reservation"
+        compactHeader
+        rightContent={renderHeaderActions()}
       >
 
       <AppCard>
@@ -799,6 +816,19 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
+  },
+  headerActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    justifyContent: 'flex-end',
+  },
+  headerButton: {
+    minHeight: 30,
+    minWidth: 94,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   modalList: {
     maxHeight: 420,

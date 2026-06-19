@@ -1,9 +1,8 @@
-import AppBackButton from '@/components/ui/AppBackButton';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
-import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { hasRole } from '@/services/accessControl';
@@ -41,6 +40,7 @@ export default function ShipmentsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [actionsShipment, setActionsShipment] = useState<Shipment | null>(null);
   const [deliveryType, setDeliveryType] = useState<ShipmentDeliveryType>('LOCAL');
   const [guideReference, setGuideReference] = useState('');
 
@@ -112,25 +112,62 @@ export default function ShipmentsScreen() {
     }
   };
 
+  const renderHeaderActions = () => (
+    <View style={styles.headerActions}>
+      <AppButton
+        title="Nuevo envio"
+        onPress={() => setCreateModalVisible(true)}
+        style={styles.headerButton}
+      />
+      <AppButton
+        title="Actualizar"
+        variant="secondary"
+        onPress={loadData}
+        loading={isLoading}
+        disabled={isLoading}
+        style={styles.headerButton}
+      />
+    </View>
+  );
+
   return (
     <>
-      <AppScreen>
-        <AppBackButton fallbackRoute="/" />
-
-        <AppText variant="title" bold>
-          Envíos
-        </AppText>
-
-        <AppCard>
-          <AppText variant="subtitle" bold>
-            Logística de paquetes
-          </AppText>
-          <AppText color={theme.colors.mutedText}>
-            Agrupa paquetes listos, despáchalos y resuelve cada entrega.
-          </AppText>
-        </AppCard>
-
-        <AppButton title="+ Nuevo envío" onPress={() => setCreateModalVisible(true)} />
+      <AppShellPage
+        title="Envios"
+        subtitle="Seguimiento de paquetes listos para enviar"
+        activeRoute="shipments"
+        session={session}
+        compactHeader
+        rightContent={renderHeaderActions()}
+      >
+        <View style={styles.kpiRow}>
+          <View
+            style={[
+              styles.kpiPill,
+              {
+                backgroundColor: theme.colors.surfaceAlt,
+                borderColor: theme.colors.border,
+              },
+            ]}
+          >
+            <AppText variant="caption" color={theme.colors.mutedText} bold>
+              Envios: {shipments.length}
+            </AppText>
+          </View>
+          <View
+            style={[
+              styles.kpiPill,
+              {
+                backgroundColor: theme.colors.surfaceAlt,
+                borderColor: theme.colors.border,
+              },
+            ]}
+          >
+            <AppText variant="caption" color={theme.colors.mutedText} bold>
+              En ruta: {shipments.filter((shipment) => shipment.status === 'OUT_FOR_DELIVERY').length}
+            </AppText>
+          </View>
+        </View>
 
         <AppInput
           label="Buscar"
@@ -149,56 +186,63 @@ export default function ShipmentsScreen() {
         ) : null}
 
         {filteredShipments.map((shipment) => (
-          <Pressable
+          <View
             key={shipment.id}
-            onPress={() => router.push(`/shipment-detail?id=${shipment.id}` as any)}
-            style={({ pressed }) => [
+            style={[
               styles.rowCard,
               {
                 borderColor: theme.colors.border,
                 backgroundColor: theme.colors.surface,
-                borderRadius: theme.radius.lg,
-                opacity: pressed ? 0.75 : 1,
               },
             ]}
           >
-            <View style={styles.rowHeader}>
-              <View style={styles.flex1}>
-                <AppText variant="subtitle" bold>
-                  {shipment.folio}
-                </AppText>
-                <AppText color={theme.colors.mutedText}>
-                  {shipmentDeliveryTypeLabel(shipment.deliveryType)} · {shipmentStatusLabel(shipment.status)}
-                </AppText>
-                <AppText variant="caption" color={theme.colors.mutedText}>
-                  {(shipment.packageCount ?? 0) > 0
-                    ? `${shipment.packageCount} paquete${shipment.packageCount === 1 ? '' : 's'}`
-                    : 'Sin paquetes'}
-                </AppText>
-              </View>
-              <AppText variant="caption" color={theme.colors.mutedText}>
-                {formatDate(shipment.createdAt)}
+            <View style={styles.shipmentIdentity}>
+              <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+                Envio #{shipment.id} - {shipment.folio}
+              </AppText>
+              <AppText bold numberOfLines={1}>
+                {shipmentDeliveryTypeLabel(shipment.deliveryType)} - {shipmentStatusLabel(shipment.status)}
               </AppText>
             </View>
 
-            {shipment.guideReference ? (
-              <AppText>Guía / referencia: {shipment.guideReference}</AppText>
-            ) : null}
-
-            {(shipment.packageCount ?? 0) === 0 ? (
-              <AppText color={theme.colors.warning}>
-                Borrador pendiente de agregar paquetes.
+            <View style={styles.shipmentMeta}>
+              <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+                {(shipment.packageCount ?? 0) > 0
+                  ? `${shipment.packageCount} paquete${shipment.packageCount === 1 ? '' : 's'}`
+                  : 'Sin paquetes'}
               </AppText>
-            ) : null}
-
-            {shipment.dispatchedAt ? (
-              <AppText color={theme.colors.mutedText}>
-                Despachado: {formatDate(shipment.dispatchedAt)}
+              <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+                {shipment.guideReference ? `Guia: ${shipment.guideReference}` : 'Sin guia'}
               </AppText>
-            ) : null}
-          </Pressable>
+            </View>
+
+            <View style={styles.shipmentActions}>
+              <View style={styles.shipmentDateBlock}>
+                <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+                  {shipment.dispatchedAt ? `Despachado: ${formatDate(shipment.dispatchedAt)}` : formatDate(shipment.createdAt)}
+                </AppText>
+                {(shipment.packageCount ?? 0) === 0 ? (
+                  <AppText variant="caption" color={theme.colors.warning} numberOfLines={1}>
+                    Pendiente: agregar paquetes
+                  </AppText>
+                ) : null}
+              </View>
+              <AppButton
+                title="Detalle"
+                variant="secondary"
+                onPress={() => router.push(`/shipment-detail?id=${shipment.id}` as any)}
+                style={styles.compactButton}
+              />
+              <AppButton
+                title="Mas"
+                variant="secondary"
+                onPress={() => setActionsShipment(shipment)}
+                style={styles.compactButton}
+              />
+            </View>
+          </View>
         ))}
-      </AppScreen>
+      </AppShellPage>
 
       <AppBottomModal
         visible={createModalVisible}
@@ -253,23 +297,113 @@ export default function ShipmentsScreen() {
           disabled={isCreating}
         />
       </AppBottomModal>
+
+      <AppBottomModal
+        visible={Boolean(actionsShipment)}
+        title={actionsShipment ? `Envio ${actionsShipment.folio}` : 'Envio'}
+        onClose={() => setActionsShipment(null)}
+      >
+        {actionsShipment ? (
+          <View style={styles.modalActionsStack}>
+            <AppButton
+              title="Detalle"
+              variant="secondary"
+              onPress={() => {
+                const id = actionsShipment.id;
+                setActionsShipment(null);
+                router.push(`/shipment-detail?id=${id}` as any);
+              }}
+            />
+            <AppButton
+              title="Gestionar paquetes"
+              variant="operation"
+              onPress={() => {
+                const id = actionsShipment.id;
+                setActionsShipment(null);
+                router.push(`/shipment-detail?id=${id}` as any);
+              }}
+            />
+            <AppButton
+              title="Marcar enviado"
+              variant="neutral"
+              disabled
+              disabledReason="Disponible desde el detalle cuando el envio tenga paquetes listos."
+            />
+          </View>
+        ) : null}
+      </AppBottomModal>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  flex1: {
-    flex: 1,
+  compactButton: {
+    minHeight: 30,
+    minWidth: 66,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  headerActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    justifyContent: 'flex-end',
+  },
+  headerButton: {
+    minHeight: 30,
+    minWidth: 94,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  kpiPill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    minHeight: 30,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  kpiRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 10,
+  },
+  modalActionsStack: {
+    gap: 8,
   },
   rowCard: {
+    alignItems: 'center',
+    borderRadius: 10,
     borderWidth: 1,
-    marginTop: 12,
-    padding: 14,
-  },
-  rowHeader: {
     flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 12,
+    padding: 12,
+  },
+  shipmentActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    justifyContent: 'flex-end',
+    minWidth: 220,
+  },
+  shipmentDateBlock: {
+    alignItems: 'flex-end',
+    gap: 2,
+    minWidth: 130,
+  },
+  shipmentIdentity: {
+    flex: 1.15,
+    gap: 3,
+    minWidth: 160,
+  },
+  shipmentMeta: {
+    flex: 1,
+    gap: 3,
+    minWidth: 140,
   },
   typeOption: {
     alignItems: 'center',
