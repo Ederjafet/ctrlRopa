@@ -63,8 +63,8 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
         items: [
           {
             key: 'platform-panel',
-            label: 'Panel Plataforma',
-            helper: 'Clientes / Compañías',
+            label: 'Panel Owner',
+            helper: 'Dashboard SaaS',
             route: '/platform?section=dashboard',
             activeFor: ['platform-dashboard'],
             icon: 'business' as const,
@@ -172,7 +172,7 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
 
   const platformItems = [
     platformAllowed
-      ? { key: 'platform', label: 'Panel Plataforma', helper: 'Clientes / Compañías', route: '/platform', activeFor: ['platform', '/platform'], icon: 'business' as const }
+      ? { key: 'platform', label: 'Panel Owner', helper: 'Dashboard SaaS', route: '/platform', activeFor: ['platform', '/platform'], icon: 'business' as const }
       : null,
   ].filter(Boolean);
 

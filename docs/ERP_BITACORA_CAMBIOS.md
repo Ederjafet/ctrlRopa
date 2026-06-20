@@ -1,5 +1,28 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-20 - FAST-OWNER-UX-E reestructura Panel Owner
+
+Tipo: frontend, UX SaaS Owner, documentacion.
+
+Objetivo:
+
+- Eliminar la navegacion horizontal duplicada dentro de `/platform` y dejar el menu lateral como navegacion principal del Platform Owner.
+
+Cambios realizados:
+
+- Se retira la barra interna que repetia Panel Plataforma, Clientes, Sucursales, Usuarios, Modulos, Limites, Planes, Tarifas, Uso y Auditoria.
+- La cabecera de `/platform` queda como `Panel Owner AppModa` / `Administracion SaaS multiempresa`.
+- Las secciones dependientes de cliente muestran contexto compacto `Administrando: {company}` y CTA para seleccionar compania.
+- Sucursales, Usuarios, Modulos, Limites y Tarifas muestran mensaje claro si no hay compania seleccionada.
+- El menu lateral renombra `Panel Plataforma` a `Panel Owner`.
+- Se documenta la fase en `docs/FAST_OWNER_UX_E_RESTRUCTURA_PANEL_OWNER.md`.
+
+Restricciones respetadas:
+
+- No se toco backend.
+- No se hizo merge a `main`.
+- No se agrego boton `Actualizar` fuera de LIVE.
+
 ## 2026-06-19 - FAST-PLATFORM-D SaaS Owner y base de suscripciones
 
 Tipo: backend, frontend, migracion, plataforma SaaS, cobranza base, documentacion.
