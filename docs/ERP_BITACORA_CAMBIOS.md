@@ -1,5 +1,31 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-20 - FAST-OWNER-UX-F refinamiento final Panel Owner
+
+Tipo: frontend, UX SaaS Owner, backend minimo de gating, documentacion.
+
+Objetivo:
+
+- Refinar `/platform` para instalacion cliente, centralizar Claro/Oscuro en layout global y controlar `Apariencia / Branding` por permiso y modulo de compania.
+
+Cambios realizados:
+
+- Se compacta el dashboard SaaS y se eliminan accesos rapidos que parecian navegacion paralela.
+- El contexto de cliente activo queda como franja compacta en secciones dependientes.
+- Botones ambiguos como `Seleccionar` se reemplazan por acciones explicitas: `Usar como cliente activo`, `Ver uso`, `Configurar precios`.
+- `Planes / Suscripciones` separa modelo de cobro, plan asignado, periodicidad y estado.
+- `Modulos activos` usa grid responsive y agrega el modulo `Personalizacion UI / Branding`.
+- Claro/Oscuro se mueve al menu lateral global y se retira de `TopBar`/`ui-kit`.
+- `Apariencia / Branding` ahora requiere `MANAGE_BRANDING` y modulo `APPEARANCE_CUSTOMIZATION` habilitado.
+- Se documenta la brecha de roles/permisos por compania como `FAST-RBAC-TENANT-A`.
+- Se documenta la fase en `docs/FAST_OWNER_UX_F_REFINAMIENTO_FINAL_UI_ROLES.md`.
+
+Restricciones respetadas:
+
+- No se hizo merge a `main`.
+- No se agrego `Actualizar` fuera de LIVE.
+- No se implemento pasarela de pago ni facturacion real.
+
 ## 2026-06-20 - FAST-OWNER-UX-E reestructura Panel Owner
 
 Tipo: frontend, UX SaaS Owner, documentacion.

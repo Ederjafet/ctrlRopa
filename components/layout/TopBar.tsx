@@ -32,12 +32,11 @@ export default function TopBar({
   showMenuButton,
   compact = false,
 }: Props) {
-  const { theme, toggleThemeMode } = useAppTheme();
+  const { theme } = useAppTheme();
   const { isPhone, isWideDesktop } = useResponsiveLayout();
   const { t } = useTranslation('common');
   const roleLabel = session?.roles?.map((role) => role.code).join(', ') || t('navigation.noRole');
   const showCompactRole = Boolean(session && !isWideDesktop);
-  const nextThemeLabel = theme.isDark ? t('theme.light') : t('theme.dark');
 
   return (
     <View
@@ -111,37 +110,6 @@ export default function TopBar({
           compact && isPhone ? styles.actionBlockMinimalPhone : null,
         ]}
       >
-        <Pressable
-          onPress={toggleThemeMode}
-          accessibilityRole="button"
-          accessibilityLabel={nextThemeLabel}
-          style={({ pressed }) => [
-            styles.themeButton,
-            compact ? styles.themeButtonCompact : null,
-            {
-              backgroundColor: theme.colors.neutralButtonBackground,
-              borderColor: theme.colors.borderStrong,
-              borderRadius: designTokens.radius.full,
-              opacity: pressed ? 0.75 : 1,
-            },
-          ]}
-        >
-          <MaterialIcons
-            name={theme.isDark ? 'light-mode' : 'dark-mode'}
-            size={18}
-            color={theme.colors.neutralButtonText}
-          />
-          {!isPhone ? (
-            <AppText
-              variant="caption"
-              color={theme.colors.neutralButtonText}
-              bold
-              style={compact ? styles.themeButtonTextCompact : null}
-            >
-              {nextThemeLabel}
-            </AppText>
-          ) : null}
-        </Pressable>
         {showCompactRole ? (
           <StatusBadge label={roleLabel} tone="info" />
         ) : null}
@@ -190,24 +158,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 15,
     marginTop: 1,
-  },
-  themeButton: {
-    alignItems: 'center',
-    borderWidth: 1,
-    minHeight: 36,
-    flexDirection: 'row',
-    gap: designTokens.spacing.xs,
-    paddingHorizontal: designTokens.spacing.sm,
-    paddingVertical: designTokens.spacing.xs,
-  },
-  themeButtonCompact: {
-    minHeight: 30,
-    paddingHorizontal: designTokens.spacing.sm,
-    paddingVertical: 4,
-  },
-  themeButtonTextCompact: {
-    fontSize: 11,
-    lineHeight: 14,
   },
   topBar: {
     alignItems: 'center',

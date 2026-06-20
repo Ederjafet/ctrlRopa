@@ -54,6 +54,9 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
     hasModuleEnabled(session, 'REPORTS');
   const securityAuditAllowed = canAccessByPermission(session, 'VIEW_SECURITY_AUDIT') || isAdmin(session);
   const adminAllowed = isAdmin(session);
+  const appearanceAllowed =
+    canAccessByPermission(session, 'MANAGE_BRANDING') &&
+    hasModuleEnabled(session, 'APPEARANCE_CUSTOMIZATION');
   const platformAllowed = canAccessPlatform(session);
 
   if (platformAllowed && isPlatformOwner(session)) {
@@ -242,7 +245,7 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
     systemAllowed
       ? { key: 'system', label: 'Sistema', labelKey: 'navigation.items.system', route: '/system', activeFor: ['system', '/system'], icon: 'settings' as const }
       : null,
-    adminAllowed
+    appearanceAllowed
       ? { key: 'appearance', label: 'Apariencia / Branding', labelKey: 'navigation.items.appearance', route: '/appearance', activeFor: ['appearance', '/appearance'], icon: 'palette' as const }
       : null,
   ].filter(Boolean);

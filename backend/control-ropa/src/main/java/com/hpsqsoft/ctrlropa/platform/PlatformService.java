@@ -38,7 +38,8 @@ public class PlatformService {
             new ModuleDefinition("MULTI_BRANCH", "Multi sucursal"),
             new ModuleDefinition("CASH_CLOSURES", "Cortes de caja"),
             new ModuleDefinition("CONSIGNMENTS", "Consignacion"),
-            new ModuleDefinition("RETURNS_REFUNDS", "Devoluciones y refunds")
+            new ModuleDefinition("RETURNS_REFUNDS", "Devoluciones y refunds"),
+            new ModuleDefinition("APPEARANCE_CUSTOMIZATION", "Personalizacion UI / Branding")
     );
     private static final List<String> BILLING_PERIODS = List.of(
             "MONTHLY",

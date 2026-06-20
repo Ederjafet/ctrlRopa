@@ -13,7 +13,7 @@ import {
   ThemeMode,
   updateAppearanceSettings,
 } from '@/services/appearanceService';
-import { isAdmin } from '@/services/accessControl';
+import { canAccessByPermission, hasModuleEnabled } from '@/services/accessControl';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -123,7 +123,10 @@ export default function AppearanceScreen() {
         return;
       }
 
-      if (!isAdmin(session)) {
+      if (
+        !canAccessByPermission(session, 'MANAGE_BRANDING') ||
+        !hasModuleEnabled(session, 'APPEARANCE_CUSTOMIZATION')
+      ) {
         router.replace('/access-denied');
         return;
       }

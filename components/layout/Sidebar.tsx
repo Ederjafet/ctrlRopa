@@ -24,9 +24,10 @@ type Props = {
 };
 
 export default function Sidebar({ sections, activeRoute, onNavigate, session, onClose, onSignOut }: Props) {
-  const { theme } = useAppTheme();
+  const { theme, toggleThemeMode } = useAppTheme();
   const { t } = useTranslation('common');
   const roleLabel = session?.roles?.map((role) => role.code).join(', ') || t('navigation.noRole');
+  const nextThemeLabel = theme.isDark ? t('theme.light') : t('theme.dark');
   const normalizedActiveRoute = activeRoute?.replace(/^\//, '');
   const isActiveItem = (item: SidebarNavItemConfig) => {
     const normalizedItemRoute = item.route?.replace(/^\//, '');
@@ -151,6 +152,29 @@ export default function Sidebar({ sections, activeRoute, onNavigate, session, on
             </AppText>
           </View>
           <Pressable
+            onPress={toggleThemeMode}
+            accessibilityRole="button"
+            accessibilityLabel={nextThemeLabel}
+            style={({ pressed }) => [
+              styles.themeToggleButton,
+              {
+                backgroundColor: theme.colors.neutralButtonBackground,
+                borderColor: theme.colors.borderStrong,
+                borderRadius: designTokens.radius.md,
+                opacity: pressed ? 0.72 : 1,
+              },
+            ]}
+          >
+            <MaterialIcons
+              name={theme.isDark ? 'light-mode' : 'dark-mode'}
+              size={18}
+              color={theme.colors.neutralButtonText}
+            />
+            <AppText color={theme.colors.neutralButtonText} bold>
+              {nextThemeLabel}
+            </AppText>
+          </Pressable>
+          <Pressable
             onPress={onSignOut}
             accessibilityRole="button"
             style={({ pressed }) => [
@@ -244,6 +268,16 @@ const styles = StyleSheet.create({
     gap: designTokens.spacing.sm,
     justifyContent: 'center',
     minHeight: 44,
+    paddingHorizontal: designTokens.spacing.md,
+    paddingVertical: designTokens.spacing.sm,
+  },
+  themeToggleButton: {
+    alignItems: 'center',
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: designTokens.spacing.sm,
+    justifyContent: 'center',
+    minHeight: 40,
     paddingHorizontal: designTokens.spacing.md,
     paddingVertical: designTokens.spacing.sm,
   },

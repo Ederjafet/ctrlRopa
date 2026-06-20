@@ -50,7 +50,6 @@ export default function UiKitPreview() {
   const {
     theme,
     themeMode,
-    toggleThemeMode,
     visualPresetId,
     customVisualIdentity,
     designPresets,
@@ -755,14 +754,9 @@ export default function UiKitPreview() {
         <AppCard style={styles.previewCard}>
           <SectionHeader
             title="Tema activo"
-            subtitle="El toggle vive en el TopBar y se guarda localmente"
+            subtitle="El cambio de tema vive en el menu lateral global"
           />
           <StatusBadge label={themeMode === 'DARK' ? 'Dark theme' : 'Light theme'} tone="info" />
-          <AppButton
-            title={themeMode === 'DARK' ? 'Cambiar a claro' : 'Cambiar a oscuro'}
-            variant="neutral"
-            onPress={toggleThemeMode}
-          />
         </AppCard>
         <AppCard style={styles.previewCard}>
           <SectionHeader title="Button variants" subtitle="Jerarquia visual base" />

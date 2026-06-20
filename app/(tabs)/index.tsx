@@ -8,6 +8,7 @@ import {
   canAccess,
   canAccessByPermission,
   hasRole,
+  hasModuleEnabled,
   isAdmin,
 } from '@/services/accessControl';
 import { logout as logoutSession, refreshSession } from '@/services/authService';
@@ -22,6 +23,7 @@ type DashboardAccess = {
   route?: string;
   channelCode?: string;
   permissionCode?: string;
+  moduleCode?: string;
   liveAccess?: boolean;
   adminOnly?: boolean;
   pending?: boolean;
@@ -62,7 +64,8 @@ const adminMainAccesses: DashboardAccess[] = [
   {
     label: 'Apariencia / Branding',
     route: '/appearance',
-    adminOnly: true,
+    permissionCode: 'MANAGE_BRANDING',
+    moduleCode: 'APPEARANCE_CUSTOMIZATION',
   },
 ];
 
@@ -203,6 +206,10 @@ const operationAccessGroups: DashboardAccessGroup[] = [
 ];
 
 function canShowAccess(user: UserSession | null, access: DashboardAccess) {
+  if (access.moduleCode && !hasModuleEnabled(user, access.moduleCode)) {
+    return false;
+  }
+
   if (access.adminOnly) {
     return isAdmin(user);
   }

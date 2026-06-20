@@ -80,7 +80,14 @@ public class OperationMenuService {
         modules.add(permissionOnly("REPORTS", "Reportes", userId, PermissionCode.VIEW_REPORTS));
         modules.add(permissionOnly("USERS", "Usuarios", userId, PermissionCode.MANAGE_USERS));
         modules.add(permissionOnly("ROLES", "Roles y permisos", userId, PermissionCode.MANAGE_ROLES));
-        modules.add(permissionOnly("BRANDING", "Apariencia / Branding", userId, PermissionCode.MANAGE_BRANDING));
+        modules.add(permissionAndCompanyModule(
+                "BRANDING",
+                "Apariencia / Branding",
+                userId,
+                user.companyId(),
+                PermissionCode.MANAGE_BRANDING,
+                "APPEARANCE_CUSTOMIZATION"
+        ));
 
         return new OperationMenuResponse(
                 userId,
@@ -170,6 +177,7 @@ public class OperationMenuService {
                 SELECT
                     u.id AS user_id,
                     u.branch_id AS branch_id,
+                    b.company_id AS company_id,
                     b.code AS branch_code,
                     b.name AS branch_name
                 FROM users u
@@ -180,10 +188,36 @@ public class OperationMenuService {
                 (rs, rowNum) -> new UserBranchRow(
                         rs.getLong("user_id"),
                         rs.getLong("branch_id"),
+                        rs.getLong("company_id"),
                         rs.getString("branch_code"),
                         rs.getString("branch_name")
                 ),
                 userId
+        );
+    }
+
+    private OperationMenuResponse.MenuModule permissionAndCompanyModule(String code,
+                                                                        String name,
+                                                                        Long userId,
+                                                                        Long companyId,
+                                                                        String permissionCode,
+                                                                        String moduleCode) {
+        boolean hasPermission = hasPermission(userId, permissionCode);
+        boolean moduleEnabled = isCompanyModuleEnabled(companyId, moduleCode);
+        boolean enabled = hasPermission && moduleEnabled;
+        String reason = null;
+
+        if (!hasPermission) {
+            reason = "Permiso requerido: " + permissionCode;
+        } else if (!moduleEnabled) {
+            reason = "Modulo deshabilitado: " + moduleCode;
+        }
+
+        return new OperationMenuResponse.MenuModule(
+                code,
+                name,
+                enabled,
+                reason
         );
     }
 
@@ -238,9 +272,27 @@ public class OperationMenuService {
         return count != null && count > 0;
     }
 
+    private boolean isCompanyModuleEnabled(Long companyId, String moduleCode) {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM company_modules
+                WHERE company_id = ?
+                  AND module_code = ?
+                  AND enabled = 1
+                """,
+                Integer.class,
+                companyId,
+                moduleCode
+        );
+
+        return count != null && count > 0;
+    }
+
     private record UserBranchRow(
             Long userId,
             Long branchId,
+            Long companyId,
             String branchCode,
             String branchName
     ) {

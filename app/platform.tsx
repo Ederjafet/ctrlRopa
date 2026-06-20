@@ -755,18 +755,26 @@ export default function PlatformScreen() {
     : null;
 
   const renderCompanyContext = () => (
-    <AppCard style={styles.panel}>
+    <View
+      style={[
+        styles.clientContextStrip,
+        {
+          backgroundColor: theme.colors.surfaceAlt,
+          borderColor: theme.colors.borderSubtle,
+        },
+      ]}
+    >
       <View style={[styles.rowBetween, isPhone ? styles.column : null]}>
         <View style={styles.flex}>
           <AppText variant="caption" color={theme.colors.mutedText} bold>
-            CONTEXTO DE CLIENTE
+            CLIENTE ACTIVO
           </AppText>
           <AppText variant="subtitle" bold>
-            {selectedCompany ? `Administrando: ${selectedCompany.name}` : 'Selecciona una compania primero'}
+            {selectedCompany ? selectedCompany.name : 'Selecciona una compania primero'}
           </AppText>
           <AppText variant="caption" color={theme.colors.mutedText}>
             {selectedCompany
-              ? `${selectedCompany.code} - ${selectedCompany.branchName || 'Sin sucursal principal'}`
+              ? `${selectedCompany.code} - ${selectedCompany.status} - ${selectedCompany.branchName || 'Sin sucursal principal'}`
               : 'Ve a Clientes / Companias para elegir el cliente que quieres configurar.'}
           </AppText>
         </View>
@@ -777,13 +785,13 @@ export default function PlatformScreen() {
           </View>
         ) : null}
         <AppButton
-          title={selectedCompany ? 'Cambiar cliente' : 'Seleccionar cliente'}
+          title={selectedCompany ? 'Cambiar cliente activo' : 'Elegir cliente activo'}
           variant="secondary"
           onPress={() => router.push('/platform?section=companies' as any)}
           style={styles.compactButton}
         />
       </View>
-    </AppCard>
+    </View>
   );
 
   const renderCompanyRequired = (message: string) => (
@@ -815,12 +823,22 @@ export default function PlatformScreen() {
           {renderMetric('Clientes con modelo consumo', usageSummary.filter((item) => item.billingModel === 'USAGE_BASED').length)}
           {renderMetric('Clientes con suscripcion activa', usageSummary.filter((item) => item.subscriptionStatus === 'ACTIVE').length)}
         </View>
-        <View style={styles.actionsRow}>
-          <AppButton title="Ver clientes" variant="secondary" onPress={() => router.push('/platform?section=companies' as any)} style={styles.compactButton} />
-          <AppButton title="Revisar suscripciones" variant="secondary" onPress={() => router.push('/platform?section=subscriptions' as any)} style={styles.compactButton} />
+      </AppCard>
+      <AppCard style={styles.panel}>
+        <View style={styles.sectionHeader}>
+          <StatusBadge label="PENDIENTES" tone={clientsWithoutPlan.length > 0 ? 'warning' : 'success'} />
+          <View style={styles.flex}>
+            <AppText variant="subtitle" bold>
+              Pendientes de instalacion SaaS
+            </AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {clientsWithoutPlan.length > 0
+                ? `${clientsWithoutPlan.length} clientes siguen sin plan o modelo de cobro configurado.`
+                : 'No hay clientes pendientes de plan en el resumen actual.'}
+            </AppText>
+          </View>
         </View>
       </AppCard>
-      {renderUsageList(true)}
     </View>
   );
 
@@ -905,7 +923,7 @@ export default function PlatformScreen() {
                   </AppText>
                 </View>
                 <AppButton
-                  title={selected ? 'Seleccionada' : 'Seleccionar'}
+                  title={selected ? 'Cliente activo' : 'Usar como cliente activo'}
                   variant={selected ? 'neutral' : 'secondary'}
                   disabled={selected || isPlatformCompany}
                   disabledReason={isPlatformCompany ? 'Tenant interno.' : 'La empresa ya esta seleccionada.'}
@@ -1389,7 +1407,7 @@ export default function PlatformScreen() {
                   LIVE {plan.includesLive ? 'si' : 'no'} - Reportes {plan.includesReports ? 'si' : 'no'} - Envios {plan.includesShipments ? 'si' : 'no'} - Paquetes {plan.includesPackages ? 'si' : 'no'}
                 </AppText>
               </View>
-              <AppButton title={selectedPlanId === plan.id ? 'Seleccionado' : 'Precios'} variant={selectedPlanId === plan.id ? 'neutral' : 'secondary'} onPress={() => setSelectedPlanId(plan.id)} style={styles.compactButton} />
+              <AppButton title={selectedPlanId === plan.id ? 'Plan para precios' : 'Configurar precios'} variant={selectedPlanId === plan.id ? 'neutral' : 'secondary'} onPress={() => setSelectedPlanId(plan.id)} style={styles.compactButton} />
             </View>
           ))
         )}
@@ -1443,21 +1461,33 @@ export default function PlatformScreen() {
           </AppText>
         </View>
       </View>
-      <View style={styles.actionsRow}>
-        {subscriptionPlans.map((plan) => (
-          <AppButton key={plan.id} title={plan.name} variant={subscriptionForm.planId === plan.id ? 'primary' : 'secondary'} onPress={() => setSubscriptionForm((current) => ({ ...current, planId: plan.id }))} style={styles.compactButton} />
-        ))}
-      </View>
+      <AppText variant="caption" color={theme.colors.mutedText} bold>
+        Modelo de cobro
+      </AppText>
       <View style={styles.actionsRow}>
         {BILLING_MODELS.map((model) => (
           <AppButton key={model.code} title={model.label} variant={subscriptionForm.billingModel === model.code ? 'primary' : 'secondary'} onPress={() => setSubscriptionForm((current) => ({ ...current, billingModel: model.code }))} style={styles.compactButton} />
         ))}
       </View>
+      <AppText variant="caption" color={theme.colors.mutedText} bold>
+        Plan asignado
+      </AppText>
+      <View style={styles.actionsRow}>
+        {subscriptionPlans.map((plan) => (
+          <AppButton key={plan.id} title={plan.name} variant={subscriptionForm.planId === plan.id ? 'primary' : 'secondary'} onPress={() => setSubscriptionForm((current) => ({ ...current, planId: plan.id }))} style={styles.compactButton} />
+        ))}
+      </View>
+      <AppText variant="caption" color={theme.colors.mutedText} bold>
+        Periodicidad
+      </AppText>
       <View style={styles.actionsRow}>
         {BILLING_PERIODS.map((period) => (
           <AppButton key={period.code} title={period.label} variant={subscriptionForm.billingPeriod === period.code ? 'primary' : 'secondary'} onPress={() => setSubscriptionForm((current) => ({ ...current, billingPeriod: period.code }))} style={styles.compactButton} />
         ))}
       </View>
+      <AppText variant="caption" color={theme.colors.mutedText} bold>
+        Estado
+      </AppText>
       <View style={styles.actionsRow}>
         {SUBSCRIPTION_STATUSES.map((status) => (
           <AppButton key={status.code} title={status.label} variant={subscriptionForm.status === status.code ? 'primary' : 'secondary'} onPress={() => setSubscriptionForm((current) => ({ ...current, status: status.code }))} style={styles.compactButton} />
@@ -1495,7 +1525,7 @@ export default function PlatformScreen() {
                 Usuarios {item.activeUsers}/{item.maxUsers ?? 'sin limite'} - Sucursales {item.activeBranches}/{item.maxBranches ?? 'sin limite'} - Modulos activos {item.activeModules}
               </AppText>
             </View>
-            <AppButton title={selectedCompanyId === item.companyId ? 'Seleccionado' : 'Seleccionar'} variant={selectedCompanyId === item.companyId ? 'neutral' : 'secondary'} onPress={() => setSelectedCompanyId(item.companyId)} style={styles.compactButton} />
+            <AppButton title={selectedCompanyId === item.companyId ? 'Uso visible' : 'Ver uso'} variant={selectedCompanyId === item.companyId ? 'neutral' : 'secondary'} onPress={() => setSelectedCompanyId(item.companyId)} style={styles.compactButton} />
           </View>
         ))}
       </View>
@@ -1572,6 +1602,13 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 10,
   },
+  clientContextStrip: {
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
   companyCard: {
     marginBottom: 0,
   },
@@ -1623,7 +1660,7 @@ const styles = StyleSheet.create({
   metricCard: {
     flex: 1,
     marginBottom: 0,
-    minWidth: 160,
+    minWidth: 135,
   },
   metricGrid: {
     flexDirection: 'row',
@@ -1634,6 +1671,8 @@ const styles = StyleSheet.create({
     minWidth: 100,
   },
   moduleGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
   moduleRow: {
@@ -1642,8 +1681,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     flexDirection: 'row',
+    flexGrow: 1,
+    flexShrink: 1,
     gap: 10,
     justifyContent: 'space-between',
+    minWidth: 230,
     padding: 10,
   },
   moneyInput: {
