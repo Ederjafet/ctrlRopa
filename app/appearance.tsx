@@ -1,10 +1,12 @@
 import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
+import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
 import ColorField from '@/components/ui/ColorField';
 import { AppDatePreview } from '@/components/ui/AppDateField';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import {
   AppearanceSettings,
   ButtonStyle,
@@ -104,6 +106,7 @@ const normalizeHex = (value?: string | null) => {
 export default function AppearanceScreen() {
   const router = useRouter();
   const { theme, reloadTheme } = useAppTheme();
+  const { isPhone } = useResponsiveLayout();
   const { t } = useTranslation('common');
   const [user, setUser] = useState<UserSession | null>(null);
   const [form, setForm] = useState<AppearanceSettings>(DEFAULT_FORM);
@@ -262,6 +265,7 @@ export default function AppearanceScreen() {
         subtitle={t('appearance.subtitle')}
         activeRoute="appearance"
         session={user}
+        compactHeader
       >
         <AppText>{t('common.loading')}</AppText>
       </AppShellPage>
@@ -274,43 +278,57 @@ export default function AppearanceScreen() {
       subtitle={t('appearance.subtitle')}
       activeRoute="appearance"
       session={user}
+      compactHeader
     >
+      <AppCard variant="info">
+        <AppText variant="subtitle" bold>
+          Apariencia por compania
+        </AppText>
+        <AppText color={theme.colors.mutedText}>
+          La ruta esta vigente y guarda configuracion visual mediante /api/appearance. El control fino por compania queda documentado como backlog de hardening.
+        </AppText>
+      </AppCard>
+
       <AppCard>
         <AppText variant="subtitle" bold>
           {t('appearance.identity')}
         </AppText>
 
-        <Field
-          label={t('appearance.systemName')}
-          value={form.appName || ''}
-          onChangeText={(value) => updateField('appName', value)}
-        />
+        <AppResponsiveGrid desktopColumns={2}>
+          <Field
+            label={t('appearance.systemName')}
+            value={form.appName || ''}
+            onChangeText={(value) => updateField('appName', value)}
+          />
 
-        <Field
-          label={t('appearance.logoUrl')}
-          value={form.logoUrl || ''}
-          onChangeText={(value) => updateField('logoUrl', value)}
-        />
+          <Field
+            label={t('appearance.logoUrl')}
+            value={form.logoUrl || ''}
+            onChangeText={(value) => updateField('logoUrl', value)}
+          />
 
-        <Field
-          label={t('appearance.faviconUrl')}
-          value={form.faviconUrl || ''}
-          onChangeText={(value) => updateField('faviconUrl', value)}
-        />
+          <Field
+            label={t('appearance.faviconUrl')}
+            value={form.faviconUrl || ''}
+            onChangeText={(value) => updateField('faviconUrl', value)}
+          />
 
-        <Field
-          label={t('appearance.loginLogoUrl')}
-          value={form.loginLogoUrl || ''}
-          onChangeText={(value) => updateField('loginLogoUrl', value)}
-        />
-        <LogoPreview title={t('appearance.loginPreview')} url={form.loginLogoUrl || form.logoUrl || ''} />
+          <Field
+            label={t('appearance.loginLogoUrl')}
+            value={form.loginLogoUrl || ''}
+            onChangeText={(value) => updateField('loginLogoUrl', value)}
+          />
 
-        <Field
-          label={t('appearance.printLogoUrl')}
-          value={form.printLogoUrl || ''}
-          onChangeText={(value) => updateField('printLogoUrl', value)}
-        />
-        <LogoPreview title={t('appearance.printPreview')} url={form.printLogoUrl || form.logoUrl || ''} />
+          <LogoPreview title={t('appearance.loginPreview')} url={form.loginLogoUrl || form.logoUrl || ''} />
+
+          <Field
+            label={t('appearance.printLogoUrl')}
+            value={form.printLogoUrl || ''}
+            onChangeText={(value) => updateField('printLogoUrl', value)}
+          />
+
+          <LogoPreview title={t('appearance.printPreview')} url={form.printLogoUrl || form.logoUrl || ''} />
+        </AppResponsiveGrid>
       </AppCard>
 
       <AppCard variant="info">
@@ -335,23 +353,25 @@ export default function AppearanceScreen() {
           {t('appearance.infoCardsHelp')}
         </AppText>
 
-        <ColorField
-          label={t('appearance.infoCardBackground')}
-          value={form.infoCardBackgroundColor || ''}
-          onChangeText={(value) => updateColorField('infoCardBackgroundColor', value)}
-        />
+        <AppResponsiveGrid desktopColumns={3}>
+          <ColorField
+            label={t('appearance.infoCardBackground')}
+            value={form.infoCardBackgroundColor || ''}
+            onChangeText={(value) => updateColorField('infoCardBackgroundColor', value)}
+          />
 
-        <ColorField
-          label={t('appearance.infoCardText')}
-          value={form.infoCardTextColor || ''}
-          onChangeText={(value) => updateColorField('infoCardTextColor', value)}
-        />
+          <ColorField
+            label={t('appearance.infoCardText')}
+            value={form.infoCardTextColor || ''}
+            onChangeText={(value) => updateColorField('infoCardTextColor', value)}
+          />
 
-        <ColorField
-          label={t('appearance.infoCardBorder')}
-          value={form.infoCardBorderColor || ''}
-          onChangeText={(value) => updateColorField('infoCardBorderColor', value)}
-        />
+          <ColorField
+            label={t('appearance.infoCardBorder')}
+            value={form.infoCardBorderColor || ''}
+            onChangeText={(value) => updateColorField('infoCardBorderColor', value)}
+          />
+        </AppResponsiveGrid>
 
         <View
           style={[
@@ -376,23 +396,25 @@ export default function AppearanceScreen() {
           {t('appearance.generalColors')}
         </AppText>
 
-        <ColorField
-          label={t('appearance.primaryColor')}
-          value={form.primaryColor || ''}
-          onChangeText={(value) => updateColorField('primaryColor', value)}
-        />
+        <AppResponsiveGrid desktopColumns={3}>
+          <ColorField
+            label={t('appearance.primaryColor')}
+            value={form.primaryColor || ''}
+            onChangeText={(value) => updateColorField('primaryColor', value)}
+          />
 
-        <ColorField
-          label={t('appearance.secondaryColor')}
-          value={form.secondaryColor || ''}
-          onChangeText={(value) => updateColorField('secondaryColor', value)}
-        />
+          <ColorField
+            label={t('appearance.secondaryColor')}
+            value={form.secondaryColor || ''}
+            onChangeText={(value) => updateColorField('secondaryColor', value)}
+          />
 
-        <ColorField
-          label={t('appearance.accentColor')}
-          value={form.accentColor || ''}
-          onChangeText={(value) => updateColorField('accentColor', value)}
-        />
+          <ColorField
+            label={t('appearance.accentColor')}
+            value={form.accentColor || ''}
+            onChangeText={(value) => updateColorField('accentColor', value)}
+          />
+        </AppResponsiveGrid>
       </AppCard>
 
       <AppCard>
@@ -664,7 +686,14 @@ export default function AppearanceScreen() {
         />
       </AppCard>
 
-      <AppButton title={t('appearance.saveChanges')} loading={saving} onPress={save} />
+      <View style={styles.actionBar}>
+        <AppButton
+          title={t('appearance.saveChanges')}
+          loading={saving}
+          onPress={save}
+          style={isPhone ? styles.mobilePrimaryAction : styles.desktopPrimaryAction}
+        />
+      </View>
     </AppShellPage>
   );
 }
@@ -818,8 +847,19 @@ function OptionGroup<T extends string>({
 }
 
 const styles = StyleSheet.create({
+  actionBar: {
+    alignItems: 'flex-end',
+    marginBottom: 12,
+  },
+  desktopPrimaryAction: {
+    minWidth: 220,
+  },
   field: {
     marginBottom: 12,
+  },
+  mobilePrimaryAction: {
+    alignSelf: 'stretch',
+    width: '100%',
   },
   input: {
     borderWidth: 1,

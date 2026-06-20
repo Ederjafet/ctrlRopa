@@ -3,6 +3,7 @@ import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
+import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import {
@@ -152,6 +153,7 @@ export default function SystemRolesScreen() {
         title={t('systemRoles.title')}
         subtitle={t('systemRoles.cardHelp')}
         activeRoute="system-roles"
+        compactHeader
       >
         <ActivityIndicator />
       </AppShellPage>
@@ -164,6 +166,7 @@ export default function SystemRolesScreen() {
         title={t('systemRoles.title')}
         subtitle={t('systemRoles.cardHelp')}
         activeRoute="system-roles"
+        compactHeader
         rightContent={<AppButton title={t('systemRoles.newRole')} variant="secondary" onPress={openNew} />}
       >
         <AppCard>
@@ -172,6 +175,15 @@ export default function SystemRolesScreen() {
           </AppText>
           <AppText color={theme.colors.mutedText}>
             {t('systemRoles.cardHelp')}
+          </AppText>
+        </AppCard>
+
+        <AppCard variant="info">
+          <AppText variant="subtitle" bold>
+            Alcance de roles
+          </AppText>
+          <AppText color={theme.colors.mutedText}>
+            Esta pantalla conserva el esquema RBAC actual. La separacion de roles por compania queda documentada como backlog.
           </AppText>
         </AppCard>
 
@@ -188,24 +200,26 @@ export default function SystemRolesScreen() {
             <AppButton title={t('common.retry')} variant="secondary" onPress={load} />
           </AppCard>
         ) : (
-          roles.map((role) => (
-            <AppCard key={role.id}>
-              <View style={styles.roleHeader}>
-                <View style={styles.roleText}>
-                  <AppText bold>{role.name}</AppText>
-                  <AppText variant="caption" color={theme.colors.mutedText}>
-                    {formatPermissionCode(role.code, i18n.language)}
-                  </AppText>
-                  <AppText variant="caption" color={theme.colors.mutedText}>
-                    {t('systemRoles.includedPermissions', { count: permissionIds(role).length })}
-                  </AppText>
+          <AppResponsiveGrid tabletColumns={2} desktopColumns={3}>
+            {roles.map((role) => (
+              <AppCard key={role.id}>
+                <View style={styles.roleHeader}>
+                  <View style={styles.roleText}>
+                    <AppText bold>{role.name}</AppText>
+                    <AppText variant="caption" color={theme.colors.mutedText}>
+                      {formatPermissionCode(role.code, i18n.language)}
+                    </AppText>
+                    <AppText variant="caption" color={theme.colors.mutedText}>
+                      {t('systemRoles.includedPermissions', { count: permissionIds(role).length })}
+                    </AppText>
+                  </View>
+                  <View style={styles.roleAction}>
+                    <AppButton title={t('systemRoles.edit')} variant="secondary" onPress={() => openEdit(role)} />
+                  </View>
                 </View>
-                <View style={styles.roleAction}>
-                  <AppButton title={t('systemRoles.edit')} variant="secondary" onPress={() => openEdit(role)} />
-                </View>
-              </View>
-            </AppCard>
-          ))
+              </AppCard>
+            ))}
+          </AppResponsiveGrid>
         )}
       </AppShellPage>
 

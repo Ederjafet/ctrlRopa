@@ -3962,3 +3962,15 @@ Resultado:
 - El menu separa `PLATAFORMA` de operacion normal para `PLATFORM_OWNER`.
 - `/users` muestra contexto de empresa/sucursal y alcance tenant.
 - Se agregan pruebas de regresion para aislamiento de usuarios y permisos de Plataforma.
+
+## 2026-06-20 - FAST-FORMS-UX-B formularios y sistema responsivos
+
+Tipo: ajuste frontend/UX de pantallas operativas y de configuracion, sin backend ni migraciones.
+
+Resultado:
+
+- `/items-create` usa header compacto, bloques internos ligeros y accion `Generar prendas` con ancho razonable en escritorio.
+- `/users-form` organiza datos, acceso, sucursales, roles y permisos en grids responsivos; acciones finales quedan compactas.
+- `/system`, `/system-channels` y `/system-roles` usan headers compactos y listados en grids/cards operativas.
+- `/appearance` se mantiene vigente, con aviso de alcance y layout mas compacto para identidad, colores y guardado.
+- Se documenta backlog para apariencia por compania y roles/permisos por compania.

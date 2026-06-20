@@ -3,6 +3,7 @@ import { buildMainNavSections, getSessionScopeLabel } from '@/components/layout/
 import ActionTile from '@/components/ui/ActionTile';
 import AppButton from '@/components/ui/AppButton';
 import AppInfoCard from '@/components/ui/AppInfoCard';
+import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { hasPermission, hasRole } from '@/services/accessControl';
@@ -84,6 +85,7 @@ export default function SystemScreen() {
       activeRoute="system"
       session={user}
       navSections={navSections}
+      compactHeader
     >
       <AppInfoCard title={t('system.sensitiveTitle')}>
         <AppText>{t('system.sensitiveHelp')}</AppText>
@@ -151,7 +153,7 @@ export default function SystemScreen() {
         />
       </AppInfoCard>
 
-      <View style={styles.grid}>
+      <AppResponsiveGrid tabletColumns={2} desktopColumns={3}>
         <SystemTile
           title={t('system.rolesTileTitle')}
           description={t('system.rolesTileHelp')}
@@ -190,7 +192,7 @@ export default function SystemScreen() {
             onPress={() => router.push('/system-security-audit' as any)}
           />
         ) : null}
-      </View>
+      </AppResponsiveGrid>
     </AppShell>
   );
 }

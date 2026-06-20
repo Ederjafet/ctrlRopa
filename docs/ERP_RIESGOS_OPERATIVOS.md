@@ -245,6 +245,9 @@ Probabilidad:
 - APK-QA-C no encontro screenshots ni evidencia visual por roles; el release LIVE no debe promocionarse a QA visual completo hasta repetir la fase con evidencias reales en `qa-evidence/APK-QA-C/android/`.
 - PRODUCT-ERR-A agrega mapper frontend de errores accionables; modulos fuera de las rutas criticas aun deben migrarse por dominio para evitar que `err.message` exponga mensajes genericos o tecnicos.
 - FAST-PLATFORM-A habilita super usuario AppModa con tenant interno; antes de produccion se debe reemplazar `{noop}Platform123!`, endurecer auditoria de altas SaaS e implementar impersonacion auditada si soporte necesita entrar a tenants de clientes.
+- FAST-FORMS-UX-B compacta `/system-roles` sin cambiar RBAC; no prometer roles/permisos por compania hasta implementar `FAST-RBAC-TENANT-A`.
+- FAST-FORMS-UX-B confirma `/appearance` como funcional, pero el hardening por compania queda pendiente; no prometer personalizacion SaaS aislada hasta `FAST-APPEARANCE-A`.
+- FAST-FORMS-UX-B detecta textos heredados con mojibake en formularios; no afecta compilacion, pero conviene normalizar encoding/i18n antes de demo final pulida.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

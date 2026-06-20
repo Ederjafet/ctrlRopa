@@ -9,6 +9,7 @@ import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
 import AppSelectorField from '@/components/ui/AppSelectorField';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
 import { getActionableApiError } from '@/services/apiError';
 import {
@@ -90,6 +91,7 @@ export default function ItemsCreateScreen() {
   const router = useRouter();
   const { returnTo, batchId, batchFolio } = useLocalSearchParams();
   const { theme } = useAppTheme();
+  const { isPhone } = useResponsiveLayout();
   const { t } = useTranslation('common');
   const priceInputRef = useRef<TextInput>(null);
   const quantityInputRef = useRef<TextInput>(null);
@@ -411,6 +413,7 @@ export default function ItemsCreateScreen() {
       title={t('navigation.items.createItems')}
       subtitle={t('operationalScreens.itemsCreate.subtitle')}
       activeRoute="items-create"
+      compactHeader
       rightContent={
         <AppButton
           title={t('operationalScreens.itemsCreate.backToFlow')}
@@ -443,6 +446,15 @@ export default function ItemsCreateScreen() {
         ) : null}
 
         <AppCard>
+          <View style={styles.sectionHeader}>
+            <AppText variant="subtitle" bold>
+              Datos de inventario
+            </AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              Selecciona lote, tipo, talla y ubicacion en una vista compacta.
+            </AppText>
+          </View>
+
           <AppResponsiveGrid>
           <AppSelectorField
             label="Lote"
@@ -509,7 +521,16 @@ export default function ItemsCreateScreen() {
         </AppCard>
 
         <AppCard>
-          <AppResponsiveGrid>
+          <View style={styles.sectionHeader}>
+            <AppText variant="subtitle" bold>
+              Cantidad y datos opcionales
+            </AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              Define cuantas prendas generar y agrega precio o comentarios si aplica.
+            </AppText>
+          </View>
+
+          <AppResponsiveGrid desktopColumns={3}>
           <AppInput
             ref={priceInputRef}
             label={requiresPrice ? 'Precio *' : 'Precio sugerido'}
@@ -545,11 +566,14 @@ export default function ItemsCreateScreen() {
           </AppResponsiveGrid>
         </AppCard>
 
-        <AppButton
-          title={t('operationalScreens.itemsCreate.generateItems')}
-          onPress={handleCreate}
-          loading={isSaving}
-        />
+        <View style={styles.actionBar}>
+          <AppButton
+            title={t('operationalScreens.itemsCreate.generateItems')}
+            onPress={handleCreate}
+            loading={isSaving}
+            style={isPhone ? styles.mobilePrimaryAction : styles.desktopPrimaryAction}
+          />
+        </View>
       <AppActionDialog
         visible={!!validationDialog}
         title={t('itemsCreate.validationTitle')}
@@ -628,6 +652,20 @@ const styles = StyleSheet.create({
   successBox: {
     padding: 12,
     marginBottom: 10,
+  },
+  actionBar: {
+    alignItems: 'flex-end',
+    marginBottom: 12,
+  },
+  desktopPrimaryAction: {
+    minWidth: 220,
+  },
+  mobilePrimaryAction: {
+    alignSelf: 'stretch',
+    width: '100%',
+  },
+  sectionHeader: {
+    marginBottom: 12,
   },
   selectorList: {
     maxHeight: 360,

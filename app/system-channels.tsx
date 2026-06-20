@@ -1,8 +1,10 @@
 import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
+import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import {
   getAllSalesChannels,
   SalesChannel,
@@ -36,6 +38,7 @@ function sortChannels(channels: SalesChannel[]) {
 
 export default function SystemChannelsScreen() {
   const { theme } = useAppTheme();
+  const { isPhone } = useResponsiveLayout();
   const { t } = useTranslation('common');
   const [channels, setChannels] = useState<SalesChannel[]>([]);
   const [originalChannels, setOriginalChannels] = useState<SalesChannel[]>([]);
@@ -135,6 +138,7 @@ export default function SystemChannelsScreen() {
       title={t('systemChannels.title')}
       subtitle={t('systemChannels.globalRuleHelp')}
       activeRoute="system-channels"
+      compactHeader
     >
       <AppCard>
         <AppText variant="subtitle" bold>
@@ -161,7 +165,7 @@ export default function SystemChannelsScreen() {
         ) : channels.length === 0 ? (
           <AppText color={theme.colors.mutedText}>{t('systemChannels.empty')}</AppText>
         ) : (
-          <View style={styles.channelList}>
+          <AppResponsiveGrid tabletColumns={2} desktopColumns={2}>
             {channels.map((channel) => {
               const enabled = Boolean(channel.globalEnabled);
               const inactive = Boolean(channel.status && channel.status !== 'ACTIVE');
@@ -208,17 +212,18 @@ export default function SystemChannelsScreen() {
                 </View>
               );
             })}
-          </View>
+          </AppResponsiveGrid>
         )}
       </AppCard>
 
-      <View style={styles.actions}>
+      <View style={[styles.actions, isPhone ? styles.actionsMobile : null]}>
         <AppButton
           title={t('systemChannels.saveChanges')}
           onPress={saveChanges}
           loading={saving}
           disabled={loading || saving || !hasChanges}
           disabledReason={saveBlockedReason}
+          style={isPhone ? styles.mobileAction : styles.primaryAction}
         />
 
         <AppButton
@@ -227,7 +232,7 @@ export default function SystemChannelsScreen() {
           onPress={resetChanges}
           disabled={loading || saving || !hasChanges}
           disabledReason={discardBlockedReason}
-          style={{ marginTop: 10 }}
+          style={isPhone ? styles.mobileAction : styles.secondaryAction}
         />
       </View>
     </AppShellPage>
@@ -235,9 +240,6 @@ export default function SystemChannelsScreen() {
 }
 
 const styles = StyleSheet.create({
-  channelList: {
-    marginTop: 6,
-  },
   channelRow: {
     borderWidth: 1,
     marginBottom: 10,
@@ -249,6 +251,23 @@ const styles = StyleSheet.create({
     paddingRight: 12,
   },
   actions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'flex-end',
     marginBottom: 12,
+  },
+  actionsMobile: {
+    alignItems: 'stretch',
+    flexDirection: 'column',
+  },
+  mobileAction: {
+    width: '100%',
+  },
+  primaryAction: {
+    minWidth: 180,
+  },
+  secondaryAction: {
+    minWidth: 150,
   },
 });

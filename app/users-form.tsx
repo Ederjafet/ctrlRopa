@@ -4,9 +4,11 @@ import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
+import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
 import AppSelectorField from '@/components/ui/AppSelectorField';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import {
   formatPermissionCode,
   groupPermissionsForDisplay,
@@ -104,6 +106,7 @@ export default function UsersFormScreen() {
   const userId = parseId(id);
   const isEdit = userId !== null;
   const { theme } = useAppTheme();
+  const { isPhone } = useResponsiveLayout();
   const { t, i18n } = useTranslation('common');
 
   const [form, setForm] = useState<FormState>(initialForm);
@@ -306,6 +309,7 @@ export default function UsersFormScreen() {
         title={isEdit ? t('usersForm.editTitle') : t('usersForm.newTitle')}
         subtitle={t('usersForm.subtitle')}
         activeRoute="users"
+        compactHeader
       >
         <ActivityIndicator />
       </AppShellPage>
@@ -318,36 +322,43 @@ export default function UsersFormScreen() {
         title={isEdit ? t('usersForm.editTitle') : t('usersForm.newTitle')}
         subtitle={t('usersForm.subtitle')}
         activeRoute="users"
+        compactHeader
       >
         <AppCard>
           <AppText variant="subtitle" bold>
             {t('usersForm.generalData')}
           </AppText>
+          <AppText variant="caption" color={theme.colors.mutedText} style={styles.sectionHint}>
+            Datos visibles del usuario dentro de la empresa actual.
+          </AppText>
 
-          <AppInput
-            label={t('usersForm.name')}
-            value={form.name}
-            onChangeText={(name) => setForm((current) => ({ ...current, name }))}
-            placeholder={t('usersForm.fullName')}
-          />
+          <AppResponsiveGrid desktopColumns={3}>
+            <AppInput
+              label={t('usersForm.name')}
+              value={form.name}
+              onChangeText={(name) => setForm((current) => ({ ...current, name }))}
+              placeholder={t('usersForm.fullName')}
+            />
 
-          <AppInput
-            label={t('usersForm.email')}
-            value={form.email}
-            onChangeText={(email) => setForm((current) => ({ ...current, email }))}
-            placeholder="correo@ejemplo.com"
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
+            <AppInput
+              label={t('usersForm.email')}
+              value={form.email}
+              onChangeText={(email) => setForm((current) => ({ ...current, email }))}
+              placeholder="correo@ejemplo.com"
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
 
-          <AppInput
-            label={t('usersForm.phone')}
-            value={form.phone}
-            onChangeText={(phone) => setForm((current) => ({ ...current, phone }))}
-            placeholder={t('usersForm.optional')}
-            keyboardType="phone-pad"
-          />
+            <AppInput
+              label={t('usersForm.phone')}
+              value={form.phone}
+              onChangeText={(phone) => setForm((current) => ({ ...current, phone }))}
+              placeholder={t('usersForm.optional')}
+              keyboardType="phone-pad"
+            />
+          </AppResponsiveGrid>
 
+          <AppResponsiveGrid desktopColumns={3}>
           <AppInput
             label={isEdit ? t('usersForm.newPasswordOptional') : t('usersForm.initialPassword')}
             value={form.password}
@@ -386,6 +397,7 @@ export default function UsersFormScreen() {
             placeholder={t('usersForm.selectBranches')}
             onPress={() => setAssignedBranchesModalVisible(true)}
           />
+          </AppResponsiveGrid>
 
           <AppText color={theme.colors.mutedText} variant="caption">
             {t('usersForm.branchHelp')}
@@ -396,25 +408,30 @@ export default function UsersFormScreen() {
           <AppText variant="subtitle" bold>
             {t('usersForm.access')}
           </AppText>
+          <AppText variant="caption" color={theme.colors.mutedText} style={styles.sectionHint}>
+            Rol y permisos directos se asignan dentro del alcance tenant actual.
+          </AppText>
 
-          <AppSelectorField
-            label={t('usersForm.roles')}
-            value={selectedNames(roles, form.roleIds, t('usersForm.selectRoles'), i18n.language)}
-            placeholder={t('usersForm.selectRoles')}
-            onPress={openRolesModal}
-          />
+          <AppResponsiveGrid desktopColumns={2}>
+            <AppSelectorField
+              label={t('usersForm.roles')}
+              value={selectedNames(roles, form.roleIds, t('usersForm.selectRoles'), i18n.language)}
+              placeholder={t('usersForm.selectRoles')}
+              onPress={openRolesModal}
+            />
 
-          <AppSelectorField
-            label={t('usersForm.directPermissions')}
-            value={selectedNames(
-              permissions,
-              form.permissionIds,
-              t('usersForm.noDirectPermissions'),
-              i18n.language
-            )}
-            placeholder={t('usersForm.selectDirectPermissions')}
-            onPress={openPermissionsModal}
-          />
+            <AppSelectorField
+              label={t('usersForm.directPermissions')}
+              value={selectedNames(
+                permissions,
+                form.permissionIds,
+                t('usersForm.noDirectPermissions'),
+                i18n.language
+              )}
+              placeholder={t('usersForm.selectDirectPermissions')}
+              onPress={openPermissionsModal}
+            />
+          </AppResponsiveGrid>
 
           <AppText color={theme.colors.mutedText} variant="caption">
             {t('usersForm.accessHelp')}
@@ -463,7 +480,20 @@ export default function UsersFormScreen() {
           </View>
         </AppCard>
 
-        <AppButton title={t('common.save')} loading={isSaving} onPress={save} />
+        <View style={[styles.formActions, isPhone ? styles.formActionsMobile : null]}>
+          <AppButton
+            title={t('common.back')}
+            variant="secondary"
+            onPress={() => router.replace('/users' as any)}
+            style={isPhone ? styles.mobileAction : styles.secondaryAction}
+          />
+          <AppButton
+            title={t('common.save')}
+            loading={isSaving}
+            onPress={save}
+            style={isPhone ? styles.mobileAction : styles.primaryAction}
+          />
+        </View>
       </AppShellPage>
 
       <AppBottomModal
@@ -660,6 +690,29 @@ export default function UsersFormScreen() {
 }
 
 const styles = StyleSheet.create({
+  formActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'flex-end',
+    marginBottom: 12,
+  },
+  formActionsMobile: {
+    alignItems: 'stretch',
+    flexDirection: 'column',
+  },
+  mobileAction: {
+    width: '100%',
+  },
+  primaryAction: {
+    minWidth: 180,
+  },
+  secondaryAction: {
+    minWidth: 130,
+  },
+  sectionHint: {
+    marginBottom: 12,
+  },
   statusRow: {
     flexDirection: 'row',
     gap: 10,
