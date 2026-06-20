@@ -111,32 +111,34 @@ export default function Sidebar({
           </Pressable>
         ) : null}
       </View>
-      {contextContent ? <View style={styles.contextContent}>{contextContent}</View> : null}
       <ScrollView
         style={styles.navArea}
         contentContainerStyle={styles.navContent}
         showsVerticalScrollIndicator={false}
       >
         {sections.map((section, index) => (
-          <View key={`${section.title ?? 'section'}-${index}`} style={styles.section}>
-            {section.title || section.titleKey ? (
-              <AppText
-                variant="caption"
-                color={theme.colors.mutedText}
-                bold
-                style={styles.sectionLabel}
-              >
-                {section.titleKey ? t(section.titleKey) : section.title}
-              </AppText>
-            ) : null}
-            {section.items.map((item) => (
-              <SidebarNavItem
-                key={item.key}
-                item={item}
-                active={isActiveItem(item)}
-                onPress={onNavigate}
-              />
-            ))}
+          <View key={`${section.title ?? 'section'}-${index}`}>
+            <View style={styles.section}>
+              {section.title || section.titleKey ? (
+                <AppText
+                  variant="caption"
+                  color={theme.colors.mutedText}
+                  bold
+                  style={styles.sectionLabel}
+                >
+                  {section.titleKey ? t(section.titleKey) : section.title}
+                </AppText>
+              ) : null}
+              {section.items.map((item) => (
+                <SidebarNavItem
+                  key={item.key}
+                  item={item}
+                  active={isActiveItem(item)}
+                  onPress={onNavigate}
+                />
+              ))}
+            </View>
+            {index === 0 && contextContent ? <View style={styles.contextContent}>{contextContent}</View> : null}
           </View>
         ))}
       </ScrollView>

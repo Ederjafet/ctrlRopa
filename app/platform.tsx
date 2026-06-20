@@ -60,15 +60,15 @@ type PlatformSection =
   | 'audit';
 
 const SECTION_CONFIG: { key: PlatformSection; label: string }[] = [
-  { key: 'dashboard', label: 'Panel Owner' },
+  { key: 'dashboard', label: 'Dashboard SaaS' },
   { key: 'companies', label: 'Clientes / Companias' },
   { key: 'branches', label: 'Sucursales' },
   { key: 'users', label: 'Usuarios' },
   { key: 'modules', label: 'Modulos activos' },
-  { key: 'limits', label: 'Limites por cliente' },
+  { key: 'limits', label: 'Limites' },
   { key: 'subscriptions', label: 'Planes / Suscripciones' },
   { key: 'usageRates', label: 'Tarifas por consumo' },
-  { key: 'usage', label: 'Uso por cliente' },
+  { key: 'usage', label: 'Uso del cliente' },
   { key: 'audit', label: 'Auditoria global' },
 ];
 
@@ -847,6 +847,11 @@ export default function PlatformScreen() {
             {formatCompanyScopeCounts(selectedCompanyDetail)}
           </AppText>
         ) : null}
+        <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={2}>
+          {selectedCompany
+            ? 'Se usa en sucursales, usuarios, modulos y limites.'
+            : 'No cambia tu sesion ni entra como cliente.'}
+        </AppText>
       </View>
       <AppButton
         title={selectedCompany ? 'Cambiar' : 'Elegir'}
@@ -909,7 +914,7 @@ export default function PlatformScreen() {
 
   const renderCompanyRequired = (message: string) => (
     <AppCard style={styles.panel}>
-      <EmptyState title="Selecciona un cliente" message={message} icon="domain" />
+      <EmptyState title="Selecciona un cliente para continuar" message={message} icon="domain" />
       <View style={styles.actionsRow}>
         <AppButton title="Elegir cliente" variant="operation" onPress={() => setCompanyPickerVisible(true)} style={styles.actionButton} />
         <AppButton title="Ir a Clientes / Companias" variant="secondary" onPress={() => router.push(buildPlatformRoute('companies', selectedCompanyId))} style={styles.actionButton} />
@@ -917,17 +922,24 @@ export default function PlatformScreen() {
     </AppCard>
   );
 
+  const renderCompanyScopeLine = () =>
+    selectedCompany ? (
+      <AppText variant="caption" color={theme.colors.mutedText}>
+        Cliente en administracion: {selectedCompany.name} - {selectedCompany.status} - {selectedCompany.branchName || 'Sin sucursal principal'}
+      </AppText>
+    ) : null;
+
   const renderDashboard = () => (
     <View style={styles.sectionStack}>
       <AppCard style={styles.panel}>
         <View style={styles.sectionHeader}>
-          <StatusBadge label="PANEL SAAS" tone="info" />
+          <StatusBadge label="GLOBAL" tone="info" />
           <View style={styles.flex}>
             <AppText variant="subtitle" bold>
               Dashboard SaaS AppModa
             </AppText>
             <AppText variant="caption" color={theme.colors.mutedText}>
-              Resumen general de plataforma. No contiene formularios ni operacion de tienda.
+              Vista global de plataforma. Estas metricas no dependen del cliente en administracion.
             </AppText>
           </View>
         </View>
@@ -967,7 +979,7 @@ export default function PlatformScreen() {
               Clientes / Companias
             </AppText>
             <AppText variant="caption" color={theme.colors.mutedText}>
-              Lista clientes, crea empresas y define que tenant estas configurando desde el Panel Owner.
+              Crea clientes, consulta companias y elige que cliente vas a administrar.
             </AppText>
           </View>
           <AppButton
@@ -1057,7 +1069,7 @@ export default function PlatformScreen() {
   const renderBranches = () => (
     <View style={styles.sectionStack}>
       {!canUseSelectedCompany
-        ? renderCompanyRequired('Selecciona una compania en Clientes / Companias para administrar sus sucursales.')
+        ? renderCompanyRequired('Elige un cliente en Clientes / Companias o usa Cambiar en el menu lateral para configurar sucursales, usuarios, modulos, limites, tarifas y uso.')
         : (
       <AppCard style={styles.panel}>
         <View style={[styles.rowBetween, isPhone ? styles.column : null]}>
@@ -1068,6 +1080,7 @@ export default function PlatformScreen() {
             <AppText variant="caption" color={theme.colors.mutedText}>
               Administra sucursales del cliente en administracion.
             </AppText>
+            {renderCompanyScopeLine()}
           </View>
           <AppButton
             title={showBranchForm ? 'Ocultar formulario' : 'Nueva sucursal'}
@@ -1113,7 +1126,7 @@ export default function PlatformScreen() {
   const renderUsers = () => (
     <View style={styles.sectionStack}>
       {!canUseSelectedCompany
-        ? renderCompanyRequired('Selecciona una compania para administrar sus usuarios.')
+        ? renderCompanyRequired('Elige un cliente en Clientes / Companias o usa Cambiar en el menu lateral para configurar sus usuarios.')
         : (
       <AppCard style={styles.panel}>
         <View style={[styles.rowBetween, isPhone ? styles.column : null]}>
@@ -1124,6 +1137,7 @@ export default function PlatformScreen() {
             <AppText variant="caption" color={theme.colors.mutedText}>
               Administra usuarios y roles operativos del cliente en administracion.
             </AppText>
+            {renderCompanyScopeLine()}
           </View>
           <View style={styles.actionsRow}>
             <AppButton
@@ -1153,7 +1167,7 @@ export default function PlatformScreen() {
 
   const renderModules = () => (
     <View style={styles.sectionStack}>
-      {!canUseSelectedCompany ? renderCompanyRequired('Selecciona una compania para activar o desactivar modulos.') : null}
+      {!canUseSelectedCompany ? renderCompanyRequired('Elige un cliente en Clientes / Companias o usa Cambiar en el menu lateral para activar sus modulos.') : null}
       {canUseSelectedCompany ? (
       <AppCard style={styles.panel}>
         <View style={styles.sectionHeader}>
@@ -1165,6 +1179,7 @@ export default function PlatformScreen() {
             <AppText variant="caption" color={theme.colors.mutedText}>
               Activa o desactiva funcionalidades para el cliente en administracion.
             </AppText>
+            {renderCompanyScopeLine()}
           </View>
         </View>
         {companySettings ? (
@@ -1208,7 +1223,7 @@ export default function PlatformScreen() {
 
   const renderLimits = () => (
     <View style={styles.sectionStack}>
-      {!canUseSelectedCompany ? renderCompanyRequired('Selecciona una compania para configurar sus limites contratados.') : null}
+      {!canUseSelectedCompany ? renderCompanyRequired('Elige un cliente en Clientes / Companias o usa Cambiar en el menu lateral para configurar sus limites contratados.') : null}
       {canUseSelectedCompany ? (
       <AppCard style={styles.panel}>
         <View style={styles.sectionHeader}>
@@ -1220,6 +1235,7 @@ export default function PlatformScreen() {
             <AppText variant="caption" color={theme.colors.mutedText}>
               Define limites contratados para el cliente en administracion.
             </AppText>
+            {renderCompanyScopeLine()}
           </View>
         </View>
         {selectedCompanyDetail ? (
@@ -1258,7 +1274,7 @@ export default function PlatformScreen() {
               Planes / Suscripciones
             </AppText>
             <AppText variant="caption" color={theme.colors.mutedText}>
-              Crea planes, define periodicidades y asocia el cliente en administracion a un modelo de cobro.
+              Catalogo global de planes y suscripcion del cliente en administracion cuando aplique.
             </AppText>
           </View>
           <AppButton
@@ -1279,7 +1295,7 @@ export default function PlatformScreen() {
 
   const renderUsageRates = () => (
     <View style={styles.sectionStack}>
-      {!canUseSelectedCompany ? renderCompanyRequired('Selecciona una compania para configurar sus tarifas por consumo.') : null}
+      {!canUseSelectedCompany ? renderCompanyRequired('Elige un cliente en Clientes / Companias o usa Cambiar en el menu lateral para configurar sus tarifas por consumo.') : null}
       {canUseSelectedCompany ? (
       <AppCard style={styles.panel}>
         <View style={styles.sectionHeader}>
@@ -1291,6 +1307,7 @@ export default function PlatformScreen() {
             <AppText variant="caption" color={theme.colors.mutedText}>
               Define cuanto cuesta cada evento de uso para clientes por consumo o modelo hibrido.
             </AppText>
+            {renderCompanyScopeLine()}
           </View>
         </View>
         {usageRates.length === 0 ? (
@@ -1339,7 +1356,7 @@ export default function PlatformScreen() {
   const renderUsage = () => (
     <View style={styles.sectionStack}>
       {!canUseSelectedCompany
-        ? renderCompanyRequired('Elige un cliente para consultar su consumo y actividad.')
+        ? renderCompanyRequired('Elige un cliente en Clientes / Companias o usa Cambiar en el menu lateral para consultar su consumo y actividad.')
         : renderUsageList(false)}
     </View>
   );
@@ -1502,7 +1519,15 @@ export default function PlatformScreen() {
 
   const renderPlanCatalog = () => (
     <AppCard style={styles.panel}>
-      <AppText variant="subtitle" bold>Catalogo de planes</AppText>
+      <View style={styles.sectionHeader}>
+        <StatusBadge label="GLOBAL" tone="info" />
+        <View style={styles.flex}>
+          <AppText variant="subtitle" bold>Catalogo global de planes</AppText>
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            Planes disponibles para todos los clientes. No dependen del cliente en administracion.
+          </AppText>
+        </View>
+      </View>
       <View style={styles.compactList}>
         {subscriptionPlans.length === 0 ? (
           <EmptyState title="Sin planes" message="Crea un plan para iniciar la configuracion SaaS." icon="payments" />
@@ -1535,7 +1560,9 @@ export default function PlatformScreen() {
             Precios por periodo
           </AppText>
           <AppText variant="caption" color={theme.colors.mutedText}>
-            {selectedPlan ? selectedPlan.name : 'Selecciona un plan del catalogo'}
+            {selectedPlan
+              ? `${selectedPlan.name} - precios globales del plan`
+              : 'Selecciona un plan del catalogo global'}
           </AppText>
         </View>
       </View>
@@ -1561,7 +1588,7 @@ export default function PlatformScreen() {
 
   const renderCompanySubscription = () => (
     !canUseSelectedCompany ? (
-      renderCompanyRequired('Elige un cliente para administrar su suscripcion.')
+      renderCompanyRequired('Elige un cliente en Clientes / Companias o usa Cambiar en el menu lateral para asignar o revisar su suscripcion.')
     ) : (
     <AppCard style={styles.panel}>
       <View style={styles.sectionHeader}>
@@ -1573,6 +1600,7 @@ export default function PlatformScreen() {
           <AppText variant="caption" color={theme.colors.mutedText}>
             {selectedCompany ? selectedCompany.name : 'Selecciona un cliente'}
           </AppText>
+          {renderCompanyScopeLine()}
         </View>
       </View>
       <AppText variant="caption" color={theme.colors.mutedText} bold>
@@ -1621,11 +1649,12 @@ export default function PlatformScreen() {
         <StatusBadge label="USO" tone="info" />
         <View style={styles.flex}>
           <AppText variant="subtitle" bold>
-            Uso por cliente
+            Uso del cliente
           </AppText>
           <AppText variant="caption" color={theme.colors.mutedText}>
-            Metricas basicas para cobranza SaaS. No configura planes ni tarifas.
+            Metricas basicas del cliente en administracion. No configura planes ni tarifas.
           </AppText>
+          {renderCompanyScopeLine()}
         </View>
       </View>
       <View style={styles.compactList}>

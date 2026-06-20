@@ -62,12 +62,12 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
   if (platformAllowed && isPlatformOwner(session)) {
     return [
       {
-        title: 'PLATAFORMA',
+        title: 'PLATAFORMA GLOBAL',
         items: [
           {
             key: 'platform-panel',
-            label: 'Panel Owner',
-            helper: 'Dashboard SaaS',
+            label: 'Dashboard SaaS',
+            helper: 'Vista global',
             route: '/platform?section=dashboard',
             activeFor: ['platform-dashboard'],
             icon: 'business' as const,
@@ -80,6 +80,27 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
             activeFor: ['platform-companies'],
             icon: 'domain' as const,
           },
+          {
+            key: 'platform-subscriptions',
+            label: 'Planes / Suscripciones',
+            helper: 'Catalogo global',
+            route: '/platform?section=subscriptions',
+            activeFor: ['platform-subscriptions'],
+            icon: 'payments' as const,
+          },
+          {
+            key: 'platform-audit',
+            label: 'Auditoria global',
+            helper: 'Eventos plataforma',
+            route: '/platform?section=audit',
+            activeFor: ['platform-audit'],
+            icon: 'security' as const,
+          },
+        ],
+      },
+      {
+        title: 'CONFIGURACION DEL CLIENTE',
+        items: [
           {
             key: 'platform-branches',
             label: 'Sucursales',
@@ -96,11 +117,6 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
             activeFor: ['platform-users'],
             icon: 'manage-accounts' as const,
           },
-        ],
-      },
-      {
-        title: 'CONFIGURACION CLIENTE',
-        items: [
           {
             key: 'platform-modules',
             label: 'Modulos activos',
@@ -111,58 +127,27 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
           },
           {
             key: 'platform-limits',
-            label: 'Limites por cliente',
+            label: 'Limites',
             helper: 'Usuarios y sucursales',
             route: '/platform?section=limits',
             activeFor: ['platform-limits'],
             icon: 'speed' as const,
           },
-        ],
-      },
-      {
-        title: 'COBRANZA SAAS',
-        items: [
-          {
-            key: 'platform-subscriptions',
-            label: 'Planes / Suscripciones',
-            helper: 'Periodos y plan por cliente',
-            route: '/platform?section=subscriptions',
-            activeFor: ['platform-subscriptions'],
-            icon: 'payments' as const,
-          },
           {
             key: 'platform-usage-rates',
             label: 'Tarifas por consumo',
-            helper: 'Costos unitarios SaaS',
+            helper: 'Costos del cliente',
             route: '/platform?section=usageRates',
             activeFor: ['platform-usageRates'],
             icon: 'receipt-long' as const,
           },
-        ],
-      },
-      {
-        title: 'REPORTES',
-        items: [
           {
             key: 'platform-usage',
-            label: 'Uso por cliente',
-            helper: 'Base para dashboard SaaS',
+            label: 'Uso del cliente',
+            helper: 'Consumo del tenant',
             route: '/platform?section=usage',
             activeFor: ['platform-usage'],
             icon: 'analytics' as const,
-          },
-        ],
-      },
-      {
-        title: 'SEGURIDAD',
-        items: [
-          {
-            key: 'platform-audit',
-            label: 'Auditoria global',
-            helper: 'Pendiente de hardening',
-            route: '/platform?section=audit',
-            activeFor: ['platform-audit'],
-            icon: 'security' as const,
           },
         ],
       },
@@ -175,7 +160,7 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
 
   const platformItems = [
     platformAllowed
-      ? { key: 'platform', label: 'Panel Owner', helper: 'Dashboard SaaS', route: '/platform', activeFor: ['platform', '/platform'], icon: 'business' as const }
+      ? { key: 'platform', label: 'Dashboard SaaS', helper: 'Panel Owner', route: '/platform', activeFor: ['platform', '/platform'], icon: 'business' as const }
       : null,
   ].filter(Boolean);
 

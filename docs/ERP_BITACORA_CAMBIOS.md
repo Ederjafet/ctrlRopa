@@ -1,5 +1,30 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-20 - FAST-OWNER-UX-I plataforma global vs cliente en administracion
+
+Tipo: frontend, UX SaaS Owner, navegacion, documentacion.
+
+Objetivo:
+
+- Separar visual y conceptualmente las secciones globales de AppModa SaaS de las secciones que configuran el cliente en administracion.
+
+Cambios realizados:
+
+- El menu lateral Owner agrupa `PLATAFORMA GLOBAL` y `CONFIGURACION DEL CLIENTE`.
+- `Dashboard SaaS`, `Clientes / Companias`, `Planes / Suscripciones` y `Auditoria global` quedan como secciones globales.
+- `Sucursales`, `Usuarios`, `Modulos activos`, `Limites`, `Tarifas por consumo` y `Uso del cliente` quedan como configuracion del cliente.
+- El bloque `Cliente en administracion` se renderiza despues del grupo global, antes de la configuracion del cliente.
+- Dashboard SaaS aclara que sus metricas no dependen del cliente en administracion.
+- Planes / Suscripciones separa catalogo global y suscripcion del cliente.
+- Se documenta la fase en `docs/FAST_OWNER_UX_I_PLATAFORMA_GLOBAL_VS_CLIENTE_ADMIN.md`.
+
+Restricciones respetadas:
+
+- No se implemento impersonacion.
+- No se toco backend.
+- No se hizo merge a `main`.
+- No se agrego `Actualizar` fuera de LIVE.
+
 ## 2026-06-20 - FAST-OWNER-UX-H persistencia cliente en administracion
 
 Tipo: frontend, UX SaaS Owner, layout, persistencia local, documentacion.
