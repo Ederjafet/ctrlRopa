@@ -148,6 +148,12 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   fixedSidebar: {
+    alignSelf: 'stretch',
+    flexShrink: 0,
+    height: '100%',
+    maxHeight: '100%',
+    minHeight: 0,
+    overflow: 'hidden',
     width: designTokens.layout.sidebarWidth,
   },
   ambientPanel: {
@@ -167,6 +173,7 @@ const styles = StyleSheet.create({
   mobileSidebar: {
     bottom: 0,
     left: 0,
+    overflow: 'hidden',
     position: 'absolute',
     top: 0,
     zIndex: 2,

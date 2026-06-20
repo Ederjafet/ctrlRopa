@@ -229,47 +229,49 @@ export default function Sidebar({
               {session.email}
             </AppText>
           </View>
-          <Pressable
-            onPress={toggleThemeMode}
-            accessibilityRole="button"
-            accessibilityLabel={nextThemeLabel}
-            style={({ pressed }) => [
-              styles.themeToggleButton,
-              {
-                backgroundColor: theme.colors.neutralButtonBackground,
-                borderColor: theme.colors.borderStrong,
-                borderRadius: designTokens.radius.md,
-                opacity: pressed ? 0.72 : 1,
-              },
-            ]}
-          >
-            <MaterialIcons
-              name={theme.isDark ? 'light-mode' : 'dark-mode'}
-              size={18}
-              color={theme.colors.neutralButtonText}
-            />
-            <AppText color={theme.colors.neutralButtonText} bold>
-              {nextThemeLabel}
-            </AppText>
-          </Pressable>
-          <Pressable
-            onPress={onSignOut}
-            accessibilityRole="button"
-            style={({ pressed }) => [
-              styles.signOutButton,
-              {
-                backgroundColor: theme.isDark ? theme.colors.surfaceMuted : theme.colors.surface,
-                borderColor: theme.isDark ? theme.colors.borderStrong : theme.colors.dangerBackground,
-                borderRadius: designTokens.radius.md,
-                opacity: pressed ? 0.72 : 1,
-              },
-            ]}
-          >
-            <MaterialIcons name="logout" size={18} color={theme.colors.danger} />
-            <AppText color={theme.colors.danger} bold>
-              {t('navigation.signOut')}
-            </AppText>
-          </Pressable>
+          <View style={styles.sessionActions}>
+            <Pressable
+              onPress={toggleThemeMode}
+              accessibilityRole="button"
+              accessibilityLabel={nextThemeLabel}
+              style={({ pressed }) => [
+                styles.themeToggleButton,
+                {
+                  backgroundColor: theme.colors.neutralButtonBackground,
+                  borderColor: theme.colors.borderStrong,
+                  borderRadius: designTokens.radius.md,
+                  opacity: pressed ? 0.72 : 1,
+                },
+              ]}
+            >
+              <MaterialIcons
+                name={theme.isDark ? 'light-mode' : 'dark-mode'}
+                size={16}
+                color={theme.colors.neutralButtonText}
+              />
+              <AppText color={theme.colors.neutralButtonText} bold numberOfLines={1}>
+                {nextThemeLabel}
+              </AppText>
+            </Pressable>
+            <Pressable
+              onPress={onSignOut}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.signOutButton,
+                {
+                  backgroundColor: theme.isDark ? theme.colors.surfaceMuted : theme.colors.surface,
+                  borderColor: theme.isDark ? theme.colors.borderStrong : theme.colors.dangerBackground,
+                  borderRadius: designTokens.radius.md,
+                  opacity: pressed ? 0.72 : 1,
+                },
+              ]}
+            >
+              <MaterialIcons name="logout" size={16} color={theme.colors.danger} />
+              <AppText color={theme.colors.danger} bold numberOfLines={1}>
+                {t('navigation.signOut')}
+              </AppText>
+            </Pressable>
+          </View>
         </View>
       ) : null}
     </View>
@@ -294,9 +296,10 @@ const styles = StyleSheet.create({
   },
   brandRow: {
     alignItems: 'flex-start',
+    flexShrink: 0,
     flexDirection: 'row',
     gap: designTokens.spacing.md,
-    marginBottom: designTokens.spacing.lg,
+    marginBottom: designTokens.spacing.md,
   },
   closeButton: {
     alignItems: 'center',
@@ -310,10 +313,12 @@ const styles = StyleSheet.create({
   },
   navArea: {
     flex: 1,
+    flexShrink: 1,
+    marginBottom: designTokens.spacing.md,
     minHeight: 0,
   },
   navContent: {
-    paddingBottom: designTokens.spacing.md,
+    paddingBottom: designTokens.spacing.lg,
   },
   section: {
     marginBottom: designTokens.spacing.lg,
@@ -322,6 +327,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     marginBottom: designTokens.spacing.sm,
     textTransform: 'uppercase',
+  },
+  sessionActions: {
+    flexDirection: 'row',
+    gap: designTokens.spacing.xs,
   },
   sessionHeader: {
     alignItems: 'flex-start',
@@ -333,33 +342,42 @@ const styles = StyleSheet.create({
   sessionPanel: {
     borderWidth: 1,
     gap: designTokens.spacing.xs,
+    flexShrink: 0,
     padding: designTokens.spacing.sm,
   },
   sidebar: {
     borderRightWidth: 1,
     flex: 1,
-    minHeight: '100%',
+    flexDirection: 'column',
+    height: '100%',
+    maxHeight: '100%',
+    minHeight: 0,
+    overflow: 'hidden',
     padding: designTokens.spacing.lg,
     width: '100%',
   },
   signOutButton: {
     alignItems: 'center',
     borderWidth: 1,
+    flex: 1,
     flexDirection: 'row',
-    gap: designTokens.spacing.sm,
+    gap: designTokens.spacing.xs,
     justifyContent: 'center',
-    minHeight: 44,
-    paddingHorizontal: designTokens.spacing.md,
-    paddingVertical: designTokens.spacing.sm,
+    minHeight: 36,
+    minWidth: 0,
+    paddingHorizontal: designTokens.spacing.sm,
+    paddingVertical: designTokens.spacing.xs,
   },
   themeToggleButton: {
     alignItems: 'center',
     borderWidth: 1,
+    flex: 1,
     flexDirection: 'row',
-    gap: designTokens.spacing.sm,
+    gap: designTokens.spacing.xs,
     justifyContent: 'center',
-    minHeight: 40,
-    paddingHorizontal: designTokens.spacing.md,
-    paddingVertical: designTokens.spacing.sm,
+    minHeight: 36,
+    minWidth: 0,
+    paddingHorizontal: designTokens.spacing.sm,
+    paddingVertical: designTokens.spacing.xs,
   },
 });

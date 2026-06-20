@@ -1,5 +1,30 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-20 - FAST-SIDEBAR-UX-K layout global del sidebar
+
+Tipo: frontend, UX global, navegacion, documentacion.
+
+Objetivo:
+
+- Corregir el solapamiento del footer de usuario sobre opciones del menu lateral en usuarios tenant/admin y mantener el arreglo compatible con Platform Owner.
+
+Cambios realizados:
+
+- `Sidebar` queda como columna estable con header fijo, navegacion central scrolleable y footer inferior seguro.
+- El area central de navegacion usa `flex: 1`, `minHeight: 0`, `flexShrink: 1` y padding inferior.
+- El footer de usuario usa `flexShrink: 0` para no tapar opciones.
+- `AppShell` acota el sidebar desktop/mobile con alto completo y `overflow: hidden`.
+- Los botones `Oscuro/Claro` y `Cerrar sesion` se compactan en una fila.
+- Se conserva la persistencia de scroll Owner de FAST-OWNER-UX-J.
+- Se documenta la fase en `docs/FAST_SIDEBAR_UX_K_LAYOUT_GLOBAL.md`.
+
+Restricciones respetadas:
+
+- No se toco backend.
+- No se hizo merge a `main`.
+- No se agrego `Actualizar` fuera de LIVE.
+- No se cambio `selectedCompanyId`.
+
 ## 2026-06-20 - FAST-OWNER-UX-J sidebar persistente Owner
 
 Tipo: frontend, UX SaaS Owner, navegacion, documentacion.
