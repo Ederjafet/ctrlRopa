@@ -42,6 +42,7 @@ import {
   updatePlatformUsageRates,
 } from '@/services/platformService';
 import { getSession, UserSession } from '@/services/sessionStorage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-native';
@@ -163,6 +164,8 @@ const EMPTY_SUBSCRIPTION_FORM = {
   status: 'TRIAL',
 };
 
+const PLATFORM_SELECTED_COMPANY_ID_KEY = 'appmoda.platform.selectedCompanyId';
+
 function normalizeSection(value: unknown): PlatformSection {
   const raw = Array.isArray(value) ? value[0] : value;
   const candidate = typeof raw === 'string' ? raw : 'dashboard';
@@ -201,6 +204,12 @@ function money(value: number | string | null | undefined) {
     style: 'currency',
     currency: 'MXN',
   });
+}
+
+function formatCompanyScopeCounts(detail: PlatformCompanyDetail) {
+  const branches = `${detail.branchCount} sucursal${detail.branchCount === 1 ? '' : 'es'}`;
+  const users = `${detail.activeUserCount} usuario${detail.activeUserCount === 1 ? '' : 's'}`;
+  return `${branches} - ${users}`;
 }
 
 export default function PlatformScreen() {
@@ -290,6 +299,11 @@ export default function PlatformScreen() {
   const updateCompanyInAdministration = useCallback((companyId: number | null, feedbackName?: string) => {
     setSelectedCompanyId(companyId);
     router.replace(buildPlatformRoute(activeSection, companyId));
+    if (companyId) {
+      void AsyncStorage.setItem(PLATFORM_SELECTED_COMPANY_ID_KEY, String(companyId));
+    } else {
+      void AsyncStorage.removeItem(PLATFORM_SELECTED_COMPANY_ID_KEY);
+    }
 
     if (feedbackName) {
       setMessage(`Ahora administras ${feedbackName}.`);
@@ -413,16 +427,18 @@ export default function PlatformScreen() {
     try {
       setLoading(true);
       setErrorMessage('');
-      const [companyRows, planRows, usageRows] = await Promise.all([
+      const [companyRows, planRows, usageRows, storedCompanyIdRaw] = await Promise.all([
         getPlatformCompanies(),
         getPlatformSubscriptionPlans(),
         getPlatformUsageSummary(),
+        AsyncStorage.getItem(PLATFORM_SELECTED_COMPANY_ID_KEY),
       ]);
+      const storedCompanyId = parseCompanyIdParam(storedCompanyIdRaw);
       setCompanies(companyRows);
       setSubscriptionPlans(planRows);
       setUsageSummary(usageRows);
       setSelectedCompanyId((current) => {
-        const requestedId = routeCompanyId ?? current;
+        const requestedId = routeCompanyId ?? storedCompanyId ?? current;
         const validCompany = requestedId
           ? companyRows.find(
               (company) => company.id === requestedId && company.code !== 'APPMODA_PLATFORM'
@@ -430,8 +446,13 @@ export default function PlatformScreen() {
           : null;
 
         if (requestedId && !validCompany) {
+          void AsyncStorage.removeItem(PLATFORM_SELECTED_COMPANY_ID_KEY);
           router.replace(buildPlatformRoute(normalizeSection(params.section), null));
           return null;
+        }
+
+        if (validCompany) {
+          void AsyncStorage.setItem(PLATFORM_SELECTED_COMPANY_ID_KEY, String(validCompany.id));
         }
 
         return validCompany?.id ?? null;
@@ -810,28 +831,28 @@ export default function PlatformScreen() {
       ]}
     >
       <View style={styles.flex}>
-        <AppText variant="caption" color={theme.colors.mutedText} bold>
-          CLIENTE EN ADMINISTRACION
+        <AppText variant="caption" color={theme.colors.mutedText} bold numberOfLines={1}>
+          Cliente en administracion
         </AppText>
         <AppText bold numberOfLines={1} style={styles.ownerContextName}>
-          {selectedCompany ? selectedCompany.name : 'Sin cliente en administracion'}
+          {selectedCompany ? selectedCompany.name : 'Sin cliente seleccionado'}
         </AppText>
         <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
           {selectedCompany
             ? `${selectedCompany.status} - ${selectedCompany.branchName || 'Sin sucursal principal'}`
-            : 'Configura un tenant sin cambiar tu sesion.'}
+            : 'Elige un cliente para configurar.'}
         </AppText>
         {selectedCompanyDetail ? (
           <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
-            Sucursales: {selectedCompanyDetail.branchCount} - Usuarios: {selectedCompanyDetail.activeUserCount}
+            {formatCompanyScopeCounts(selectedCompanyDetail)}
           </AppText>
         ) : null}
       </View>
       <AppButton
-        title={selectedCompany ? 'Cambiar cliente' : 'Elegir cliente'}
+        title={selectedCompany ? 'Cambiar' : 'Elegir'}
         variant="secondary"
         onPress={() => setCompanyPickerVisible(true)}
-        style={styles.compactButton}
+        style={[styles.compactButton, styles.ownerContextButton]}
       />
     </View>
   );
@@ -1656,7 +1677,7 @@ export default function PlatformScreen() {
       activeRoute={`platform-${activeSection}`}
       session={session}
       compactHeader
-      rightContent={renderOwnerCompanyContext()}
+      sidebarContext={renderOwnerCompanyContext()}
     >
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {message ? (
@@ -1793,17 +1814,20 @@ const styles = StyleSheet.create({
   ownerContextName: {
     marginTop: 1,
   },
+  ownerContextButton: {
+    alignSelf: 'flex-start',
+    minHeight: 28,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
   ownerContextPill: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     borderRadius: 10,
     borderWidth: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    maxWidth: 240,
-    minWidth: 200,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    width: '100%',
   },
   panel: {
     gap: 12,

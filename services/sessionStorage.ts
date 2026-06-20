@@ -68,6 +68,7 @@ export async function clearSession() {
       'token',
       'user',
       'current_user',
+      'appmoda.platform.selectedCompanyId',
     ].includes(key) || key.startsWith('selected_live_')
   );
 

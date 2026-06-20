@@ -23,6 +23,7 @@ type Props = {
   session?: UserSession | null;
   navSections: SidebarSection[];
   rightContent?: ReactNode;
+  sidebarContext?: ReactNode;
   compactHeader?: boolean;
   children: ReactNode;
 };
@@ -39,6 +40,7 @@ export default function AppShell({
   session,
   navSections,
   rightContent,
+  sidebarContext,
   compactHeader,
   children,
 }: Props) {
@@ -74,6 +76,7 @@ export default function AppShell({
       activeRoute={activeRoute}
       onNavigate={navigate}
       session={session}
+      contextContent={sidebarContext}
       onClose={mobile ? () => setMenuOpen(false) : undefined}
       onSignOut={handleSignOut}
     />

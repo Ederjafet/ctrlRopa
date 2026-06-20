@@ -14,6 +14,7 @@ type Props = {
   activeRoute: string;
   session?: UserSession | null;
   rightContent?: ReactNode;
+  sidebarContext?: ReactNode;
   compactHeader?: boolean;
   children: ReactNode;
 };
@@ -29,6 +30,7 @@ export default function AppShellPage({
   activeRoute,
   session: providedSession,
   rightContent,
+  sidebarContext,
   compactHeader,
   children,
 }: Props) {
@@ -65,6 +67,7 @@ export default function AppShellPage({
       session={session}
       navSections={navSections}
       rightContent={rightContent}
+      sidebarContext={sidebarContext}
       compactHeader={compactHeader}
     >
       {children}

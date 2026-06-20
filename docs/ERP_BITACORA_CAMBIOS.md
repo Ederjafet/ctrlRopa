@@ -1,5 +1,29 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-20 - FAST-OWNER-UX-H persistencia cliente en administracion
+
+Tipo: frontend, UX SaaS Owner, layout, persistencia local, documentacion.
+
+Objetivo:
+
+- Corregir perdida de `Cliente en administracion` al navegar/refrescar y compactar el bloque visual del Panel Owner.
+
+Cambios realizados:
+
+- El contexto Owner pasa al menu lateral mediante `sidebarContext`.
+- La seleccion se sincroniza con query param `companyId` y se respalda en `AsyncStorage` como `appmoda.platform.selectedCompanyId`.
+- `clearSession()` elimina el `selectedCompanyId` del Owner al cerrar sesion.
+- El bloque muestra `Sin cliente seleccionado`, `Elige un cliente para configurar.`, y botones cortos `Elegir` / `Cambiar`.
+- La lista del selector conserva accion `Administrar` y copy explicito de no impersonacion.
+- Se documenta la fase en `docs/FAST_OWNER_UX_H_PERSISTENCIA_CLIENTE_ADMINISTRACION.md`.
+
+Restricciones respetadas:
+
+- No se implemento impersonacion.
+- No se toco backend.
+- No se hizo merge a `main`.
+- No se agrego `Actualizar` fuera de LIVE.
+
 ## 2026-06-20 - FAST-OWNER-UX-G cliente en administracion
 
 Tipo: frontend, UX SaaS Owner, documentacion.

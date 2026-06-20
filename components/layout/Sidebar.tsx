@@ -5,6 +5,7 @@ import { useAppTheme } from '@/context/AppThemeContext';
 import { UserSession } from '@/services/sessionStorage';
 import { designTokens } from '@/theme/designTokens';
 import { MaterialIcons } from '@expo/vector-icons';
+import { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
@@ -19,11 +20,20 @@ type Props = {
   activeRoute?: string;
   onNavigate?: (item: SidebarNavItemConfig) => void;
   session?: UserSession | null;
+  contextContent?: ReactNode;
   onClose?: () => void;
   onSignOut?: () => void;
 };
 
-export default function Sidebar({ sections, activeRoute, onNavigate, session, onClose, onSignOut }: Props) {
+export default function Sidebar({
+  sections,
+  activeRoute,
+  onNavigate,
+  session,
+  contextContent,
+  onClose,
+  onSignOut,
+}: Props) {
   const { theme, toggleThemeMode } = useAppTheme();
   const { t } = useTranslation('common');
   const roleLabel = session?.roles?.map((role) => role.code).join(', ') || t('navigation.noRole');
@@ -101,6 +111,7 @@ export default function Sidebar({ sections, activeRoute, onNavigate, session, on
           </Pressable>
         ) : null}
       </View>
+      {contextContent ? <View style={styles.contextContent}>{contextContent}</View> : null}
       <ScrollView
         style={styles.navArea}
         contentContainerStyle={styles.navContent}
@@ -226,6 +237,9 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     width: 40,
+  },
+  contextContent: {
+    marginBottom: designTokens.spacing.md,
   },
   navArea: {
     flex: 1,
