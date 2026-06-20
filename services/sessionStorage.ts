@@ -70,7 +70,9 @@ export async function clearSession() {
       'current_user',
       'appmoda.platform.selectedCompanyId',
       'appmoda.owner.sidebarScrollY',
-    ].includes(key) || key.startsWith('selected_live_')
+    ].includes(key) ||
+    key.startsWith('selected_live_') ||
+    key.startsWith('appmoda.sidebar.scroll.')
   );
 
   if (sessionKeys.length > 0) {

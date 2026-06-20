@@ -59,6 +59,8 @@ export default function AppShell({
   const topBarTitle = showSidebar && contextTitle ? contextTitle : title;
   const topBarSubtitle = showSidebar && contextTitle ? contextSubtitle : subtitle;
   const topBarMetadata = showSidebar && contextTitle ? contextMetadata : metadata;
+  const resolvedSidebarScrollStorageKey = sidebarScrollStorageKey
+    ?? (session?.userId ? `appmoda.sidebar.scroll.${session.userId}` : undefined);
 
   const navigate = (item: SidebarNavItemConfig) => {
     if (!item.route || item.disabled) return;
@@ -79,7 +81,7 @@ export default function AppShell({
       onNavigate={navigate}
       session={session}
       contextContent={sidebarContext}
-      scrollStorageKey={sidebarScrollStorageKey}
+      scrollStorageKey={resolvedSidebarScrollStorageKey}
       onClose={mobile ? () => setMenuOpen(false) : undefined}
       onSignOut={handleSignOut}
     />

@@ -8,7 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ReactNode, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { LayoutChangeEvent, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 export type SidebarSection = {
   title?: string;
@@ -44,7 +44,12 @@ export default function Sidebar({
   const normalizedActiveRoute = activeRoute?.replace(/^\//, '');
   const scrollRef = useRef<ScrollView | null>(null);
   const scrollYRef = useRef(0);
+  const contentHeightRef = useRef(0);
+  const navViewportHeightRef = useRef(0);
+  const groupOffsetsRef = useRef<Record<number, number>>({});
+  const itemLayoutsRef = useRef<Record<string, { groupIndex: number; y: number; height: number }>>({});
   const pendingRestoreYRef = useRef<number | null>(null);
+  const activeScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const restoreSidebarScroll = useCallback((nextY: number) => {
     const safeY = Math.max(0, Math.round(nextY));
@@ -99,10 +104,87 @@ export default function Sidebar({
       aliases.some((alias) => alias === activeRoute || alias.replace(/^\//, '') === normalizedActiveRoute)
     );
   };
+  const activeItemKey = sections.flatMap((section) => section.items).find(isActiveItem)?.key;
+
+  const ensureActiveItemVisible = useCallback((animated = false) => {
+    if (!activeItemKey) return;
+
+    const layout = itemLayoutsRef.current[activeItemKey];
+    const viewportHeight = navViewportHeightRef.current;
+    if (!layout || viewportHeight <= 0) return;
+
+    const groupOffset = groupOffsetsRef.current[layout.groupIndex] ?? 0;
+    const itemTop = groupOffset + layout.y;
+    const itemBottom = itemTop + layout.height;
+    const margin = designTokens.spacing.md;
+    const visibleTop = scrollYRef.current + margin;
+    const visibleBottom = scrollYRef.current + viewportHeight - margin;
+    let targetY: number | null = null;
+
+    if (itemTop < visibleTop) {
+      targetY = itemTop - margin;
+    } else if (itemBottom > visibleBottom) {
+      targetY = itemBottom - viewportHeight + margin;
+    }
+
+    if (targetY === null) return;
+
+    const maxScrollY = Math.max(0, contentHeightRef.current - viewportHeight);
+    const safeY = Math.max(0, Math.min(Math.round(targetY), maxScrollY));
+    scrollYRef.current = safeY;
+    scrollRef.current?.scrollTo({ y: safeY, animated });
+
+    if (scrollStorageKey) {
+      void AsyncStorage.setItem(scrollStorageKey, String(safeY));
+    }
+  }, [activeItemKey, scrollStorageKey]);
+
+  const queueEnsureActiveItemVisible = useCallback((animated = false) => {
+    if (activeScrollTimeoutRef.current) {
+      clearTimeout(activeScrollTimeoutRef.current);
+    }
+
+    activeScrollTimeoutRef.current = setTimeout(() => {
+      ensureActiveItemVisible(animated);
+      setTimeout(() => ensureActiveItemVisible(false), 80);
+    }, 0);
+  }, [ensureActiveItemVisible]);
+
+  useEffect(() => {
+    queueEnsureActiveItemVisible(false);
+  }, [activeItemKey, queueEnsureActiveItemVisible]);
+
+  useEffect(() => () => {
+    if (activeScrollTimeoutRef.current) {
+      clearTimeout(activeScrollTimeoutRef.current);
+    }
+  }, []);
+
   const handleNavigate = useCallback((item: SidebarNavItemConfig) => {
     persistSidebarScroll();
     onNavigate?.(item);
   }, [onNavigate, persistSidebarScroll]);
+
+  const handleGroupLayout = useCallback((index: number, event: LayoutChangeEvent) => {
+    groupOffsetsRef.current[index] = event.nativeEvent.layout.y;
+    queueEnsureActiveItemVisible(false);
+  }, [queueEnsureActiveItemVisible]);
+
+  const handleItemLayout = useCallback((
+    item: SidebarNavItemConfig,
+    groupIndex: number,
+    event: LayoutChangeEvent
+  ) => {
+    itemLayoutsRef.current[item.key] = {
+      groupIndex,
+      y: event.nativeEvent.layout.y,
+      height: event.nativeEvent.layout.height,
+    };
+
+    if (item.key === activeItemKey) {
+      queueEnsureActiveItemVisible(false);
+    }
+  }, [activeItemKey, queueEnsureActiveItemVisible]);
 
   return (
     <View
@@ -169,20 +251,31 @@ export default function Sidebar({
         contentContainerStyle={styles.navContent}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={80}
+        onLayout={(event) => {
+          navViewportHeightRef.current = event.nativeEvent.layout.height;
+          queueEnsureActiveItemVisible(false);
+        }}
         onScroll={(event) => {
           scrollYRef.current = event.nativeEvent.contentOffset.y;
         }}
-        onContentSizeChange={() => {
-          if (pendingRestoreYRef.current === null) return;
+        onContentSizeChange={(_width, height) => {
+          contentHeightRef.current = height;
 
-          restoreSidebarScroll(pendingRestoreYRef.current);
-          pendingRestoreYRef.current = null;
+          if (pendingRestoreYRef.current !== null) {
+            restoreSidebarScroll(pendingRestoreYRef.current);
+            pendingRestoreYRef.current = null;
+          }
+
+          queueEnsureActiveItemVisible(false);
         }}
         onMomentumScrollEnd={persistSidebarScroll}
         onScrollEndDrag={persistSidebarScroll}
       >
         {sections.map((section, index) => (
-          <View key={`${section.title ?? 'section'}-${index}`}>
+          <View
+            key={`${section.title ?? 'section'}-${index}`}
+            onLayout={(event) => handleGroupLayout(index, event)}
+          >
             <View style={styles.section}>
               {section.title || section.titleKey ? (
                 <AppText
@@ -195,12 +288,16 @@ export default function Sidebar({
                 </AppText>
               ) : null}
               {section.items.map((item) => (
-                <SidebarNavItem
+                <View
                   key={item.key}
-                  item={item}
-                  active={isActiveItem(item)}
-                  onPress={handleNavigate}
-                />
+                  onLayout={(event) => handleItemLayout(item, index, event)}
+                >
+                  <SidebarNavItem
+                    item={item}
+                    active={isActiveItem(item)}
+                    onPress={handleNavigate}
+                  />
+                </View>
               ))}
             </View>
             {index === 0 && contextContent ? <View style={styles.contextContent}>{contextContent}</View> : null}

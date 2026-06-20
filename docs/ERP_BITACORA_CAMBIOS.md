@@ -1,5 +1,30 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-20 - FAST-SIDEBAR-UX-L scroll global y opcion activa visible
+
+Tipo: frontend, UX global, navegacion, documentacion.
+
+Objetivo:
+
+- Evitar que el menu lateral vuelva siempre al inicio al cambiar de ruta y asegurar que la opcion activa quede visible.
+
+Cambios realizados:
+
+- `AppShell` asigna una llave global de scroll por usuario: `appmoda.sidebar.scroll.<userId>`.
+- `Sidebar` mide grupos e items del menu con `onLayout`.
+- Al cambiar `activeRoute`, el sidebar calcula si el item activo esta fuera de vista y ejecuta `scrollTo`.
+- Se conserva la llave explicita del Owner: `appmoda.owner.sidebarScrollY`.
+- `clearSession()` limpia tambien llaves `appmoda.sidebar.scroll.*`.
+- Se mantiene la estructura de footer seguro de FAST-SIDEBAR-UX-K.
+- Se documenta la fase en `docs/FAST_SIDEBAR_UX_L_SCROLL_GLOBAL_ACTIVO.md`.
+
+Restricciones respetadas:
+
+- No se toco backend.
+- No se hizo merge a `main`.
+- No se agrego `Actualizar` fuera de LIVE.
+- No se cambio `selectedCompanyId`.
+
 ## 2026-06-20 - FAST-SIDEBAR-UX-K layout global del sidebar
 
 Tipo: frontend, UX global, navegacion, documentacion.
