@@ -1,5 +1,30 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-20 - FAST-OWNER-UX-G cliente en administracion
+
+Tipo: frontend, UX SaaS Owner, documentacion.
+
+Objetivo:
+
+- Convertir el contexto de cliente del Panel Owner en un selector global persistente y eliminar tarjetas repetidas de `CLIENTE ACTIVO`.
+
+Cambios realizados:
+
+- `/platform` usa `Cliente en administracion` en el header fijo del Panel Owner.
+- Se elimina la tarjeta grande repetida de Sucursales, Usuarios, Modulos, Limites, Tarifas, Uso y Suscripcion.
+- `Cambiar cliente` abre modal con lista compacta de clientes y copy explicito de no impersonacion.
+- La seleccion persiste con query param `companyId`, por ejemplo `/platform?section=users&companyId=2`.
+- La lista de `Clientes / Companias` usa accion `Administrar`.
+- Secciones dependientes muestran empty state si no hay cliente en administracion.
+- Se documenta la fase en `docs/FAST_OWNER_UX_G_CLIENTE_EN_ADMINISTRACION.md`.
+
+Restricciones respetadas:
+
+- No se implemento impersonacion.
+- No se toco backend.
+- No se hizo merge a `main`.
+- No se agrego `Actualizar` fuera de LIVE.
+
 ## 2026-06-20 - FAST-OWNER-UX-F refinamiento final Panel Owner
 
 Tipo: frontend, UX SaaS Owner, backend minimo de gating, documentacion.

@@ -101,7 +101,6 @@ export default function OperationalAuthorizationsScreen() {
   const [session, setSession] = useState<UserSession | null>(null);
   const [items, setItems] = useState<OperationalAuthorization[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [selected, setSelected] = useState<OperationalAuthorization | null>(null);
@@ -130,7 +129,7 @@ export default function OperationalAuthorizationsScreen() {
   );
 
   const load = useCallback(
-    async (refreshing = false) => {
+    async () => {
       const currentSession = await getSession();
 
       if (!canOpenScreen(currentSession)) {
@@ -143,17 +142,12 @@ export default function OperationalAuthorizationsScreen() {
       if (!currentSession?.branchId) {
         setErrorMessage(t('liveAuth.branchMissing'));
         setIsLoading(false);
-        setIsRefreshing(false);
         return;
       }
 
       try {
         setErrorMessage('');
-        if (refreshing) {
-          setIsRefreshing(true);
-        } else {
-          setIsLoading(true);
-        }
+        setIsLoading(true);
 
         const data = hasPermission(currentSession, 'VIEW_LIVE_OPERATION_AUTHORIZATIONS')
           ? await getOperationalAuthorizationsByBranch(currentSession.branchId)
@@ -163,7 +157,6 @@ export default function OperationalAuthorizationsScreen() {
         setErrorMessage(getActionableApiErrorMessage(error, t));
       } finally {
         setIsLoading(false);
-        setIsRefreshing(false);
       }
     },
     [router, t]
@@ -171,7 +164,7 @@ export default function OperationalAuthorizationsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void load(false);
+      void load();
     }, [load])
   );
 
@@ -234,7 +227,7 @@ export default function OperationalAuthorizationsScreen() {
         requestedPrice: '',
         reason: '',
       });
-      await load(true);
+      await load();
     } catch (error) {
       const copy = getActionableApiError(error, t);
       Alert.alert(copy.title, copy.message, [{ text: copy.primaryActionLabel }]);
@@ -258,7 +251,7 @@ export default function OperationalAuthorizationsScreen() {
       setSelected(updated);
       setDecisionAction(null);
       setDecisionReason('');
-      await load(true);
+      await load();
     } catch (error) {
       const copy = getActionableApiError(error, t);
       Alert.alert(copy.title, copy.message, [{ text: copy.primaryActionLabel }]);
@@ -323,13 +316,6 @@ export default function OperationalAuthorizationsScreen() {
       navSections={navSections}
     >
       <View style={styles.toolbar}>
-        <AppButton
-          title={t('liveAuth.refresh')}
-          variant="secondary"
-          loading={isRefreshing}
-          onPress={() => void load(true)}
-          style={styles.toolbarButton}
-        />
         {canRequest ? (
           <AppButton
             title={t('liveAuth.newRequest')}

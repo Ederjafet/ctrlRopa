@@ -1,4 +1,5 @@
 import AppShellPage from '@/components/layout/AppShellPage';
+import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
@@ -170,6 +171,13 @@ function normalizeSection(value: unknown): PlatformSection {
     : 'dashboard';
 }
 
+function parseCompanyIdParam(value: unknown): number | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (typeof raw !== 'string' || !raw.trim()) return null;
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
 function parseNullableInteger(value: string, label: string): number | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -200,6 +208,7 @@ export default function PlatformScreen() {
   const params = useLocalSearchParams();
   const { theme } = useAppTheme();
   const { isPhone } = useResponsiveLayout();
+  const routeCompanyId = useMemo(() => parseCompanyIdParam(params.companyId), [params.companyId]);
 
   const [activeSection, setActiveSection] = useState<PlatformSection>(() =>
     normalizeSection(params.section)
@@ -232,6 +241,7 @@ export default function PlatformScreen() {
   const [showUserForm, setShowUserForm] = useState(false);
   const [showAdminForm, setShowAdminForm] = useState(false);
   const [showPlanForm, setShowPlanForm] = useState(false);
+  const [companyPickerVisible, setCompanyPickerVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingCompanyScope, setLoadingCompanyScope] = useState(false);
   const [creatingCompany, setCreatingCompany] = useState(false);
@@ -271,6 +281,27 @@ export default function PlatformScreen() {
   useEffect(() => {
     setActiveSection(normalizeSection(params.section));
   }, [params.section]);
+
+  const buildPlatformRoute = useCallback((section: PlatformSection, companyId?: number | null) => {
+    const companyParam = companyId ? `&companyId=${companyId}` : '';
+    return `/platform?section=${section}${companyParam}` as any;
+  }, []);
+
+  const updateCompanyInAdministration = useCallback((companyId: number | null, feedbackName?: string) => {
+    setSelectedCompanyId(companyId);
+    router.replace(buildPlatformRoute(activeSection, companyId));
+
+    if (feedbackName) {
+      setMessage(`Ahora administras ${feedbackName}.`);
+      setErrorMessage('');
+    }
+  }, [activeSection, buildPlatformRoute, router]);
+
+  useEffect(() => {
+    if (!selectedCompanyId || loading) return;
+    if (routeCompanyId === selectedCompanyId) return;
+    router.replace(buildPlatformRoute(activeSection, selectedCompanyId));
+  }, [activeSection, buildPlatformRoute, loading, routeCompanyId, router, selectedCompanyId]);
 
   const loadPlanPrices = useCallback(async (planId: number | null) => {
     if (!planId) {
@@ -390,16 +421,28 @@ export default function PlatformScreen() {
       setCompanies(companyRows);
       setSubscriptionPlans(planRows);
       setUsageSummary(usageRows);
-      setSelectedCompanyId((current) =>
-        current ?? companyRows.find((company) => company.code !== 'APPMODA_PLATFORM')?.id ?? null
-      );
+      setSelectedCompanyId((current) => {
+        const requestedId = routeCompanyId ?? current;
+        const validCompany = requestedId
+          ? companyRows.find(
+              (company) => company.id === requestedId && company.code !== 'APPMODA_PLATFORM'
+            )
+          : null;
+
+        if (requestedId && !validCompany) {
+          router.replace(buildPlatformRoute(normalizeSection(params.section), null));
+          return null;
+        }
+
+        return validCompany?.id ?? null;
+      });
       setSelectedPlanId((current) => current ?? planRows[0]?.id ?? null);
     } catch (error) {
       setErrorMessage(getActionableApiErrorMessage(error));
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [buildPlatformRoute, params.section, routeCompanyId, router]);
 
   useFocusEffect(
     useCallback(() => {
@@ -410,8 +453,11 @@ export default function PlatformScreen() {
   const refreshCompanies = async () => {
     const data = await getPlatformCompanies();
     setCompanies(data);
-    if (selectedCompanyId && !data.some((company) => company.id === selectedCompanyId)) {
-      setSelectedCompanyId(null);
+    if (
+      selectedCompanyId &&
+      !data.some((company) => company.id === selectedCompanyId && company.code !== 'APPMODA_PLATFORM')
+    ) {
+      updateCompanyInAdministration(null);
     }
   };
 
@@ -440,8 +486,7 @@ export default function PlatformScreen() {
       });
       setCompanyForm(EMPTY_COMPANY_FORM);
       setShowCompanyForm(false);
-      setSelectedCompanyId(created.id);
-      setMessage(`Empresa creada: ${created.name}.`);
+      updateCompanyInAdministration(created.id, created.name);
       Alert.alert('Empresa creada', `Se creo ${created.name} con sucursal principal.`);
       await refreshCompanies();
       await refreshUsageSummary();
@@ -614,7 +659,7 @@ export default function PlatformScreen() {
           ? String(saved.limits.maxPackagesPerMonth)
           : '',
       });
-      setMessage('Modulos y limites actualizados para el cliente seleccionado.');
+      setMessage('Modulos y limites actualizados para el cliente en administracion.');
       await loadCompanyScope(selectedCompany.id);
       await refreshUsageSummary();
     } catch (error) {
@@ -754,50 +799,100 @@ export default function PlatformScreen() {
     ? usageSummary.find((item) => item.companyId === selectedCompany.id)
     : null;
 
-  const renderCompanyContext = () => (
+  const renderOwnerCompanyContext = () => (
     <View
       style={[
-        styles.clientContextStrip,
+        styles.ownerContextPill,
         {
           backgroundColor: theme.colors.surfaceAlt,
           borderColor: theme.colors.borderSubtle,
         },
       ]}
     >
-      <View style={[styles.rowBetween, isPhone ? styles.column : null]}>
-        <View style={styles.flex}>
-          <AppText variant="caption" color={theme.colors.mutedText} bold>
-            CLIENTE ACTIVO
-          </AppText>
-          <AppText variant="subtitle" bold>
-            {selectedCompany ? selectedCompany.name : 'Selecciona una compania primero'}
-          </AppText>
-          <AppText variant="caption" color={theme.colors.mutedText}>
-            {selectedCompany
-              ? `${selectedCompany.code} - ${selectedCompany.status} - ${selectedCompany.branchName || 'Sin sucursal principal'}`
-              : 'Ve a Clientes / Companias para elegir el cliente que quieres configurar.'}
-          </AppText>
-        </View>
+      <View style={styles.flex}>
+        <AppText variant="caption" color={theme.colors.mutedText} bold>
+          CLIENTE EN ADMINISTRACION
+        </AppText>
+        <AppText bold numberOfLines={1} style={styles.ownerContextName}>
+          {selectedCompany ? selectedCompany.name : 'Sin cliente en administracion'}
+        </AppText>
+        <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+          {selectedCompany
+            ? `${selectedCompany.status} - ${selectedCompany.branchName || 'Sin sucursal principal'}`
+            : 'Configura un tenant sin cambiar tu sesion.'}
+        </AppText>
         {selectedCompanyDetail ? (
-          <View style={styles.metaStack}>
-            <StatusBadge label={`Sucursales ${selectedCompanyDetail.branchCount}`} tone="neutral" />
-            <StatusBadge label={`Usuarios activos ${selectedCompanyDetail.activeUserCount}`} tone="info" />
-          </View>
+          <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+            Sucursales: {selectedCompanyDetail.branchCount} - Usuarios: {selectedCompanyDetail.activeUserCount}
+          </AppText>
         ) : null}
-        <AppButton
-          title={selectedCompany ? 'Cambiar cliente activo' : 'Elegir cliente activo'}
-          variant="secondary"
-          onPress={() => router.push('/platform?section=companies' as any)}
-          style={styles.compactButton}
-        />
       </View>
+      <AppButton
+        title={selectedCompany ? 'Cambiar cliente' : 'Elegir cliente'}
+        variant="secondary"
+        onPress={() => setCompanyPickerVisible(true)}
+        style={styles.compactButton}
+      />
     </View>
+  );
+
+  const renderCompanyPicker = () => (
+    <AppBottomModal
+      visible={companyPickerVisible}
+      title="Cliente en administracion"
+      onClose={() => setCompanyPickerVisible(false)}
+      maxHeight="88%"
+    >
+      <View style={styles.sectionStack}>
+        <AppCard style={styles.panel}>
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            Elegir un cliente solo cambia el contexto de administracion del Panel Owner. No cambia tu sesion, no entra como el cliente y no es impersonacion.
+          </AppText>
+        </AppCard>
+        <View style={styles.compactList}>
+          {companies.filter((company) => company.code !== 'APPMODA_PLATFORM').length === 0 ? (
+            <EmptyState title="Sin clientes" message="Crea una compania para comenzar a administrarla." icon="domain" />
+          ) : null}
+          {companies.filter((company) => company.code !== 'APPMODA_PLATFORM').map((company) => {
+            const selected = company.id === selectedCompanyId;
+            const usage = usageSummary.find((item) => item.companyId === company.id);
+            return (
+              <View key={company.id} style={styles.companyPickerRow}>
+                <View style={styles.flex}>
+                  <AppText bold numberOfLines={1}>{company.name}</AppText>
+                  <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+                    {company.status} - {company.branchName || 'Sin sucursal principal'}
+                  </AppText>
+                  <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+                    Usuarios {usage?.activeUsers ?? '-'} - Sucursales {usage?.activeBranches ?? '-'} - Plan {usage?.planName || 'sin plan'}
+                  </AppText>
+                </View>
+                <AppButton
+                  title={selected ? 'En administracion' : 'Administrar'}
+                  variant={selected ? 'neutral' : 'secondary'}
+                  disabled={selected}
+                  disabledReason="Este cliente ya esta en administracion."
+                  onPress={() => {
+                    updateCompanyInAdministration(company.id, company.name);
+                    setCompanyPickerVisible(false);
+                  }}
+                  style={styles.compactButton}
+                />
+              </View>
+            );
+          })}
+        </View>
+      </View>
+    </AppBottomModal>
   );
 
   const renderCompanyRequired = (message: string) => (
     <AppCard style={styles.panel}>
-      <EmptyState title="Selecciona una compania" message={message} icon="domain" />
-      <AppButton title="Ir a Clientes / Companias" variant="secondary" onPress={() => router.push('/platform?section=companies' as any)} style={styles.actionButton} />
+      <EmptyState title="Selecciona un cliente" message={message} icon="domain" />
+      <View style={styles.actionsRow}>
+        <AppButton title="Elegir cliente" variant="operation" onPress={() => setCompanyPickerVisible(true)} style={styles.actionButton} />
+        <AppButton title="Ir a Clientes / Companias" variant="secondary" onPress={() => router.push(buildPlatformRoute('companies', selectedCompanyId))} style={styles.actionButton} />
+      </View>
     </AppCard>
   );
 
@@ -851,7 +946,7 @@ export default function PlatformScreen() {
               Clientes / Companias
             </AppText>
             <AppText variant="caption" color={theme.colors.mutedText}>
-              Lista clientes, crea empresas y selecciona el contexto que usaran las demas secciones.
+              Lista clientes, crea empresas y define que tenant estas configurando desde el Panel Owner.
             </AppText>
           </View>
           <AppButton
@@ -923,11 +1018,11 @@ export default function PlatformScreen() {
                   </AppText>
                 </View>
                 <AppButton
-                  title={selected ? 'Cliente activo' : 'Usar como cliente activo'}
+                  title={selected ? 'En administracion' : 'Administrar'}
                   variant={selected ? 'neutral' : 'secondary'}
                   disabled={selected || isPlatformCompany}
-                  disabledReason={isPlatformCompany ? 'Tenant interno.' : 'La empresa ya esta seleccionada.'}
-                  onPress={() => setSelectedCompanyId(company.id)}
+                  disabledReason={isPlatformCompany ? 'Tenant interno.' : 'Este cliente ya esta en administracion.'}
+                  onPress={() => updateCompanyInAdministration(company.id, company.name)}
                   style={styles.compactButton}
                 />
               </View>
@@ -940,7 +1035,6 @@ export default function PlatformScreen() {
 
   const renderBranches = () => (
     <View style={styles.sectionStack}>
-      {renderCompanyContext()}
       {!canUseSelectedCompany
         ? renderCompanyRequired('Selecciona una compania en Clientes / Companias para administrar sus sucursales.')
         : (
@@ -948,10 +1042,10 @@ export default function PlatformScreen() {
         <View style={[styles.rowBetween, isPhone ? styles.column : null]}>
           <View style={styles.flex}>
             <AppText variant="subtitle" bold>
-              Sucursales del cliente
+              Sucursales
             </AppText>
             <AppText variant="caption" color={theme.colors.mutedText}>
-              Administra solo las sucursales de la compania seleccionada.
+              Administra sucursales del cliente en administracion.
             </AppText>
           </View>
           <AppButton
@@ -997,7 +1091,6 @@ export default function PlatformScreen() {
 
   const renderUsers = () => (
     <View style={styles.sectionStack}>
-      {renderCompanyContext()}
       {!canUseSelectedCompany
         ? renderCompanyRequired('Selecciona una compania para administrar sus usuarios.')
         : (
@@ -1005,10 +1098,10 @@ export default function PlatformScreen() {
         <View style={[styles.rowBetween, isPhone ? styles.column : null]}>
           <View style={styles.flex}>
             <AppText variant="subtitle" bold>
-              Usuarios del cliente
+              Usuarios
             </AppText>
             <AppText variant="caption" color={theme.colors.mutedText}>
-              Crea admins y usuarios operativos asociados a la compania seleccionada.
+              Administra usuarios y roles operativos del cliente en administracion.
             </AppText>
           </View>
           <View style={styles.actionsRow}>
@@ -1039,7 +1132,6 @@ export default function PlatformScreen() {
 
   const renderModules = () => (
     <View style={styles.sectionStack}>
-      {renderCompanyContext()}
       {!canUseSelectedCompany ? renderCompanyRequired('Selecciona una compania para activar o desactivar modulos.') : null}
       {canUseSelectedCompany ? (
       <AppCard style={styles.panel}>
@@ -1047,10 +1139,10 @@ export default function PlatformScreen() {
           <StatusBadge label="MODULOS" tone="info" />
           <View style={styles.flex}>
             <AppText variant="subtitle" bold>
-              Modulos activos del cliente
+              Modulos activos
             </AppText>
             <AppText variant="caption" color={theme.colors.mutedText}>
-              Activa o desactiva funcionalidades disponibles para este cliente.
+              Activa o desactiva funcionalidades para el cliente en administracion.
             </AppText>
           </View>
         </View>
@@ -1095,7 +1187,6 @@ export default function PlatformScreen() {
 
   const renderLimits = () => (
     <View style={styles.sectionStack}>
-      {renderCompanyContext()}
       {!canUseSelectedCompany ? renderCompanyRequired('Selecciona una compania para configurar sus limites contratados.') : null}
       {canUseSelectedCompany ? (
       <AppCard style={styles.panel}>
@@ -1103,10 +1194,10 @@ export default function PlatformScreen() {
           <StatusBadge label="LIMITES" tone="warning" />
           <View style={styles.flex}>
             <AppText variant="subtitle" bold>
-              Limites contratados del cliente
+              Limites
             </AppText>
             <AppText variant="caption" color={theme.colors.mutedText}>
-              Define cuantos usuarios, sucursales y operaciones puede usar este cliente.
+              Define limites contratados para el cliente en administracion.
             </AppText>
           </View>
         </View>
@@ -1146,7 +1237,7 @@ export default function PlatformScreen() {
               Planes / Suscripciones
             </AppText>
             <AppText variant="caption" color={theme.colors.mutedText}>
-              Crea planes, define periodicidades y asocia el cliente seleccionado a un modelo de cobro.
+              Crea planes, define periodicidades y asocia el cliente en administracion a un modelo de cobro.
             </AppText>
           </View>
           <AppButton
@@ -1161,14 +1252,12 @@ export default function PlatformScreen() {
       </AppCard>
       {renderPlanCatalog()}
       {renderPlanPrices()}
-      {renderCompanyContext()}
       {renderCompanySubscription()}
     </View>
   );
 
   const renderUsageRates = () => (
     <View style={styles.sectionStack}>
-      {renderCompanyContext()}
       {!canUseSelectedCompany ? renderCompanyRequired('Selecciona una compania para configurar sus tarifas por consumo.') : null}
       {canUseSelectedCompany ? (
       <AppCard style={styles.panel}>
@@ -1228,8 +1317,9 @@ export default function PlatformScreen() {
 
   const renderUsage = () => (
     <View style={styles.sectionStack}>
-      {renderCompanyContext()}
-      {renderUsageList(false)}
+      {!canUseSelectedCompany
+        ? renderCompanyRequired('Elige un cliente para consultar su consumo y actividad.')
+        : renderUsageList(false)}
     </View>
   );
 
@@ -1299,7 +1389,7 @@ export default function PlatformScreen() {
   const renderBranchesList = () => (
     <View style={styles.compactList}>
       {companyBranches.length === 0 ? (
-        <EmptyState title="Sin sucursales" message="Crea una sucursal para el cliente seleccionado." icon="store" />
+        <EmptyState title="Sin sucursales" message="Crea una sucursal para el cliente en administracion." icon="store" />
       ) : (
         companyBranches.map((branch) => (
           <AppCard key={branch.id} style={styles.listCard}>
@@ -1449,12 +1539,15 @@ export default function PlatformScreen() {
   );
 
   const renderCompanySubscription = () => (
+    !canUseSelectedCompany ? (
+      renderCompanyRequired('Elige un cliente para administrar su suscripcion.')
+    ) : (
     <AppCard style={styles.panel}>
       <View style={styles.sectionHeader}>
         <StatusBadge label="CLIENTE" tone="role" />
         <View style={styles.flex}>
           <AppText variant="subtitle" bold>
-            Suscripcion del cliente
+            Suscripcion del cliente en administracion
           </AppText>
           <AppText variant="caption" color={theme.colors.mutedText}>
             {selectedCompany ? selectedCompany.name : 'Selecciona un cliente'}
@@ -1498,6 +1591,7 @@ export default function PlatformScreen() {
       </AppText>
       <AppButton title="Guardar suscripcion" loading={savingSubscription} disabled={savingSubscription || !canManageSubscriptions || !canUseSelectedCompany} disabledReason="Selecciona cliente y permiso MANAGE_COMPANY_SUBSCRIPTIONS." onPress={handleSaveSubscription} style={styles.actionButton} />
     </AppCard>
+    )
   );
 
   const renderUsageList = (compact: boolean) => (
@@ -1514,7 +1608,7 @@ export default function PlatformScreen() {
         </View>
       </View>
       <View style={styles.compactList}>
-        {(compact ? usageSummary.slice(0, 5) : usageSummary).map((item) => (
+        {(compact ? usageSummary.slice(0, 5) : selectedUsage ? [selectedUsage] : []).map((item) => (
           <View key={item.companyId} style={styles.listRow}>
             <View style={styles.flex}>
               <AppText bold>{item.companyName}</AppText>
@@ -1525,13 +1619,13 @@ export default function PlatformScreen() {
                 Usuarios {item.activeUsers}/{item.maxUsers ?? 'sin limite'} - Sucursales {item.activeBranches}/{item.maxBranches ?? 'sin limite'} - Modulos activos {item.activeModules}
               </AppText>
             </View>
-            <AppButton title={selectedCompanyId === item.companyId ? 'Uso visible' : 'Ver uso'} variant={selectedCompanyId === item.companyId ? 'neutral' : 'secondary'} onPress={() => setSelectedCompanyId(item.companyId)} style={styles.compactButton} />
+            <AppButton title={selectedCompanyId === item.companyId ? 'Uso visible' : 'Ver uso'} variant={selectedCompanyId === item.companyId ? 'neutral' : 'secondary'} onPress={() => updateCompanyInAdministration(item.companyId, item.companyName)} style={styles.compactButton} />
           </View>
         ))}
       </View>
       {selectedUsage ? (
         <AppText variant="caption" color={theme.colors.mutedText}>
-          Cliente seleccionado: {selectedUsage.companyName} - {selectedUsage.billingModel} - {selectedUsage.planName || 'sin plan'}
+          Cliente en administracion: {selectedUsage.companyName} - {selectedUsage.billingModel} - {selectedUsage.planName || 'sin plan'}
         </AppText>
       ) : null}
     </AppCard>
@@ -1562,6 +1656,7 @@ export default function PlatformScreen() {
       activeRoute={`platform-${activeSection}`}
       session={session}
       compactHeader
+      rightContent={renderOwnerCompanyContext()}
     >
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {message ? (
@@ -1576,6 +1671,7 @@ export default function PlatformScreen() {
         ) : null}
         {renderActiveSection()}
       </ScrollView>
+      {renderCompanyPicker()}
     </AppShellPage>
   );
 }
@@ -1602,15 +1698,19 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 10,
   },
-  clientContextStrip: {
-    borderRadius: 10,
-    borderWidth: 1,
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
   companyCard: {
     marginBottom: 0,
+  },
+  companyPickerRow: {
+    alignItems: 'center',
+    borderColor: '#d8dee9',
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
+    padding: 10,
   },
   companyList: {
     gap: 10,
@@ -1653,10 +1753,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 10,
   },
-  metaStack: {
-    alignItems: 'flex-end',
-    gap: 6,
-  },
   metricCard: {
     flex: 1,
     marginBottom: 0,
@@ -1693,6 +1789,21 @@ const styles = StyleSheet.create({
   },
   notice: {
     marginBottom: 0,
+  },
+  ownerContextName: {
+    marginTop: 1,
+  },
+  ownerContextPill: {
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    maxWidth: 240,
+    minWidth: 200,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   panel: {
     gap: 12,

@@ -120,13 +120,6 @@ export default function SystemSessionsScreen() {
       </AppCard>
 
       <AppButton
-        title={loading ? t('securitySessions.refreshing') : t('securitySessions.refresh')}
-        onPress={loadState}
-        loading={loading}
-        disabled={loading}
-      />
-
-      <AppButton
         title={t('securitySessions.closeAll')}
         variant="danger"
         onPress={revokeAllSessions}
