@@ -230,6 +230,7 @@ Probabilidad:
 - RELEASE-LIVE-GO queda como release interno condicionado: APK Android instala, abre y permite login, pero no debe declararse release final completo hasta contar con screenshots y smoke por roles desde APK instalado.
 - APK-QA-C no encontro screenshots ni evidencia visual por roles; el release LIVE no debe promocionarse a QA visual completo hasta repetir la fase con evidencias reales en `qa-evidence/APK-QA-C/android/`.
 - PRODUCT-ERR-A agrega mapper frontend de errores accionables; modulos fuera de las rutas criticas aun deben migrarse por dominio para evitar que `err.message` exponga mensajes genericos o tecnicos.
+- FAST-PLATFORM-A habilita super usuario AppModa con tenant interno; antes de produccion se debe reemplazar `{noop}Platform123!`, endurecer auditoria de altas SaaS e implementar impersonacion auditada si soporte necesita entrar a tenants de clientes.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

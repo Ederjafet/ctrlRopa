@@ -16,6 +16,14 @@ export function isNoAccess(user: UserSession | null): boolean {
   return hasRole(user, 'NO_ACCESS') || (user?.effectivePermissions?.length ?? 0) === 0;
 }
 
+export function isPlatformOwner(user: UserSession | null): boolean {
+  return hasRole(user, 'PLATFORM_OWNER');
+}
+
+export function canAccessPlatform(user: UserSession | null): boolean {
+  return isPlatformOwner(user) || hasEffectivePermission(user, 'VIEW_PLATFORM');
+}
+
 export function getRoleCodes(user: UserSession | null): string[] {
   return user?.roles?.map((role) => role.code) ?? [];
 }

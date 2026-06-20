@@ -2,6 +2,7 @@ import AppButton from '@/components/ui/AppButton';
 import AppInput from '@/components/ui/AppInput';
 import AppScreen from '@/components/ui/AppScreen';
 import AppText from '@/components/ui/AppText';
+import { canAccessPlatform } from '@/services/accessControl';
 import { ApiError } from '@/services/apiClient';
 import { getAppearanceSettings } from '@/services/appearanceService';
 import { login } from '@/services/authService';
@@ -58,8 +59,13 @@ export default function LoginScreen() {
       setIsSubmitting(true);
 
       const session = await login(cleanEmail, password);
+      const nextRoute = session.passwordChangeRequired
+        ? '/change-password'
+        : canAccessPlatform(session)
+          ? '/platform'
+          : '/';
 
-      router.replace((session.passwordChangeRequired ? '/change-password' : '/') as any);
+      router.replace(nextRoute as any);
     } catch (e: unknown) {
       const friendlyError = getFriendlyError(e);
       setMessage(friendlyError);

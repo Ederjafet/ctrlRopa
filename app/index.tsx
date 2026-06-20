@@ -12,7 +12,7 @@ import AppText from '@/components/ui/AppText';
 import SectionHeader from '@/components/ui/SectionHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { useAppTheme } from '@/context/AppThemeContext';
-import { canAccess, canAccessByPermission, isAdmin, isNoAccess } from '@/services/accessControl';
+import { canAccess, canAccessByPermission, canAccessPlatform, isAdmin, isNoAccess } from '@/services/accessControl';
 import { getUserDashboard, UserDashboard } from '@/services/dashboardService';
 import { canViewLive } from '@/services/livePermissionGuards';
 import { getLiveEvents, getLivesByBranch, Live } from '@/services/liveService';
@@ -292,6 +292,10 @@ export default function HomeDashboard() {
 
   if (mustChangePassword) {
     return <Redirect href={'/change-password' as any} />;
+  }
+
+  if (canAccessPlatform(session)) {
+    return <Redirect href={'/platform' as any} />;
   }
 
   if (session && isNoAccess(session)) {

@@ -3663,3 +3663,15 @@ Resultado:
 - Backend LAN respondio `200`.
 - Se mantiene `PENDING_QA_VISUAL`.
 - Se mantiene `PENDING_ROLE_SMOKE`.
+
+## 2026-06-19 - FAST-PLATFORM-A super usuario AppModa MVP
+
+Tipo: MVP de plataforma para alta rapida de clientes AppModa, con migracion, endpoints y pantalla minima.
+
+Resultado:
+
+- Se agrega tenant interno `AppModa Platform` / `AppModa HQ`.
+- Se agrega usuario local/dev `platform@appmoda.local`.
+- Se agrega rol `PLATFORM_OWNER` y permisos `VIEW_PLATFORM`, `MANAGE_COMPANIES`, `MANAGE_TENANT_ADMINS`.
+- Se agregan endpoints `/api/platform/companies` y `/api/platform/companies/{companyId}/admin-user`.
+- Se agrega pantalla `/platform` y menu `Plataforma` solo para permisos de plataforma.

@@ -13,6 +13,10 @@ public final class PermissionCode {
     public static final String MANAGE_SECURITY_SETTINGS = "MANAGE_SECURITY_SETTINGS";
     public static final String VIEW_SECURITY_AUDIT = "VIEW_SECURITY_AUDIT";
 
+    public static final String VIEW_PLATFORM = "VIEW_PLATFORM";
+    public static final String MANAGE_COMPANIES = "MANAGE_COMPANIES";
+    public static final String MANAGE_TENANT_ADMINS = "MANAGE_TENANT_ADMINS";
+
     public static final String VIEW_CUSTOMERS = "VIEW_CUSTOMERS";
     public static final String CREATE_CUSTOMER = "CREATE_CUSTOMER";
     public static final String EDIT_CUSTOMER = "EDIT_CUSTOMER";

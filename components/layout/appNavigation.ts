@@ -2,6 +2,7 @@ import { SidebarSection } from '@/components/layout/Sidebar';
 import {
   canAccess,
   canAccessByPermission,
+  canAccessPlatform,
   hasAnyPermission,
   isAdmin,
   isNoAccess,
@@ -37,10 +38,17 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
   const reportsAllowed = canAccessByPermission(session, 'VIEW_REPORTS') || isAdmin(session);
   const securityAuditAllowed = canAccessByPermission(session, 'VIEW_SECURITY_AUDIT') || isAdmin(session);
   const adminAllowed = isAdmin(session);
+  const platformAllowed = canAccessPlatform(session);
 
   const homeItems = [
     { key: 'home', label: 'Resumen operativo', labelKey: 'navigation.items.homeSummary', route: '/', activeFor: ['home', '/'], icon: 'space-dashboard' as const },
   ];
+
+  const platformItems = [
+    platformAllowed
+      ? { key: 'platform', label: 'Plataforma', route: '/platform', activeFor: ['platform', '/platform'], icon: 'business' as const }
+      : null,
+  ].filter(Boolean);
 
   const operationItems = [
     liveAllowed
@@ -170,6 +178,7 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
   ].filter(Boolean);
 
   return [
+    { title: 'Plataforma', items: platformItems },
     { title: 'Inicio', titleKey: 'navigation.sections.home', items: homeItems },
     { title: 'Operacion', titleKey: 'navigation.sections.operation', items: operationItems },
     { title: 'Inventario', titleKey: 'navigation.sections.inventory', items: inventoryItems },
