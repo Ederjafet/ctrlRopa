@@ -17,10 +17,13 @@ import {
   createPlatformTenantAdmin,
   getPlatformCompanies,
   getPlatformCompanyDetail,
+  getPlatformCompanySettings,
   getPlatformUsers,
+  updatePlatformCompanySettings,
   PlatformBranch,
   PlatformCompany,
   PlatformCompanyDetail,
+  PlatformCompanySettings,
   PlatformCompanyUser,
 } from '@/services/platformService';
 import { getSession, UserSession } from '@/services/sessionStorage';
@@ -54,6 +57,13 @@ const EMPTY_USER_FORM = {
   branchId: null as number | null,
 };
 
+const EMPTY_SETTINGS_FORM = {
+  maxUsers: '',
+  maxBranches: '',
+};
+
+type ActivePanel = 'overview' | 'company' | 'admin' | 'branches' | 'users' | 'settings';
+
 const TENANT_ROLE_OPTIONS = [
   { code: 'ADMIN', label: 'Admin' },
   { code: 'SUPERVISOR', label: 'Supervisor' },
@@ -72,10 +82,13 @@ export default function PlatformScreen() {
   const [selectedCompanyDetail, setSelectedCompanyDetail] = useState<PlatformCompanyDetail | null>(null);
   const [companyBranches, setCompanyBranches] = useState<PlatformBranch[]>([]);
   const [companyUsers, setCompanyUsers] = useState<PlatformCompanyUser[]>([]);
+  const [companySettings, setCompanySettings] = useState<PlatformCompanySettings | null>(null);
   const [companyForm, setCompanyForm] = useState(EMPTY_COMPANY_FORM);
   const [adminForm, setAdminForm] = useState(EMPTY_ADMIN_FORM);
   const [branchForm, setBranchForm] = useState(EMPTY_BRANCH_FORM);
   const [userForm, setUserForm] = useState(EMPTY_USER_FORM);
+  const [settingsForm, setSettingsForm] = useState(EMPTY_SETTINGS_FORM);
+  const [activePanel, setActivePanel] = useState<ActivePanel>('overview');
   const [loading, setLoading] = useState(true);
   const [loadingCompanyScope, setLoadingCompanyScope] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -83,6 +96,7 @@ export default function PlatformScreen() {
   const [creatingAdmin, setCreatingAdmin] = useState(false);
   const [creatingBranch, setCreatingBranch] = useState(false);
   const [creatingUser, setCreatingUser] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
   const [message, setMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -105,20 +119,28 @@ export default function PlatformScreen() {
       setSelectedCompanyDetail(null);
       setCompanyBranches([]);
       setCompanyUsers([]);
+      setCompanySettings(null);
+      setSettingsForm(EMPTY_SETTINGS_FORM);
       setUserForm((current) => ({ ...current, branchId: null }));
       return;
     }
 
     try {
       setLoadingCompanyScope(true);
-      const [detail, branches, users] = await Promise.all([
+      const [detail, branches, users, settings] = await Promise.all([
         getPlatformCompanyDetail(companyId),
         getPlatformBranches(companyId),
         getPlatformUsers(companyId),
+        getPlatformCompanySettings(companyId),
       ]);
       setSelectedCompanyDetail(detail);
       setCompanyBranches(branches);
       setCompanyUsers(users);
+      setCompanySettings(settings);
+      setSettingsForm({
+        maxUsers: settings.limits.maxUsers ? String(settings.limits.maxUsers) : '',
+        maxBranches: settings.limits.maxBranches ? String(settings.limits.maxBranches) : '',
+      });
       setUserForm((current) => ({
         ...current,
         branchId:
@@ -323,12 +345,66 @@ export default function PlatformScreen() {
     }
   };
 
+  const toggleModule = (code: string) => {
+    setCompanySettings((current) => {
+      if (!current) return current;
+
+      return {
+        ...current,
+        modules: current.modules.map((module) =>
+          module.code === code ? { ...module, enabled: !module.enabled } : module
+        ),
+      };
+    });
+  };
+
+  const parseLimit = (value: string, label: string): number | null => {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    const parsed = Number(trimmed);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      throw new Error(`${label} debe ser un numero entero mayor a cero.`);
+    }
+
+    return parsed;
+  };
+
+  const handleSaveSettings = async () => {
+    if (savingSettings || !selectedCompany || !companySettings) return;
+
+    try {
+      setSavingSettings(true);
+      setErrorMessage('');
+      setMessage('');
+      const saved = await updatePlatformCompanySettings(selectedCompany.id, {
+        modules: companySettings.modules.map((module) => ({
+          code: module.code,
+          enabled: module.enabled,
+        })),
+        maxUsers: parseLimit(settingsForm.maxUsers, 'Limite de usuarios'),
+        maxBranches: parseLimit(settingsForm.maxBranches, 'Limite de sucursales'),
+      });
+      setCompanySettings(saved);
+      setSettingsForm({
+        maxUsers: saved.limits.maxUsers ? String(saved.limits.maxUsers) : '',
+        maxBranches: saved.limits.maxBranches ? String(saved.limits.maxBranches) : '',
+      });
+      setMessage('Modulos y limites actualizados para el cliente seleccionado.');
+      await loadCompanyScope(selectedCompany.id);
+    } catch (error) {
+      setErrorMessage(getActionableApiErrorMessage(error));
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   if (loading) {
     return (
       <AppShellPage
-        title="Plataforma"
-        subtitle="Clientes AppModa"
-        metadata="Super usuario"
+        title="Administracion multiempresa AppModa"
+        subtitle="Clientes, sucursales, usuarios, modulos y limites SaaS"
+        metadata="Modo Plataforma"
         activeRoute="platform"
         session={session}
         compactHeader
@@ -340,9 +416,9 @@ export default function PlatformScreen() {
 
   return (
     <AppShellPage
-      title="Plataforma"
-      subtitle="Clientes AppModa"
-      metadata="Administracion minima de empresas y admins iniciales"
+      title="Administracion multiempresa AppModa"
+      subtitle="Clientes, sucursales, usuarios, modulos y limites SaaS"
+      metadata="Modo Plataforma"
       activeRoute="platform"
       session={session}
       compactHeader
@@ -360,7 +436,7 @@ export default function PlatformScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <AppCard style={styles.scopeCard}>
           <View style={styles.scopeHeader}>
-            <StatusBadge label="MODO PLATAFORMA" tone="info" />
+            <StatusBadge label="ALCANCE SAAS" tone="info" />
             <AppText variant="subtitle" bold>
               Administración multiempresa AppModa
             </AppText>
@@ -383,7 +459,93 @@ export default function PlatformScreen() {
           </AppCard>
         ) : null}
 
+        <AppCard style={styles.panel}>
+          <View style={[styles.companyRow, isPhone ? styles.companyRowMobile : null]}>
+            <View style={styles.companyMain}>
+              <View style={styles.companyTitleRow}>
+                <StatusBadge label="CLIENTE ACTUAL" tone="info" />
+                <AppText variant="subtitle" bold>
+                  {selectedCompany ? selectedCompany.name : 'Selecciona un cliente'}
+                </AppText>
+              </View>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                {selectedCompany
+                  ? `${selectedCompany.code} · ${selectedCompany.branchName || 'Sin sucursal principal'}`
+                  : 'Elige una compania para administrar sucursales, usuarios, modulos y limites.'}
+              </AppText>
+            </View>
+            {selectedCompanyDetail ? (
+              <View style={styles.scopeStats}>
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  Sucursales: {selectedCompanyDetail.branchCount}
+                </AppText>
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  Usuarios activos: {selectedCompanyDetail.activeUserCount}
+                </AppText>
+              </View>
+            ) : null}
+          </View>
+
+          <View style={styles.companySelectorGrid}>
+            {companies.map((company) => {
+              const selected = company.id === selectedCompanyId;
+              const isPlatformCompany = company.code === 'APPMODA_PLATFORM';
+
+              return (
+                <AppButton
+                  key={company.id}
+                  title={isPlatformCompany ? 'AppModa Platform' : company.name}
+                  variant={selected ? 'primary' : 'secondary'}
+                  disabled={selected || isPlatformCompany}
+                  disabledReason={
+                    isPlatformCompany
+                      ? 'AppModa Platform es el tenant interno del super usuario.'
+                      : 'La empresa ya esta seleccionada.'
+                  }
+                  onPress={() => setSelectedCompanyId(company.id)}
+                  style={styles.selectorButton}
+                />
+              );
+            })}
+          </View>
+
+          <View style={styles.quickActions}>
+            <AppButton
+              title="Crear cliente"
+              variant={activePanel === 'company' ? 'primary' : 'secondary'}
+              onPress={() => setActivePanel('company')}
+              style={styles.quickActionButton}
+            />
+            <AppButton
+              title="Admin inicial"
+              variant={activePanel === 'admin' ? 'primary' : 'secondary'}
+              onPress={() => setActivePanel('admin')}
+              style={styles.quickActionButton}
+            />
+            <AppButton
+              title="Sucursales"
+              variant={activePanel === 'branches' ? 'primary' : 'secondary'}
+              onPress={() => setActivePanel('branches')}
+              style={styles.quickActionButton}
+            />
+            <AppButton
+              title="Usuarios"
+              variant={activePanel === 'users' ? 'primary' : 'secondary'}
+              onPress={() => setActivePanel('users')}
+              style={styles.quickActionButton}
+            />
+            <AppButton
+              title="Modulos y limites"
+              variant={activePanel === 'settings' ? 'primary' : 'secondary'}
+              onPress={() => setActivePanel('settings')}
+              style={styles.quickActionButton}
+            />
+          </View>
+        </AppCard>
+
+        {activePanel === 'company' || activePanel === 'admin' ? (
         <View style={[styles.grid, isPhone ? styles.gridMobile : null]}>
+          {activePanel === 'company' ? (
           <AppCard style={styles.panel}>
             <View style={styles.sectionHeader}>
               <View style={styles.titleBlock}>
@@ -427,7 +589,9 @@ export default function PlatformScreen() {
               style={styles.actionButton}
             />
           </AppCard>
+          ) : null}
 
+          {activePanel === 'admin' ? (
           <AppCard style={styles.panel}>
             <View style={styles.sectionHeader}>
               <View style={styles.titleBlock}>
@@ -496,7 +660,9 @@ export default function PlatformScreen() {
               style={styles.actionButton}
             />
           </AppCard>
+          ) : null}
         </View>
+        ) : null}
 
         <AppCard style={styles.panel}>
           <View style={[styles.companyRow, isPhone ? styles.companyRowMobile : null]}>
@@ -529,6 +695,32 @@ export default function PlatformScreen() {
             <ActivityIndicator style={styles.scopeLoader} />
           ) : canUseSelectedCompany ? (
             <View style={[styles.grid, isPhone ? styles.gridMobile : null]}>
+              {activePanel === 'overview' ? (
+                <View style={styles.scopeColumn}>
+                  <View style={styles.sectionHeader}>
+                    <AppText bold>Modo Plataforma AppModa</AppText>
+                    <AppText variant="caption" color={theme.colors.mutedText}>
+                      Puedes crear clientes, sucursales, usuarios, modulos y limites por cliente. La operacion normal
+                      queda aislada por empresa y sucursal.
+                    </AppText>
+                  </View>
+                  <View style={styles.compactList}>
+                    <View style={styles.compactRow}>
+                      <AppText bold>Clientes visibles</AppText>
+                      <StatusBadge label={String(companies.filter((company) => company.code !== 'APPMODA_PLATFORM').length)} tone="info" />
+                    </View>
+                    <View style={styles.compactRow}>
+                      <AppText bold>Sucursales de este cliente</AppText>
+                      <StatusBadge label={String(companyBranches.length)} tone="neutral" />
+                    </View>
+                    <View style={styles.compactRow}>
+                      <AppText bold>Usuarios de este cliente</AppText>
+                      <StatusBadge label={String(companyUsers.length)} tone="neutral" />
+                    </View>
+                  </View>
+                </View>
+              ) : null}
+              {activePanel === 'branches' ? (
               <View style={styles.scopeColumn}>
                 <View style={styles.sectionHeader}>
                   <AppText bold>Sucursales</AppText>
@@ -587,7 +779,9 @@ export default function PlatformScreen() {
                   )}
                 </View>
               </View>
+              ) : null}
 
+              {activePanel === 'users' ? (
               <View style={styles.scopeColumn}>
                 <View style={styles.sectionHeader}>
                   <AppText bold>Usuarios de compañía</AppText>
@@ -672,6 +866,72 @@ export default function PlatformScreen() {
                   )}
                 </View>
               </View>
+              ) : null}
+
+              {activePanel === 'settings' ? (
+                <View style={styles.scopeColumn}>
+                  <View style={styles.sectionHeader}>
+                    <AppText bold>Modulos y limites</AppText>
+                    <AppText variant="caption" color={theme.colors.mutedText}>
+                      Define que aparece en la operacion del cliente y bloquea altas cuando se alcance un limite.
+                    </AppText>
+                  </View>
+                  {companySettings ? (
+                    <>
+                      <View style={styles.moduleGrid}>
+                        {companySettings.modules.map((module) => (
+                          <View key={module.code} style={styles.moduleRow}>
+                            <View style={styles.companyMain}>
+                              <AppText bold>{module.name}</AppText>
+                              <AppText variant="caption" color={theme.colors.mutedText}>
+                                {module.code}
+                              </AppText>
+                            </View>
+                            <AppButton
+                              title={module.enabled ? 'Activo' : 'Inactivo'}
+                              variant={module.enabled ? 'primary' : 'secondary'}
+                              onPress={() => toggleModule(module.code)}
+                              style={styles.moduleButton}
+                            />
+                          </View>
+                        ))}
+                      </View>
+                      <View style={[styles.grid, isPhone ? styles.gridMobile : null]}>
+                        <AppInput
+                          label="Maximo de usuarios"
+                          placeholder="Sin limite"
+                          keyboardType="numeric"
+                          value={settingsForm.maxUsers}
+                          onChangeText={(value) => setSettingsForm((current) => ({ ...current, maxUsers: value }))}
+                          editable={!savingSettings && canManageCompanies}
+                        />
+                        <AppInput
+                          label="Maximo de sucursales"
+                          placeholder="Sin limite"
+                          keyboardType="numeric"
+                          value={settingsForm.maxBranches}
+                          onChangeText={(value) => setSettingsForm((current) => ({ ...current, maxBranches: value }))}
+                          editable={!savingSettings && canManageCompanies}
+                        />
+                      </View>
+                      <AppButton
+                        title="Guardar modulos y limites"
+                        loading={savingSettings}
+                        disabled={savingSettings || !canManageCompanies}
+                        disabledReason="Tu usuario necesita MANAGE_COMPANIES para cambiar modulos y limites."
+                        onPress={handleSaveSettings}
+                        style={styles.actionButton}
+                      />
+                    </>
+                  ) : (
+                    <EmptyState
+                      title="Sin configuracion cargada"
+                      message="Selecciona una empresa cliente para administrar sus modulos y limites."
+                      icon="toggle-on"
+                    />
+                  )}
+                </View>
+              ) : null}
             </View>
           ) : null}
         </AppCard>
@@ -783,6 +1043,12 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
+  companySelectorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
   compactButton: {
     minWidth: 120,
     paddingVertical: 10,
@@ -820,6 +1086,25 @@ const styles = StyleSheet.create({
   inlineForm: {
     gap: 8,
   },
+  moduleButton: {
+    minWidth: 92,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  moduleGrid: {
+    gap: 8,
+    marginBottom: 10,
+  },
+  moduleRow: {
+    alignItems: 'center',
+    borderColor: '#d8dee9',
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'space-between',
+    padding: 10,
+  },
   listHeader: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -843,6 +1128,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  quickActionButton: {
+    minWidth: 128,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  quickActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
   },
   scopeCard: {
     gap: 8,
@@ -876,6 +1172,11 @@ const styles = StyleSheet.create({
     gap: 4,
     marginBottom: 12,
     padding: 12,
+  },
+  selectorButton: {
+    minWidth: 150,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
   },
   titleBlock: {
     gap: 6,

@@ -16,6 +16,7 @@ public class MeResponse {
     private List<RoleInfo> roles;
     private List<PermissionInfo> permissions;
     private List<ChannelInfo> channels;
+    private List<String> enabledModules;
 
     public MeResponse() {
     }
@@ -30,7 +31,8 @@ public class MeResponse {
                       BranchInfo branch,
                       List<RoleInfo> roles,
                       List<PermissionInfo> permissions,
-                      List<ChannelInfo> channels) {
+                      List<ChannelInfo> channels,
+                      List<String> enabledModules) {
         this.userId = userId;
         this.name = name;
         this.email = email;
@@ -42,6 +44,7 @@ public class MeResponse {
         this.roles = roles;
         this.permissions = permissions;
         this.channels = channels;
+        this.enabledModules = enabledModules;
     }
 
     public Long getUserId() { return userId; }
@@ -76,6 +79,9 @@ public class MeResponse {
 
     public List<ChannelInfo> getChannels() { return channels; }
     public void setChannels(List<ChannelInfo> channels) { this.channels = channels; }
+
+    public List<String> getEnabledModules() { return enabledModules; }
+    public void setEnabledModules(List<String> enabledModules) { this.enabledModules = enabledModules; }
 
     public static class CompanyInfo {
         private Long id;

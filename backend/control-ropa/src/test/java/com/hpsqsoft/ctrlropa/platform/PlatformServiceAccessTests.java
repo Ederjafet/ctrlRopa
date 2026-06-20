@@ -47,6 +47,29 @@ class PlatformServiceAccessTests {
     }
 
     @Test
+    void findCompanySettingsRequiresViewPlatform() {
+        when(currentUser.getUserId()).thenReturn(10L);
+        doThrow(new AccessDeniedException("missing"))
+                .when(accessService)
+                .assertCan(10L, PermissionCode.VIEW_PLATFORM);
+
+        assertThrows(AccessDeniedException.class, () -> service.findCompanySettings(2L));
+    }
+
+    @Test
+    void updateCompanySettingsRequiresManageCompanies() {
+        when(currentUser.getUserId()).thenReturn(10L);
+        doThrow(new AccessDeniedException("missing"))
+                .when(accessService)
+                .assertCan(10L, PermissionCode.MANAGE_COMPANIES);
+
+        assertThrows(
+                AccessDeniedException.class,
+                () -> service.updateCompanySettings(2L, new UpdatePlatformCompanySettingsRequest())
+        );
+    }
+
+    @Test
     void createBranchRequiresManageCompanies() {
         when(currentUser.getUserId()).thenReturn(10L);
         doThrow(new AccessDeniedException("missing"))

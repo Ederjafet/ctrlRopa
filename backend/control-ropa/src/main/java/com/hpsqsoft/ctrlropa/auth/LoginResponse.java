@@ -17,6 +17,7 @@ public class LoginResponse {
     private List<RoleInfo> roles;
     private List<PermissionInfo> effectivePermissions;
     private List<ChannelInfo> channels;
+    private List<String> enabledModules;
 
     public LoginResponse(Long userId,
                          String name,
@@ -30,7 +31,8 @@ public class LoginResponse {
                          BranchInfo branch,
                          List<RoleInfo> roles,
                          List<PermissionInfo> effectivePermissions,
-                         List<ChannelInfo> channels) {
+                         List<ChannelInfo> channels,
+                         List<String> enabledModules) {
         this.userId = userId;
         this.name = name;
         this.email = email;
@@ -44,6 +46,7 @@ public class LoginResponse {
         this.roles = roles;
         this.effectivePermissions = effectivePermissions;
         this.channels = channels;
+        this.enabledModules = enabledModules;
     }
 
     public Long getUserId() { return userId; }
@@ -59,6 +62,7 @@ public class LoginResponse {
     public List<RoleInfo> getRoles() { return roles; }
     public List<PermissionInfo> getEffectivePermissions() { return effectivePermissions; }
     public List<ChannelInfo> getChannels() { return channels; }
+    public List<String> getEnabledModules() { return enabledModules; }
 
     public static class CompanyInfo {
         private Long id;

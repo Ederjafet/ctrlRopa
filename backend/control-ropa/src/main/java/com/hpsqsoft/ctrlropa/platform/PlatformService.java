@@ -23,6 +23,20 @@ public class PlatformService {
 
     private static final String PLATFORM_COMPANY_CODE = "APPMODA_PLATFORM";
     private static final String TENANT_ADMIN_ROLE = "ADMIN";
+    private static final List<ModuleDefinition> MODULE_DEFINITIONS = List.of(
+            new ModuleDefinition("INVENTORY", "Inventario"),
+            new ModuleDefinition("DOOR_SALES", "Venta puerta"),
+            new ModuleDefinition("RESERVATIONS", "Apartados"),
+            new ModuleDefinition("CUSTOMER_PACKAGES", "Paquetes"),
+            new ModuleDefinition("SHIPMENTS", "Envios"),
+            new ModuleDefinition("PAYMENTS", "Pagos"),
+            new ModuleDefinition("LIVE", "LIVE"),
+            new ModuleDefinition("REPORTS", "Reportes"),
+            new ModuleDefinition("MULTI_BRANCH", "Multi sucursal"),
+            new ModuleDefinition("CASH_CLOSURES", "Cortes de caja"),
+            new ModuleDefinition("CONSIGNMENTS", "Consignacion"),
+            new ModuleDefinition("RETURNS_REFUNDS", "Devoluciones y refunds")
+    );
 
     private final JdbcTemplate jdbcTemplate;
     private final AccessService accessService;
@@ -121,6 +135,7 @@ public class PlatformService {
         Long companyId = companyKey.getKey().longValue();
         Long branchId = createMainBranch(companyId, branchName);
         enableDefaultSalesChannels(branchId, userId);
+        ensureDefaultCompanySettings(companyId);
 
         return findCompany(companyId);
     }
@@ -136,6 +151,64 @@ public class PlatformService {
                 .execute((statement, values) -> jdbcTemplate.update(statement + " WHERE id = ?", append(values, companyId)));
 
         return findCompanyDetailById(companyId);
+    }
+
+    @Transactional(readOnly = true)
+    public PlatformCompanySettingsResponse findCompanySettings(Long companyId) {
+        assertCanViewPlatform();
+        assertCompanyExists(companyId);
+        return findCompanySettingsById(companyId);
+    }
+
+    public PlatformCompanySettingsResponse updateCompanySettings(
+            Long companyId,
+            UpdatePlatformCompanySettingsRequest request
+    ) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.MANAGE_COMPANIES);
+        assertCustomerCompany(companyId);
+        ensureDefaultCompanySettings(companyId);
+
+        if (request.getModules() != null) {
+            request.getModules().forEach(module -> {
+                String code = normalizeModuleCode(module.getCode());
+                Boolean enabled = module.getEnabled();
+                if (enabled == null) {
+                    return;
+                }
+
+                jdbcTemplate.update(
+                        """
+                        INSERT INTO company_modules (company_id, module_code, enabled)
+                        VALUES (?, ?, ?)
+                        ON DUPLICATE KEY UPDATE
+                          enabled = VALUES(enabled),
+                          updated_at = CURRENT_TIMESTAMP
+                        """,
+                        companyId,
+                        code,
+                        Boolean.TRUE.equals(enabled) ? 1 : 0
+                );
+            });
+        }
+
+        Integer maxUsers = validateLimit(request.getMaxUsers(), "maxUsers");
+        Integer maxBranches = validateLimit(request.getMaxBranches(), "maxBranches");
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO company_limits (company_id, max_users, max_branches)
+                VALUES (?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                  max_users = VALUES(max_users),
+                  max_branches = VALUES(max_branches),
+                  updated_at = CURRENT_TIMESTAMP
+                """,
+                companyId,
+                maxUsers,
+                maxBranches
+        );
+
+        return findCompanySettingsById(companyId);
     }
 
     @Transactional(readOnly = true)
@@ -164,6 +237,7 @@ public class PlatformService {
     public PlatformBranchResponse createBranch(Long companyId, CreatePlatformBranchRequest request) {
         accessService.assertCan(currentUser.getUserId(), PermissionCode.MANAGE_COMPANIES);
         assertCustomerCompany(companyId);
+        assertBranchLimitAllows(companyId);
 
         String name = cleanRequired(request.getName(), "name");
         String code = cleanNullable(request.getCode()) == null
@@ -347,6 +421,7 @@ public class PlatformService {
                                   String password,
                                   String roleCode) {
         assertBranchBelongsToCompany(branchId, companyId);
+        assertUserLimitAllows(companyId);
         assertEmailAvailable(email);
 
         securitySettingsService.assertPasswordPolicy(password);
@@ -576,6 +651,120 @@ public class PlatformService {
         );
     }
 
+    private PlatformCompanySettingsResponse findCompanySettingsById(Long companyId) {
+        List<ModuleRow> rows = jdbcTemplate.query(
+                """
+                SELECT module_code, enabled
+                FROM company_modules
+                WHERE company_id = ?
+                """,
+                (rs, rowNum) -> new ModuleRow(
+                        rs.getString("module_code"),
+                        rs.getBoolean("enabled")
+                ),
+                companyId
+        );
+
+        List<PlatformCompanySettingsResponse.ModuleSetting> modules = MODULE_DEFINITIONS.stream()
+                .map(definition -> new PlatformCompanySettingsResponse.ModuleSetting(
+                        definition.code(),
+                        definition.name(),
+                        rows.stream()
+                                .filter(row -> row.code().equals(definition.code()))
+                                .findFirst()
+                                .map(ModuleRow::enabled)
+                                .orElse(Boolean.TRUE)
+                ))
+                .toList();
+
+        PlatformCompanySettingsResponse.LimitSettings limits = findCompanyLimits(companyId);
+
+        return new PlatformCompanySettingsResponse(modules, limits);
+    }
+
+    private PlatformCompanySettingsResponse.LimitSettings findCompanyLimits(Long companyId) {
+        List<PlatformCompanySettingsResponse.LimitSettings> rows = jdbcTemplate.query(
+                """
+                SELECT max_users, max_branches
+                FROM company_limits
+                WHERE company_id = ?
+                """,
+                (rs, rowNum) -> new PlatformCompanySettingsResponse.LimitSettings(
+                        rs.getObject("max_users", Integer.class),
+                        rs.getObject("max_branches", Integer.class)
+                ),
+                companyId
+        );
+
+        return rows.isEmpty()
+                ? new PlatformCompanySettingsResponse.LimitSettings(null, null)
+                : rows.get(0);
+    }
+
+    private void ensureDefaultCompanySettings(Long companyId) {
+        MODULE_DEFINITIONS.forEach(module -> jdbcTemplate.update(
+                """
+                INSERT IGNORE INTO company_modules (company_id, module_code, enabled)
+                VALUES (?, ?, 1)
+                """,
+                companyId,
+                module.code()
+        ));
+
+        jdbcTemplate.update(
+                """
+                INSERT IGNORE INTO company_limits (company_id, max_users, max_branches)
+                VALUES (?, NULL, NULL)
+                """,
+                companyId
+        );
+    }
+
+    private void assertBranchLimitAllows(Long companyId) {
+        Integer maxBranches = findCompanyLimits(companyId).maxBranches();
+        if (maxBranches == null) {
+            return;
+        }
+
+        Integer activeBranches = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM branches
+                WHERE company_id = ?
+                  AND status = 'ACTIVE'
+                """,
+                Integer.class,
+                companyId
+        );
+
+        if (activeBranches != null && activeBranches >= maxBranches) {
+            throw new IllegalArgumentException("Este cliente llego al limite de sucursales permitido");
+        }
+    }
+
+    private void assertUserLimitAllows(Long companyId) {
+        Integer maxUsers = findCompanyLimits(companyId).maxUsers();
+        if (maxUsers == null) {
+            return;
+        }
+
+        Integer activeUsers = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM users u
+                JOIN branches b ON b.id = u.branch_id
+                WHERE b.company_id = ?
+                  AND u.status = 'ACTIVE'
+                """,
+                Integer.class,
+                companyId
+        );
+
+        if (activeUsers != null && activeUsers >= maxUsers) {
+            throw new IllegalArgumentException("Este cliente llego al limite de usuarios permitido");
+        }
+    }
+
     private void assertCanViewPlatform() {
         accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_PLATFORM);
     }
@@ -782,6 +971,32 @@ public class PlatformService {
         };
     }
 
+    private String normalizeModuleCode(String code) {
+        String normalized = cleanRequired(code, "moduleCode")
+                .toUpperCase(Locale.ROOT)
+                .replaceAll("[^A-Z0-9_]", "_");
+
+        boolean known = MODULE_DEFINITIONS.stream()
+                .anyMatch(module -> module.code().equals(normalized));
+        if (!known) {
+            throw new IllegalArgumentException("Modulo no reconocido: " + code);
+        }
+
+        return normalized;
+    }
+
+    private Integer validateLimit(Integer value, String field) {
+        if (value == null) {
+            return null;
+        }
+
+        if (value < 1) {
+            throw new IllegalArgumentException(field + " debe ser mayor a cero o quedar vacio");
+        }
+
+        return value;
+    }
+
     private String normalizeActiveStatus(String status) {
         String cleaned = cleanNullable(status);
         if (cleaned == null) {
@@ -926,6 +1141,18 @@ public class PlatformService {
     @FunctionalInterface
     private interface CodeExists {
         boolean test(String value);
+    }
+
+    private record ModuleDefinition(
+            String code,
+            String name
+    ) {
+    }
+
+    private record ModuleRow(
+            String code,
+            Boolean enabled
+    ) {
     }
 
     @FunctionalInterface

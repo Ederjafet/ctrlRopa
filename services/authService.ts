@@ -39,6 +39,7 @@ type LoginResponse = {
     code: string;
     name: string;
   }[];
+  enabledModules?: string[];
   sessionTimeoutMinutes?: number;
 };
 
@@ -64,6 +65,7 @@ function toSession(data: LoginResponse | MeResponse): UserSession {
     channels: data.channels ?? [],
     roles: data.roles ?? [],
     effectivePermissions: permissions ?? [],
+    enabledModules: data.enabledModules ?? [],
     sessionTimeoutMinutes: data.sessionTimeoutMinutes,
   };
 }

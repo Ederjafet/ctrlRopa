@@ -93,7 +93,8 @@ public class AuthService {
                 findBranch(tenant.branchId()),
                 roles,
                 effectivePermissions,
-                findChannels(user.branchId())
+                findChannels(user.branchId()),
+                findEnabledModules(tenant.companyId())
         );
     }
 
@@ -731,6 +732,20 @@ public class AuthService {
                         rs.getBoolean("enabled")
                 ),
                 branchId
+        );
+    }
+
+    private List<String> findEnabledModules(Long companyId) {
+        return jdbcTemplate.query(
+                """
+                SELECT module_code
+                FROM company_modules
+                WHERE company_id = ?
+                  AND enabled = 1
+                ORDER BY module_code
+                """,
+                (rs, rowNum) -> rs.getString("module_code"),
+                companyId
         );
     }
 

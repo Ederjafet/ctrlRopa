@@ -4,6 +4,7 @@ import {
   canAccessByPermission,
   canAccessPlatform,
   hasAnyPermission,
+  hasModuleEnabled,
   isAdmin,
   isNoAccess,
   isPlatformOwner,
@@ -16,19 +17,31 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
     return [];
   }
 
-  const liveAllowed = canViewLive(session);
-  const doorSaleAllowed = canAccess(session, 'DOOR_SALE', 'DO_DOOR_SALE');
-  const doorReservationAllowed = canAccess(session, 'DOOR_RESERVATION', 'DO_DOOR_RESERVATION');
+  const liveAllowed = canViewLive(session) && hasModuleEnabled(session, 'LIVE');
+  const doorSaleAllowed =
+    canAccess(session, 'DOOR_SALE', 'DO_DOOR_SALE') && hasModuleEnabled(session, 'DOOR_SALES');
+  const doorReservationAllowed =
+    canAccess(session, 'DOOR_RESERVATION', 'DO_DOOR_RESERVATION') &&
+    hasModuleEnabled(session, 'RESERVATIONS');
   const customersAllowed = canAccessByPermission(session, 'VIEW_CUSTOMERS');
-  const reservationsAllowed = doorReservationAllowed || liveAllowed;
-  const packagesAllowed = canAccessByPermission(session, 'CREATE_CLOSE_CUSTOMER_PACKAGE');
-  const shipmentsAllowed = canAccessByPermission(session, 'MANAGE_SHIPMENTS');
+  const reservationsAllowed =
+    (doorReservationAllowed || liveAllowed) && hasModuleEnabled(session, 'RESERVATIONS');
+  const packagesAllowed =
+    canAccessByPermission(session, 'CREATE_CLOSE_CUSTOMER_PACKAGE') &&
+    hasModuleEnabled(session, 'CUSTOMER_PACKAGES');
+  const shipmentsAllowed =
+    canAccessByPermission(session, 'MANAGE_SHIPMENTS') &&
+    hasModuleEnabled(session, 'SHIPMENTS');
   const operationalAuthorizationsAllowed = hasAnyPermission(session, [
     'VIEW_LIVE_OPERATION_AUTHORIZATIONS',
     'REQUEST_LIVE_OPERATION_AUTHORIZATION',
   ]);
-  const inventoryAllowed = hasAnyPermission(session, ['VIEW_INVENTORY', 'MANAGE_INVENTORY']);
-  const inventoryManageAllowed = canAccessByPermission(session, 'MANAGE_INVENTORY');
+  const inventoryAllowed =
+    hasAnyPermission(session, ['VIEW_INVENTORY', 'MANAGE_INVENTORY']) &&
+    hasModuleEnabled(session, 'INVENTORY');
+  const inventoryManageAllowed =
+    canAccessByPermission(session, 'MANAGE_INVENTORY') &&
+    hasModuleEnabled(session, 'INVENTORY');
   const usersAllowed = canAccessByPermission(session, 'MANAGE_USERS') || isAdmin(session);
   const rolesAllowed = canAccessByPermission(session, 'MANAGE_ROLES') || isAdmin(session);
   const channelsAllowed = canAccessByPermission(session, 'MANAGE_BRANCH_CHANNELS') || isAdmin(session);
@@ -36,7 +49,9 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
     rolesAllowed ||
     channelsAllowed ||
     isAdmin(session);
-  const reportsAllowed = canAccessByPermission(session, 'VIEW_REPORTS') || isAdmin(session);
+  const reportsAllowed =
+    (canAccessByPermission(session, 'VIEW_REPORTS') || isAdmin(session)) &&
+    hasModuleEnabled(session, 'REPORTS');
   const securityAuditAllowed = canAccessByPermission(session, 'VIEW_SECURITY_AUDIT') || isAdmin(session);
   const adminAllowed = isAdmin(session);
   const platformAllowed = canAccessPlatform(session);
@@ -47,12 +62,83 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
         title: 'PLATAFORMA',
         items: [
           {
-            key: 'platform',
+            key: 'platform-panel',
             label: 'Panel Plataforma',
             helper: 'Clientes / Compañías',
             route: '/platform',
             activeFor: ['platform', '/platform'],
             icon: 'business' as const,
+          },
+          {
+            key: 'platform-companies',
+            label: 'Clientes / Companias',
+            helper: 'Alta y alcance tenant',
+            route: '/platform',
+            activeFor: ['platform', '/platform'],
+            icon: 'domain' as const,
+          },
+          {
+            key: 'platform-branches',
+            label: 'Sucursales',
+            helper: 'Administracion por cliente',
+            route: '/platform',
+            activeFor: ['platform', '/platform'],
+            icon: 'store' as const,
+          },
+          {
+            key: 'platform-users',
+            label: 'Usuarios',
+            helper: 'Admins y operativos tenant',
+            route: '/platform',
+            activeFor: ['platform', '/platform'],
+            icon: 'manage-accounts' as const,
+          },
+        ],
+      },
+      {
+        title: 'CONFIGURACION CLIENTE',
+        items: [
+          {
+            key: 'platform-modules',
+            label: 'Modulos activos',
+            helper: 'LIVE, paquetes, envios',
+            route: '/platform',
+            activeFor: ['platform', '/platform'],
+            icon: 'toggle-on' as const,
+          },
+          {
+            key: 'platform-limits',
+            label: 'Limites por cliente',
+            helper: 'Usuarios y sucursales',
+            route: '/platform',
+            activeFor: ['platform', '/platform'],
+            icon: 'speed' as const,
+          },
+        ],
+      },
+      {
+        title: 'REPORTES',
+        items: [
+          {
+            key: 'platform-usage',
+            label: 'Uso por cliente',
+            helper: 'Base para dashboard SaaS',
+            route: '/platform',
+            activeFor: ['platform', '/platform'],
+            icon: 'analytics' as const,
+          },
+        ],
+      },
+      {
+        title: 'SEGURIDAD',
+        items: [
+          {
+            key: 'platform-audit',
+            label: 'Auditoria global',
+            helper: 'Pendiente de hardening',
+            route: '/platform',
+            activeFor: ['platform', '/platform'],
+            icon: 'security' as const,
           },
         ],
       },

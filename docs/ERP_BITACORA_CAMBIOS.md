@@ -1,5 +1,34 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-19 - FAST-PLATFORM-C tenant SaaS por cliente
+
+Tipo: backend, frontend, migracion, plataforma SaaS, tenant settings, documentacion.
+
+Objetivo:
+
+- Preparar la instalacion de clientes AppModa con modulos activos y limites por compania, manteniendo separacion entre Plataforma y Operacion.
+
+Cambios realizados:
+
+- Se agrega migracion `V60__fast_platform_c_tenant_saas_settings.sql`.
+- Se crean `company_modules` y `company_limits`.
+- Se agregan permisos SaaS `MANAGE_PLATFORM_BRANCHES`, `MANAGE_PLATFORM_USERS`, `MANAGE_COMPANY_BRANCHES` y `MANAGE_COMPANY_USERS`.
+- `/api/platform/companies/{companyId}/settings` permite consultar y actualizar modulos/limites por cliente.
+- Login y `/api/me` devuelven `enabledModules`.
+- El menu tenant oculta modulos deshabilitados por compania.
+- `/platform` agrega selector de cliente, acciones rapidas y panel de modulos/limites.
+
+Restricciones respetadas:
+
+- No se implemento impersonacion.
+- No se tocaron pagos/caja/LIVE funcionalmente.
+- No se hizo merge a `main`.
+
+Pendientes:
+
+- Hardening tenant completo para todos los modulos P0.
+- Suscripciones, cobro SaaS, bloqueo comercial y dashboard global.
+
 ## 2026-06-10 - LIVE-PRICE-C autorizacion cambio de precio LIVE
 
 Tipo: backend, frontend minimo, permisos, migracion, autorizaciones LIVE, documentacion.

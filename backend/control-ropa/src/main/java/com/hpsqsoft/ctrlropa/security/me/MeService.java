@@ -60,7 +60,8 @@ public class MeService {
                 branch,
                 roles,
                 permissions,
-                channels
+                channels,
+                findEnabledModules(tenant.getCompanyId())
         );
     }
 
@@ -203,6 +204,20 @@ public class MeService {
                         rs.getBoolean("enabled")
                 ),
                 branchId
+        );
+    }
+
+    private List<String> findEnabledModules(Long companyId) {
+        return jdbcTemplate.query(
+                """
+                SELECT module_code
+                FROM company_modules
+                WHERE company_id = ?
+                  AND enabled = 1
+                ORDER BY module_code
+                """,
+                (rs, rowNum) -> rs.getString("module_code"),
+                companyId
         );
     }
 

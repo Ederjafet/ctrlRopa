@@ -42,6 +42,18 @@ public class PlatformController {
         return service.updateCompany(companyId, request);
     }
 
+    @GetMapping("/companies/{companyId}/settings")
+    public PlatformCompanySettingsResponse findCompanySettings(@PathVariable Long companyId) {
+        return service.findCompanySettings(companyId);
+    }
+
+    @PatchMapping("/companies/{companyId}/settings")
+    public PlatformCompanySettingsResponse updateCompanySettings(
+            @PathVariable Long companyId,
+            @RequestBody UpdatePlatformCompanySettingsRequest request) {
+        return service.updateCompanySettings(companyId, request);
+    }
+
     @GetMapping("/companies/{companyId}/branches")
     public List<PlatformBranchResponse> findBranches(@PathVariable Long companyId) {
         return service.findBranches(companyId);

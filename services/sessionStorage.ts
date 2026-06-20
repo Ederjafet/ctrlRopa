@@ -37,6 +37,7 @@ export type UserSession = {
   channels: Channel[];
   roles: Role[];
   effectivePermissions: Permission[];
+  enabledModules?: string[];
   sessionTimeoutMinutes?: number;
   lastActivityAt?: string;
 };

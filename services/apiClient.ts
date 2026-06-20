@@ -144,13 +144,18 @@ async function validateServerSession(session: UserSession): Promise<UserSession>
     const me = JSON.parse(text);
     const nextBranchId = Number(me?.branch?.id);
     const nextCompanyId = me?.company?.id ? Number(me.company.id) : session.companyId;
+    const nextEnabledModules = Array.isArray(me?.enabledModules)
+      ? me.enabledModules
+      : session.enabledModules;
     const hasBranchMismatch = Number.isFinite(nextBranchId) && nextBranchId !== session.branchId;
     const hasCompanyMismatch =
       Number.isFinite(nextCompanyId) &&
       session.companyId !== undefined &&
       nextCompanyId !== session.companyId;
+    const hasModuleMismatch =
+      JSON.stringify(nextEnabledModules ?? []) !== JSON.stringify(session.enabledModules ?? []);
 
-    if (hasBranchMismatch || hasCompanyMismatch) {
+    if (hasBranchMismatch || hasCompanyMismatch || hasModuleMismatch) {
       const updatedSession = {
         ...session,
         companyId: Number.isFinite(nextCompanyId) ? nextCompanyId : session.companyId,
@@ -161,6 +166,7 @@ async function validateServerSession(session: UserSession): Promise<UserSession>
         channels: me?.channels ?? session.channels,
         roles: me?.roles ?? session.roles,
         effectivePermissions: me?.permissions ?? session.effectivePermissions,
+        enabledModules: nextEnabledModules,
         passwordChangeRequired: me?.passwordChangeRequired ?? session.passwordChangeRequired,
       };
 

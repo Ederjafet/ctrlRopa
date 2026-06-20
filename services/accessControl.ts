@@ -74,6 +74,16 @@ export function hasAnyPermission(
   return permissionCodes.some((permissionCode) => hasPermission(user, permissionCode));
 }
 
+export function hasModuleEnabled(user: UserSession | null, moduleCode: string): boolean {
+  if (!moduleCode) return true;
+  if (isPlatformOwner(user)) return true;
+
+  const modules = user?.enabledModules;
+  if (!modules || modules.length === 0) return true;
+
+  return modules.includes(moduleCode);
+}
+
 export function canAccess(
   user: UserSession | null,
   channelCode: string,

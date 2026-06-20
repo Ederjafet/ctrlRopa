@@ -42,6 +42,20 @@ export type PlatformCompanyUser = {
   roles: string[];
 };
 
+export type PlatformModuleSetting = {
+  code: string;
+  name: string;
+  enabled: boolean;
+};
+
+export type PlatformCompanySettings = {
+  modules: PlatformModuleSetting[];
+  limits: {
+    maxUsers?: number | null;
+    maxBranches?: number | null;
+  };
+};
+
 export type CreatePlatformCompanyPayload = {
   name: string;
   legalName?: string;
@@ -67,6 +81,15 @@ export type CreatePlatformCompanyUserPayload = {
   role: string;
   branchId?: number | null;
   phone?: string | null;
+};
+
+export type UpdatePlatformCompanySettingsPayload = {
+  modules: {
+    code: string;
+    enabled: boolean;
+  }[];
+  maxUsers?: number | null;
+  maxBranches?: number | null;
 };
 
 export type PlatformTenantAdmin = {
@@ -114,6 +137,22 @@ export async function createPlatformBranch(
 
 export async function getPlatformUsers(companyId: number): Promise<PlatformCompanyUser[]> {
   return apiRequest<PlatformCompanyUser[]>(`/api/platform/companies/${companyId}/users`);
+}
+
+export async function getPlatformCompanySettings(
+  companyId: number
+): Promise<PlatformCompanySettings> {
+  return apiRequest<PlatformCompanySettings>(`/api/platform/companies/${companyId}/settings`);
+}
+
+export async function updatePlatformCompanySettings(
+  companyId: number,
+  payload: UpdatePlatformCompanySettingsPayload
+): Promise<PlatformCompanySettings> {
+  return apiRequest<PlatformCompanySettings>(`/api/platform/companies/${companyId}/settings`, {
+    method: 'PATCH',
+    body: payload,
+  });
 }
 
 export async function createPlatformUser(
