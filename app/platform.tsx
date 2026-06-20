@@ -91,7 +91,6 @@ export default function PlatformScreen() {
   const [activePanel, setActivePanel] = useState<ActivePanel>('overview');
   const [loading, setLoading] = useState(true);
   const [loadingCompanyScope, setLoadingCompanyScope] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [creatingCompany, setCreatingCompany] = useState(false);
   const [creatingAdmin, setCreatingAdmin] = useState(false);
   const [creatingBranch, setCreatingBranch] = useState(false);
@@ -189,7 +188,6 @@ export default function PlatformScreen() {
 
   const refreshCompanies = async () => {
     try {
-      setRefreshing(true);
       setErrorMessage('');
       const data = await getPlatformCompanies();
       setCompanies(data);
@@ -198,8 +196,6 @@ export default function PlatformScreen() {
       }
     } catch (error) {
       setErrorMessage(getActionableApiErrorMessage(error));
-    } finally {
-      setRefreshing(false);
     }
   };
 
@@ -422,28 +418,18 @@ export default function PlatformScreen() {
       activeRoute="platform"
       session={session}
       compactHeader
-      rightContent={
-        <AppButton
-          title="Actualizar"
-          variant="secondary"
-          loading={refreshing}
-          disabled={refreshing}
-          onPress={refreshCompanies}
-          style={styles.headerButton}
-        />
-      }
     >
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <AppCard style={styles.scopeCard}>
           <View style={styles.scopeHeader}>
             <StatusBadge label="ALCANCE SAAS" tone="info" />
             <AppText variant="subtitle" bold>
-              Administración multiempresa AppModa
+              Que puedes hacer
             </AppText>
           </View>
           <AppText color={theme.colors.mutedText}>
-            Puedes crear compañías, sucursales y usuarios por cliente. Desde este modo no se operan ventas,
-            inventario, pagos ni LIVE mezclando datos de clientes.
+            Crear companias, sucursales, usuarios, modulos y limites por cliente. Desde este
+            modo no se operan ventas, inventario, pagos ni LIVE mezclando datos de clientes.
           </AppText>
         </AppCard>
 
@@ -698,7 +684,7 @@ export default function PlatformScreen() {
               {activePanel === 'overview' ? (
                 <View style={styles.scopeColumn}>
                   <View style={styles.sectionHeader}>
-                    <AppText bold>Modo Plataforma AppModa</AppText>
+                    <AppText bold>Alcance operativo de Plataforma</AppText>
                     <AppText variant="caption" color={theme.colors.mutedText}>
                       Puedes crear clientes, sucursales, usuarios, modulos y limites por cliente. La operacion normal
                       queda aislada por empresa y sucursal.
@@ -1064,10 +1050,6 @@ const styles = StyleSheet.create({
   },
   gridMobile: {
     flexDirection: 'column',
-  },
-  headerButton: {
-    minWidth: 120,
-    paddingVertical: 10,
   },
   compactList: {
     gap: 8,

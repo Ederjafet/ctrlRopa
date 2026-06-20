@@ -119,14 +119,6 @@ export default function ShipmentsScreen() {
         onPress={() => setCreateModalVisible(true)}
         style={styles.headerButton}
       />
-      <AppButton
-        title="Actualizar"
-        variant="secondary"
-        onPress={loadData}
-        loading={isLoading}
-        disabled={isLoading}
-        style={styles.headerButton}
-      />
     </View>
   );
 

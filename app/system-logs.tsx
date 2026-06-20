@@ -1,5 +1,4 @@
 import AppBackButton from '@/components/ui/AppBackButton';
-import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppScreen from '@/components/ui/AppScreen';
@@ -146,13 +145,6 @@ export default function SystemLogsScreen() {
         placeholder="Usuario, ruta, sucursal, evento o HTTP"
         value={search}
         onChangeText={setSearch}
-      />
-
-      <AppButton
-        title={loading ? 'Actualizando...' : 'Actualizar'}
-        onPress={loadLogs}
-        loading={loading}
-        disabled={loading}
       />
 
       <AppCard>

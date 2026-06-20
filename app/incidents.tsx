@@ -1,5 +1,4 @@
 import AppBackButton from '@/components/ui/AppBackButton';
-import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppScreen from '@/components/ui/AppScreen';
@@ -294,12 +293,6 @@ export default function IncidentsScreen() {
         );
       })}
 
-      <AppButton
-        title="Actualizar"
-        variant="secondary"
-        onPress={() => load(status)}
-        disabled={loading}
-      />
     </AppScreen>
   );
 }

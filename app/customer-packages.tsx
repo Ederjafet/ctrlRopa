@@ -183,14 +183,6 @@ export default function CustomerPackagesScreen() {
           style={styles.headerButton}
         />
       ) : null}
-      <AppButton
-        title="Actualizar"
-        variant="secondary"
-        onPress={loadData}
-        loading={isLoading}
-        disabled={isLoading}
-        style={styles.headerButton}
-      />
     </View>
   );
 

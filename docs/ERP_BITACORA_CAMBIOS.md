@@ -1,5 +1,25 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-19 - FAST-UX-NORMALIZE-A encabezados y Actualizar
+
+Tipo: frontend, UX operativa, documentacion.
+
+Objetivo:
+
+- Normalizar encabezados para evitar bloques duplicados y limitar el boton visible `Actualizar` al modulo LIVE.
+
+Cambios realizados:
+
+- Se retira `Actualizar` de Plataforma, Dashboard, Paquetes, Envios, Apartados, Venta puerta, Apartado puerta, Incidencias, Reembolsos, Devoluciones y Logs.
+- Se conserva `Actualizar` solo en LIVE.
+- `/platform` deja de repetir `Administracion multiempresa AppModa` entre header y tarjeta de alcance.
+- Se documenta la regla en `docs/FAST_UX_NORMALIZE_A_HEADERS_REFRESH.md`.
+
+Restricciones respetadas:
+
+- No se toco backend.
+- No se hizo merge a `main`.
+
 ## 2026-06-19 - FAST-PLATFORM-C tenant SaaS por cliente
 
 Tipo: backend, frontend, migracion, plataforma SaaS, tenant settings, documentacion.

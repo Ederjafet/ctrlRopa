@@ -233,7 +233,6 @@ export default function DashboardScreen() {
   const [dashboard, setDashboard] = useState<UserDashboard | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [detail, setDetail] = useState<DashboardMetricDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
@@ -243,7 +242,6 @@ export default function DashboardScreen() {
 
   const loadDashboard = async () => {
     try {
-      setIsRefreshing(true);
       const data = await getUserDashboard();
       setDashboard(data);
       setSelectedBranchId((current) => current ?? data.branches[0]?.branchId ?? null);
@@ -251,7 +249,6 @@ export default function DashboardScreen() {
       Alert.alert('No se pudo cargar el dashboard', error?.message ?? 'Intenta nuevamente.');
     } finally {
       setIsLoading(false);
-      setIsRefreshing(false);
     }
   };
 
@@ -345,22 +342,6 @@ export default function DashboardScreen() {
             {selectedBranch.branchName} · {dashboard.date}
           </AppText>
         </View>
-        <Pressable
-          onPress={loadDashboard}
-          disabled={isRefreshing}
-          style={({ pressed }) => [
-            styles.refreshButton,
-            {
-              borderColor: theme.colors.border,
-              borderRadius: theme.radius.md,
-              opacity: isRefreshing ? 0.55 : pressed ? 0.8 : 1,
-            },
-          ]}
-        >
-          <AppText bold color={theme.colors.accent}>
-            Actualizar
-          </AppText>
-        </Pressable>
       </View>
 
       <BranchSelector
@@ -508,13 +489,6 @@ const styles = StyleSheet.create({
   metricValue: {
     fontSize: 18,
     marginTop: 8,
-  },
-  refreshButton: {
-    alignItems: 'center',
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: 42,
-    paddingHorizontal: 12,
   },
   titleRow: {
     alignItems: 'flex-start',

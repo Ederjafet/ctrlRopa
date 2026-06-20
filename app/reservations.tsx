@@ -1275,14 +1275,6 @@ export default function ReservationsScreen() {
             onPress={() => router.push('/door-reservation' as any)}
             style={styles.headerSecondaryButton}
           />
-          <AppButton
-            title={isRefreshing ? 'Actualizando...' : 'Actualizar'}
-            variant="secondary"
-            onPress={handleManualRefresh}
-            loading={isRefreshing}
-            disabled={isRefreshing}
-            style={styles.refreshButton}
-          />
         </View>
       }
     >
@@ -1944,12 +1936,6 @@ const styles = StyleSheet.create({
   packageSection: {
     gap: 8,
     marginTop: 12,
-  },
-  refreshButton: {
-    minHeight: 32,
-    minWidth: 118,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
   },
   retryButton: {
     marginTop: 12,

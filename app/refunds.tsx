@@ -228,12 +228,6 @@ export default function RefundsScreen() {
         );
       })}
 
-      <AppButton
-        title="Actualizar"
-        variant="secondary"
-        onPress={() => load(status)}
-        disabled={loading}
-      />
     </AppScreen>
   );
 }
