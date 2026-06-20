@@ -7,6 +7,7 @@ type Props = {
   title: string;
   subtitle?: string;
   metadata?: string;
+  eyebrow?: string;
   contextTitle?: string;
   contextSubtitle?: string;
   contextMetadata?: string;
@@ -21,6 +22,7 @@ export default function AppShellPage({
   title,
   subtitle,
   metadata,
+  eyebrow,
   contextTitle,
   contextSubtitle,
   contextMetadata,
@@ -55,6 +57,7 @@ export default function AppShellPage({
       title={title}
       subtitle={subtitle}
       metadata={metadata}
+      eyebrow={eyebrow}
       contextTitle={contextTitle ?? title}
       contextSubtitle={contextSubtitle ?? getSessionScopeLabel(session)}
       contextMetadata={contextMetadata}

@@ -53,7 +53,71 @@ export type PlatformCompanySettings = {
   limits: {
     maxUsers?: number | null;
     maxBranches?: number | null;
+    maxItems?: number | null;
+    maxLiveSessionsPerMonth?: number | null;
+    maxShipmentsPerMonth?: number | null;
+    maxPackagesPerMonth?: number | null;
   };
+};
+
+export type PlatformSubscriptionPlan = {
+  id: number;
+  code: string;
+  name: string;
+  description?: string | null;
+  status: string;
+  includedMaxUsers?: number | null;
+  includedMaxBranches?: number | null;
+  includesLive: boolean;
+  includesReports: boolean;
+  includesShipments: boolean;
+  includesPackages: boolean;
+};
+
+export type PlatformPlanPrice = {
+  id: number;
+  planId: number;
+  billingPeriod: string;
+  priceAmount: number;
+  currency: string;
+  status: string;
+};
+
+export type PlatformCompanySubscription = {
+  id?: number | null;
+  companyId: number;
+  planId?: number | null;
+  planCode?: string | null;
+  planName?: string | null;
+  billingModel: string;
+  billingPeriod?: string | null;
+  status: string;
+  startedAt?: string | null;
+  endsAt?: string | null;
+  nextBillingAt?: string | null;
+};
+
+export type PlatformUsageRate = {
+  id?: number | null;
+  companyId: number;
+  usageType: string;
+  name: string;
+  unitPrice: number;
+  currency: string;
+  enabled: boolean;
+};
+
+export type PlatformUsageSummary = {
+  companyId: number;
+  companyName: string;
+  billingModel: string;
+  planName?: string | null;
+  subscriptionStatus: string;
+  activeBranches: number;
+  activeUsers: number;
+  activeModules: number;
+  maxUsers?: number | null;
+  maxBranches?: number | null;
 };
 
 export type CreatePlatformCompanyPayload = {
@@ -90,6 +154,51 @@ export type UpdatePlatformCompanySettingsPayload = {
   }[];
   maxUsers?: number | null;
   maxBranches?: number | null;
+  maxItems?: number | null;
+  maxLiveSessionsPerMonth?: number | null;
+  maxShipmentsPerMonth?: number | null;
+  maxPackagesPerMonth?: number | null;
+};
+
+export type CreatePlatformSubscriptionPlanPayload = {
+  code: string;
+  name: string;
+  description?: string | null;
+  status?: string;
+  includedMaxUsers?: number | null;
+  includedMaxBranches?: number | null;
+  includesLive?: boolean;
+  includesReports?: boolean;
+  includesShipments?: boolean;
+  includesPackages?: boolean;
+};
+
+export type UpdatePlatformPlanPricesPayload = {
+  prices: {
+    billingPeriod: string;
+    priceAmount: number;
+    currency?: string;
+    status?: string;
+  }[];
+};
+
+export type UpdatePlatformCompanySubscriptionPayload = {
+  planId?: number | null;
+  billingModel: string;
+  billingPeriod?: string | null;
+  status: string;
+  startedAt?: string | null;
+  endsAt?: string | null;
+  nextBillingAt?: string | null;
+};
+
+export type UpdatePlatformUsageRatesPayload = {
+  rates: {
+    usageType: string;
+    unitPrice: number;
+    currency?: string;
+    enabled?: boolean;
+  }[];
 };
 
 export type PlatformTenantAdmin = {
@@ -173,4 +282,65 @@ export async function createPlatformTenantAdmin(
     method: 'POST',
     body: payload,
   });
+}
+
+export async function getPlatformSubscriptionPlans(): Promise<PlatformSubscriptionPlan[]> {
+  return apiRequest<PlatformSubscriptionPlan[]>('/api/platform/subscription-plans');
+}
+
+export async function createPlatformSubscriptionPlan(
+  payload: CreatePlatformSubscriptionPlanPayload
+): Promise<PlatformSubscriptionPlan> {
+  return apiRequest<PlatformSubscriptionPlan>('/api/platform/subscription-plans', {
+    method: 'POST',
+    body: payload,
+  });
+}
+
+export async function getPlatformPlanPrices(planId: number): Promise<PlatformPlanPrice[]> {
+  return apiRequest<PlatformPlanPrice[]>(`/api/platform/subscription-plans/${planId}/prices`);
+}
+
+export async function updatePlatformPlanPrices(
+  planId: number,
+  payload: UpdatePlatformPlanPricesPayload
+): Promise<PlatformPlanPrice[]> {
+  return apiRequest<PlatformPlanPrice[]>(`/api/platform/subscription-plans/${planId}/prices`, {
+    method: 'PUT',
+    body: payload,
+  });
+}
+
+export async function getPlatformCompanySubscription(
+  companyId: number
+): Promise<PlatformCompanySubscription> {
+  return apiRequest<PlatformCompanySubscription>(`/api/platform/companies/${companyId}/subscription`);
+}
+
+export async function updatePlatformCompanySubscription(
+  companyId: number,
+  payload: UpdatePlatformCompanySubscriptionPayload
+): Promise<PlatformCompanySubscription> {
+  return apiRequest<PlatformCompanySubscription>(`/api/platform/companies/${companyId}/subscription`, {
+    method: 'PUT',
+    body: payload,
+  });
+}
+
+export async function getPlatformUsageRates(companyId: number): Promise<PlatformUsageRate[]> {
+  return apiRequest<PlatformUsageRate[]>(`/api/platform/companies/${companyId}/usage-rates`);
+}
+
+export async function updatePlatformUsageRates(
+  companyId: number,
+  payload: UpdatePlatformUsageRatesPayload
+): Promise<PlatformUsageRate[]> {
+  return apiRequest<PlatformUsageRate[]>(`/api/platform/companies/${companyId}/usage-rates`, {
+    method: 'PUT',
+    body: payload,
+  });
+}
+
+export async function getPlatformUsageSummary(): Promise<PlatformUsageSummary[]> {
+  return apiRequest<PlatformUsageSummary[]>('/api/platform/usage');
 }

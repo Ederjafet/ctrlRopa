@@ -15,7 +15,11 @@ public record PlatformCompanySettingsResponse(
 
     public record LimitSettings(
             Integer maxUsers,
-            Integer maxBranches
+            Integer maxBranches,
+            Integer maxItems,
+            Integer maxLiveSessionsPerMonth,
+            Integer maxShipmentsPerMonth,
+            Integer maxPackagesPerMonth
     ) {
     }
 }

@@ -1,5 +1,32 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-19 - FAST-PLATFORM-D SaaS Owner y base de suscripciones
+
+Tipo: backend, frontend, migracion, plataforma SaaS, cobranza base, documentacion.
+
+Objetivo:
+
+- Separar el menu Platform Owner en secciones reales y agregar la base administrativa para planes, suscripciones y tarifas por consumo.
+
+Cambios realizados:
+
+- `/platform` queda con una sola cabecera `MODO PLATAFORMA`, sin tarjeta superior duplicada ni boton `Actualizar`.
+- El menu Platform Owner separa Panel Plataforma, Clientes, Sucursales, Usuarios, Modulos, Limites, Planes/Suscripciones, Tarifas por consumo, Uso y Auditoria.
+- Se agrega migracion `V61__fast_platform_d_saas_billing_base.sql`.
+- Se crean tablas `subscription_plans`, `subscription_plan_prices`, `company_subscriptions` y `company_usage_rates`.
+- Se agregan permisos SaaS de billing, uso, planes, suscripciones, tarifas, modulos y limites.
+- Se exponen endpoints `/api/platform` para planes, precios, suscripcion por compania, tarifas de consumo y resumen de uso.
+- Se documenta el cierre en `docs/FAST_PLATFORM_D_SAAS_OWNER_BILLING_BASE.md`.
+
+Restricciones respetadas:
+
+- No se implemento pasarela de pago, facturacion real, recibos ni impersonacion.
+- No se hizo merge a `main`.
+
+Pendientes:
+
+- Corte de cobranza mensual, calculo automatico de consumo, suspension comercial, recibos/facturas, auditoria global endurecida e impersonacion auditada.
+
 ## 2026-06-19 - FAST-UX-NORMALIZE-A encabezados y Actualizar
 
 Tipo: frontend, UX operativa, documentacion.

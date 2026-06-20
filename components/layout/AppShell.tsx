@@ -15,6 +15,7 @@ type Props = {
   title: string;
   subtitle?: string;
   metadata?: string;
+  eyebrow?: string;
   contextTitle?: string;
   contextSubtitle?: string;
   contextMetadata?: string;
@@ -30,6 +31,7 @@ export default function AppShell({
   title,
   subtitle,
   metadata,
+  eyebrow,
   contextTitle,
   contextSubtitle,
   contextMetadata,
@@ -110,6 +112,7 @@ export default function AppShell({
             title={topBarTitle}
             subtitle={topBarSubtitle}
             metadata={topBarMetadata}
+            eyebrow={eyebrow}
             session={session}
             rightContent={rightContent}
             showMenuButton={!showSidebar}

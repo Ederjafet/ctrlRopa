@@ -10,8 +10,11 @@ import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.text.Normalizer;
 import java.util.Arrays;
 import java.util.List;
@@ -36,6 +39,35 @@ public class PlatformService {
             new ModuleDefinition("CASH_CLOSURES", "Cortes de caja"),
             new ModuleDefinition("CONSIGNMENTS", "Consignacion"),
             new ModuleDefinition("RETURNS_REFUNDS", "Devoluciones y refunds")
+    );
+    private static final List<String> BILLING_PERIODS = List.of(
+            "MONTHLY",
+            "QUARTERLY",
+            "SEMIANNUAL",
+            "ANNUAL"
+    );
+    private static final List<String> BILLING_MODELS = List.of(
+            "SUBSCRIPTION",
+            "USAGE_BASED",
+            "HYBRID"
+    );
+    private static final List<String> SUBSCRIPTION_STATUSES = List.of(
+            "TRIAL",
+            "ACTIVE",
+            "PAST_DUE",
+            "SUSPENDED",
+            "CANCELLED"
+    );
+    private static final List<UsageDefinition> USAGE_DEFINITIONS = List.of(
+            new UsageDefinition("ACTIVE_USER", "Usuario activo"),
+            new UsageDefinition("ACTIVE_BRANCH", "Sucursal activa"),
+            new UsageDefinition("LIVE_SESSION", "LIVE realizado"),
+            new UsageDefinition("PACKAGE_CREATED", "Paquete creado"),
+            new UsageDefinition("SHIPMENT_CREATED", "Envio generado"),
+            new UsageDefinition("SALE_CREATED", "Venta registrada"),
+            new UsageDefinition("ITEM_CREATED", "Prenda registrada"),
+            new UsageDefinition("PAYMENT_REGISTERED", "Pago registrado"),
+            new UsageDefinition("RESERVATION_CREATED", "Apartado creado")
     );
 
     private final JdbcTemplate jdbcTemplate;
@@ -164,7 +196,26 @@ public class PlatformService {
             Long companyId,
             UpdatePlatformCompanySettingsRequest request
     ) {
-        accessService.assertCan(currentUser.getUserId(), PermissionCode.MANAGE_COMPANIES);
+        if (request.getModules() != null) {
+            accessService.assertCan(currentUser.getUserId(), PermissionCode.MANAGE_COMPANY_MODULES);
+        }
+
+        Integer maxUsers = validateLimit(request.getMaxUsers(), "maxUsers");
+        Integer maxBranches = validateLimit(request.getMaxBranches(), "maxBranches");
+        Integer maxItems = validateLimit(request.getMaxItems(), "maxItems");
+        Integer maxLiveSessions = validateLimit(request.getMaxLiveSessionsPerMonth(), "maxLiveSessionsPerMonth");
+        Integer maxShipments = validateLimit(request.getMaxShipmentsPerMonth(), "maxShipmentsPerMonth");
+        Integer maxPackages = validateLimit(request.getMaxPackagesPerMonth(), "maxPackagesPerMonth");
+
+        if (request.getMaxUsers() != null ||
+                request.getMaxBranches() != null ||
+                request.getMaxItems() != null ||
+                request.getMaxLiveSessionsPerMonth() != null ||
+                request.getMaxShipmentsPerMonth() != null ||
+                request.getMaxPackagesPerMonth() != null) {
+            accessService.assertCan(currentUser.getUserId(), PermissionCode.MANAGE_COMPANY_LIMITS);
+        }
+
         assertCustomerCompany(companyId);
         ensureDefaultCompanySettings(companyId);
 
@@ -191,21 +242,29 @@ public class PlatformService {
             });
         }
 
-        Integer maxUsers = validateLimit(request.getMaxUsers(), "maxUsers");
-        Integer maxBranches = validateLimit(request.getMaxBranches(), "maxBranches");
-
         jdbcTemplate.update(
                 """
-                INSERT INTO company_limits (company_id, max_users, max_branches)
-                VALUES (?, ?, ?)
+                INSERT INTO company_limits (
+                  company_id, max_users, max_branches, max_items,
+                  max_live_sessions_per_month, max_shipments_per_month, max_packages_per_month
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                   max_users = VALUES(max_users),
                   max_branches = VALUES(max_branches),
+                  max_items = VALUES(max_items),
+                  max_live_sessions_per_month = VALUES(max_live_sessions_per_month),
+                  max_shipments_per_month = VALUES(max_shipments_per_month),
+                  max_packages_per_month = VALUES(max_packages_per_month),
                   updated_at = CURRENT_TIMESTAMP
                 """,
                 companyId,
                 maxUsers,
-                maxBranches
+                maxBranches,
+                maxItems,
+                maxLiveSessions,
+                maxShipments,
+                maxPackages
         );
 
         return findCompanySettingsById(companyId);
@@ -411,6 +470,415 @@ public class PlatformService {
                 created.status(),
                 TENANT_ADMIN_ROLE
         );
+    }
+
+    @Transactional(readOnly = true)
+    public List<PlatformSubscriptionPlanResponse> findSubscriptionPlans() {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_PLATFORM_BILLING);
+
+        return jdbcTemplate.query(
+                """
+                SELECT id, code, name, description, status, included_max_users, included_max_branches,
+                       includes_live, includes_reports, includes_shipments, includes_packages
+                FROM subscription_plans
+                ORDER BY status, name
+                """,
+                (rs, rowNum) -> mapSubscriptionPlan(rs.getLong("id"),
+                        rs.getString("code"),
+                        rs.getString("name"),
+                        rs.getString("description"),
+                        rs.getString("status"),
+                        rs.getObject("included_max_users", Integer.class),
+                        rs.getObject("included_max_branches", Integer.class),
+                        rs.getBoolean("includes_live"),
+                        rs.getBoolean("includes_reports"),
+                        rs.getBoolean("includes_shipments"),
+                        rs.getBoolean("includes_packages"))
+        );
+    }
+
+    public PlatformSubscriptionPlanResponse createSubscriptionPlan(CreatePlatformSubscriptionPlanRequest request) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.MANAGE_SUBSCRIPTION_PLANS);
+
+        String code = normalizeCode(cleanRequired(request.getCode(), "code"), 64);
+        String name = cleanRequired(request.getName(), "name");
+        String status = normalizePlanStatus(request.getStatus() == null ? "ACTIVE" : request.getStatus());
+
+        KeyHolder planKey = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement(
+                    """
+                    INSERT INTO subscription_plans (
+                      code, name, description, status, included_max_users, included_max_branches,
+                      includes_live, includes_reports, includes_shipments, includes_packages
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    Statement.RETURN_GENERATED_KEYS
+            );
+            ps.setString(1, code);
+            ps.setString(2, name);
+            ps.setString(3, cleanNullable(request.getDescription()));
+            ps.setString(4, status);
+            setNullableInteger(ps, 5, request.getIncludedMaxUsers());
+            setNullableInteger(ps, 6, request.getIncludedMaxBranches());
+            ps.setInt(7, Boolean.TRUE.equals(request.getIncludesLive()) ? 1 : 0);
+            ps.setInt(8, Boolean.TRUE.equals(request.getIncludesReports()) ? 1 : 0);
+            ps.setInt(9, Boolean.TRUE.equals(request.getIncludesShipments()) ? 1 : 0);
+            ps.setInt(10, Boolean.TRUE.equals(request.getIncludesPackages()) ? 1 : 0);
+            return ps;
+        }, planKey);
+
+        return findSubscriptionPlan(planKey.getKey().longValue());
+    }
+
+    public PlatformSubscriptionPlanResponse updateSubscriptionPlan(
+            Long planId,
+            CreatePlatformSubscriptionPlanRequest request
+    ) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.MANAGE_SUBSCRIPTION_PLANS);
+        assertPlanExists(planId);
+
+        String code = cleanNullable(request.getCode()) == null ? null : normalizeCode(request.getCode(), 64);
+        StringBuilder sql = new StringBuilder("UPDATE subscription_plans SET ");
+        new UpdateBuilder(sql)
+                .add("code", code)
+                .add("name", cleanNullable(request.getName()))
+                .add("description", cleanNullable(request.getDescription()))
+                .add("status", request.getStatus() == null ? null : normalizePlanStatus(request.getStatus()))
+                .add("included_max_users", request.getIncludedMaxUsers())
+                .add("included_max_branches", request.getIncludedMaxBranches())
+                .add("includes_live", request.getIncludesLive() == null ? null : (Boolean.TRUE.equals(request.getIncludesLive()) ? 1 : 0))
+                .add("includes_reports", request.getIncludesReports() == null ? null : (Boolean.TRUE.equals(request.getIncludesReports()) ? 1 : 0))
+                .add("includes_shipments", request.getIncludesShipments() == null ? null : (Boolean.TRUE.equals(request.getIncludesShipments()) ? 1 : 0))
+                .add("includes_packages", request.getIncludesPackages() == null ? null : (Boolean.TRUE.equals(request.getIncludesPackages()) ? 1 : 0))
+                .execute((statement, values) -> jdbcTemplate.update(statement + " WHERE id = ?", append(values, planId)));
+
+        return findSubscriptionPlan(planId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PlatformPlanPriceResponse> findSubscriptionPlanPrices(Long planId) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_PLATFORM_BILLING);
+        assertPlanExists(planId);
+        return findSubscriptionPlanPricesById(planId);
+    }
+
+    public List<PlatformPlanPriceResponse> updateSubscriptionPlanPrices(
+            Long planId,
+            UpdatePlatformPlanPricesRequest request
+    ) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.MANAGE_SUBSCRIPTION_PLANS);
+        assertPlanExists(planId);
+
+        if (request.getPrices() != null) {
+            request.getPrices().forEach(price -> {
+                String period = normalizeBillingPeriod(price.getBillingPeriod(), true);
+                BigDecimal amount = validateMoney(price.getPriceAmount());
+                String currency = normalizeCurrency(price.getCurrency());
+                String status = normalizePlanStatus(price.getStatus() == null ? "ACTIVE" : price.getStatus());
+
+                jdbcTemplate.update(
+                        """
+                        INSERT INTO subscription_plan_prices (plan_id, billing_period, price_amount, currency, status)
+                        VALUES (?, ?, ?, ?, ?)
+                        ON DUPLICATE KEY UPDATE
+                          price_amount = VALUES(price_amount),
+                          currency = VALUES(currency),
+                          status = VALUES(status),
+                          updated_at = CURRENT_TIMESTAMP
+                        """,
+                        planId,
+                        period,
+                        amount,
+                        currency,
+                        status
+                );
+            });
+        }
+
+        return findSubscriptionPlanPricesById(planId);
+    }
+
+    @Transactional(readOnly = true)
+    public PlatformCompanySubscriptionResponse findCompanySubscription(Long companyId) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_PLATFORM_BILLING);
+        assertCompanyExists(companyId);
+        return findCompanySubscriptionByCompanyId(companyId);
+    }
+
+    public PlatformCompanySubscriptionResponse updateCompanySubscription(
+            Long companyId,
+            UpdatePlatformCompanySubscriptionRequest request
+    ) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.MANAGE_COMPANY_SUBSCRIPTIONS);
+        assertCustomerCompany(companyId);
+
+        Long planId = request.getPlanId();
+        if (planId != null) {
+            assertPlanExists(planId);
+        }
+
+        String billingModel = normalizeBillingModel(request.getBillingModel() == null ? "SUBSCRIPTION" : request.getBillingModel());
+        String billingPeriod = normalizeBillingPeriod(request.getBillingPeriod(), false);
+        String status = normalizeSubscriptionStatus(request.getStatus() == null ? "TRIAL" : request.getStatus());
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO company_subscriptions (
+                  company_id, plan_id, billing_model, billing_period, status,
+                  started_at, ends_at, next_billing_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                  plan_id = VALUES(plan_id),
+                  billing_model = VALUES(billing_model),
+                  billing_period = VALUES(billing_period),
+                  status = VALUES(status),
+                  started_at = VALUES(started_at),
+                  ends_at = VALUES(ends_at),
+                  next_billing_at = VALUES(next_billing_at),
+                  updated_at = CURRENT_TIMESTAMP
+                """,
+                companyId,
+                planId,
+                billingModel,
+                billingPeriod,
+                status,
+                normalizeDateTime(request.getStartedAt()),
+                normalizeDateTime(request.getEndsAt()),
+                normalizeDateTime(request.getNextBillingAt())
+        );
+
+        return findCompanySubscriptionByCompanyId(companyId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PlatformUsageRateResponse> findCompanyUsageRates(Long companyId) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_PLATFORM_BILLING);
+        assertCompanyExists(companyId);
+        return findCompanyUsageRatesByCompanyId(companyId);
+    }
+
+    public List<PlatformUsageRateResponse> updateCompanyUsageRates(
+            Long companyId,
+            UpdatePlatformUsageRatesRequest request
+    ) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.MANAGE_USAGE_RATES);
+        assertCustomerCompany(companyId);
+
+        if (request.getRates() != null) {
+            request.getRates().forEach(rate -> {
+                String type = normalizeUsageType(rate.getUsageType());
+                BigDecimal amount = validateMoney(rate.getUnitPrice());
+                jdbcTemplate.update(
+                        """
+                        INSERT INTO company_usage_rates (company_id, usage_type, unit_price, currency, enabled)
+                        VALUES (?, ?, ?, ?, ?)
+                        ON DUPLICATE KEY UPDATE
+                          unit_price = VALUES(unit_price),
+                          currency = VALUES(currency),
+                          enabled = VALUES(enabled),
+                          updated_at = CURRENT_TIMESTAMP
+                        """,
+                        companyId,
+                        type,
+                        amount,
+                        normalizeCurrency(rate.getCurrency()),
+                        Boolean.FALSE.equals(rate.getEnabled()) ? 0 : 1
+                );
+            });
+        }
+
+        return findCompanyUsageRatesByCompanyId(companyId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PlatformUsageSummaryResponse> findUsageSummary() {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_PLATFORM_USAGE);
+
+        return jdbcTemplate.query(
+                """
+                SELECT
+                  c.id AS company_id,
+                  c.name AS company_name,
+                  COALESCE(cs.billing_model, 'SIN_CONFIGURAR') AS billing_model,
+                  sp.name AS plan_name,
+                  COALESCE(cs.status, 'SIN_CONFIGURAR') AS subscription_status,
+                  (SELECT COUNT(*) FROM branches b WHERE b.company_id = c.id AND b.status = 'ACTIVE') AS active_branches,
+                  (
+                    SELECT COUNT(*)
+                    FROM users u
+                    JOIN branches b ON b.id = u.branch_id
+                    WHERE b.company_id = c.id
+                      AND u.status = 'ACTIVE'
+                  ) AS active_users,
+                  (SELECT COUNT(*) FROM company_modules cm WHERE cm.company_id = c.id AND cm.enabled = 1) AS active_modules,
+                  cl.max_users,
+                  cl.max_branches
+                FROM companies c
+                LEFT JOIN company_subscriptions cs ON cs.company_id = c.id
+                LEFT JOIN subscription_plans sp ON sp.id = cs.plan_id
+                LEFT JOIN company_limits cl ON cl.company_id = c.id
+                WHERE c.code <> ?
+                ORDER BY c.name
+                """,
+                (rs, rowNum) -> new PlatformUsageSummaryResponse(
+                        rs.getLong("company_id"),
+                        rs.getString("company_name"),
+                        rs.getString("billing_model"),
+                        rs.getString("plan_name"),
+                        rs.getString("subscription_status"),
+                        rs.getInt("active_branches"),
+                        rs.getInt("active_users"),
+                        rs.getInt("active_modules"),
+                        rs.getObject("max_users", Integer.class),
+                        rs.getObject("max_branches", Integer.class)
+                ),
+                PLATFORM_COMPANY_CODE
+        );
+    }
+
+    private PlatformSubscriptionPlanResponse findSubscriptionPlan(Long planId) {
+        return jdbcTemplate.queryForObject(
+                """
+                SELECT id, code, name, description, status, included_max_users, included_max_branches,
+                       includes_live, includes_reports, includes_shipments, includes_packages
+                FROM subscription_plans
+                WHERE id = ?
+                """,
+                (rs, rowNum) -> mapSubscriptionPlan(
+                        rs.getLong("id"),
+                        rs.getString("code"),
+                        rs.getString("name"),
+                        rs.getString("description"),
+                        rs.getString("status"),
+                        rs.getObject("included_max_users", Integer.class),
+                        rs.getObject("included_max_branches", Integer.class),
+                        rs.getBoolean("includes_live"),
+                        rs.getBoolean("includes_reports"),
+                        rs.getBoolean("includes_shipments"),
+                        rs.getBoolean("includes_packages")
+                ),
+                planId
+        );
+    }
+
+    private List<PlatformPlanPriceResponse> findSubscriptionPlanPricesById(Long planId) {
+        return jdbcTemplate.query(
+                """
+                SELECT id, plan_id, billing_period, price_amount, currency, status
+                FROM subscription_plan_prices
+                WHERE plan_id = ?
+                ORDER BY
+                  CASE billing_period
+                    WHEN 'MONTHLY' THEN 1
+                    WHEN 'QUARTERLY' THEN 2
+                    WHEN 'SEMIANNUAL' THEN 3
+                    WHEN 'ANNUAL' THEN 4
+                    ELSE 9
+                  END,
+                  billing_period
+                """,
+                (rs, rowNum) -> new PlatformPlanPriceResponse(
+                        rs.getLong("id"),
+                        rs.getLong("plan_id"),
+                        rs.getString("billing_period"),
+                        rs.getBigDecimal("price_amount"),
+                        rs.getString("currency"),
+                        rs.getString("status")
+                ),
+                planId
+        );
+    }
+
+    private PlatformCompanySubscriptionResponse findCompanySubscriptionByCompanyId(Long companyId) {
+        List<PlatformCompanySubscriptionResponse> rows = jdbcTemplate.query(
+                """
+                SELECT
+                  cs.id,
+                  cs.company_id,
+                  cs.plan_id,
+                  sp.code AS plan_code,
+                  sp.name AS plan_name,
+                  cs.billing_model,
+                  cs.billing_period,
+                  cs.status,
+                  DATE_FORMAT(cs.started_at, '%Y-%m-%d %H:%i:%s') AS started_at,
+                  DATE_FORMAT(cs.ends_at, '%Y-%m-%d %H:%i:%s') AS ends_at,
+                  DATE_FORMAT(cs.next_billing_at, '%Y-%m-%d %H:%i:%s') AS next_billing_at
+                FROM company_subscriptions cs
+                LEFT JOIN subscription_plans sp ON sp.id = cs.plan_id
+                WHERE cs.company_id = ?
+                """,
+                (rs, rowNum) -> new PlatformCompanySubscriptionResponse(
+                        rs.getLong("id"),
+                        rs.getLong("company_id"),
+                        rs.getObject("plan_id", Long.class),
+                        rs.getString("plan_code"),
+                        rs.getString("plan_name"),
+                        rs.getString("billing_model"),
+                        rs.getString("billing_period"),
+                        rs.getString("status"),
+                        rs.getString("started_at"),
+                        rs.getString("ends_at"),
+                        rs.getString("next_billing_at")
+                ),
+                companyId
+        );
+
+        if (!rows.isEmpty()) {
+            return rows.get(0);
+        }
+
+        return new PlatformCompanySubscriptionResponse(
+                null,
+                companyId,
+                null,
+                null,
+                null,
+                "SIN_CONFIGURAR",
+                null,
+                "SIN_CONFIGURAR",
+                null,
+                null,
+                null
+        );
+    }
+
+    private List<PlatformUsageRateResponse> findCompanyUsageRatesByCompanyId(Long companyId) {
+        List<UsageRateRow> rows = jdbcTemplate.query(
+                """
+                SELECT usage_type, id, unit_price, currency, enabled
+                FROM company_usage_rates
+                WHERE company_id = ?
+                """,
+                (rs, rowNum) -> new UsageRateRow(
+                        rs.getString("usage_type"),
+                        rs.getObject("id", Long.class),
+                        rs.getBigDecimal("unit_price"),
+                        rs.getString("currency"),
+                        rs.getBoolean("enabled")
+                ),
+                companyId
+        );
+
+        return USAGE_DEFINITIONS.stream()
+                .map(definition -> {
+                    UsageRateRow row = rows.stream()
+                            .filter(candidate -> candidate.usageType().equals(definition.code()))
+                            .findFirst()
+                            .orElse(null);
+
+                    return new PlatformUsageRateResponse(
+                            row == null ? null : row.id(),
+                            companyId,
+                            definition.code(),
+                            definition.name(),
+                            row == null ? BigDecimal.ZERO : row.unitPrice(),
+                            row == null ? "MXN" : row.currency(),
+                            row == null || Boolean.TRUE.equals(row.enabled())
+                    );
+                })
+                .toList();
     }
 
     private Long createTenantUser(Long companyId,
@@ -685,19 +1153,29 @@ public class PlatformService {
     private PlatformCompanySettingsResponse.LimitSettings findCompanyLimits(Long companyId) {
         List<PlatformCompanySettingsResponse.LimitSettings> rows = jdbcTemplate.query(
                 """
-                SELECT max_users, max_branches
+                SELECT
+                  max_users,
+                  max_branches,
+                  max_items,
+                  max_live_sessions_per_month,
+                  max_shipments_per_month,
+                  max_packages_per_month
                 FROM company_limits
                 WHERE company_id = ?
                 """,
                 (rs, rowNum) -> new PlatformCompanySettingsResponse.LimitSettings(
                         rs.getObject("max_users", Integer.class),
-                        rs.getObject("max_branches", Integer.class)
+                        rs.getObject("max_branches", Integer.class),
+                        rs.getObject("max_items", Integer.class),
+                        rs.getObject("max_live_sessions_per_month", Integer.class),
+                        rs.getObject("max_shipments_per_month", Integer.class),
+                        rs.getObject("max_packages_per_month", Integer.class)
                 ),
                 companyId
         );
 
         return rows.isEmpty()
-                ? new PlatformCompanySettingsResponse.LimitSettings(null, null)
+                ? new PlatformCompanySettingsResponse.LimitSettings(null, null, null, null, null, null)
                 : rows.get(0);
     }
 
@@ -1023,6 +1501,128 @@ public class PlatformService {
         return normalized;
     }
 
+    private PlatformSubscriptionPlanResponse mapSubscriptionPlan(
+            Long id,
+            String code,
+            String name,
+            String description,
+            String status,
+            Integer includedMaxUsers,
+            Integer includedMaxBranches,
+            Boolean includesLive,
+            Boolean includesReports,
+            Boolean includesShipments,
+            Boolean includesPackages
+    ) {
+        return new PlatformSubscriptionPlanResponse(
+                id,
+                code,
+                name,
+                description,
+                status,
+                includedMaxUsers,
+                includedMaxBranches,
+                includesLive,
+                includesReports,
+                includesShipments,
+                includesPackages
+        );
+    }
+
+    private void assertPlanExists(Long planId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM subscription_plans WHERE id = ?",
+                Integer.class,
+                planId
+        );
+
+        if (count == null || count == 0) {
+            throw new IllegalArgumentException("Plan de suscripcion no encontrado");
+        }
+    }
+
+    private String normalizePlanStatus(String status) {
+        String normalized = cleanRequired(status, "status").toUpperCase(Locale.ROOT);
+        if (!"ACTIVE".equals(normalized) && !"INACTIVE".equals(normalized)) {
+            throw new IllegalArgumentException("status debe ser ACTIVE o INACTIVE");
+        }
+        return normalized;
+    }
+
+    private String normalizeBillingModel(String value) {
+        String normalized = cleanRequired(value, "billingModel").toUpperCase(Locale.ROOT);
+        if (!BILLING_MODELS.contains(normalized)) {
+            throw new IllegalArgumentException("billingModel no permitido: " + value);
+        }
+        return normalized;
+    }
+
+    private String normalizeBillingPeriod(String value, boolean required) {
+        String cleaned = cleanNullable(value);
+        if (cleaned == null) {
+            if (required) {
+                throw new IllegalArgumentException("billingPeriod es obligatorio");
+            }
+            return null;
+        }
+
+        String normalized = cleaned.toUpperCase(Locale.ROOT);
+        if (!BILLING_PERIODS.contains(normalized)) {
+            throw new IllegalArgumentException("billingPeriod no permitido: " + value);
+        }
+        return normalized;
+    }
+
+    private String normalizeSubscriptionStatus(String value) {
+        String normalized = cleanRequired(value, "status").toUpperCase(Locale.ROOT);
+        if (!SUBSCRIPTION_STATUSES.contains(normalized)) {
+            throw new IllegalArgumentException("status de suscripcion no permitido: " + value);
+        }
+        return normalized;
+    }
+
+    private String normalizeUsageType(String value) {
+        String normalized = cleanRequired(value, "usageType").toUpperCase(Locale.ROOT);
+        boolean known = USAGE_DEFINITIONS.stream().anyMatch(definition -> definition.code().equals(normalized));
+        if (!known) {
+            throw new IllegalArgumentException("Tipo de consumo no reconocido: " + value);
+        }
+        return normalized;
+    }
+
+    private BigDecimal validateMoney(BigDecimal value) {
+        BigDecimal amount = value == null ? BigDecimal.ZERO : value;
+        if (amount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("El monto no puede ser negativo");
+        }
+        return amount;
+    }
+
+    private String normalizeCurrency(String value) {
+        String normalized = cleanNullable(value);
+        if (normalized == null) {
+            return "MXN";
+        }
+        String sanitized = normalized.toUpperCase(Locale.ROOT).replaceAll("[^A-Z]", "");
+        return sanitized.isBlank() ? "MXN" : sanitized.substring(0, Math.min(8, sanitized.length()));
+    }
+
+    private String normalizeDateTime(String value) {
+        String cleaned = cleanNullable(value);
+        if (cleaned == null) {
+            return null;
+        }
+        return cleaned.replace('T', ' ');
+    }
+
+    private void setNullableInteger(PreparedStatement ps, int index, Integer value) throws SQLException {
+        if (value == null) {
+            ps.setNull(index, Types.INTEGER);
+            return;
+        }
+        ps.setInt(index, value);
+    }
+
     private String nextCompanyCode(String name) {
         return nextCode(name, 50, candidate -> exists("companies", "code", candidate));
     }
@@ -1151,6 +1751,21 @@ public class PlatformService {
 
     private record ModuleRow(
             String code,
+            Boolean enabled
+    ) {
+    }
+
+    private record UsageDefinition(
+            String code,
+            String name
+    ) {
+    }
+
+    private record UsageRateRow(
+            String usageType,
+            Long id,
+            BigDecimal unitPrice,
+            String currency,
             Boolean enabled
     ) {
     }

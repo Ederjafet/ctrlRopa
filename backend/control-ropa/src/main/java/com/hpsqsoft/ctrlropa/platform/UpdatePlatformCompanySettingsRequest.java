@@ -7,6 +7,10 @@ public class UpdatePlatformCompanySettingsRequest {
     private List<ModuleSetting> modules;
     private Integer maxUsers;
     private Integer maxBranches;
+    private Integer maxItems;
+    private Integer maxLiveSessionsPerMonth;
+    private Integer maxShipmentsPerMonth;
+    private Integer maxPackagesPerMonth;
 
     public List<ModuleSetting> getModules() {
         return modules;
@@ -30,6 +34,38 @@ public class UpdatePlatformCompanySettingsRequest {
 
     public void setMaxBranches(Integer maxBranches) {
         this.maxBranches = maxBranches;
+    }
+
+    public Integer getMaxItems() {
+        return maxItems;
+    }
+
+    public void setMaxItems(Integer maxItems) {
+        this.maxItems = maxItems;
+    }
+
+    public Integer getMaxLiveSessionsPerMonth() {
+        return maxLiveSessionsPerMonth;
+    }
+
+    public void setMaxLiveSessionsPerMonth(Integer maxLiveSessionsPerMonth) {
+        this.maxLiveSessionsPerMonth = maxLiveSessionsPerMonth;
+    }
+
+    public Integer getMaxShipmentsPerMonth() {
+        return maxShipmentsPerMonth;
+    }
+
+    public void setMaxShipmentsPerMonth(Integer maxShipmentsPerMonth) {
+        this.maxShipmentsPerMonth = maxShipmentsPerMonth;
+    }
+
+    public Integer getMaxPackagesPerMonth() {
+        return maxPackagesPerMonth;
+    }
+
+    public void setMaxPackagesPerMonth(Integer maxPackagesPerMonth) {
+        this.maxPackagesPerMonth = maxPackagesPerMonth;
     }
 
     public static class ModuleSetting {

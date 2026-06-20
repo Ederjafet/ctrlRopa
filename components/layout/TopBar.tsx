@@ -13,6 +13,7 @@ type Props = {
   title: string;
   subtitle?: string;
   metadata?: string;
+  eyebrow?: string;
   session?: UserSession | null;
   rightContent?: ReactNode;
   onMenuPress?: () => void;
@@ -24,6 +25,7 @@ export default function TopBar({
   title,
   subtitle,
   metadata,
+  eyebrow,
   session,
   rightContent,
   onMenuPress,
@@ -75,7 +77,7 @@ export default function TopBar({
           bold
           style={[styles.eyebrow, compact ? styles.eyebrowCompact : null]}
         >
-          {t('topBar.operationalPanel')}
+          {eyebrow ?? t('topBar.operationalPanel')}
         </AppText>
         <AppText variant="title" bold style={[styles.title, compact ? styles.titleCompact : null]} numberOfLines={1}>
           {title}

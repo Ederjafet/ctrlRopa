@@ -61,11 +61,69 @@ class PlatformServiceAccessTests {
         when(currentUser.getUserId()).thenReturn(10L);
         doThrow(new AccessDeniedException("missing"))
                 .when(accessService)
-                .assertCan(10L, PermissionCode.MANAGE_COMPANIES);
+                .assertCan(10L, PermissionCode.MANAGE_COMPANY_MODULES);
+
+        UpdatePlatformCompanySettingsRequest request = new UpdatePlatformCompanySettingsRequest();
+        UpdatePlatformCompanySettingsRequest.ModuleSetting module = new UpdatePlatformCompanySettingsRequest.ModuleSetting();
+        module.setCode("LIVE");
+        module.setEnabled(true);
+        request.setModules(java.util.List.of(module));
 
         assertThrows(
                 AccessDeniedException.class,
-                () -> service.updateCompanySettings(2L, new UpdatePlatformCompanySettingsRequest())
+                () -> service.updateCompanySettings(2L, request)
+        );
+    }
+
+    @Test
+    void updateCompanyLimitsRequiresManageCompanyLimits() {
+        when(currentUser.getUserId()).thenReturn(10L);
+        doThrow(new AccessDeniedException("missing"))
+                .when(accessService)
+                .assertCan(10L, PermissionCode.MANAGE_COMPANY_LIMITS);
+
+        UpdatePlatformCompanySettingsRequest request = new UpdatePlatformCompanySettingsRequest();
+        request.setMaxUsers(5);
+
+        assertThrows(
+                AccessDeniedException.class,
+                () -> service.updateCompanySettings(2L, request)
+        );
+    }
+
+    @Test
+    void findSubscriptionPlansRequiresBillingPermission() {
+        when(currentUser.getUserId()).thenReturn(10L);
+        doThrow(new AccessDeniedException("missing"))
+                .when(accessService)
+                .assertCan(10L, PermissionCode.VIEW_PLATFORM_BILLING);
+
+        assertThrows(AccessDeniedException.class, service::findSubscriptionPlans);
+    }
+
+    @Test
+    void createSubscriptionPlanRequiresManagePlansPermission() {
+        when(currentUser.getUserId()).thenReturn(10L);
+        doThrow(new AccessDeniedException("missing"))
+                .when(accessService)
+                .assertCan(10L, PermissionCode.MANAGE_SUBSCRIPTION_PLANS);
+
+        assertThrows(
+                AccessDeniedException.class,
+                () -> service.createSubscriptionPlan(new CreatePlatformSubscriptionPlanRequest())
+        );
+    }
+
+    @Test
+    void updateUsageRatesRequiresManageUsageRatesPermission() {
+        when(currentUser.getUserId()).thenReturn(10L);
+        doThrow(new AccessDeniedException("missing"))
+                .when(accessService)
+                .assertCan(10L, PermissionCode.MANAGE_USAGE_RATES);
+
+        assertThrows(
+                AccessDeniedException.class,
+                () -> service.updateCompanyUsageRates(2L, new UpdatePlatformUsageRatesRequest())
         );
     }
 

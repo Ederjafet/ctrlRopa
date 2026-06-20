@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -94,5 +95,64 @@ public class PlatformController {
     public PlatformTenantAdminResponse createTenantAdmin(@PathVariable Long companyId,
                                                          @Valid @RequestBody CreateTenantAdminRequest request) {
         return service.createTenantAdmin(companyId, request);
+    }
+
+    @GetMapping("/subscription-plans")
+    public List<PlatformSubscriptionPlanResponse> findSubscriptionPlans() {
+        return service.findSubscriptionPlans();
+    }
+
+    @PostMapping("/subscription-plans")
+    public PlatformSubscriptionPlanResponse createSubscriptionPlan(
+            @RequestBody CreatePlatformSubscriptionPlanRequest request) {
+        return service.createSubscriptionPlan(request);
+    }
+
+    @PatchMapping("/subscription-plans/{planId}")
+    public PlatformSubscriptionPlanResponse updateSubscriptionPlan(
+            @PathVariable Long planId,
+            @RequestBody CreatePlatformSubscriptionPlanRequest request) {
+        return service.updateSubscriptionPlan(planId, request);
+    }
+
+    @GetMapping("/subscription-plans/{planId}/prices")
+    public List<PlatformPlanPriceResponse> findSubscriptionPlanPrices(@PathVariable Long planId) {
+        return service.findSubscriptionPlanPrices(planId);
+    }
+
+    @PutMapping("/subscription-plans/{planId}/prices")
+    public List<PlatformPlanPriceResponse> updateSubscriptionPlanPrices(
+            @PathVariable Long planId,
+            @RequestBody UpdatePlatformPlanPricesRequest request) {
+        return service.updateSubscriptionPlanPrices(planId, request);
+    }
+
+    @GetMapping("/companies/{companyId}/subscription")
+    public PlatformCompanySubscriptionResponse findCompanySubscription(@PathVariable Long companyId) {
+        return service.findCompanySubscription(companyId);
+    }
+
+    @PutMapping("/companies/{companyId}/subscription")
+    public PlatformCompanySubscriptionResponse updateCompanySubscription(
+            @PathVariable Long companyId,
+            @RequestBody UpdatePlatformCompanySubscriptionRequest request) {
+        return service.updateCompanySubscription(companyId, request);
+    }
+
+    @GetMapping("/companies/{companyId}/usage-rates")
+    public List<PlatformUsageRateResponse> findCompanyUsageRates(@PathVariable Long companyId) {
+        return service.findCompanyUsageRates(companyId);
+    }
+
+    @PutMapping("/companies/{companyId}/usage-rates")
+    public List<PlatformUsageRateResponse> updateCompanyUsageRates(
+            @PathVariable Long companyId,
+            @RequestBody UpdatePlatformUsageRatesRequest request) {
+        return service.updateCompanyUsageRates(companyId, request);
+    }
+
+    @GetMapping("/usage")
+    public List<PlatformUsageSummaryResponse> findUsageSummary() {
+        return service.findUsageSummary();
     }
 }
