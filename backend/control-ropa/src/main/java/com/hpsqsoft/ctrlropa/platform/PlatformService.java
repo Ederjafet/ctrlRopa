@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.text.Normalizer;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
@@ -20,6 +21,7 @@ import java.util.Locale;
 @Transactional
 public class PlatformService {
 
+    private static final String PLATFORM_COMPANY_CODE = "APPMODA_PLATFORM";
     private static final String TENANT_ADMIN_ROLE = "ADMIN";
 
     private final JdbcTemplate jdbcTemplate;
@@ -39,7 +41,7 @@ public class PlatformService {
 
     @Transactional(readOnly = true)
     public List<PlatformCompanyResponse> findCompanies() {
-        accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_PLATFORM);
+        assertCanViewPlatform();
 
         return jdbcTemplate.query(
                 """
@@ -87,6 +89,13 @@ public class PlatformService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public PlatformCompanyDetailResponse findCompanyDetail(Long companyId) {
+        assertCanViewPlatform();
+        assertCompanyExists(companyId);
+        return findCompanyDetailById(companyId);
+    }
+
     public PlatformCompanyResponse createCompany(CreatePlatformCompanyRequest request) {
         Long userId = currentUser.getUserId();
         accessService.assertCan(userId, PermissionCode.MANAGE_COMPANIES);
@@ -116,17 +125,230 @@ public class PlatformService {
         return findCompany(companyId);
     }
 
-    public PlatformTenantAdminResponse createTenantAdmin(Long companyId, CreateTenantAdminRequest request) {
-        Long userId = currentUser.getUserId();
-        accessService.assertCan(userId, PermissionCode.MANAGE_TENANT_ADMINS);
+    public PlatformCompanyDetailResponse updateCompany(Long companyId, UpdatePlatformCompanyRequest request) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.MANAGE_COMPANIES);
+        assertCustomerCompany(companyId);
 
-        assertActiveCompany(companyId);
-        Long branchId = findPrimaryBranchId(companyId);
-        Long roleId = findRoleId(TENANT_ADMIN_ROLE);
-        String email = cleanRequired(request.getEmail(), "email").toLowerCase(Locale.ROOT);
+        StringBuilder sql = new StringBuilder("UPDATE companies SET ");
+        new UpdateBuilder(sql)
+                .add("name", cleanNullable(request.getName()))
+                .add("status", normalizeCompanyStatus(request.getStatus()))
+                .execute((statement, values) -> jdbcTemplate.update(statement + " WHERE id = ?", append(values, companyId)));
+
+        return findCompanyDetailById(companyId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PlatformBranchResponse> findBranches(Long companyId) {
+        assertCanViewPlatform();
+        assertCompanyExists(companyId);
+
+        return jdbcTemplate.query(
+                """
+                SELECT id, company_id, code, name, status
+                FROM branches
+                WHERE company_id = ?
+                ORDER BY status, name
+                """,
+                (rs, rowNum) -> new PlatformBranchResponse(
+                        rs.getLong("id"),
+                        rs.getLong("company_id"),
+                        rs.getString("code"),
+                        rs.getString("name"),
+                        rs.getString("status")
+                ),
+                companyId
+        );
+    }
+
+    public PlatformBranchResponse createBranch(Long companyId, CreatePlatformBranchRequest request) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.MANAGE_COMPANIES);
+        assertCustomerCompany(companyId);
+
+        String name = cleanRequired(request.getName(), "name");
+        String code = cleanNullable(request.getCode()) == null
+                ? nextBranchCode(companyId, name)
+                : normalizeCode(request.getCode(), 32);
+
+        assertBranchCodeAvailable(companyId, code, null);
+
+        KeyHolder branchKey = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement(
+                    """
+                    INSERT INTO branches (
+                      company_id,
+                      code,
+                      name,
+                      status,
+                      address_line1,
+                      address_line2,
+                      city,
+                      state,
+                      postal_code,
+                      country
+                    ) VALUES (?, ?, ?, 'ACTIVE', 'Pendiente de capturar', NULL, 'Pendiente', 'Pendiente', '00000', 'Mexico')
+                    """,
+                    Statement.RETURN_GENERATED_KEYS
+            );
+            ps.setLong(1, companyId);
+            ps.setString(2, code);
+            ps.setString(3, name);
+            return ps;
+        }, branchKey);
+
+        Long branchId = branchKey.getKey().longValue();
+        enableDefaultSalesChannels(branchId, currentUser.getUserId());
+
+        return findBranch(companyId, branchId);
+    }
+
+    public PlatformBranchResponse updateBranch(Long companyId, Long branchId, UpdatePlatformBranchRequest request) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.MANAGE_COMPANIES);
+        assertCustomerCompany(companyId);
+        assertBranchBelongsToCompany(branchId, companyId);
+
+        String code = cleanNullable(request.getCode()) == null ? null : normalizeCode(request.getCode(), 32);
+        assertBranchCodeAvailable(companyId, code, branchId);
+
+        StringBuilder sql = new StringBuilder("UPDATE branches SET ");
+        new UpdateBuilder(sql)
+                .add("code", code)
+                .add("name", cleanNullable(request.getName()))
+                .add("status", normalizeActiveStatus(request.getStatus()))
+                .execute((statement, values) -> jdbcTemplate.update(statement + " WHERE id = ? AND company_id = ?", append(values, branchId, companyId)));
+
+        return findBranch(companyId, branchId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PlatformCompanyUserResponse> findUsers(Long companyId) {
+        assertCanViewPlatform();
+        assertCompanyExists(companyId);
+
+        return jdbcTemplate.query(
+                """
+                SELECT
+                  u.id,
+                  b.company_id,
+                  u.branch_id,
+                  b.code AS branch_code,
+                  b.name AS branch_name,
+                  u.name,
+                  u.email,
+                  u.phone,
+                  u.status,
+                  GROUP_CONCAT(r.code ORDER BY r.code SEPARATOR ',') AS role_codes
+                FROM users u
+                JOIN branches b ON b.id = u.branch_id
+                LEFT JOIN user_roles ur ON ur.user_id = u.id
+                LEFT JOIN roles r ON r.id = ur.role_id
+                WHERE b.company_id = ?
+                GROUP BY u.id, b.company_id, u.branch_id, b.code, b.name, u.name, u.email, u.phone, u.status
+                ORDER BY u.created_at DESC, u.name
+                """,
+                (rs, rowNum) -> new PlatformCompanyUserResponse(
+                        rs.getLong("id"),
+                        rs.getLong("company_id"),
+                        rs.getLong("branch_id"),
+                        rs.getString("branch_code"),
+                        rs.getString("branch_name"),
+                        rs.getString("name"),
+                        rs.getString("email"),
+                        rs.getString("phone"),
+                        rs.getString("status"),
+                        splitRoles(rs.getString("role_codes"))
+                ),
+                companyId
+        );
+    }
+
+    public PlatformCompanyUserResponse createCompanyUser(Long companyId, CreatePlatformCompanyUserRequest request) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.MANAGE_TENANT_ADMINS);
+        assertCustomerCompany(companyId);
+
+        Long branchId = request.getBranchId() == null ? findPrimaryBranchId(companyId) : request.getBranchId();
+        String roleCode = normalizeAllowedTenantRole(request.getRole());
+        Long userId = createTenantUser(
+                companyId,
+                branchId,
+                cleanRequired(request.getName(), "name"),
+                cleanRequired(request.getEmail(), "email").toLowerCase(Locale.ROOT),
+                cleanNullable(request.getPhone()),
+                cleanRequired(request.getPassword(), "password"),
+                roleCode
+        );
+
+        return findUser(companyId, userId);
+    }
+
+    public PlatformCompanyUserResponse updateCompanyUser(Long companyId, Long userId, UpdatePlatformCompanyUserRequest request) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.MANAGE_TENANT_ADMINS);
+        assertCustomerCompany(companyId);
+        assertUserBelongsToCompany(userId, companyId);
+
+        Long branchId = request.getBranchId();
+        if (branchId != null) {
+            assertBranchBelongsToCompany(branchId, companyId);
+        }
+
+        StringBuilder sql = new StringBuilder("UPDATE users SET ");
+        new UpdateBuilder(sql)
+                .add("branch_id", branchId)
+                .add("name", cleanNullable(request.getName()))
+                .add("phone", cleanNullable(request.getPhone()))
+                .add("status", normalizeActiveStatus(request.getStatus()))
+                .execute((statement, values) -> jdbcTemplate.update(statement + " WHERE id = ?", append(values, userId)));
+
+        if (branchId != null) {
+            replaceUserBranches(userId, branchId);
+            ensureUserCompany(userId, companyId);
+        }
+
+        if (cleanNullable(request.getRole()) != null) {
+            replaceUserRole(userId, normalizeAllowedTenantRole(request.getRole()));
+        }
+
+        return findUser(companyId, userId);
+    }
+
+    public PlatformTenantAdminResponse createTenantAdmin(Long companyId, CreateTenantAdminRequest request) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.MANAGE_TENANT_ADMINS);
+        assertCustomerCompany(companyId);
+
+        Long branchId = request.getBranchId() == null ? findPrimaryBranchId(companyId) : request.getBranchId();
+        Long userId = createTenantUser(
+                companyId,
+                branchId,
+                cleanRequired(request.getName(), "name"),
+                cleanRequired(request.getEmail(), "email").toLowerCase(Locale.ROOT),
+                null,
+                cleanRequired(request.getPassword(), "password"),
+                TENANT_ADMIN_ROLE
+        );
+
+        PlatformCompanyUserResponse created = findUser(companyId, userId);
+        return new PlatformTenantAdminResponse(
+                created.id(),
+                companyId,
+                created.branchId(),
+                created.name(),
+                created.email(),
+                created.status(),
+                TENANT_ADMIN_ROLE
+        );
+    }
+
+    private Long createTenantUser(Long companyId,
+                                  Long branchId,
+                                  String name,
+                                  String email,
+                                  String phone,
+                                  String password,
+                                  String roleCode) {
+        assertBranchBelongsToCompany(branchId, companyId);
         assertEmailAvailable(email);
 
-        String password = cleanRequired(request.getPassword(), "password");
         securitySettingsService.assertPasswordPolicy(password);
         String passwordHash = "{noop}" + password;
 
@@ -143,47 +365,25 @@ public class PlatformService {
                       password_change_required,
                       password_updated_at,
                       status
-                    ) VALUES (?, ?, ?, NULL, ?, 0, CURRENT_TIMESTAMP, 'ACTIVE')
+                    ) VALUES (?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, 'ACTIVE')
                     """,
                     Statement.RETURN_GENERATED_KEYS
             );
             ps.setLong(1, branchId);
-            ps.setString(2, cleanRequired(request.getName(), "name"));
+            ps.setString(2, name);
             ps.setString(3, email);
-            ps.setString(4, passwordHash);
+            ps.setString(4, phone);
+            ps.setString(5, passwordHash);
             return ps;
         }, userKey);
 
-        Long newUserId = userKey.getKey().longValue();
+        Long userId = userKey.getKey().longValue();
+        replaceUserRole(userId, roleCode);
+        ensureUserCompany(userId, companyId);
+        replaceUserBranches(userId, branchId);
+        savePasswordHistory(userId, passwordHash);
 
-        jdbcTemplate.update(
-                "INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)",
-                newUserId,
-                roleId
-        );
-        jdbcTemplate.update(
-                """
-                INSERT INTO user_companies (user_id, company_id, is_primary, status)
-                VALUES (?, ?, 1, 'ACTIVE')
-                """,
-                newUserId,
-                companyId
-        );
-        jdbcTemplate.update(
-                """
-                INSERT INTO user_branches (user_id, branch_id, is_primary)
-                VALUES (?, ?, 1)
-                """,
-                newUserId,
-                branchId
-        );
-        jdbcTemplate.update(
-                "INSERT INTO user_password_history (user_id, password_hash) VALUES (?, ?)",
-                newUserId,
-                passwordHash
-        );
-
-        return findTenantAdmin(newUserId, companyId, branchId);
+        return userId;
     }
 
     private Long createMainBranch(Long companyId, String branchName) {
@@ -279,41 +479,210 @@ public class PlatformService {
         );
     }
 
-    private PlatformTenantAdminResponse findTenantAdmin(Long userId, Long companyId, Long branchId) {
+    private PlatformCompanyDetailResponse findCompanyDetailById(Long companyId) {
         return jdbcTemplate.queryForObject(
                 """
-                SELECT id, name, email, status
-                FROM users
-                WHERE id = ?
+                SELECT
+                  c.id,
+                  c.code,
+                  c.name,
+                  c.status,
+                  (SELECT COUNT(*) FROM branches b WHERE b.company_id = c.id) AS branch_count,
+                  (
+                    SELECT COUNT(*)
+                    FROM users u
+                    JOIN branches b ON b.id = u.branch_id
+                    WHERE b.company_id = c.id
+                  ) AS user_count,
+                  (
+                    SELECT COUNT(*)
+                    FROM users u
+                    JOIN branches b ON b.id = u.branch_id
+                    WHERE b.company_id = c.id
+                      AND u.status = 'ACTIVE'
+                  ) AS active_user_count
+                FROM companies c
+                WHERE c.id = ?
                 """,
-                (rs, rowNum) -> new PlatformTenantAdminResponse(
+                (rs, rowNum) -> new PlatformCompanyDetailResponse(
                         rs.getLong("id"),
-                        companyId,
-                        branchId,
+                        rs.getString("code"),
                         rs.getString("name"),
-                        rs.getString("email"),
                         rs.getString("status"),
-                        TENANT_ADMIN_ROLE
+                        rs.getLong("branch_count"),
+                        rs.getLong("user_count"),
+                        rs.getLong("active_user_count")
                 ),
-                userId
+                companyId
         );
     }
 
-    private void assertActiveCompany(Long companyId) {
+    private PlatformBranchResponse findBranch(Long companyId, Long branchId) {
+        return jdbcTemplate.queryForObject(
+                """
+                SELECT id, company_id, code, name, status
+                FROM branches
+                WHERE id = ?
+                  AND company_id = ?
+                """,
+                (rs, rowNum) -> new PlatformBranchResponse(
+                        rs.getLong("id"),
+                        rs.getLong("company_id"),
+                        rs.getString("code"),
+                        rs.getString("name"),
+                        rs.getString("status")
+                ),
+                branchId,
+                companyId
+        );
+    }
+
+    private PlatformCompanyUserResponse findUser(Long companyId, Long userId) {
+        return jdbcTemplate.queryForObject(
+                """
+                SELECT
+                  u.id,
+                  b.company_id,
+                  u.branch_id,
+                  b.code AS branch_code,
+                  b.name AS branch_name,
+                  u.name,
+                  u.email,
+                  u.phone,
+                  u.status,
+                  GROUP_CONCAT(r.code ORDER BY r.code SEPARATOR ',') AS role_codes
+                FROM users u
+                JOIN branches b ON b.id = u.branch_id
+                LEFT JOIN user_roles ur ON ur.user_id = u.id
+                LEFT JOIN roles r ON r.id = ur.role_id
+                WHERE u.id = ?
+                  AND b.company_id = ?
+                GROUP BY u.id, b.company_id, u.branch_id, b.code, b.name, u.name, u.email, u.phone, u.status
+                """,
+                (rs, rowNum) -> new PlatformCompanyUserResponse(
+                        rs.getLong("id"),
+                        rs.getLong("company_id"),
+                        rs.getLong("branch_id"),
+                        rs.getString("branch_code"),
+                        rs.getString("branch_name"),
+                        rs.getString("name"),
+                        rs.getString("email"),
+                        rs.getString("phone"),
+                        rs.getString("status"),
+                        splitRoles(rs.getString("role_codes"))
+                ),
+                userId,
+                companyId
+        );
+    }
+
+    private void assertCanViewPlatform() {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_PLATFORM);
+    }
+
+    private void assertCompanyExists(Long companyId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM companies WHERE id = ?",
+                Integer.class,
+                companyId
+        );
+
+        if (count == null || count == 0) {
+            throw new IllegalArgumentException("Empresa no encontrada");
+        }
+    }
+
+    private void assertCustomerCompany(Long companyId) {
         Integer count = jdbcTemplate.queryForObject(
                 """
                 SELECT COUNT(*)
                 FROM companies
                 WHERE id = ?
                   AND status = 'ACTIVE'
-                  AND code <> 'APPMODA_PLATFORM'
+                  AND code <> ?
                 """,
                 Integer.class,
-                companyId
+                companyId,
+                PLATFORM_COMPANY_CODE
         );
 
         if (count == null || count == 0) {
             throw new IllegalArgumentException("Empresa cliente activa no encontrada");
+        }
+    }
+
+    private void assertBranchBelongsToCompany(Long branchId, Long companyId) {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM branches
+                WHERE id = ?
+                  AND company_id = ?
+                  AND status = 'ACTIVE'
+                """,
+                Integer.class,
+                branchId,
+                companyId
+        );
+
+        if (count == null || count == 0) {
+            throw new IllegalArgumentException("Sucursal activa no pertenece a la empresa seleccionada");
+        }
+    }
+
+    private void assertUserBelongsToCompany(Long userId, Long companyId) {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM users u
+                JOIN branches b ON b.id = u.branch_id
+                WHERE u.id = ?
+                  AND b.company_id = ?
+                """,
+                Integer.class,
+                userId,
+                companyId
+        );
+
+        if (count == null || count == 0) {
+            throw new IllegalArgumentException("Usuario no pertenece a la empresa seleccionada");
+        }
+    }
+
+    private void assertEmailAvailable(String email) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM users WHERE email = ?",
+                Integer.class,
+                email
+        );
+
+        if (count != null && count > 0) {
+            throw new IllegalArgumentException("Ya existe un usuario con ese email");
+        }
+    }
+
+    private void assertBranchCodeAvailable(Long companyId, String code, Long currentBranchId) {
+        if (code == null) {
+            return;
+        }
+
+        Integer count = currentBranchId == null
+                ? jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM branches WHERE company_id = ? AND code = ?",
+                        Integer.class,
+                        companyId,
+                        code
+                )
+                : jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM branches WHERE company_id = ? AND code = ? AND id <> ?",
+                        Integer.class,
+                        companyId,
+                        code,
+                        currentBranchId
+                );
+
+        if (count != null && count > 0) {
+            throw new IllegalArgumentException("Ya existe una sucursal con ese codigo en la empresa");
         }
     }
 
@@ -351,16 +720,92 @@ public class PlatformService {
         );
     }
 
-    private void assertEmailAvailable(String email) {
-        Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM users WHERE email = ?",
-                Integer.class,
-                email
+    private void replaceUserRole(Long userId, String roleCode) {
+        Long roleId = findRoleId(roleCode);
+        jdbcTemplate.update("DELETE FROM user_roles WHERE user_id = ?", userId);
+        jdbcTemplate.update(
+                "INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)",
+                userId,
+                roleId
         );
+    }
 
-        if (count != null && count > 0) {
-            throw new IllegalArgumentException("Ya existe un usuario con ese email");
+    private void ensureUserCompany(Long userId, Long companyId) {
+        jdbcTemplate.update(
+                "UPDATE user_companies SET is_primary = 0 WHERE user_id = ?",
+                userId
+        );
+        jdbcTemplate.update(
+                """
+                INSERT INTO user_companies (user_id, company_id, is_primary, status)
+                VALUES (?, ?, 1, 'ACTIVE')
+                ON DUPLICATE KEY UPDATE
+                  is_primary = VALUES(is_primary),
+                  status = VALUES(status)
+                """,
+                userId,
+                companyId
+        );
+    }
+
+    private void replaceUserBranches(Long userId, Long branchId) {
+        jdbcTemplate.update("DELETE FROM user_branches WHERE user_id = ?", userId);
+        jdbcTemplate.update(
+                """
+                INSERT INTO user_branches (user_id, branch_id, is_primary)
+                VALUES (?, ?, 1)
+                """,
+                userId,
+                branchId
+        );
+    }
+
+    private void savePasswordHistory(Long userId, String passwordHash) {
+        jdbcTemplate.update(
+                "INSERT INTO user_password_history (user_id, password_hash) VALUES (?, ?)",
+                userId,
+                passwordHash
+        );
+    }
+
+    private String normalizeAllowedTenantRole(String role) {
+        String normalized = cleanRequired(role, "role")
+                .toUpperCase(Locale.ROOT)
+                .replaceAll("[^A-Z0-9_]", "_");
+
+        return switch (normalized) {
+            case "ADMIN", "TENANT_ADMIN", "ADMINISTRADOR" -> "ADMIN";
+            case "SUPERVISOR" -> "SUPERVISOR";
+            case "SELLER", "VENDEDOR" -> "SELLER";
+            case "CASHIER", "CAJERO" -> "CASHIER";
+            default -> throw new IllegalArgumentException("Rol tenant no permitido: " + role);
+        };
+    }
+
+    private String normalizeActiveStatus(String status) {
+        String cleaned = cleanNullable(status);
+        if (cleaned == null) {
+            return null;
         }
+
+        String normalized = cleaned.toUpperCase(Locale.ROOT);
+        if (!"ACTIVE".equals(normalized) && !"INACTIVE".equals(normalized)) {
+            throw new IllegalArgumentException("status debe ser ACTIVE o INACTIVE");
+        }
+        return normalized;
+    }
+
+    private String normalizeCompanyStatus(String status) {
+        String cleaned = cleanNullable(status);
+        if (cleaned == null) {
+            return null;
+        }
+
+        String normalized = cleaned.toUpperCase(Locale.ROOT);
+        if (!"ACTIVE".equals(normalized) && !"INACTIVE".equals(normalized) && !"SUSPENDED".equals(normalized)) {
+            throw new IllegalArgumentException("status debe ser ACTIVE, INACTIVE o SUSPENDED");
+        }
+        return normalized;
     }
 
     private String nextCompanyCode(String name) {
@@ -449,8 +894,75 @@ public class PlatformService {
         return value.trim();
     }
 
+    private String cleanNullable(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        String cleaned = value.trim();
+        return cleaned.isBlank() ? null : cleaned;
+    }
+
+    private List<String> splitRoles(String roles) {
+        if (roles == null || roles.isBlank()) {
+            return List.of();
+        }
+
+        return Arrays.stream(roles.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .toList();
+    }
+
+    private Object[] append(List<Object> values, Object... suffix) {
+        Object[] params = new Object[values.size() + suffix.length];
+        for (int i = 0; i < values.size(); i++) {
+            params[i] = values.get(i);
+        }
+        System.arraycopy(suffix, 0, params, values.size(), suffix.length);
+        return params;
+    }
+
     @FunctionalInterface
     private interface CodeExists {
         boolean test(String value);
+    }
+
+    @FunctionalInterface
+    private interface UpdateExecutor {
+        void execute(String statement, List<Object> values);
+    }
+
+    private static class UpdateBuilder {
+        private final StringBuilder sql;
+        private final List<Object> values = new java.util.ArrayList<>();
+        private boolean hasField = false;
+
+        UpdateBuilder(StringBuilder sql) {
+            this.sql = sql;
+        }
+
+        UpdateBuilder add(String column, Object value) {
+            if (value == null) {
+                return this;
+            }
+
+            if (hasField) {
+                sql.append(", ");
+            }
+
+            sql.append(column).append(" = ?");
+            values.add(value);
+            hasField = true;
+            return this;
+        }
+
+        void execute(UpdateExecutor executor) {
+            if (!hasField) {
+                return;
+            }
+
+            executor.execute(sql.toString(), values);
+        }
     }
 }

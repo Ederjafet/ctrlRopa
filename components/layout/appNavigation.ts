@@ -6,6 +6,7 @@ import {
   hasAnyPermission,
   isAdmin,
   isNoAccess,
+  isPlatformOwner,
 } from '@/services/accessControl';
 import { canViewLive } from '@/services/livePermissionGuards';
 import { UserSession } from '@/services/sessionStorage';
@@ -40,13 +41,31 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
   const adminAllowed = isAdmin(session);
   const platformAllowed = canAccessPlatform(session);
 
+  if (platformAllowed && isPlatformOwner(session)) {
+    return [
+      {
+        title: 'PLATAFORMA',
+        items: [
+          {
+            key: 'platform',
+            label: 'Panel Plataforma',
+            helper: 'Clientes / Compañías',
+            route: '/platform',
+            activeFor: ['platform', '/platform'],
+            icon: 'business' as const,
+          },
+        ],
+      },
+    ];
+  }
+
   const homeItems = [
     { key: 'home', label: 'Resumen operativo', labelKey: 'navigation.items.homeSummary', route: '/', activeFor: ['home', '/'], icon: 'space-dashboard' as const },
   ];
 
   const platformItems = [
     platformAllowed
-      ? { key: 'platform', label: 'Plataforma', route: '/platform', activeFor: ['platform', '/platform'], icon: 'business' as const }
+      ? { key: 'platform', label: 'Panel Plataforma', helper: 'Clientes / Compañías', route: '/platform', activeFor: ['platform', '/platform'], icon: 'business' as const }
       : null,
   ].filter(Boolean);
 
@@ -190,6 +209,10 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
 }
 
 export function getSessionScopeLabel(session: UserSession | null) {
+  if (canAccessPlatform(session) && isPlatformOwner(session)) {
+    return 'Modo Plataforma AppModa';
+  }
+
   const company = session?.companyName || session?.companyCode || 'Empresa no disponible';
   const branch = session?.branchName || 'Sucursal no disponible';
   return `${company} · ${branch}`;

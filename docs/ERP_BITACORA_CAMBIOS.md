@@ -3675,3 +3675,17 @@ Resultado:
 - Se agrega rol `PLATFORM_OWNER` y permisos `VIEW_PLATFORM`, `MANAGE_COMPANIES`, `MANAGE_TENANT_ADMINS`.
 - Se agregan endpoints `/api/platform/companies` y `/api/platform/companies/{companyId}/admin-user`.
 - Se agrega pantalla `/platform` y menu `Plataforma` solo para permisos de plataforma.
+
+## 2026-06-19 - FAST-PLATFORM-B aislamiento tenant y administracion multiempresa
+
+Tipo: hardening backend multiempresa, plataforma MVP ampliada, UX de alcance tenant.
+
+Resultado:
+
+- `/api/users` queda filtrado por empresa activa y bloquea detalle, edicion, desactivacion, roles/permisos y creacion cross-company.
+- `/api/branches` normal queda limitado a sucursales de la empresa activa.
+- `/api/platform/**` se amplia con detalle de compania, sucursales por compania y usuarios por compania.
+- `/platform` permite seleccionar compania cliente, crear sucursales y crear usuarios/admins dentro de esa compania.
+- El menu separa `PLATAFORMA` de operacion normal para `PLATFORM_OWNER`.
+- `/users` muestra contexto de empresa/sucursal y alcance tenant.
+- Se agregan pruebas de regresion para aislamiento de usuarios y permisos de Plataforma.

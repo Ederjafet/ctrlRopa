@@ -4,9 +4,12 @@ import com.hpsqsoft.ctrlropa.security.access.AccessService;
 import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
 import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
 import com.hpsqsoft.ctrlropa.security.settings.SecuritySettingsService;
+import com.hpsqsoft.ctrlropa.tenant.CurrentTenantContext;
+import com.hpsqsoft.ctrlropa.tenant.TenantResolver;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,20 +29,24 @@ public class UserAdminService {
     private final AccessService accessService;
     private final CurrentUser currentUser;
     private final SecuritySettingsService securitySettingsService;
+    private final TenantResolver tenantResolver;
 
     public UserAdminService(JdbcTemplate jdbcTemplate,
                             AccessService accessService,
                             CurrentUser currentUser,
-                            SecuritySettingsService securitySettingsService) {
+                            SecuritySettingsService securitySettingsService,
+                            TenantResolver tenantResolver) {
         this.jdbcTemplate = jdbcTemplate;
         this.accessService = accessService;
         this.currentUser = currentUser;
         this.securitySettingsService = securitySettingsService;
+        this.tenantResolver = tenantResolver;
     }
 
     @Transactional(readOnly = true)
     public List<UserAdminResponse> findAll(String search) {
         assertCanManageUsers();
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
 
         String normalizedSearch = search == null ? null : search.trim();
 
@@ -50,9 +57,12 @@ public class UserAdminService {
                     """
                     SELECT u.id
                     FROM users u
+                    JOIN branches b ON b.id = u.branch_id
+                    WHERE b.company_id = ?
                     ORDER BY u.created_at DESC
                     """,
-                    (rs, rowNum) -> rs.getLong("id")
+                    (rs, rowNum) -> rs.getLong("id"),
+                    tenant.getCompanyId()
             );
         } else {
             String like = "%" + normalizedSearch + "%";
@@ -60,12 +70,17 @@ public class UserAdminService {
                     """
                     SELECT u.id
                     FROM users u
-                    WHERE u.name LIKE ?
-                       OR u.email LIKE ?
-                       OR u.phone LIKE ?
+                    JOIN branches b ON b.id = u.branch_id
+                    WHERE b.company_id = ?
+                      AND (
+                        u.name LIKE ?
+                        OR u.email LIKE ?
+                        OR u.phone LIKE ?
+                      )
                     ORDER BY u.created_at DESC
                     """,
                     (rs, rowNum) -> rs.getLong("id"),
+                    tenant.getCompanyId(),
                     like,
                     like,
                     like
@@ -80,15 +95,18 @@ public class UserAdminService {
     @Transactional(readOnly = true)
     public UserAdminResponse findById(Long id) {
         assertCanManageUsers();
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        assertUserBelongsToCompany(id, tenant.getCompanyId());
         return findResponseById(id);
     }
 
     public UserAdminResponse create(CreateUserRequest request) {
         assertCanManageUsers();
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
 
         validateStatus(request.getStatus());
-        assertBranchExists(request.getBranchId());
-        assertIdsExist("branches", request.getBranchIds());
+        assertBranchBelongsToCompany(request.getBranchId(), tenant.getCompanyId());
+        assertBranchesBelongToCompany(request.getBranchIds(), tenant.getCompanyId());
         assertEmailAvailable(request.getEmail(), null);
         assertIdsExist("roles", request.getRoleIds());
         assertAssignableRoles(request.getRoleIds());
@@ -124,6 +142,7 @@ public class UserAdminService {
         savePasswordHistory(userId, passwordHash);
 
         replaceBranches(userId, request.getBranchId(), request.getBranchIds());
+        ensureUserCompany(userId, tenant.getCompanyId(), true);
         replaceRoles(userId, request.getRoleIds());
         replacePermissions(userId, request.getPermissionIds());
 
@@ -133,12 +152,14 @@ public class UserAdminService {
     public UserAdminResponse update(Long id, UpdateUserRequest request) {
         assertCanManageUsers();
         assertUserExists(id);
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        assertUserBelongsToCompany(id, tenant.getCompanyId());
 
         if (request.getBranchId() != null) {
-            assertBranchExists(request.getBranchId());
+            assertBranchBelongsToCompany(request.getBranchId(), tenant.getCompanyId());
         }
 
-        assertIdsExist("branches", request.getBranchIds());
+        assertBranchesBelongToCompany(request.getBranchIds(), tenant.getCompanyId());
 
         if (request.getEmail() != null) {
             assertEmailAvailable(request.getEmail(), id);
@@ -226,8 +247,10 @@ public class UserAdminService {
         if (request.hasBranchIds()) {
             Long primaryBranchId = request.getBranchId() != null ? request.getBranchId() : findPrimaryBranchId(id);
             replaceBranches(id, primaryBranchId, request.getBranchIds());
+            ensureUserCompany(id, tenant.getCompanyId(), true);
         } else if (request.getBranchId() != null) {
             ensureAssignedBranch(id, request.getBranchId(), true);
+            ensureUserCompany(id, tenant.getCompanyId(), true);
         }
 
         if (request.getPermissionIds() != null) {
@@ -240,6 +263,8 @@ public class UserAdminService {
     public UserAdminResponse deactivate(Long id) {
         assertCanManageUsers();
         assertUserExists(id);
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        assertUserBelongsToCompany(id, tenant.getCompanyId());
 
         jdbcTemplate.update(
                 """
@@ -256,6 +281,8 @@ public class UserAdminService {
     public UserAdminResponse updateRoles(Long userId, UpdateUserRolesRequest request) {
         assertCanManageRoles();
         assertUserExists(userId);
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        assertUserBelongsToCompany(userId, tenant.getCompanyId());
         assertIdsExist("roles", request.getRoleIds());
         assertAssignableRoles(request.getRoleIds());
 
@@ -267,6 +294,8 @@ public class UserAdminService {
     public UserAdminResponse updatePermissions(Long userId, UpdateUserPermissionsRequest request) {
         assertCanManageRoles();
         assertUserExists(userId);
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        assertUserBelongsToCompany(userId, tenant.getCompanyId());
         assertIdsExist("permissions", request.getPermissionIds());
 
         replacePermissions(userId, request.getPermissionIds());
@@ -668,6 +697,28 @@ public class UserAdminService {
         );
     }
 
+    private void ensureUserCompany(Long userId, Long companyId, boolean primary) {
+        if (primary) {
+            jdbcTemplate.update(
+                    "UPDATE user_companies SET is_primary = 0 WHERE user_id = ?",
+                    userId
+            );
+        }
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO user_companies (user_id, company_id, is_primary, status)
+                VALUES (?, ?, ?, 'ACTIVE')
+                ON DUPLICATE KEY UPDATE
+                  is_primary = VALUES(is_primary),
+                  status = VALUES(status)
+                """,
+                userId,
+                companyId,
+                primary ? 1 : 0
+        );
+    }
+
     private Long findPrimaryBranchId(Long userId) {
         return jdbcTemplate.queryForObject(
                 "SELECT branch_id FROM users WHERE id = ?",
@@ -712,15 +763,51 @@ public class UserAdminService {
         }
     }
 
-    private void assertBranchExists(Long branchId) {
+    private void assertBranchBelongsToCompany(Long branchId, Long companyId) {
+        if (branchId == null) {
+            throw new IllegalArgumentException("Sucursal obligatoria");
+        }
+
         Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM branches WHERE id = ?",
+                """
+                SELECT COUNT(*)
+                FROM branches
+                WHERE id = ?
+                  AND company_id = ?
+                  AND status = 'ACTIVE'
+                """,
                 Integer.class,
-                branchId
+                branchId,
+                companyId
         );
 
         if (count == null || count == 0) {
-            throw new IllegalArgumentException("Sucursal no encontrada con id: " + branchId);
+            throw new AccessDeniedException("La sucursal no pertenece a la empresa activa");
+        }
+    }
+
+    private void assertBranchesBelongToCompany(List<Long> branchIds, Long companyId) {
+        for (Long branchId : normalizeIds(branchIds)) {
+            assertBranchBelongsToCompany(branchId, companyId);
+        }
+    }
+
+    private void assertUserBelongsToCompany(Long userId, Long companyId) {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM users u
+                JOIN branches b ON b.id = u.branch_id
+                WHERE u.id = ?
+                  AND b.company_id = ?
+                """,
+                Integer.class,
+                userId,
+                companyId
+        );
+
+        if (count == null || count == 0) {
+            throw new AccessDeniedException("El usuario no pertenece a la empresa activa");
         }
     }
 

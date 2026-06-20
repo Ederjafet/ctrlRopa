@@ -169,6 +169,20 @@ export default function UsersScreen() {
         Administra usuarios del sistema. No se eliminan registros: se activan o desactivan.
       </AppText>
 
+      <AppCard style={styles.scopeCard}>
+        <View style={styles.scopeHeader}>
+          <StatusBadge label="ALCANCE TENANT" tone="info" />
+          <AppText bold>{session?.companyName || 'Empresa actual'}</AppText>
+        </View>
+        <AppText variant="caption" style={styles.metaCompact}>
+          Sucursal actual: {session?.branchName || 'Sucursal no disponible'}
+        </AppText>
+        <AppText variant="caption" style={styles.metaCompact}>
+          Este listado solo puede devolver usuarios de la empresa activa. La API bloquea consultas y cambios
+          cross-company.
+        </AppText>
+      </AppCard>
+
       <View style={styles.search}>
         <AppInput
           placeholder="Buscar por nombre, correo, sucursal o rol"
@@ -276,5 +290,14 @@ const styles = StyleSheet.create({
   },
   search: {
     marginTop: 12,
+  },
+  scopeCard: {
+    marginTop: 12,
+  },
+  scopeHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
 });
