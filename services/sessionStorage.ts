@@ -69,6 +69,7 @@ export async function clearSession() {
       'user',
       'current_user',
       'appmoda.platform.selectedCompanyId',
+      'appmoda.owner.sidebarScrollY',
     ].includes(key) || key.startsWith('selected_live_')
   );
 

@@ -24,6 +24,7 @@ type Props = {
   navSections: SidebarSection[];
   rightContent?: ReactNode;
   sidebarContext?: ReactNode;
+  sidebarScrollStorageKey?: string;
   compactHeader?: boolean;
   children: ReactNode;
 };
@@ -41,6 +42,7 @@ export default function AppShell({
   navSections,
   rightContent,
   sidebarContext,
+  sidebarScrollStorageKey,
   compactHeader,
   children,
 }: Props) {
@@ -77,6 +79,7 @@ export default function AppShell({
       onNavigate={navigate}
       session={session}
       contextContent={sidebarContext}
+      scrollStorageKey={sidebarScrollStorageKey}
       onClose={mobile ? () => setMenuOpen(false) : undefined}
       onSignOut={handleSignOut}
     />

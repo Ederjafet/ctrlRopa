@@ -15,6 +15,7 @@ type Props = {
   session?: UserSession | null;
   rightContent?: ReactNode;
   sidebarContext?: ReactNode;
+  sidebarScrollStorageKey?: string;
   compactHeader?: boolean;
   children: ReactNode;
 };
@@ -31,6 +32,7 @@ export default function AppShellPage({
   session: providedSession,
   rightContent,
   sidebarContext,
+  sidebarScrollStorageKey,
   compactHeader,
   children,
 }: Props) {
@@ -68,6 +70,7 @@ export default function AppShellPage({
       navSections={navSections}
       rightContent={rightContent}
       sidebarContext={sidebarContext}
+      sidebarScrollStorageKey={sidebarScrollStorageKey}
       compactHeader={compactHeader}
     >
       {children}

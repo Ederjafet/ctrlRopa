@@ -165,6 +165,7 @@ const EMPTY_SUBSCRIPTION_FORM = {
 };
 
 const PLATFORM_SELECTED_COMPANY_ID_KEY = 'appmoda.platform.selectedCompanyId';
+const OWNER_SIDEBAR_SCROLL_KEY = 'appmoda.owner.sidebarScrollY';
 
 function normalizeSection(value: unknown): PlatformSection {
   const raw = Array.isArray(value) ? value[0] : value;
@@ -1690,6 +1691,7 @@ export default function PlatformScreen() {
         metadata="Administra clientes, sucursales, usuarios, modulos, limites, suscripciones y consumo. No opera ventas, inventario, pagos ni LIVE mezclando clientes."
         activeRoute={`platform-${activeSection}`}
         session={session}
+        sidebarScrollStorageKey={OWNER_SIDEBAR_SCROLL_KEY}
         compactHeader
       >
         <ActivityIndicator />
@@ -1707,6 +1709,7 @@ export default function PlatformScreen() {
       session={session}
       compactHeader
       sidebarContext={renderOwnerCompanyContext()}
+      sidebarScrollStorageKey={OWNER_SIDEBAR_SCROLL_KEY}
     >
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {message ? (

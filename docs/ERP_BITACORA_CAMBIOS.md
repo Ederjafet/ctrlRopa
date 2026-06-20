@@ -1,5 +1,29 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-20 - FAST-OWNER-UX-J sidebar persistente Owner
+
+Tipo: frontend, UX SaaS Owner, navegacion, documentacion.
+
+Objetivo:
+
+- Evitar que el menu lateral del Panel Owner regrese arriba al seleccionar secciones inferiores como `Tarifas por consumo`, `Uso del cliente` o `Auditoria global`.
+
+Cambios realizados:
+
+- `Sidebar` acepta una llave opcional `scrollStorageKey` para persistir el offset del `ScrollView`.
+- El scroll se guarda al terminar desplazamiento y antes de navegar.
+- El Panel Owner usa `appmoda.owner.sidebarScrollY` mediante `sidebarScrollStorageKey`.
+- `AppShell` y `AppShellPage` transportan la llave sin cambiar el menu tenant.
+- `clearSession()` limpia tambien `appmoda.owner.sidebarScrollY`.
+- Se documenta la fase en `docs/FAST_OWNER_UX_J_SIDEBAR_PERSISTENTE.md`.
+
+Restricciones respetadas:
+
+- No se toco backend.
+- No se hizo merge a `main`.
+- No se agrego `Actualizar` fuera de LIVE.
+- No se cambio la logica de `selectedCompanyId`.
+
 ## 2026-06-20 - FAST-OWNER-UX-I plataforma global vs cliente en administracion
 
 Tipo: frontend, UX SaaS Owner, navegacion, documentacion.

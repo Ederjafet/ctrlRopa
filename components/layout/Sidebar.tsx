@@ -4,8 +4,9 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { UserSession } from '@/services/sessionStorage';
 import { designTokens } from '@/theme/designTokens';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
-import { ReactNode } from 'react';
+import { ReactNode, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
@@ -21,6 +22,7 @@ type Props = {
   onNavigate?: (item: SidebarNavItemConfig) => void;
   session?: UserSession | null;
   contextContent?: ReactNode;
+  scrollStorageKey?: string;
   onClose?: () => void;
   onSignOut?: () => void;
 };
@@ -31,6 +33,7 @@ export default function Sidebar({
   onNavigate,
   session,
   contextContent,
+  scrollStorageKey,
   onClose,
   onSignOut,
 }: Props) {
@@ -39,6 +42,51 @@ export default function Sidebar({
   const roleLabel = session?.roles?.map((role) => role.code).join(', ') || t('navigation.noRole');
   const nextThemeLabel = theme.isDark ? t('theme.light') : t('theme.dark');
   const normalizedActiveRoute = activeRoute?.replace(/^\//, '');
+  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollYRef = useRef(0);
+  const pendingRestoreYRef = useRef<number | null>(null);
+
+  const restoreSidebarScroll = useCallback((nextY: number) => {
+    const safeY = Math.max(0, Math.round(nextY));
+    scrollYRef.current = safeY;
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: safeY, animated: false });
+    }, 0);
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: safeY, animated: false });
+    }, 80);
+  }, []);
+
+  const persistSidebarScroll = useCallback(() => {
+    if (!scrollStorageKey) return;
+
+    const safeY = Math.max(0, Math.round(scrollYRef.current));
+    void AsyncStorage.setItem(scrollStorageKey, String(safeY));
+  }, [scrollStorageKey]);
+
+  useEffect(() => {
+    if (!scrollStorageKey) return undefined;
+
+    let mounted = true;
+    pendingRestoreYRef.current = null;
+
+    AsyncStorage.getItem(scrollStorageKey).then((value) => {
+      if (!mounted) return;
+
+      const savedY = Number(value ?? 0);
+      if (!Number.isFinite(savedY) || savedY <= 0) return;
+
+      pendingRestoreYRef.current = savedY;
+      restoreSidebarScroll(savedY);
+    });
+
+    return () => {
+      mounted = false;
+      const safeY = Math.max(0, Math.round(scrollYRef.current));
+      void AsyncStorage.setItem(scrollStorageKey, String(safeY));
+    };
+  }, [restoreSidebarScroll, scrollStorageKey]);
+
   const isActiveItem = (item: SidebarNavItemConfig) => {
     const normalizedItemRoute = item.route?.replace(/^\//, '');
     const aliases = item.activeFor ?? [];
@@ -51,6 +99,10 @@ export default function Sidebar({
       aliases.some((alias) => alias === activeRoute || alias.replace(/^\//, '') === normalizedActiveRoute)
     );
   };
+  const handleNavigate = useCallback((item: SidebarNavItemConfig) => {
+    persistSidebarScroll();
+    onNavigate?.(item);
+  }, [onNavigate, persistSidebarScroll]);
 
   return (
     <View
@@ -112,9 +164,22 @@ export default function Sidebar({
         ) : null}
       </View>
       <ScrollView
+        ref={scrollRef}
         style={styles.navArea}
         contentContainerStyle={styles.navContent}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={80}
+        onScroll={(event) => {
+          scrollYRef.current = event.nativeEvent.contentOffset.y;
+        }}
+        onContentSizeChange={() => {
+          if (pendingRestoreYRef.current === null) return;
+
+          restoreSidebarScroll(pendingRestoreYRef.current);
+          pendingRestoreYRef.current = null;
+        }}
+        onMomentumScrollEnd={persistSidebarScroll}
+        onScrollEndDrag={persistSidebarScroll}
       >
         {sections.map((section, index) => (
           <View key={`${section.title ?? 'section'}-${index}`}>
@@ -134,7 +199,7 @@ export default function Sidebar({
                   key={item.key}
                   item={item}
                   active={isActiveItem(item)}
-                  onPress={onNavigate}
+                  onPress={handleNavigate}
                 />
               ))}
             </View>
