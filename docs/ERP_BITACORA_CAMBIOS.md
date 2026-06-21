@@ -1,5 +1,28 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-21 - PERM-UX-B bandera global de diagnostico tecnico
+
+Tipo: frontend, permisos, UX, documentacion.
+
+Objetivo:
+
+- Controlar globalmente la visibilidad del diagnostico tecnico de permisos sin retirar el resumen de capacidades de negocio.
+
+Cambios realizados:
+
+- Se agrega `constants/permissionDiagnostics.ts`.
+- Se agrega la bandera `EXPO_PUBLIC_ENABLE_PERMISSION_DIAGNOSTICS`.
+- `canViewScreenPermissionDiagnostics()` ahora requiere que la bandera este activa.
+- En `NODE_ENV=production`, el diagnostico queda apagado por defecto si no hay override.
+- Los hints y mensajes de permisos faltantes siguen funcionando siempre.
+- Se documenta la fase en `docs/PERM_UX_B_PERMISSION_DIAGNOSTICS_FLAG.md`.
+
+Restricciones respetadas:
+
+- No se toco backend.
+- No se hizo merge a `main`.
+- No se cambio la proteccion de pagos.
+
 ## 2026-06-21 - PAYMENTS-PERM-UX-A cabecera y diagnostico de permisos en pagos
 
 Tipo: frontend, UX financiera, permisos, documentacion.

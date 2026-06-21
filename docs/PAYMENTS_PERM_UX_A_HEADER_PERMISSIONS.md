@@ -75,6 +75,10 @@ La UI ahora refleja esos permisos de forma mas clara, pero no sustituye la prote
 - Evaluar tooltip nativo en web si se quiere hover real; esta fase usa hint visible/alerta de `AppButton`.
 - Integrar diagnostico con catalogo de permisos por rol cuando exista una vista QA mas formal.
 
+## Control global del diagnostico tecnico
+
+PERM-UX-B agrega `EXPO_PUBLIC_ENABLE_PERMISSION_DIAGNOSTICS` como bandera centralizada para mostrar u ocultar el panel tecnico expandible. El resumen de capacidades y los mensajes de acciones bloqueadas siguen funcionando aunque la bandera este apagada.
+
 ## Validaciones esperadas
 
 - `/payments` no muestra dos cabeceras con `Pagos`.

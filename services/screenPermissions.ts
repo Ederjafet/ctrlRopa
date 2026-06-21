@@ -1,3 +1,4 @@
+import { isPermissionDiagnosticsEnabled } from '@/constants/permissionDiagnostics';
 import {
   hasPermission,
   hasRole,
@@ -137,6 +138,8 @@ export function getMissingPermissionMessage(
 }
 
 export function canViewScreenPermissionDiagnostics(session: UserSession | null) {
+  if (!isPermissionDiagnosticsEnabled()) return false;
+
   return (
     isPlatformOwner(session) ||
     isAdmin(session) ||
