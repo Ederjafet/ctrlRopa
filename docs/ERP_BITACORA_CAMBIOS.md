@@ -1,5 +1,29 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-21 - RC-CLIENTE-A validacion integral instalacion cliente
+
+Tipo: release candidate, QA, permisos, backend, frontend, documentacion.
+
+Objetivo:
+
+- Validar AppModa como release candidate para instalacion cliente, congelando nuevas funcionalidades y corrigiendo solo errores P0/P1.
+
+Cambios realizados:
+
+- Se ejecuto reset local de base con backup previo.
+- Se valido Flyway con 62 migraciones.
+- Se valido Platform Owner por API creando `Cliente Instalacion QA`, sucursal y admin cliente.
+- Se valido aislamiento tenant del admin QA contra endpoints Platform.
+- Se detecto que usuarios/roles con permisos financieros podian no tener `VIEW_PAYMENTS`.
+- Se agrega `V62__rc_cliente_a_payment_view_backfill.sql` para asignar `VIEW_PAYMENTS` a quienes ya tienen `REGISTER_PAYMENTS`, `APPLY_CUSTOMER_BALANCE` o `VOID_PAYMENT`.
+- Se documenta la fase en `docs/RC_CLIENTE_A_VALIDACION_INSTALACION.md`.
+
+Restricciones respetadas:
+
+- No se agregaron funcionalidades nuevas.
+- No se hizo merge a `main`.
+- No se implemento facturacion real, impersonacion ni union de paquetes.
+
 ## 2026-06-21 - PERM-UX-D patron final de permisos en cabecera
 
 Tipo: frontend, permisos, UX, pagos, documentacion.
