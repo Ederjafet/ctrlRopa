@@ -25,6 +25,10 @@ public final class PermissionCode {
     public static final String MANAGE_COMPANY_SUBSCRIPTIONS = "MANAGE_COMPANY_SUBSCRIPTIONS";
     public static final String MANAGE_USAGE_RATES = "MANAGE_USAGE_RATES";
     public static final String VIEW_PLATFORM_USAGE = "VIEW_PLATFORM_USAGE";
+    public static final String VIEW_PLATFORM_LICENSES = "VIEW_PLATFORM_LICENSES";
+    public static final String MANAGE_PLATFORM_LICENSES = "MANAGE_PLATFORM_LICENSES";
+    public static final String VIEW_PLATFORM_SERVICE_AGREEMENTS = "VIEW_PLATFORM_SERVICE_AGREEMENTS";
+    public static final String MANAGE_PLATFORM_SERVICE_AGREEMENTS = "MANAGE_PLATFORM_SERVICE_AGREEMENTS";
     public static final String MANAGE_COMPANY_MODULES = "MANAGE_COMPANY_MODULES";
     public static final String MANAGE_COMPANY_LIMITS = "MANAGE_COMPANY_LIMITS";
 

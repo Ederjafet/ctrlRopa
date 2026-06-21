@@ -10,6 +10,12 @@ public record PlatformUsageSummaryResponse(
         Integer activeUsers,
         Integer activeModules,
         Integer maxUsers,
-        Integer maxBranches
+        Integer maxBranches,
+        String licenseType,
+        String licenseStatus,
+        Boolean unlimitedCommercialUse,
+        String deploymentType,
+        String serviceAgreementStatus,
+        String serviceAgreementEndDate
 ) {
 }

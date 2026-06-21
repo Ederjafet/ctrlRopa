@@ -21,6 +21,12 @@ public record PlatformDashboardSummaryResponse(
             Integer activeBranches,
             Integer activePlans,
             Integer companiesWithUsageToday,
+            Integer companiesWithPerpetualLicense,
+            Integer appModaHostedCompanies,
+            Integer clientHostedCompanies,
+            Integer annualServicesPastDue,
+            Integer annualServicesExpiringSoon,
+            BigDecimal oneTimeLicenseAmount,
             BigDecimal estimatedMonthlyRevenue
     ) {
     }
@@ -52,6 +58,9 @@ public record PlatformDashboardSummaryResponse(
             String status,
             String planName,
             String billingModel,
+            String licenseType,
+            String deploymentType,
+            String serviceAgreementStatus,
             Integer activeUsers,
             Integer maxUsers,
             Integer activeBranches,

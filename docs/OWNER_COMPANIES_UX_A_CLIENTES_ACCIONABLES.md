@@ -158,3 +158,17 @@ Validaciones visuales recomendadas:
 - OWNER-COMPANIES-UX-B: panel lateral de detalle por cliente.
 - OWNER-COMPANIES-UX-C: ultima actividad real y timeline de configuracion.
 - FAST-BILLING-A: facturacion real SaaS y estados comerciales.
+
+## Nota OWNER-LICENSE-B
+
+`Clientes / Companias` ahora consume los datos comerciales de licencia/hosting expuestos por `usageSummary`.
+
+Para clientes con licencia perpetua activa:
+
+- la salud puede mostrarse como `Licencia perpetua`;
+- el plan/modelo se muestra como pago unico;
+- usuarios y sucursales se muestran como `sin limite` cuando la licencia tiene `unlimitedCommercialUse`;
+- se muestra hospedaje `Cliente hospedado`, `AppModa hospedado`, `Mixto` u `Otro`;
+- el servicio anual se muestra como `No aplica`, `Activo`, `Vencido`, `Suspendido` o `Cancelado`.
+
+Un cliente perpetuo activo no se clasifica como `sin plan`.

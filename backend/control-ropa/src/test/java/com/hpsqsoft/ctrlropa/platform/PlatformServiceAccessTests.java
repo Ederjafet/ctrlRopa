@@ -148,6 +148,29 @@ class PlatformServiceAccessTests {
     }
 
     @Test
+    void findCommercialAgreementRequiresLicensePermission() {
+        when(currentUser.getUserId()).thenReturn(10L);
+        doThrow(new AccessDeniedException("missing"))
+                .when(accessService)
+                .assertCan(10L, PermissionCode.VIEW_PLATFORM_LICENSES);
+
+        assertThrows(AccessDeniedException.class, () -> service.findCommercialAgreement(2L));
+    }
+
+    @Test
+    void updateCommercialAgreementRequiresManageLicensePermission() {
+        when(currentUser.getUserId()).thenReturn(10L);
+        doThrow(new AccessDeniedException("missing"))
+                .when(accessService)
+                .assertCan(10L, PermissionCode.MANAGE_PLATFORM_LICENSES);
+
+        assertThrows(
+                AccessDeniedException.class,
+                () -> service.updateCommercialAgreement(2L, new UpdatePlatformCommercialAgreementRequest())
+        );
+    }
+
+    @Test
     void createBranchRequiresManageCompanies() {
         when(currentUser.getUserId()).thenReturn(10L);
         doThrow(new AccessDeniedException("missing"))

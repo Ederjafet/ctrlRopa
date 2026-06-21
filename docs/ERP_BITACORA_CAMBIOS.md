@@ -1,5 +1,32 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-21 - OWNER-LICENSE-B licencia perpetua y hosting anual
+
+Tipo: platform owner, licencias comerciales, hosting anual, backend, frontend, migracion, documentacion.
+
+Objetivo:
+
+- Separar licencia perpetua de servicio anual de infraestructura/hosting para clientes AppModa.
+
+Cambios realizados:
+
+- Se agregan tablas `company_licenses` y `company_service_agreements` con migracion `V63__owner_license_service_agreements.sql`.
+- Se agregan permisos `VIEW_PLATFORM_LICENSES`, `MANAGE_PLATFORM_LICENSES`, `VIEW_PLATFORM_SERVICE_AGREEMENTS` y `MANAGE_PLATFORM_SERVICE_AGREEMENTS`.
+- Se agrega endpoint combinado `GET/PUT /api/platform/companies/{companyId}/commercial-agreement`.
+- `Planes / Suscripciones` evoluciona a `Planes / Licencias` e incorpora bloques de licencia perpetua e infraestructura/servicio anual.
+- Dashboard SaaS refleja licencias perpetuas, cobros unicos y hosting AppModa sin sumarlos al ingreso mensual recurrente.
+- Clientes / Companias muestra licencia perpetua, pago unico, hospedaje y servicio anual, sin marcar como `sin plan` a clientes perpetuos activos.
+- Auditoria global clasifica el guardado comercial como `COMPANY_COMMERCIAL_AGREEMENT_UPDATED`.
+- Se documenta la fase en `docs/OWNER_LICENSE_B_PERPETUA_HOSTING_ANUAL.md`.
+
+Restricciones respetadas:
+
+- No se reseteo base de datos.
+- No se hardcodeo Marla Boutique.
+- No se implemento pasarela, factura fiscal ni recibo.
+- No se mezclaron cobros SaaS con pagos operativos.
+- No se hizo merge a `main`.
+
 ## 2026-06-21 - OWNER-AUDIT-UX-A auditoria global accionable
 
 Tipo: platform owner, auditoria SaaS, backend read-only, frontend, UX, documentacion.

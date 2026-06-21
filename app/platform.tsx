@@ -21,6 +21,7 @@ import {
   getPlatformCompanyDetail,
   getPlatformCompanySettings,
   getPlatformCompanySubscription,
+  getPlatformCommercialAgreement,
   getPlatformAuditEvents,
   getPlatformDashboardSummary,
   getPlatformPlanPrices,
@@ -33,6 +34,7 @@ import {
   PlatformCompanyDetail,
   PlatformCompanySettings,
   PlatformCompanySubscription,
+  PlatformCommercialAgreement,
   PlatformCompanyUser,
   PlatformAuditEvent,
   PlatformAuditEventsResponse,
@@ -43,6 +45,7 @@ import {
   PlatformUsageSummary,
   updatePlatformCompanySettings,
   updatePlatformCompanySubscription,
+  updatePlatformCommercialAgreement,
   updatePlatformPlanPrices,
   updatePlatformUsageRates,
 } from '@/services/platformService';
@@ -71,7 +74,7 @@ const SECTION_CONFIG: { key: PlatformSection; label: string }[] = [
   { key: 'users', label: 'Usuarios' },
   { key: 'modules', label: 'Modulos activos' },
   { key: 'limits', label: 'Limites' },
-  { key: 'subscriptions', label: 'Planes / Suscripciones' },
+  { key: 'subscriptions', label: 'Planes / Licencias' },
   { key: 'usageRates', label: 'Tarifas por consumo' },
   { key: 'usage', label: 'Uso del cliente' },
   { key: 'audit', label: 'Auditoria global' },
@@ -96,6 +99,35 @@ const SUBSCRIPTION_STATUSES = [
   { code: 'PAST_DUE', label: 'Vencida' },
   { code: 'SUSPENDED', label: 'Suspendida' },
   { code: 'CANCELLED', label: 'Cancelada' },
+];
+
+const LICENSE_STATUSES = [
+  { code: 'ACTIVE', label: 'Activa' },
+  { code: 'SUSPENDED', label: 'Suspendida' },
+  { code: 'CANCELLED', label: 'Cancelada' },
+];
+
+const DEPLOYMENT_TYPES = [
+  { code: 'CLIENT_HOSTED', label: 'Cliente hospedado' },
+  { code: 'APPMODA_HOSTED', label: 'AppModa hospedado' },
+  { code: 'HYBRID', label: 'Mixto' },
+  { code: 'OTHER', label: 'Otro' },
+];
+
+const SERVICE_STATUSES = [
+  { code: 'ACTIVE', label: 'Activo' },
+  { code: 'NOT_APPLICABLE', label: 'No aplica' },
+  { code: 'PAST_DUE', label: 'Vencido' },
+  { code: 'SUSPENDED', label: 'Suspendido' },
+  { code: 'CANCELLED', label: 'Cancelado' },
+];
+
+const COMMERCIAL_PAYMENT_METHODS = [
+  { code: 'TRANSFER', label: 'Transferencia' },
+  { code: 'CASH', label: 'Efectivo' },
+  { code: 'CARD', label: 'Tarjeta' },
+  { code: 'DEPOSIT', label: 'Deposito' },
+  { code: 'OTHER', label: 'Otro' },
 ];
 
 const PLAN_MODULE_FLAGS: {
@@ -205,6 +237,30 @@ const EMPTY_SUBSCRIPTION_FORM = {
   nextBillingAt: '',
 };
 
+const EMPTY_COMMERCIAL_FORM = {
+  licenseStatus: 'ACTIVE',
+  purchaseAmount: '',
+  licenseCurrency: 'MXN',
+  paymentDate: '',
+  paymentMethod: 'TRANSFER',
+  paymentReference: '',
+  licenseNotes: '',
+  validFrom: '',
+  validUntil: '',
+  noExpiration: true,
+  unlimitedCommercialUse: true,
+  deploymentType: 'CLIENT_HOSTED',
+  serviceStatus: 'NOT_APPLICABLE',
+  annualAmount: '',
+  serviceCurrency: 'MXN',
+  serviceStartDate: '',
+  serviceEndDate: '',
+  autoRenew: false,
+  servicePaymentMethod: 'TRANSFER',
+  servicePaymentReference: '',
+  serviceNotes: '',
+};
+
 const PLATFORM_SELECTED_COMPANY_ID_KEY = 'appmoda.platform.selectedCompanyId';
 const OWNER_SIDEBAR_SCROLL_KEY = 'appmoda.owner.sidebarScrollY';
 
@@ -230,7 +286,13 @@ function normalizePlatformActionSection(value?: string | null): PlatformSection 
 }
 
 function sectionForCompanyPending(labels: string[]): PlatformSection {
-  if (labels.some((item) => item.includes('plan') || item.includes('cobro') || item.includes('Suscripcion'))) {
+  if (labels.some((item) =>
+    item.includes('plan') ||
+    item.includes('cobro') ||
+    item.includes('Suscripcion') ||
+    item.includes('hosting') ||
+    item.includes('Servicio anual')
+  )) {
     return 'subscriptions';
   }
   if (labels.some((item) => item.includes('limite'))) {
@@ -263,12 +325,36 @@ function normalizeBillingModelLabel(value?: string | null) {
       return 'Consumo';
     case 'HYBRID':
       return 'Hibrido';
+    case 'PERPETUAL':
+      return 'Licencia perpetua';
     case 'SIN_CONFIGURAR':
     case '':
       return 'Sin modelo';
     default:
       return value || 'Sin modelo';
   }
+}
+
+function normalizeLicenseStatusLabel(value?: string | null) {
+  const status = LICENSE_STATUSES.find((item) => item.code === (value || '').toUpperCase());
+  if (status) return status.label;
+  if (!value || value === 'SIN_CONFIGURAR') return 'Sin licencia';
+  return value;
+}
+
+function normalizeDeploymentTypeLabel(value?: string | null) {
+  const deployment = DEPLOYMENT_TYPES.find((item) => item.code === (value || '').toUpperCase());
+  return deployment?.label ?? 'Sin hospedaje definido';
+}
+
+function normalizeServiceStatusLabel(value?: string | null) {
+  const status = SERVICE_STATUSES.find((item) => item.code === (value || '').toUpperCase());
+  return status?.label ?? 'Sin servicio';
+}
+
+function normalizePaymentMethodLabel(value?: string | null) {
+  const method = COMMERCIAL_PAYMENT_METHODS.find((item) => item.code === (value || '').toUpperCase());
+  return method?.label ?? value ?? 'Sin metodo';
 }
 
 function normalizeSubscriptionStatusLabel(value?: string | null) {
@@ -341,6 +427,35 @@ function money(value: number | string | null | undefined) {
   });
 }
 
+function commercialAgreementToForm(agreement: PlatformCommercialAgreement | null) {
+  const license = agreement?.license;
+  const service = agreement?.serviceAgreement;
+  return {
+    licenseStatus:
+      license?.status && license.status !== 'SIN_CONFIGURAR' ? license.status : 'ACTIVE',
+    purchaseAmount: license?.purchaseAmount == null ? '' : String(license.purchaseAmount),
+    licenseCurrency: license?.currency || 'MXN',
+    paymentDate: license?.paymentDate || '',
+    paymentMethod: license?.paymentMethod || 'TRANSFER',
+    paymentReference: license?.paymentReference || '',
+    licenseNotes: license?.notes || '',
+    validFrom: license?.validFrom || '',
+    validUntil: license?.validUntil || '',
+    noExpiration: license?.noExpiration ?? true,
+    unlimitedCommercialUse: license?.unlimitedCommercialUse ?? true,
+    deploymentType: service?.deploymentType || 'CLIENT_HOSTED',
+    serviceStatus: service?.status || 'NOT_APPLICABLE',
+    annualAmount: service?.annualAmount == null ? '' : String(service.annualAmount),
+    serviceCurrency: service?.currency || 'MXN',
+    serviceStartDate: service?.startDate || '',
+    serviceEndDate: service?.endDate || '',
+    autoRenew: service?.autoRenew ?? false,
+    servicePaymentMethod: service?.paymentMethod || 'TRANSFER',
+    servicePaymentReference: service?.paymentReference || '',
+    serviceNotes: service?.notes || '',
+  };
+}
+
 function formatAuditTimestamp(value?: string | null) {
   if (!value) return 'Fecha no disponible';
   const parsed = new Date(value);
@@ -406,6 +521,8 @@ export default function PlatformScreen() {
   const [companySettings, setCompanySettings] = useState<PlatformCompanySettings | null>(null);
   const [companySubscription, setCompanySubscription] =
     useState<PlatformCompanySubscription | null>(null);
+  const [commercialAgreement, setCommercialAgreement] =
+    useState<PlatformCommercialAgreement | null>(null);
   const [usageRates, setUsageRates] = useState<PlatformUsageRate[]>([]);
   const [usageSummary, setUsageSummary] = useState<PlatformUsageSummary[]>([]);
   const [dashboardSummary, setDashboardSummary] = useState<PlatformDashboardSummary | null>(null);
@@ -422,6 +539,7 @@ export default function PlatformScreen() {
   const [settingsForm, setSettingsForm] = useState(EMPTY_SETTINGS_FORM);
   const [planForm, setPlanForm] = useState(EMPTY_PLAN_FORM);
   const [subscriptionForm, setSubscriptionForm] = useState(EMPTY_SUBSCRIPTION_FORM);
+  const [commercialForm, setCommercialForm] = useState(EMPTY_COMMERCIAL_FORM);
   const [showCompanyForm, setShowCompanyForm] = useState(false);
   const [showBranchForm, setShowBranchForm] = useState(false);
   const [showUserForm, setShowUserForm] = useState(false);
@@ -443,6 +561,7 @@ export default function PlatformScreen() {
   const [savingSettings, setSavingSettings] = useState(false);
   const [savingPrices, setSavingPrices] = useState(false);
   const [savingSubscription, setSavingSubscription] = useState(false);
+  const [savingCommercialAgreement, setSavingCommercialAgreement] = useState(false);
   const [savingUsageRates, setSavingUsageRates] = useState(false);
   const [message, setMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -461,6 +580,8 @@ export default function PlatformScreen() {
   const canManageLimits = hasEffectivePermission(session, 'MANAGE_COMPANY_LIMITS');
   const canManagePlans = hasEffectivePermission(session, 'MANAGE_SUBSCRIPTION_PLANS');
   const canManageSubscriptions = hasEffectivePermission(session, 'MANAGE_COMPANY_SUBSCRIPTIONS');
+  const canManageLicenses = hasEffectivePermission(session, 'MANAGE_PLATFORM_LICENSES');
+  const canManageServiceAgreements = hasEffectivePermission(session, 'MANAGE_PLATFORM_SERVICE_AGREEMENTS');
   const canManageUsageRates = hasEffectivePermission(session, 'MANAGE_USAGE_RATES');
   const canUseSelectedCompany = Boolean(selectedCompany && selectedCompany.code !== 'APPMODA_PLATFORM');
 
@@ -545,21 +666,24 @@ export default function PlatformScreen() {
       setCompanyUsers([]);
       setCompanySettings(null);
       setCompanySubscription(null);
+      setCommercialAgreement(null);
       setUsageRates([]);
       setSettingsForm(EMPTY_SETTINGS_FORM);
       setSubscriptionForm(EMPTY_SUBSCRIPTION_FORM);
+      setCommercialForm(EMPTY_COMMERCIAL_FORM);
       setUserForm((current) => ({ ...current, branchId: null }));
       return;
     }
 
     try {
       setLoadingCompanyScope(true);
-      const [detail, branches, users, settings, subscription, rates] = await Promise.all([
+      const [detail, branches, users, settings, subscription, agreement, rates] = await Promise.all([
         getPlatformCompanyDetail(companyId),
         getPlatformBranches(companyId),
         getPlatformUsers(companyId),
         getPlatformCompanySettings(companyId),
         getPlatformCompanySubscription(companyId),
+        getPlatformCommercialAgreement(companyId),
         getPlatformUsageRates(companyId),
       ]);
       setSelectedCompanyDetail(detail);
@@ -567,6 +691,7 @@ export default function PlatformScreen() {
       setCompanyUsers(users);
       setCompanySettings(settings);
       setCompanySubscription(subscription);
+      setCommercialAgreement(agreement);
       setUsageRates(rates);
       setSettingsForm({
         maxUsers: settings.limits.maxUsers ? String(settings.limits.maxUsers) : '',
@@ -597,6 +722,7 @@ export default function PlatformScreen() {
         endsAt: subscription.endsAt ?? '',
         nextBillingAt: subscription.nextBillingAt ?? '',
       });
+      setCommercialForm(commercialAgreementToForm(agreement));
       setUserForm((current) => ({
         ...current,
         branchId:
@@ -1034,6 +1160,63 @@ export default function PlatformScreen() {
     }
   };
 
+  const handleSaveCommercialAgreement = async () => {
+    if (savingCommercialAgreement || !selectedCompany) return;
+
+    if (!canUseSelectedCompany) {
+      setErrorMessage('Selecciona una empresa cliente para registrar licencia o hosting anual.');
+      return;
+    }
+
+    const deploymentType = commercialForm.deploymentType;
+    const clientHosted = deploymentType === 'CLIENT_HOSTED';
+
+    try {
+      setSavingCommercialAgreement(true);
+      setErrorMessage('');
+      setMessage('');
+      const saved = await updatePlatformCommercialAgreement(selectedCompany.id, {
+        license: {
+          licenseType: 'PERPETUAL',
+          status: commercialForm.licenseStatus,
+          purchaseAmount: parseMoney(commercialForm.purchaseAmount),
+          currency: commercialForm.licenseCurrency || 'MXN',
+          paymentDate: commercialForm.paymentDate.trim() || null,
+          paymentMethod: commercialForm.paymentMethod,
+          paymentReference: commercialForm.paymentReference.trim() || null,
+          notes: commercialForm.licenseNotes.trim() || null,
+          validFrom: commercialForm.validFrom.trim() || null,
+          validUntil: commercialForm.noExpiration ? null : commercialForm.validUntil.trim() || null,
+          noExpiration: commercialForm.noExpiration,
+          unlimitedCommercialUse: commercialForm.unlimitedCommercialUse,
+        },
+        serviceAgreement: {
+          serviceType: 'HOSTING_INFRASTRUCTURE',
+          deploymentType,
+          status: clientHosted ? 'NOT_APPLICABLE' : commercialForm.serviceStatus,
+          annualAmount: clientHosted ? null : parseMoney(commercialForm.annualAmount),
+          currency: commercialForm.serviceCurrency || 'MXN',
+          startDate: clientHosted ? null : commercialForm.serviceStartDate.trim() || null,
+          endDate: clientHosted ? null : commercialForm.serviceEndDate.trim() || null,
+          autoRenew: clientHosted ? false : commercialForm.autoRenew,
+          paymentMethod: clientHosted ? null : commercialForm.servicePaymentMethod,
+          paymentReference: clientHosted ? null : commercialForm.servicePaymentReference.trim() || null,
+          notes: commercialForm.serviceNotes.trim() || null,
+        },
+      });
+      setCommercialAgreement(saved);
+      setCommercialForm(commercialAgreementToForm(saved));
+      setMessage('Licencia y servicio anual actualizados.');
+      await refreshUsageSummary();
+      await refreshDashboardSummary();
+      await refreshPlatformAudit();
+    } catch (error) {
+      setErrorMessage(getActionableApiErrorMessage(error));
+    } finally {
+      setSavingCommercialAgreement(false);
+    }
+  };
+
   const handleSaveUsageRates = async () => {
     if (savingUsageRates || !selectedCompany) return;
 
@@ -1090,6 +1273,12 @@ export default function PlatformScreen() {
       const attention = attentionByCompanyId.get(company.id);
       const installationPending = pendingByCompanyId.get(company.id);
       const inferredMissing: string[] = [];
+      const hasPerpetualLicense =
+        !isInternal &&
+        usage != null &&
+        ((usage.billingModel || '').toUpperCase() === 'PERPETUAL' ||
+          ((usage.licenseType || '').toUpperCase() === 'PERPETUAL' &&
+            (usage.licenseStatus || '').toUpperCase() === 'ACTIVE'));
 
       if (!isInternal) {
         if (!usage) {
@@ -1116,7 +1305,7 @@ export default function PlatformScreen() {
           if ((usage.activeModules ?? 0) <= 0) {
             inferredMissing.push('Sin modulos activos');
           }
-          if (usage.maxUsers == null && usage.maxBranches == null) {
+          if (!hasPerpetualLicense && usage.maxUsers == null && usage.maxBranches == null) {
             inferredMissing.push('Sin limites configurados');
           }
           if (usage.planName && !['ACTIVE', 'TRIAL'].includes(subscriptionStatus)) {
@@ -1146,6 +1335,8 @@ export default function PlatformScreen() {
         ? { label: 'Interno', tone: 'neutral' }
         : company.status !== 'ACTIVE' && company.status !== 'TRIAL'
           ? { label: 'Suspendido/inactivo', tone: 'danger' }
+          : hasPerpetualLicense
+            ? { label: 'Licencia perpetua', tone: 'success' }
           : hasPlanIssue
             ? { label: 'Sin plan', tone: 'warning' }
             : configurationPendings.length > 0
@@ -1175,6 +1366,7 @@ export default function PlatformScreen() {
         actionSection,
         isReady,
         hasPlanIssue,
+        hasPerpetualLicense,
       };
     });
   }, [companies, dashboardSummary, selectedCompanyId, usageSummary]);
@@ -1246,15 +1438,29 @@ export default function PlatformScreen() {
       companiesWithActiveSubscription:
         dashboardSummary?.summary.companiesWithActiveSubscription ??
         usageSummary.filter((item) => item.subscriptionStatus === 'ACTIVE').length,
+      companiesWithPerpetualLicense:
+        dashboardSummary?.summary.companiesWithPerpetualLicense ??
+        usageSummary.filter((item) => (item.billingModel || '').toUpperCase() === 'PERPETUAL').length,
+      appModaHostedCompanies:
+        dashboardSummary?.summary.appModaHostedCompanies ??
+        usageSummary.filter((item) => (item.deploymentType || '').toUpperCase() === 'APPMODA_HOSTED').length,
+      clientHostedCompanies:
+        dashboardSummary?.summary.clientHostedCompanies ??
+        usageSummary.filter((item) => (item.deploymentType || '').toUpperCase() === 'CLIENT_HOSTED').length,
+      annualServicesPastDue: dashboardSummary?.summary.annualServicesPastDue ?? 0,
+      annualServicesExpiringSoon: dashboardSummary?.summary.annualServicesExpiringSoon ?? 0,
       currentCustomerStatus: !canUseSelectedCompany
         ? 'Sin cliente'
+        : (commercialAgreement?.license.licenseType || '').toUpperCase() === 'PERPETUAL' &&
+            (commercialAgreement?.license.status || '').toUpperCase() === 'ACTIVE'
+          ? 'Licencia perpetua'
         : companySubscription?.planName
           ? companySubscription.planName
           : normalizeBillingModelLabel(companySubscription?.billingModel) === 'Consumo'
             ? 'Consumo'
             : 'Sin plan',
     };
-  }, [canUseSelectedCompany, companySubscription, dashboardSummary, planCards, subscriptionPlans, usageSummary]);
+  }, [canUseSelectedCompany, commercialAgreement, companySubscription, dashboardSummary, planCards, subscriptionPlans, usageSummary]);
   const selectedPlanPrices = selectedPlanId
     ? planPricesById[selectedPlanId] ?? planPrices.filter((price) => price.planId === selectedPlanId)
     : [];
@@ -1500,6 +1706,9 @@ export default function PlatformScreen() {
             {renderDashboardMetricTile('Clientes sin plan', summary?.companiesWithoutPlan ?? clientsWithoutPlan.length, 'Requieren configuracion comercial', (summary?.companiesWithoutPlan ?? clientsWithoutPlan.length) > 0 ? 'warning' : 'success')}
             {renderDashboardMetricTile('Suspendidos/inactivos', summary?.suspendedCompanies ?? inactiveCompanies.length, 'Riesgo de soporte o cobranza', (summary?.suspendedCompanies ?? inactiveCompanies.length) > 0 ? 'warning' : 'neutral')}
             {renderDashboardMetricTile('Ingreso mensual estimado', estimatedRevenue, 'Con suscripciones activas y precio configurado', summary?.estimatedMonthlyRevenue ? 'info' : 'neutral')}
+            {renderDashboardMetricTile('Licencias perpetuas', summary?.companiesWithPerpetualLicense ?? 0, 'Pago unico registrado', (summary?.companiesWithPerpetualLicense ?? 0) > 0 ? 'success' : 'neutral')}
+            {renderDashboardMetricTile('Cobros unicos', money(summary?.oneTimeLicenseAmount ?? 0), 'Licencias perpetuas, no MRR', (summary?.oneTimeLicenseAmount ?? 0) > 0 ? 'success' : 'neutral')}
+            {renderDashboardMetricTile('Hosting AppModa', summary?.appModaHostedCompanies ?? 0, 'Clientes con servicio anual', (summary?.appModaHostedCompanies ?? 0) > 0 ? 'info' : 'neutral')}
             {renderDashboardMetricTile('Usuarios activos', summary?.activeUsers ?? usageSummary.reduce((total, item) => total + item.activeUsers, 0), 'Global en clientes tenant', 'info')}
             {renderDashboardMetricTile('Clientes con uso hoy', summary?.companiesWithUsageToday ?? 0, 'Actividad operativa detectada', (summary?.companiesWithUsageToday ?? 0) > 0 ? 'success' : 'neutral')}
           </View>
@@ -1591,7 +1800,10 @@ export default function PlatformScreen() {
                   <View style={styles.dashboardCompanyCell}>
                     <AppText bold numberOfLines={1}>{item.companyName}</AppText>
                     <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
-                      {item.status} - {item.planName || 'Sin plan'} - {item.billingModel}
+                      {item.status} - {item.planName || 'Sin plan'} - {normalizeBillingModelLabel(item.billingModel)}
+                    </AppText>
+                    <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+                      {normalizeDeploymentTypeLabel(item.deploymentType)} - {normalizeServiceStatusLabel(item.serviceAgreementStatus)}
                     </AppText>
                   </View>
                   <View style={styles.dashboardCompactCell}>
@@ -1712,6 +1924,7 @@ export default function PlatformScreen() {
           {renderDashboardMetricTile('Clientes operativos', companyStats.totalOperational, 'Excluye AppModa Platform', 'info')}
           {renderDashboardMetricTile('Activos', dashboardSummary?.summary.activeCompanies ?? companyStats.active, 'Listos para configuracion', companyStats.active > 0 ? 'success' : 'neutral')}
           {renderDashboardMetricTile('Sin plan', dashboardSummary?.summary.companiesWithoutPlan ?? companyStats.withoutPlan, 'Plan o cobro pendiente', companyStats.withoutPlan > 0 ? 'warning' : 'success')}
+          {renderDashboardMetricTile('Licencia perpetua', dashboardSummary?.summary.companiesWithPerpetualLicense ?? 0, 'Pago unico valido', (dashboardSummary?.summary.companiesWithPerpetualLicense ?? 0) > 0 ? 'success' : 'neutral')}
           {renderDashboardMetricTile('Con pendientes', companyStats.pending, 'Configuracion o atencion requerida', companyStats.pending > 0 ? 'warning' : 'success')}
           {renderDashboardMetricTile('Listos', companyStats.ready, 'Sin pendientes criticos detectados', companyStats.ready > 0 ? 'success' : 'neutral')}
           {renderDashboardMetricTile('Suspendidos/inactivos', dashboardSummary?.summary.suspendedCompanies ?? companyStats.inactive, 'Revisar soporte o cobranza', companyStats.inactive > 0 ? 'warning' : 'neutral')}
@@ -1777,6 +1990,8 @@ export default function PlatformScreen() {
           const planLabel = usage?.planName || 'Sin plan';
           const billingLabel = normalizeBillingModelLabel(usage?.billingModel);
           const subscriptionLabel = normalizeSubscriptionStatusLabel(usage?.subscriptionStatus);
+          const hostingLabel = normalizeDeploymentTypeLabel(usage?.deploymentType);
+          const serviceStatusLabel = normalizeServiceStatusLabel(usage?.serviceAgreementStatus);
 
           return (
             <AppCard key={company.id} variant={item.selected ? 'selected' : item.health.tone === 'danger' ? 'danger' : 'default'} style={styles.companyCard}>
@@ -1841,6 +2056,11 @@ export default function PlatformScreen() {
                   <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
                     {billingLabel} - {subscriptionLabel}
                   </AppText>
+                  {item.hasPerpetualLicense ? (
+                    <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+                      Pago unico - {usage?.unlimitedCommercialUse ? 'Sin restricciones' : 'Con limites'}
+                    </AppText>
+                  ) : null}
                 </View>
                 <View style={[styles.companyInfoCell, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.borderSubtle }]}>
                   <AppText variant="caption" color={theme.colors.mutedText}>Usuarios</AppText>
@@ -1857,17 +2077,20 @@ export default function PlatformScreen() {
                   </AppText>
                 </View>
                 <View style={[styles.companyInfoCell, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.borderSubtle }]}>
-                  <AppText variant="caption" color={theme.colors.mutedText}>Modulos clave</AppText>
-                  {modulePreview.length > 0 ? (
-                    <View style={styles.inlineBadges}>
-                      {modulePreview.map((module) => (
-                        <StatusBadge key={module} label={module} tone="neutral" />
-                      ))}
-                    </View>
-                  ) : (
-                    <AppText bold>Sin modulos activos</AppText>
-                  )}
+                  <AppText variant="caption" color={theme.colors.mutedText}>Hosting / servicio</AppText>
+                  <AppText bold numberOfLines={1}>{hostingLabel}</AppText>
+                  <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+                    {serviceStatusLabel}{usage?.serviceAgreementEndDate ? ` - vence ${usage.serviceAgreementEndDate}` : ''}
+                  </AppText>
                 </View>
+              </View>
+
+              <View style={styles.inlineBadges}>
+                {modulePreview.length > 0 ? (
+                  modulePreview.map((module) => <StatusBadge key={module} label={module} tone="neutral" />)
+                ) : (
+                  <StatusBadge label="Sin modulos activos" tone="warning" />
+                )}
               </View>
 
               <View style={[styles.companyPendingRow, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.border }]}>
@@ -2103,10 +2326,10 @@ export default function PlatformScreen() {
             <StatusBadge label="SAAS" tone="info" />
             <View style={styles.flex}>
               <AppText variant="subtitle" bold>
-                Planes / Suscripciones
+                Planes / Licencias
               </AppText>
               <AppText variant="caption" color={theme.colors.mutedText}>
-                Administra el catalogo global de planes y asigna una suscripcion al cliente en administracion. No implementa cobro real ni pasarela.
+                Administra planes, licencias perpetuas y servicios comerciales del cliente. No implementa cobro real ni pasarela.
               </AppText>
             </View>
           </View>
@@ -2124,8 +2347,12 @@ export default function PlatformScreen() {
           {renderDashboardMetricTile('Planes activos', subscriptionStats.activePlans, 'Catalogo global', subscriptionStats.activePlans > 0 ? 'success' : 'neutral')}
           {renderDashboardMetricTile('Planes sin precios completos', subscriptionStats.plansWithoutCompletePrices, 'Mensual, trimestral, semestral y anual', subscriptionStats.plansWithoutCompletePrices > 0 ? 'warning' : 'success')}
           {renderDashboardMetricTile('Clientes sin plan', subscriptionStats.companiesWithoutPlan, 'Requieren configuracion comercial', subscriptionStats.companiesWithoutPlan > 0 ? 'warning' : 'success')}
-          {renderDashboardMetricTile('Suscripciones activas', subscriptionStats.companiesWithActiveSubscription, 'Clientes con estado ACTIVE', subscriptionStats.companiesWithActiveSubscription > 0 ? 'info' : 'neutral')}
-          {renderDashboardMetricTile('Cliente actual', subscriptionStats.currentCustomerStatus, 'Cliente en administracion', canUseSelectedCompany && companySubscription?.planName ? 'success' : 'warning')}
+          {renderDashboardMetricTile('Licencias perpetuas', subscriptionStats.companiesWithPerpetualLicense, 'Pago unico, sin MRR', subscriptionStats.companiesWithPerpetualLicense > 0 ? 'success' : 'neutral')}
+          {renderDashboardMetricTile('Cobros unicos', money(dashboardSummary?.summary.oneTimeLicenseAmount ?? 0), 'Licencias registradas', (dashboardSummary?.summary.oneTimeLicenseAmount ?? 0) > 0 ? 'success' : 'neutral')}
+          {renderDashboardMetricTile('AppModa hospedados', subscriptionStats.appModaHostedCompanies, 'Requieren servicio anual', subscriptionStats.appModaHostedCompanies > 0 ? 'info' : 'neutral')}
+          {renderDashboardMetricTile('Cliente hospedado', subscriptionStats.clientHostedCompanies, 'Hosting no aplica', subscriptionStats.clientHostedCompanies > 0 ? 'success' : 'neutral')}
+          {renderDashboardMetricTile('Servicios vencen/vencidos', `${subscriptionStats.annualServicesExpiringSoon}/${subscriptionStats.annualServicesPastDue}`, 'Proximos 30 dias / vencidos', subscriptionStats.annualServicesPastDue > 0 ? 'danger' : subscriptionStats.annualServicesExpiringSoon > 0 ? 'warning' : 'success')}
+          {renderDashboardMetricTile('Cliente actual', subscriptionStats.currentCustomerStatus, 'Cliente en administracion', canUseSelectedCompany && subscriptionStats.currentCustomerStatus !== 'Sin plan' ? 'success' : 'warning')}
         </View>
 
         {showPlanForm ? renderPlanForm() : null}
@@ -2137,6 +2364,7 @@ export default function PlatformScreen() {
         </View>
         <View style={styles.subscriptionColumn}>
           {renderPlanPrices()}
+          {renderCommercialAgreement()}
           {renderCompanySubscription()}
         </View>
       </View>
@@ -2443,6 +2671,287 @@ export default function PlatformScreen() {
         </View>
         <AppText variant="caption" color={theme.colors.mutedText}>
           Esto solo configura el modelo SaaS administrativo. No genera cargos, facturas ni pasarela de pago.
+        </AppText>
+      </AppCard>
+    );
+  };
+
+  const renderCommercialAgreement = () => {
+    if (!canUseSelectedCompany) return null;
+
+    const license = commercialAgreement?.license;
+    const service = commercialAgreement?.serviceAgreement;
+    const savedLicenseActive =
+      (license?.licenseType || '').toUpperCase() === 'PERPETUAL' &&
+      (license?.status || '').toUpperCase() === 'ACTIVE';
+    const clientHosted = commercialForm.deploymentType === 'CLIENT_HOSTED';
+    const canManageCommercial = canManageLicenses && canManageServiceAgreements;
+
+    return (
+      <AppCard style={styles.panel}>
+        <View style={[styles.rowBetween, isPhone ? styles.column : null]}>
+          <View style={styles.sectionHeader}>
+            <StatusBadge label="LICENCIA" tone={savedLicenseActive ? 'success' : 'warning'} />
+            <View style={styles.flex}>
+              <AppText variant="subtitle" bold>
+                Licencia del cliente
+              </AppText>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Registra el pago unico de derecho de uso y separa el servicio anual de infraestructura. No se mezcla con pagos operativos.
+              </AppText>
+              {renderCompanyScopeLine()}
+            </View>
+          </View>
+          <StatusBadge
+            label={savedLicenseActive ? 'Perpetua activa' : 'Sin licencia perpetua'}
+            tone={savedLicenseActive ? 'success' : 'warning'}
+          />
+        </View>
+
+        <View style={styles.companyInfoGrid}>
+          <View style={[styles.companyInfoCell, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.borderSubtle }]}>
+            <AppText variant="caption" color={theme.colors.mutedText}>Licencia</AppText>
+            <AppText bold>{savedLicenseActive ? 'Perpetua' : 'Sin licencia activa'}</AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {normalizeLicenseStatusLabel(license?.status)}
+            </AppText>
+          </View>
+          <View style={[styles.companyInfoCell, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.borderSubtle }]}>
+            <AppText variant="caption" color={theme.colors.mutedText}>Cobro unico</AppText>
+            <AppText bold>{license?.purchaseAmount == null ? 'Sin monto' : `${money(license.purchaseAmount)} ${license.currency || 'MXN'}`}</AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {license?.paymentDate || 'Sin fecha'} - {normalizePaymentMethodLabel(license?.paymentMethod)}
+            </AppText>
+          </View>
+          <View style={[styles.companyInfoCell, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.borderSubtle }]}>
+            <AppText variant="caption" color={theme.colors.mutedText}>Restricciones</AppText>
+            <AppText bold>{license?.unlimitedCommercialUse ? 'Sin restricciones' : 'Con limites comerciales'}</AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {license?.noExpiration ? 'Sin vencimiento' : `Vence ${license?.validUntil || 'sin fecha'}`}
+            </AppText>
+          </View>
+          <View style={[styles.companyInfoCell, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.borderSubtle }]}>
+            <AppText variant="caption" color={theme.colors.mutedText}>Infraestructura</AppText>
+            <AppText bold>{normalizeDeploymentTypeLabel(service?.deploymentType)}</AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              Servicio anual: {normalizeServiceStatusLabel(service?.status)}
+            </AppText>
+          </View>
+        </View>
+
+        <View style={styles.formBlock}>
+          <AppText variant="caption" color={theme.colors.mutedText} bold>
+            Licencia perpetua
+          </AppText>
+          <View style={styles.actionsRow}>
+            {LICENSE_STATUSES.map((status) => (
+              <AppButton
+                key={status.code}
+                title={status.label}
+                variant={commercialForm.licenseStatus === status.code ? 'primary' : 'secondary'}
+                onPress={() => setCommercialForm((current) => ({ ...current, licenseStatus: status.code }))}
+                style={styles.compactButton}
+              />
+            ))}
+          </View>
+          <View style={[styles.grid, isPhone ? styles.column : null]}>
+            <AppInput
+              label="Monto cobrado"
+              placeholder="25000.00"
+              keyboardType="decimal-pad"
+              value={commercialForm.purchaseAmount}
+              onChangeText={(value) => setCommercialForm((current) => ({ ...current, purchaseAmount: value }))}
+              editable={!savingCommercialAgreement && canManageCommercial}
+            />
+            <AppInput
+              label="Moneda"
+              placeholder="MXN"
+              value={commercialForm.licenseCurrency}
+              onChangeText={(value) => setCommercialForm((current) => ({ ...current, licenseCurrency: value.toUpperCase() }))}
+              editable={!savingCommercialAgreement && canManageCommercial}
+            />
+            <AppInput
+              label="Fecha de pago"
+              placeholder="YYYY-MM-DD"
+              value={commercialForm.paymentDate}
+              onChangeText={(value) => setCommercialForm((current) => ({ ...current, paymentDate: value }))}
+              editable={!savingCommercialAgreement && canManageCommercial}
+            />
+          </View>
+          <View style={styles.actionsRow}>
+            {COMMERCIAL_PAYMENT_METHODS.map((method) => (
+              <AppButton
+                key={method.code}
+                title={method.label}
+                variant={commercialForm.paymentMethod === method.code ? 'primary' : 'secondary'}
+                onPress={() => setCommercialForm((current) => ({ ...current, paymentMethod: method.code }))}
+                style={styles.compactButton}
+              />
+            ))}
+          </View>
+          <View style={[styles.grid, isPhone ? styles.column : null]}>
+            <AppInput
+              label="Referencia"
+              placeholder="QA-PERP-001"
+              value={commercialForm.paymentReference}
+              onChangeText={(value) => setCommercialForm((current) => ({ ...current, paymentReference: value }))}
+              editable={!savingCommercialAgreement && canManageCommercial}
+            />
+            <AppInput
+              label="Vigencia desde"
+              placeholder="YYYY-MM-DD"
+              value={commercialForm.validFrom}
+              onChangeText={(value) => setCommercialForm((current) => ({ ...current, validFrom: value }))}
+              editable={!savingCommercialAgreement && canManageCommercial}
+            />
+            <AppInput
+              label="Vigencia hasta"
+              placeholder="Sin fecha si no vence"
+              value={commercialForm.validUntil}
+              onChangeText={(value) => setCommercialForm((current) => ({ ...current, validUntil: value }))}
+              editable={!savingCommercialAgreement && canManageCommercial && !commercialForm.noExpiration}
+            />
+          </View>
+          <View style={styles.actionsRow}>
+            <AppButton
+              title={commercialForm.noExpiration ? 'Sin vencimiento' : 'Con vencimiento'}
+              variant={commercialForm.noExpiration ? 'primary' : 'secondary'}
+              onPress={() => setCommercialForm((current) => ({ ...current, noExpiration: !current.noExpiration }))}
+              style={styles.compactButton}
+            />
+            <AppButton
+              title={commercialForm.unlimitedCommercialUse ? 'Sin restricciones comerciales' : 'Con limites comerciales'}
+              variant={commercialForm.unlimitedCommercialUse ? 'primary' : 'secondary'}
+              onPress={() => setCommercialForm((current) => ({ ...current, unlimitedCommercialUse: !current.unlimitedCommercialUse }))}
+              style={styles.compactButton}
+            />
+          </View>
+          <AppInput
+            label="Notas de licencia"
+            placeholder="Licencia perpetua sin restricciones comerciales."
+            value={commercialForm.licenseNotes}
+            onChangeText={(value) => setCommercialForm((current) => ({ ...current, licenseNotes: value }))}
+            editable={!savingCommercialAgreement && canManageCommercial}
+          />
+        </View>
+
+        <View style={styles.formBlock}>
+          <AppText variant="caption" color={theme.colors.mutedText} bold>
+            Infraestructura / servicio anual
+          </AppText>
+          <View style={styles.actionsRow}>
+            {DEPLOYMENT_TYPES.map((deployment) => (
+              <AppButton
+                key={deployment.code}
+                title={deployment.label}
+                variant={commercialForm.deploymentType === deployment.code ? 'primary' : 'secondary'}
+                onPress={() => setCommercialForm((current) => ({
+                  ...current,
+                  deploymentType: deployment.code,
+                  serviceStatus: deployment.code === 'CLIENT_HOSTED' ? 'NOT_APPLICABLE' : current.serviceStatus === 'NOT_APPLICABLE' ? 'ACTIVE' : current.serviceStatus,
+                }))}
+                style={styles.compactButton}
+              />
+            ))}
+          </View>
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            {clientHosted
+              ? 'El servidor y la base son responsabilidad del cliente; el servicio anual de hosting queda como No aplica.'
+              : 'AppModa participa en hosting, base, respaldos o monitoreo; registra el servicio anual correspondiente.'}
+          </AppText>
+
+          {!clientHosted ? (
+            <>
+              <View style={styles.actionsRow}>
+                {SERVICE_STATUSES.filter((status) => status.code !== 'NOT_APPLICABLE').map((status) => (
+                  <AppButton
+                    key={status.code}
+                    title={status.label}
+                    variant={commercialForm.serviceStatus === status.code ? 'primary' : 'secondary'}
+                    onPress={() => setCommercialForm((current) => ({ ...current, serviceStatus: status.code }))}
+                    style={styles.compactButton}
+                  />
+                ))}
+              </View>
+              <View style={[styles.grid, isPhone ? styles.column : null]}>
+                <AppInput
+                  label="Monto anual"
+                  placeholder="6000.00"
+                  keyboardType="decimal-pad"
+                  value={commercialForm.annualAmount}
+                  onChangeText={(value) => setCommercialForm((current) => ({ ...current, annualAmount: value }))}
+                  editable={!savingCommercialAgreement && canManageCommercial}
+                />
+                <AppInput
+                  label="Moneda"
+                  placeholder="MXN"
+                  value={commercialForm.serviceCurrency}
+                  onChangeText={(value) => setCommercialForm((current) => ({ ...current, serviceCurrency: value.toUpperCase() }))}
+                  editable={!savingCommercialAgreement && canManageCommercial}
+                />
+                <AppInput
+                  label="Inicio"
+                  placeholder="YYYY-MM-DD"
+                  value={commercialForm.serviceStartDate}
+                  onChangeText={(value) => setCommercialForm((current) => ({ ...current, serviceStartDate: value }))}
+                  editable={!savingCommercialAgreement && canManageCommercial}
+                />
+                <AppInput
+                  label="Vencimiento"
+                  placeholder="YYYY-MM-DD"
+                  value={commercialForm.serviceEndDate}
+                  onChangeText={(value) => setCommercialForm((current) => ({ ...current, serviceEndDate: value }))}
+                  editable={!savingCommercialAgreement && canManageCommercial}
+                />
+              </View>
+              <View style={styles.actionsRow}>
+                <AppButton
+                  title={commercialForm.autoRenew ? 'Renovacion automatica' : 'Sin renovacion automatica'}
+                  variant={commercialForm.autoRenew ? 'primary' : 'secondary'}
+                  onPress={() => setCommercialForm((current) => ({ ...current, autoRenew: !current.autoRenew }))}
+                  style={styles.compactButton}
+                />
+                {COMMERCIAL_PAYMENT_METHODS.map((method) => (
+                  <AppButton
+                    key={method.code}
+                    title={method.label}
+                    variant={commercialForm.servicePaymentMethod === method.code ? 'primary' : 'secondary'}
+                    onPress={() => setCommercialForm((current) => ({ ...current, servicePaymentMethod: method.code }))}
+                    style={styles.compactButton}
+                  />
+                ))}
+              </View>
+              <AppInput
+                label="Referencia de servicio"
+                placeholder="HOST-2026-001"
+                value={commercialForm.servicePaymentReference}
+                onChangeText={(value) => setCommercialForm((current) => ({ ...current, servicePaymentReference: value }))}
+                editable={!savingCommercialAgreement && canManageCommercial}
+              />
+            </>
+          ) : null}
+
+          <AppInput
+            label="Notas de infraestructura"
+            placeholder={clientHosted ? 'Servidor y base de datos son responsabilidad del cliente.' : 'Servicio anual de servidor, base de datos, respaldos y monitoreo.'}
+            value={commercialForm.serviceNotes}
+            onChangeText={(value) => setCommercialForm((current) => ({ ...current, serviceNotes: value }))}
+            editable={!savingCommercialAgreement && canManageCommercial}
+          />
+        </View>
+
+        <View style={styles.actionsRow}>
+          <AppButton
+            title="Guardar licencia y hosting"
+            loading={savingCommercialAgreement}
+            disabled={savingCommercialAgreement || !canManageCommercial || !canUseSelectedCompany}
+            disabledReason="Necesitas MANAGE_PLATFORM_LICENSES y MANAGE_PLATFORM_SERVICE_AGREEMENTS."
+            onPress={handleSaveCommercialAgreement}
+            style={styles.actionButton}
+          />
+        </View>
+        <AppText variant="caption" color={theme.colors.mutedText}>
+          Estos datos son comerciales de AppModa hacia la empresa cliente. No registran pagos de clientas finales, paquetes, apartados ni saldo a favor.
         </AppText>
       </AppCard>
     );
@@ -2901,10 +3410,13 @@ export default function PlatformScreen() {
             <View style={styles.flex}>
               <AppText bold>{item.companyName}</AppText>
               <AppText variant="caption" color={theme.colors.mutedText}>
-                Modelo {item.billingModel} - Plan {item.planName || 'sin plan'} - Estado {item.subscriptionStatus}
+                Modelo {normalizeBillingModelLabel(item.billingModel)} - Plan {item.planName || 'sin plan'} - Estado {normalizeSubscriptionStatusLabel(item.subscriptionStatus)}
               </AppText>
               <AppText variant="caption" color={theme.colors.mutedText}>
                 Usuarios {item.activeUsers}/{item.maxUsers ?? 'sin limite'} - Sucursales {item.activeBranches}/{item.maxBranches ?? 'sin limite'} - Modulos activos {item.activeModules}
+              </AppText>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Hosting {normalizeDeploymentTypeLabel(item.deploymentType)} - Servicio {normalizeServiceStatusLabel(item.serviceAgreementStatus)}
               </AppText>
             </View>
             <AppButton title={selectedCompanyId === item.companyId ? 'Uso visible' : 'Ver uso'} variant={selectedCompanyId === item.companyId ? 'neutral' : 'secondary'} onPress={() => updateCompanyInAdministration(item.companyId, item.companyName)} style={styles.compactButton} />
@@ -2913,7 +3425,7 @@ export default function PlatformScreen() {
       </View>
       {selectedUsage ? (
         <AppText variant="caption" color={theme.colors.mutedText}>
-          Cliente en administracion: {selectedUsage.companyName} - {selectedUsage.billingModel} - {selectedUsage.planName || 'sin plan'}
+          Cliente en administracion: {selectedUsage.companyName} - {normalizeBillingModelLabel(selectedUsage.billingModel)} - {selectedUsage.planName || 'sin plan'}
         </AppText>
       ) : null}
     </AppCard>

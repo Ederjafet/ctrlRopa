@@ -165,3 +165,20 @@ Backend:
 - FAST-BILLING-A: facturacion SaaS real.
 - FAST-BILLING-B: vencimientos, cortes y recibos.
 - PLATFORM-AUDIT-A: auditoria de cambios de plan, precio y suscripcion.
+
+## Nota OWNER-LICENSE-B
+
+La seccion evoluciono visualmente a `Planes / Licencias`.
+
+Ademas de catalogo global, precios y suscripcion del cliente, ahora incluye:
+
+- `Licencia del cliente`: licencia perpetua, monto cobrado, moneda, fecha, metodo, referencia, notas, sin vencimiento y sin restricciones comerciales.
+- `Infraestructura / servicio anual`: cliente hospedado, AppModa hospedado, mixto u otro; servicio anual activo/no aplica/vencido/suspendido/cancelado; monto anual e inicio/vencimiento.
+
+Backend agregado por OWNER-LICENSE-B:
+
+- `company_licenses`
+- `company_service_agreements`
+- `GET/PUT /api/platform/companies/{companyId}/commercial-agreement`
+
+El bloque comercial no genera cobros reales, recibos, facturas ni movimientos en `payments` operativos.

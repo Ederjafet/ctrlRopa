@@ -97,6 +97,40 @@ export type PlatformCompanySubscription = {
   nextBillingAt?: string | null;
 };
 
+export type PlatformCommercialAgreement = {
+  license: {
+    id?: number | null;
+    companyId: number;
+    licenseType: string;
+    status: string;
+    purchaseAmount?: number | null;
+    currency: string;
+    paymentDate?: string | null;
+    paymentMethod?: string | null;
+    paymentReference?: string | null;
+    notes?: string | null;
+    validFrom?: string | null;
+    validUntil?: string | null;
+    noExpiration: boolean;
+    unlimitedCommercialUse: boolean;
+  };
+  serviceAgreement: {
+    id?: number | null;
+    companyId: number;
+    serviceType: string;
+    deploymentType: string;
+    status: string;
+    annualAmount?: number | null;
+    currency: string;
+    startDate?: string | null;
+    endDate?: string | null;
+    autoRenew: boolean;
+    paymentMethod?: string | null;
+    paymentReference?: string | null;
+    notes?: string | null;
+  };
+};
+
 export type PlatformUsageRate = {
   id?: number | null;
   companyId: number;
@@ -118,6 +152,12 @@ export type PlatformUsageSummary = {
   activeModules: number;
   maxUsers?: number | null;
   maxBranches?: number | null;
+  licenseType?: string | null;
+  licenseStatus?: string | null;
+  unlimitedCommercialUse?: boolean | null;
+  deploymentType?: string | null;
+  serviceAgreementStatus?: string | null;
+  serviceAgreementEndDate?: string | null;
 };
 
 export type PlatformDashboardSummary = {
@@ -132,6 +172,12 @@ export type PlatformDashboardSummary = {
     activeBranches: number;
     activePlans: number;
     companiesWithUsageToday: number;
+    companiesWithPerpetualLicense: number;
+    appModaHostedCompanies: number;
+    clientHostedCompanies: number;
+    annualServicesPastDue: number;
+    annualServicesExpiringSoon: number;
+    oneTimeLicenseAmount?: number | null;
     estimatedMonthlyRevenue?: number | null;
   };
   todayActivity: {
@@ -157,6 +203,9 @@ export type PlatformDashboardSummary = {
     status: string;
     planName?: string | null;
     billingModel: string;
+    licenseType?: string | null;
+    deploymentType?: string | null;
+    serviceAgreementStatus?: string | null;
     activeUsers: number;
     maxUsers?: number | null;
     activeBranches: number;
@@ -280,6 +329,36 @@ export type UpdatePlatformCompanySubscriptionPayload = {
   startedAt?: string | null;
   endsAt?: string | null;
   nextBillingAt?: string | null;
+};
+
+export type UpdatePlatformCommercialAgreementPayload = {
+  license: {
+    licenseType: string;
+    status: string;
+    purchaseAmount?: number | null;
+    currency: string;
+    paymentDate?: string | null;
+    paymentMethod?: string | null;
+    paymentReference?: string | null;
+    notes?: string | null;
+    validFrom?: string | null;
+    validUntil?: string | null;
+    noExpiration: boolean;
+    unlimitedCommercialUse: boolean;
+  };
+  serviceAgreement: {
+    serviceType: string;
+    deploymentType: string;
+    status: string;
+    annualAmount?: number | null;
+    currency: string;
+    startDate?: string | null;
+    endDate?: string | null;
+    autoRenew: boolean;
+    paymentMethod?: string | null;
+    paymentReference?: string | null;
+    notes?: string | null;
+  };
 };
 
 export type UpdatePlatformUsageRatesPayload = {
@@ -412,6 +491,22 @@ export async function updatePlatformCompanySubscription(
   payload: UpdatePlatformCompanySubscriptionPayload
 ): Promise<PlatformCompanySubscription> {
   return apiRequest<PlatformCompanySubscription>(`/api/platform/companies/${companyId}/subscription`, {
+    method: 'PUT',
+    body: payload,
+  });
+}
+
+export async function getPlatformCommercialAgreement(
+  companyId: number
+): Promise<PlatformCommercialAgreement> {
+  return apiRequest<PlatformCommercialAgreement>(`/api/platform/companies/${companyId}/commercial-agreement`);
+}
+
+export async function updatePlatformCommercialAgreement(
+  companyId: number,
+  payload: UpdatePlatformCommercialAgreementPayload
+): Promise<PlatformCommercialAgreement> {
+  return apiRequest<PlatformCommercialAgreement>(`/api/platform/companies/${companyId}/commercial-agreement`, {
     method: 'PUT',
     body: payload,
   });

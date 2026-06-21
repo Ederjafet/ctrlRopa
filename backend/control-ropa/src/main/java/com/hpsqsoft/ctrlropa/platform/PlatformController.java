@@ -139,6 +139,18 @@ public class PlatformController {
         return service.updateCompanySubscription(companyId, request);
     }
 
+    @GetMapping("/companies/{companyId}/commercial-agreement")
+    public PlatformCommercialAgreementResponse findCommercialAgreement(@PathVariable Long companyId) {
+        return service.findCommercialAgreement(companyId);
+    }
+
+    @PutMapping("/companies/{companyId}/commercial-agreement")
+    public PlatformCommercialAgreementResponse updateCommercialAgreement(
+            @PathVariable Long companyId,
+            @RequestBody UpdatePlatformCommercialAgreementRequest request) {
+        return service.updateCommercialAgreement(companyId, request);
+    }
+
     @GetMapping("/companies/{companyId}/usage-rates")
     public List<PlatformUsageRateResponse> findCompanyUsageRates(@PathVariable Long companyId) {
         return service.findCompanyUsageRates(companyId);

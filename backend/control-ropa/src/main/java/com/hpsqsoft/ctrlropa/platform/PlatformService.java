@@ -64,11 +64,39 @@ public class PlatformService {
     private static final List<String> BILLING_MODELS = List.of(
             "SUBSCRIPTION",
             "USAGE_BASED",
-            "HYBRID"
+            "HYBRID",
+            "PERPETUAL"
     );
     private static final List<String> SUBSCRIPTION_STATUSES = List.of(
             "TRIAL",
             "ACTIVE",
+            "PAST_DUE",
+            "SUSPENDED",
+            "CANCELLED"
+    );
+    private static final List<String> LICENSE_TYPES = List.of(
+            "PERPETUAL"
+    );
+    private static final List<String> LICENSE_STATUSES = List.of(
+            "ACTIVE",
+            "SUSPENDED",
+            "CANCELLED"
+    );
+    private static final List<String> DEPLOYMENT_TYPES = List.of(
+            "APPMODA_HOSTED",
+            "CLIENT_HOSTED",
+            "HYBRID",
+            "OTHER"
+    );
+    private static final List<String> SERVICE_TYPES = List.of(
+            "HOSTING_INFRASTRUCTURE",
+            "SUPPORT_MAINTENANCE",
+            "BACKUP_MONITORING",
+            "OTHER"
+    );
+    private static final List<String> SERVICE_STATUSES = List.of(
+            "ACTIVE",
+            "NOT_APPLICABLE",
             "PAST_DUE",
             "SUSPENDED",
             "CANCELLED"
@@ -667,6 +695,37 @@ public class PlatformService {
     }
 
     @Transactional(readOnly = true)
+    public PlatformCommercialAgreementResponse findCommercialAgreement(Long companyId) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_PLATFORM_LICENSES);
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_PLATFORM_SERVICE_AGREEMENTS);
+        assertCompanyExists(companyId);
+        return findCommercialAgreementByCompanyId(companyId);
+    }
+
+    public PlatformCommercialAgreementResponse updateCommercialAgreement(
+            Long companyId,
+            UpdatePlatformCommercialAgreementRequest request
+    ) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.MANAGE_PLATFORM_LICENSES);
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.MANAGE_PLATFORM_SERVICE_AGREEMENTS);
+        assertCustomerCompany(companyId);
+
+        UpdatePlatformCommercialAgreementRequest.LicensePayload license =
+                request == null ? null : request.getLicense();
+        UpdatePlatformCommercialAgreementRequest.ServiceAgreementPayload serviceAgreement =
+                request == null ? null : request.getServiceAgreement();
+
+        if (license != null) {
+            upsertCommercialLicense(companyId, license);
+        }
+        if (serviceAgreement != null) {
+            upsertServiceAgreement(companyId, serviceAgreement);
+        }
+
+        return findCommercialAgreementByCompanyId(companyId);
+    }
+
+    @Transactional(readOnly = true)
     public List<PlatformUsageRateResponse> findCompanyUsageRates(Long companyId) {
         accessService.assertCan(currentUser.getUserId(), PermissionCode.VIEW_PLATFORM_BILLING);
         assertCompanyExists(companyId);
@@ -715,9 +774,18 @@ public class PlatformService {
                 SELECT
                   c.id AS company_id,
                   c.name AS company_name,
-                  COALESCE(cs.billing_model, 'SIN_CONFIGURAR') AS billing_model,
-                  sp.name AS plan_name,
-                  COALESCE(cs.status, 'SIN_CONFIGURAR') AS subscription_status,
+                  CASE
+                    WHEN lic.license_type = 'PERPETUAL' AND lic.status = 'ACTIVE' THEN 'PERPETUAL'
+                    ELSE COALESCE(cs.billing_model, 'SIN_CONFIGURAR')
+                  END AS billing_model,
+                  CASE
+                    WHEN lic.license_type = 'PERPETUAL' AND lic.status = 'ACTIVE' THEN 'Licencia perpetua'
+                    ELSE sp.name
+                  END AS plan_name,
+                  CASE
+                    WHEN lic.license_type = 'PERPETUAL' AND lic.status = 'ACTIVE' THEN 'ACTIVE'
+                    ELSE COALESCE(cs.status, 'SIN_CONFIGURAR')
+                  END AS subscription_status,
                   (SELECT COUNT(*) FROM branches b WHERE b.company_id = c.id AND b.status = 'ACTIVE') AS active_branches,
                   (
                     SELECT COUNT(*)
@@ -727,12 +795,22 @@ public class PlatformService {
                       AND u.status = 'ACTIVE'
                   ) AS active_users,
                   (SELECT COUNT(*) FROM company_modules cm WHERE cm.company_id = c.id AND cm.enabled = 1) AS active_modules,
-                  cl.max_users,
-                  cl.max_branches
+                  CASE WHEN lic.license_type = 'PERPETUAL' AND lic.status = 'ACTIVE' AND lic.unlimited_commercial_use = 1 THEN NULL ELSE cl.max_users END AS max_users,
+                  CASE WHEN lic.license_type = 'PERPETUAL' AND lic.status = 'ACTIVE' AND lic.unlimited_commercial_use = 1 THEN NULL ELSE cl.max_branches END AS max_branches,
+                  lic.license_type,
+                  lic.status AS license_status,
+                  lic.unlimited_commercial_use,
+                  csa.deployment_type,
+                  csa.status AS service_agreement_status,
+                  DATE_FORMAT(csa.end_date, '%Y-%m-%d') AS service_agreement_end_date
                 FROM companies c
                 LEFT JOIN company_subscriptions cs ON cs.company_id = c.id
                 LEFT JOIN subscription_plans sp ON sp.id = cs.plan_id
                 LEFT JOIN company_limits cl ON cl.company_id = c.id
+                LEFT JOIN company_licenses lic ON lic.company_id = c.id
+                LEFT JOIN company_service_agreements csa
+                  ON csa.company_id = c.id
+                 AND csa.service_type = 'HOSTING_INFRASTRUCTURE'
                 WHERE c.code <> ?
                 ORDER BY c.name
                 """,
@@ -746,7 +824,13 @@ public class PlatformService {
                         rs.getInt("active_users"),
                         rs.getInt("active_modules"),
                         rs.getObject("max_users", Integer.class),
-                        rs.getObject("max_branches", Integer.class)
+                        rs.getObject("max_branches", Integer.class),
+                        rs.getString("license_type"),
+                        rs.getString("license_status"),
+                        rs.getObject("unlimited_commercial_use", Boolean.class),
+                        rs.getString("deployment_type"),
+                        rs.getString("service_agreement_status"),
+                        rs.getString("service_agreement_end_date")
                 ),
                 PLATFORM_COMPANY_CODE
         );
@@ -842,9 +926,18 @@ public class PlatformService {
                   c.name AS company_name,
                   c.status,
                   cs.plan_id,
-                  sp.name AS plan_name,
-                  COALESCE(cs.billing_model, 'SIN_CONFIGURAR') AS billing_model,
-                  COALESCE(cs.status, 'SIN_CONFIGURAR') AS subscription_status,
+                  CASE
+                    WHEN lic.license_type = 'PERPETUAL' AND lic.status = 'ACTIVE' THEN 'Licencia perpetua'
+                    ELSE sp.name
+                  END AS plan_name,
+                  CASE
+                    WHEN lic.license_type = 'PERPETUAL' AND lic.status = 'ACTIVE' THEN 'PERPETUAL'
+                    ELSE COALESCE(cs.billing_model, 'SIN_CONFIGURAR')
+                  END AS billing_model,
+                  CASE
+                    WHEN lic.license_type = 'PERPETUAL' AND lic.status = 'ACTIVE' THEN 'ACTIVE'
+                    ELSE COALESCE(cs.status, 'SIN_CONFIGURAR')
+                  END AS subscription_status,
                   (SELECT COUNT(*) FROM branches b WHERE b.company_id = c.id AND b.status = 'ACTIVE') AS active_branches,
                   (
                     SELECT COUNT(*)
@@ -876,12 +969,22 @@ public class PlatformService {
                   (SELECT COUNT(*) FROM company_modules cm WHERE cm.company_id = c.id AND cm.enabled = 1) AS active_modules,
                   CASE WHEN cl.company_id IS NULL THEN 0 ELSE 1 END AS has_limits,
                   (SELECT COUNT(*) FROM company_modules cm WHERE cm.company_id = c.id AND cm.module_code = 'LIVE' AND cm.enabled = 1) AS live_enabled,
-                  cl.max_users,
-                  cl.max_branches
+                  CASE WHEN lic.license_type = 'PERPETUAL' AND lic.status = 'ACTIVE' AND lic.unlimited_commercial_use = 1 THEN NULL ELSE cl.max_users END AS max_users,
+                  CASE WHEN lic.license_type = 'PERPETUAL' AND lic.status = 'ACTIVE' AND lic.unlimited_commercial_use = 1 THEN NULL ELSE cl.max_branches END AS max_branches,
+                  lic.license_type,
+                  lic.status AS license_status,
+                  lic.unlimited_commercial_use,
+                  csa.deployment_type,
+                  csa.status AS service_agreement_status,
+                  DATE_FORMAT(csa.end_date, '%Y-%m-%d') AS service_agreement_end_date
                 FROM companies c
                 LEFT JOIN company_subscriptions cs ON cs.company_id = c.id
                 LEFT JOIN subscription_plans sp ON sp.id = cs.plan_id
                 LEFT JOIN company_limits cl ON cl.company_id = c.id
+                LEFT JOIN company_licenses lic ON lic.company_id = c.id
+                LEFT JOIN company_service_agreements csa
+                  ON csa.company_id = c.id
+                 AND csa.service_type = 'HOSTING_INFRASTRUCTURE'
                 WHERE c.code <> ?
                 ORDER BY
                   CASE c.status WHEN 'ACTIVE' THEN 0 WHEN 'TRIAL' THEN 1 ELSE 2 END,
@@ -903,7 +1006,13 @@ public class PlatformService {
                         rs.getInt("has_limits") == 1,
                         rs.getInt("live_enabled") > 0,
                         rs.getObject("max_users", Integer.class),
-                        rs.getObject("max_branches", Integer.class)
+                        rs.getObject("max_branches", Integer.class),
+                        rs.getString("license_type"),
+                        rs.getString("license_status"),
+                        rs.getObject("unlimited_commercial_use", Boolean.class),
+                        rs.getString("deployment_type"),
+                        rs.getString("service_agreement_status"),
+                        rs.getString("service_agreement_end_date")
                 ),
                 PLATFORM_COMPANY_CODE
         );
@@ -921,9 +1030,17 @@ public class PlatformService {
         int companiesWithUsageBilling = 0;
         int activeUsers = 0;
         int activeBranches = 0;
+        int companiesWithPerpetualLicense = 0;
+        int appModaHostedCompanies = 0;
+        int clientHostedCompanies = 0;
+        int annualServicesPastDue = 0;
+        int annualServicesExpiringSoon = 0;
 
         for (DashboardCompanyRow company : companies) {
             String status = normalizeCode(company.status());
+            boolean hasActivePerpetualLicense = hasActivePerpetualLicense(company);
+            String deploymentType = normalizeCode(company.deploymentType());
+            String serviceStatus = normalizeCode(company.serviceAgreementStatus());
             if ("ACTIVE".equals(status)) {
                 activeCompanies++;
             } else if ("TRIAL".equals(status)) {
@@ -932,7 +1049,8 @@ public class PlatformService {
                 suspendedCompanies++;
             }
 
-            if (company.planId() == null || "SIN_CONFIGURAR".equals(normalizeCode(company.billingModel()))) {
+            if (!hasActivePerpetualLicense &&
+                    (company.planId() == null || "SIN_CONFIGURAR".equals(normalizeCode(company.billingModel())))) {
                 companiesWithoutPlan++;
             }
             if ("ACTIVE".equals(normalizeCode(company.subscriptionStatus()))) {
@@ -940,6 +1058,20 @@ public class PlatformService {
             }
             if ("USAGE_BASED".equals(normalizeCode(company.billingModel()))) {
                 companiesWithUsageBilling++;
+            }
+            if (hasActivePerpetualLicense) {
+                companiesWithPerpetualLicense++;
+            }
+            if ("APPMODA_HOSTED".equals(deploymentType)) {
+                appModaHostedCompanies++;
+            } else if ("CLIENT_HOSTED".equals(deploymentType)) {
+                clientHostedCompanies++;
+            }
+            if ("PAST_DUE".equals(serviceStatus)) {
+                annualServicesPastDue++;
+            }
+            if (isAnnualServiceExpiringSoon(company.serviceAgreementEndDate())) {
+                annualServicesExpiringSoon++;
             }
 
             activeUsers += company.activeUsers();
@@ -957,7 +1089,27 @@ public class PlatformService {
                 activeBranches,
                 queryInteger("SELECT COUNT(*) FROM subscription_plans WHERE status = 'ACTIVE'"),
                 companiesWithUsageToday,
+                companiesWithPerpetualLicense,
+                appModaHostedCompanies,
+                clientHostedCompanies,
+                annualServicesPastDue,
+                annualServicesExpiringSoon,
+                findOneTimeLicenseAmount(),
                 findEstimatedMonthlyRevenue()
+        );
+    }
+
+    private BigDecimal findOneTimeLicenseAmount() {
+        return queryBigDecimal(
+                """
+                SELECT SUM(COALESCE(lic.purchase_amount, 0))
+                FROM company_licenses lic
+                JOIN companies c ON c.id = lic.company_id
+                WHERE c.code <> ?
+                  AND lic.license_type = 'PERPETUAL'
+                  AND lic.status = 'ACTIVE'
+                """,
+                PLATFORM_COMPANY_CODE
         );
     }
 
@@ -1217,6 +1369,9 @@ public class PlatformService {
                             company.status(),
                             company.planName(),
                             company.billingModel(),
+                            company.licenseType(),
+                            company.deploymentType(),
+                            company.serviceAgreementStatus(),
                             company.activeUsers(),
                             company.maxUsers(),
                             company.activeBranches(),
@@ -1325,6 +1480,30 @@ public class PlatformService {
                 companiesNearLimits,
                 "warning",
                 "limits"
+        );
+
+        int servicesPastDue = (int) companies.stream()
+                .filter(company -> "PAST_DUE".equals(normalizeCode(company.serviceAgreementStatus())))
+                .count();
+        addAlert(
+                alerts,
+                "ANNUAL_SERVICES_PAST_DUE",
+                "Servicios anuales de hosting vencidos",
+                servicesPastDue,
+                "danger",
+                "subscriptions"
+        );
+
+        int servicesExpiringSoon = (int) companies.stream()
+                .filter(company -> isAnnualServiceExpiringSoon(company.serviceAgreementEndDate()))
+                .count();
+        addAlert(
+                alerts,
+                "ANNUAL_SERVICES_EXPIRING",
+                "Servicios anuales proximos a vencer",
+                servicesExpiringSoon,
+                "warning",
+                "subscriptions"
         );
 
         return alerts;
@@ -1487,6 +1666,9 @@ public class PlatformService {
         if ("PUT".equals(method) && path.matches("^/api/platform/companies/\\d+/subscription$")) {
             return "SUBSCRIPTION_ASSIGNED";
         }
+        if ("PUT".equals(method) && path.matches("^/api/platform/companies/\\d+/commercial-agreement$")) {
+            return "COMPANY_COMMERCIAL_AGREEMENT_UPDATED";
+        }
         if ("PATCH".equals(method) && path.matches("^/api/platform/companies/\\d+/settings$")) {
             return "COMPANY_SETTINGS_UPDATED";
         }
@@ -1500,7 +1682,8 @@ public class PlatformService {
         return switch (eventType) {
             case "COMPANY_CREATED", "COMPANY_UPDATED", "BRANCH_CREATED", "BRANCH_UPDATED" -> "COMPANIES";
             case "TENANT_ADMIN_CREATED", "TENANT_USER_CREATED", "TENANT_USER_UPDATED" -> "USERS";
-            case "SUBSCRIPTION_PLAN_CREATED", "SUBSCRIPTION_PLAN_UPDATED", "SUBSCRIPTION_ASSIGNED" -> "SUBSCRIPTIONS";
+            case "SUBSCRIPTION_PLAN_CREATED", "SUBSCRIPTION_PLAN_UPDATED", "SUBSCRIPTION_ASSIGNED",
+                    "COMPANY_COMMERCIAL_AGREEMENT_UPDATED" -> "SUBSCRIPTIONS";
             case "PLAN_PRICES_UPDATED", "USAGE_RATES_UPDATED" -> "PRICES";
             case "COMPANY_SETTINGS_UPDATED" -> "CONFIGURATION";
             default -> "PLATFORM";
@@ -1511,7 +1694,8 @@ public class PlatformService {
         return switch (eventType) {
             case "COMPANY_CREATED", "COMPANY_UPDATED", "BRANCH_CREATED", "BRANCH_UPDATED",
                     "TENANT_ADMIN_CREATED", "TENANT_USER_CREATED", "TENANT_USER_UPDATED",
-                    "SUBSCRIPTION_ASSIGNED", "COMPANY_SETTINGS_UPDATED", "USAGE_RATES_UPDATED" -> "COMPANY";
+                    "SUBSCRIPTION_ASSIGNED", "COMPANY_COMMERCIAL_AGREEMENT_UPDATED",
+                    "COMPANY_SETTINGS_UPDATED", "USAGE_RATES_UPDATED" -> "COMPANY";
             case "SUBSCRIPTION_PLAN_CREATED", "SUBSCRIPTION_PLAN_UPDATED", "PLAN_PRICES_UPDATED" -> "SUBSCRIPTION_PLAN";
             default -> "PLATFORM";
         };
@@ -1530,6 +1714,7 @@ public class PlatformService {
             case "SUBSCRIPTION_PLAN_UPDATED" -> "Plan SaaS actualizado";
             case "PLAN_PRICES_UPDATED" -> "Precios del plan actualizados";
             case "SUBSCRIPTION_ASSIGNED" -> "Suscripcion del cliente actualizada";
+            case "COMPANY_COMMERCIAL_AGREEMENT_UPDATED" -> "Licencia y hosting actualizados";
             case "COMPANY_SETTINGS_UPDATED" -> "Modulos o limites actualizados";
             case "USAGE_RATES_UPDATED" -> "Tarifas por consumo actualizadas";
             default -> "Cambio global de plataforma";
@@ -1563,6 +1748,8 @@ public class PlatformService {
             case "SUBSCRIPTION_PLAN_UPDATED" -> "Se actualizo el plan " + planLabel + ".";
             case "PLAN_PRICES_UPDATED" -> "Se actualizaron precios por periodo del plan " + planLabel + ".";
             case "SUBSCRIPTION_ASSIGNED" -> "Se actualizo la suscripcion SaaS de " + companyLabel + ".";
+            case "COMPANY_COMMERCIAL_AGREEMENT_UPDATED" ->
+                    "Se actualizo la licencia comercial o servicio anual de infraestructura de " + companyLabel + ".";
             case "COMPANY_SETTINGS_UPDATED" -> "Se actualizaron modulos o limites de " + companyLabel + ".";
             case "USAGE_RATES_UPDATED" -> "Se actualizaron tarifas por consumo de " + companyLabel + ".";
             default -> "Se registro una accion global de plataforma.";
@@ -1596,11 +1783,12 @@ public class PlatformService {
         List<String> missing = new ArrayList<>();
         String billingModel = normalizeCode(company.billingModel());
         String subscriptionStatus = normalizeCode(company.subscriptionStatus());
+        boolean hasActivePerpetualLicense = hasActivePerpetualLicense(company);
 
-        if (company.planId() == null) {
+        if (!hasActivePerpetualLicense && company.planId() == null) {
             missing.add("Sin plan");
         }
-        if ("SIN_CONFIGURAR".equals(billingModel)) {
+        if (!hasActivePerpetualLicense && "SIN_CONFIGURAR".equals(billingModel)) {
             missing.add("Sin modelo de cobro");
         }
         if (company.activeBranches() == 0) {
@@ -1615,22 +1803,34 @@ public class PlatformService {
         if (company.activeModules() == 0) {
             missing.add("Sin modulos activos");
         }
-        if (!company.hasLimits()) {
+        if (!hasActivePerpetualLicense && !company.hasLimits()) {
             missing.add("Sin limites configurados");
         }
         if (!company.liveEnabled()) {
             missing.add("LIVE desactivado");
         }
-        if (company.planId() != null &&
+        if (!hasActivePerpetualLicense &&
+                company.planId() != null &&
                 !List.of("ACTIVE", "TRIAL").contains(subscriptionStatus)) {
             missing.add("Suscripcion no activa");
+        }
+        String serviceStatus = normalizeCode(company.serviceAgreementStatus());
+        if (hasActivePerpetualLicense && "PAST_DUE".equals(serviceStatus)) {
+            missing.add("Servicio anual vencido");
+        } else if (hasActivePerpetualLicense && requiresAnnualService(company) &&
+                !"ACTIVE".equals(serviceStatus)) {
+            missing.add("Falta servicio anual de hosting");
         }
 
         return missing;
     }
 
     private String actionSectionForMissing(List<String> missing) {
-        if (missing.stream().anyMatch(item -> item.contains("plan") || item.contains("cobro") || item.contains("Suscripcion"))) {
+        if (missing.stream().anyMatch(item -> item.contains("plan") ||
+                item.contains("cobro") ||
+                item.contains("Suscripcion") ||
+                item.contains("hosting") ||
+                item.contains("Servicio anual"))) {
             return "subscriptions";
         }
         if (missing.stream().anyMatch(item -> item.contains("limite"))) {
@@ -1650,6 +1850,30 @@ public class PlatformService {
             return false;
         }
         return current >= Math.ceil(max * 0.8);
+    }
+
+    private boolean hasActivePerpetualLicense(DashboardCompanyRow company) {
+        return "PERPETUAL".equals(normalizeCode(company.licenseType())) &&
+                "ACTIVE".equals(normalizeCode(company.licenseStatus()));
+    }
+
+    private boolean requiresAnnualService(DashboardCompanyRow company) {
+        String deploymentType = normalizeCode(company.deploymentType());
+        return "APPMODA_HOSTED".equals(deploymentType) || "HYBRID".equals(deploymentType);
+    }
+
+    private boolean isAnnualServiceExpiringSoon(String endDate) {
+        String cleaned = cleanNullable(endDate);
+        if (cleaned == null) {
+            return false;
+        }
+        try {
+            LocalDate parsed = LocalDate.parse(cleaned);
+            LocalDate today = LocalDate.now();
+            return !parsed.isBefore(today) && !parsed.isAfter(today.plusDays(30));
+        } catch (RuntimeException ex) {
+            return false;
+        }
     }
 
     private void addAlert(
@@ -1789,6 +2013,250 @@ public class PlatformService {
                 null,
                 null,
                 null
+        );
+    }
+
+    private PlatformCommercialAgreementResponse findCommercialAgreementByCompanyId(Long companyId) {
+        return new PlatformCommercialAgreementResponse(
+                findCommercialLicenseByCompanyId(companyId),
+                findServiceAgreementByCompanyId(companyId)
+        );
+    }
+
+    private PlatformCommercialAgreementResponse.License findCommercialLicenseByCompanyId(Long companyId) {
+        List<PlatformCommercialAgreementResponse.License> rows = jdbcTemplate.query(
+                """
+                SELECT
+                  id,
+                  company_id,
+                  license_type,
+                  status,
+                  purchase_amount,
+                  currency,
+                  DATE_FORMAT(payment_date, '%Y-%m-%d') AS payment_date,
+                  payment_method,
+                  payment_reference,
+                  notes,
+                  DATE_FORMAT(valid_from, '%Y-%m-%d') AS valid_from,
+                  DATE_FORMAT(valid_until, '%Y-%m-%d') AS valid_until,
+                  no_expiration,
+                  unlimited_commercial_use
+                FROM company_licenses
+                WHERE company_id = ?
+                """,
+                (rs, rowNum) -> new PlatformCommercialAgreementResponse.License(
+                        rs.getLong("id"),
+                        rs.getLong("company_id"),
+                        rs.getString("license_type"),
+                        rs.getString("status"),
+                        rs.getBigDecimal("purchase_amount"),
+                        rs.getString("currency"),
+                        rs.getString("payment_date"),
+                        rs.getString("payment_method"),
+                        rs.getString("payment_reference"),
+                        rs.getString("notes"),
+                        rs.getString("valid_from"),
+                        rs.getString("valid_until"),
+                        rs.getObject("no_expiration", Boolean.class),
+                        rs.getObject("unlimited_commercial_use", Boolean.class)
+                ),
+                companyId
+        );
+
+        if (!rows.isEmpty()) {
+            return rows.get(0);
+        }
+
+        return new PlatformCommercialAgreementResponse.License(
+                null,
+                companyId,
+                "SIN_LICENCIA",
+                "SIN_CONFIGURAR",
+                null,
+                "MXN",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                true,
+                true
+        );
+    }
+
+    private PlatformCommercialAgreementResponse.ServiceAgreement findServiceAgreementByCompanyId(Long companyId) {
+        List<PlatformCommercialAgreementResponse.ServiceAgreement> rows = jdbcTemplate.query(
+                """
+                SELECT
+                  id,
+                  company_id,
+                  service_type,
+                  deployment_type,
+                  status,
+                  annual_amount,
+                  currency,
+                  DATE_FORMAT(start_date, '%Y-%m-%d') AS start_date,
+                  DATE_FORMAT(end_date, '%Y-%m-%d') AS end_date,
+                  auto_renew,
+                  payment_method,
+                  payment_reference,
+                  notes
+                FROM company_service_agreements
+                WHERE company_id = ?
+                  AND service_type = 'HOSTING_INFRASTRUCTURE'
+                """,
+                (rs, rowNum) -> new PlatformCommercialAgreementResponse.ServiceAgreement(
+                        rs.getLong("id"),
+                        rs.getLong("company_id"),
+                        rs.getString("service_type"),
+                        rs.getString("deployment_type"),
+                        rs.getString("status"),
+                        rs.getBigDecimal("annual_amount"),
+                        rs.getString("currency"),
+                        rs.getString("start_date"),
+                        rs.getString("end_date"),
+                        rs.getObject("auto_renew", Boolean.class),
+                        rs.getString("payment_method"),
+                        rs.getString("payment_reference"),
+                        rs.getString("notes")
+                ),
+                companyId
+        );
+
+        if (!rows.isEmpty()) {
+            return rows.get(0);
+        }
+
+        return new PlatformCommercialAgreementResponse.ServiceAgreement(
+                null,
+                companyId,
+                "HOSTING_INFRASTRUCTURE",
+                "CLIENT_HOSTED",
+                "NOT_APPLICABLE",
+                null,
+                "MXN",
+                null,
+                null,
+                false,
+                null,
+                null,
+                null
+        );
+    }
+
+    private void upsertCommercialLicense(
+            Long companyId,
+            UpdatePlatformCommercialAgreementRequest.LicensePayload license
+    ) {
+        String licenseType = normalizeLicenseType(license.getLicenseType() == null ? "PERPETUAL" : license.getLicenseType());
+        String status = normalizeLicenseStatus(license.getStatus() == null ? "ACTIVE" : license.getStatus());
+        boolean noExpiration = license.getNoExpiration() == null || license.getNoExpiration();
+        boolean unlimitedCommercialUse =
+                license.getUnlimitedCommercialUse() == null || license.getUnlimitedCommercialUse();
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO company_licenses (
+                  company_id, license_type, status, purchase_amount, currency,
+                  payment_date, payment_method, payment_reference, notes,
+                  valid_from, valid_until, no_expiration, unlimited_commercial_use,
+                  created_by_user_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                  license_type = VALUES(license_type),
+                  status = VALUES(status),
+                  purchase_amount = VALUES(purchase_amount),
+                  currency = VALUES(currency),
+                  payment_date = VALUES(payment_date),
+                  payment_method = VALUES(payment_method),
+                  payment_reference = VALUES(payment_reference),
+                  notes = VALUES(notes),
+                  valid_from = VALUES(valid_from),
+                  valid_until = VALUES(valid_until),
+                  no_expiration = VALUES(no_expiration),
+                  unlimited_commercial_use = VALUES(unlimited_commercial_use),
+                  updated_at = CURRENT_TIMESTAMP
+                """,
+                companyId,
+                licenseType,
+                status,
+                validateMoney(license.getPurchaseAmount()),
+                normalizeCurrency(license.getCurrency()),
+                normalizeDate(license.getPaymentDate()),
+                truncate(cleanNullable(license.getPaymentMethod()), 64),
+                truncate(cleanNullable(license.getPaymentReference()), 150),
+                truncate(cleanNullable(license.getNotes()), 1000),
+                normalizeDate(license.getValidFrom()),
+                noExpiration ? null : normalizeDate(license.getValidUntil()),
+                noExpiration ? 1 : 0,
+                unlimitedCommercialUse ? 1 : 0,
+                currentUser.getUserId()
+        );
+    }
+
+    private void upsertServiceAgreement(
+            Long companyId,
+            UpdatePlatformCommercialAgreementRequest.ServiceAgreementPayload serviceAgreement
+    ) {
+        String serviceType = normalizeServiceType(
+                serviceAgreement.getServiceType() == null
+                        ? "HOSTING_INFRASTRUCTURE"
+                        : serviceAgreement.getServiceType()
+        );
+        String deploymentType = normalizeDeploymentType(
+                serviceAgreement.getDeploymentType() == null
+                        ? "CLIENT_HOSTED"
+                        : serviceAgreement.getDeploymentType()
+        );
+        String status = normalizeServiceStatus(
+                serviceAgreement.getStatus() == null
+                        ? "NOT_APPLICABLE"
+                        : serviceAgreement.getStatus()
+        );
+        BigDecimal annualAmount = validateMoney(serviceAgreement.getAnnualAmount());
+        String startDate = normalizeDate(serviceAgreement.getStartDate());
+        String endDate = normalizeDate(serviceAgreement.getEndDate());
+
+        if ("CLIENT_HOSTED".equals(deploymentType)) {
+            status = "NOT_APPLICABLE";
+            annualAmount = null;
+            startDate = null;
+            endDate = null;
+        }
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO company_service_agreements (
+                  company_id, service_type, deployment_type, status, annual_amount,
+                  currency, start_date, end_date, auto_renew, payment_method,
+                  payment_reference, notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                  deployment_type = VALUES(deployment_type),
+                  status = VALUES(status),
+                  annual_amount = VALUES(annual_amount),
+                  currency = VALUES(currency),
+                  start_date = VALUES(start_date),
+                  end_date = VALUES(end_date),
+                  auto_renew = VALUES(auto_renew),
+                  payment_method = VALUES(payment_method),
+                  payment_reference = VALUES(payment_reference),
+                  notes = VALUES(notes),
+                  updated_at = CURRENT_TIMESTAMP
+                """,
+                companyId,
+                serviceType,
+                deploymentType,
+                status,
+                annualAmount,
+                normalizeCurrency(serviceAgreement.getCurrency()),
+                startDate,
+                endDate,
+                Boolean.TRUE.equals(serviceAgreement.getAutoRenew()) ? 1 : 0,
+                truncate(cleanNullable(serviceAgreement.getPaymentMethod()), 64),
+                truncate(cleanNullable(serviceAgreement.getPaymentReference()), 150),
+                truncate(cleanNullable(serviceAgreement.getNotes()), 1000)
         );
     }
 
@@ -2529,6 +2997,46 @@ public class PlatformService {
         return normalized;
     }
 
+    private String normalizeLicenseType(String value) {
+        String normalized = cleanRequired(value, "licenseType").toUpperCase(Locale.ROOT);
+        if (!LICENSE_TYPES.contains(normalized)) {
+            throw new IllegalArgumentException("licenseType no permitido: " + value);
+        }
+        return normalized;
+    }
+
+    private String normalizeLicenseStatus(String value) {
+        String normalized = cleanRequired(value, "licenseStatus").toUpperCase(Locale.ROOT);
+        if (!LICENSE_STATUSES.contains(normalized)) {
+            throw new IllegalArgumentException("licenseStatus no permitido: " + value);
+        }
+        return normalized;
+    }
+
+    private String normalizeDeploymentType(String value) {
+        String normalized = cleanRequired(value, "deploymentType").toUpperCase(Locale.ROOT);
+        if (!DEPLOYMENT_TYPES.contains(normalized)) {
+            throw new IllegalArgumentException("deploymentType no permitido: " + value);
+        }
+        return normalized;
+    }
+
+    private String normalizeServiceType(String value) {
+        String normalized = cleanRequired(value, "serviceType").toUpperCase(Locale.ROOT);
+        if (!SERVICE_TYPES.contains(normalized)) {
+            throw new IllegalArgumentException("serviceType no permitido: " + value);
+        }
+        return normalized;
+    }
+
+    private String normalizeServiceStatus(String value) {
+        String normalized = cleanRequired(value, "serviceStatus").toUpperCase(Locale.ROOT);
+        if (!SERVICE_STATUSES.contains(normalized)) {
+            throw new IllegalArgumentException("serviceStatus no permitido: " + value);
+        }
+        return normalized;
+    }
+
     private String normalizeUsageType(String value) {
         String normalized = cleanRequired(value, "usageType").toUpperCase(Locale.ROOT);
         boolean known = USAGE_DEFINITIONS.stream().anyMatch(definition -> definition.code().equals(normalized));
@@ -2561,6 +3069,14 @@ public class PlatformService {
             return null;
         }
         return cleaned.replace('T', ' ');
+    }
+
+    private String normalizeDate(String value) {
+        String cleaned = cleanNullable(value);
+        if (cleaned == null) {
+            return null;
+        }
+        return cleaned.length() > 10 ? cleaned.substring(0, 10) : cleaned;
     }
 
     private void setNullableInteger(PreparedStatement ps, int index, Integer value) throws SQLException {
@@ -2666,6 +3182,13 @@ public class PlatformService {
         return cleaned.isBlank() ? null : cleaned;
     }
 
+    private String truncate(String value, int maxLength) {
+        if (value == null) {
+            return null;
+        }
+        return value.length() > maxLength ? value.substring(0, maxLength) : value;
+    }
+
     private List<String> splitRoles(String roles) {
         if (roles == null || roles.isBlank()) {
             return List.of();
@@ -2749,7 +3272,13 @@ public class PlatformService {
             boolean hasLimits,
             boolean liveEnabled,
             Integer maxUsers,
-            Integer maxBranches
+            Integer maxBranches,
+            String licenseType,
+            String licenseStatus,
+            Boolean unlimitedCommercialUse,
+            String deploymentType,
+            String serviceAgreementStatus,
+            String serviceAgreementEndDate
     ) {
     }
 

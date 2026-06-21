@@ -163,3 +163,14 @@ Validaciones manuales recomendadas:
 - Alertas avanzadas con drill-down.
 - Grafica de tendencia mensual.
 - Vista historica por cliente.
+
+## Nota OWNER-LICENSE-B
+
+El dashboard global ahora distingue licencia perpetua y hosting anual:
+
+- `Licencias perpetuas` cuenta clientes con licencia `PERPETUAL` activa.
+- `Cobros unicos` muestra montos de licencia perpetua como pago unico, no como MRR.
+- `Hosting AppModa` identifica clientes donde AppModa hospeda infraestructura.
+- Servicios anuales vencidos o proximos a vencer aparecen como alerta comercial.
+
+Los clientes con licencia perpetua activa ya no deben aparecer como `sin plan`.
