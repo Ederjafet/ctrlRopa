@@ -8,6 +8,7 @@ import AppOptionRow from '@/components/ui/AppOptionRow';
 import PermissionBlockedHint from '@/components/ui/PermissionBlockedHint';
 import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
 import ScreenCapabilitySummary from '@/components/ui/ScreenCapabilitySummary';
+import ScreenPermissionModal from '@/components/ui/ScreenPermissionModal';
 import AppText from '@/components/ui/AppText';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { useAppTheme } from '@/context/AppThemeContext';
@@ -232,7 +233,7 @@ export default function PaymentsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingTarget, setIsLoadingTarget] = useState(false);
-  const [showPermissionDiagnostics, setShowPermissionDiagnostics] = useState(false);
+  const [isPermissionModalVisible, setIsPermissionModalVisible] = useState(false);
 
   useEffect(() => {
     if (initialReservationId) {
@@ -763,9 +764,9 @@ export default function PaymentsScreen() {
     >
       <ScreenCapabilitySummary
         evaluations={permissionEvaluations}
-        showDiagnostics={canShowPermissionDiagnostics}
-        diagnosticsExpanded={showPermissionDiagnostics}
-        onToggleDiagnostics={() => setShowPermissionDiagnostics((current) => !current)}
+        showPermissionButton={canShowPermissionDiagnostics}
+        permissionButtonTitle="Ver permisos"
+        onOpenPermissions={() => setIsPermissionModalVisible(true)}
       />
 
       {isLiveContext ? (
@@ -1325,6 +1326,14 @@ export default function PaymentsScreen() {
           </AppOptionRow>
         ))}
       </AppBottomModal>
+
+      <ScreenPermissionModal
+        visible={isPermissionModalVisible}
+        screenTitle="Pagos"
+        evaluations={permissionEvaluations}
+        showTechnicalDetails={canShowPermissionDiagnostics}
+        onClose={() => setIsPermissionModalVisible(false)}
+      />
     </AppShellPage>
   );
 }

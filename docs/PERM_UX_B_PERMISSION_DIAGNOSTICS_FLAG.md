@@ -62,6 +62,8 @@ Primera aplicacion:
 
 - `/payments`
 
+PERM-UX-C mueve el diagnostico tecnico de `/payments` a una modal reusable. La bandera sigue controlando si aparece el boton `Ver permisos` y si la modal muestra codigos tecnicos.
+
 Backlog:
 
 - Paquete.

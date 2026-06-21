@@ -9,17 +9,17 @@ import { StyleSheet, View } from 'react-native';
 type Props = {
   title?: string;
   evaluations: ScreenPermissionEvaluation[];
-  showDiagnostics?: boolean;
-  diagnosticsExpanded?: boolean;
-  onToggleDiagnostics?: () => void;
+  showPermissionButton?: boolean;
+  permissionButtonTitle?: string;
+  onOpenPermissions?: () => void;
 };
 
 export default function ScreenCapabilitySummary({
   title = 'Tu acceso en esta pantalla',
   evaluations,
-  showDiagnostics = false,
-  diagnosticsExpanded = false,
-  onToggleDiagnostics,
+  showPermissionButton = false,
+  permissionButtonTitle = 'Ver permisos',
+  onOpenPermissions,
 }: Props) {
   const { theme } = useAppTheme();
 
@@ -34,12 +34,12 @@ export default function ScreenCapabilitySummary({
             Las acciones visibles dependen de permisos activos en tu usuario.
           </AppText>
         </View>
-        {showDiagnostics && onToggleDiagnostics ? (
+        {showPermissionButton && onOpenPermissions ? (
           <AppButton
-            title={diagnosticsExpanded ? 'Ocultar diagnostico' : 'Ver diagnostico'}
+            title={permissionButtonTitle}
             variant="secondary"
-            onPress={onToggleDiagnostics}
-            style={styles.diagnosticsButton}
+            onPress={onOpenPermissions}
+            style={styles.permissionButton}
           />
         ) : null}
       </View>
@@ -58,25 +58,6 @@ export default function ScreenCapabilitySummary({
         ))}
       </View>
 
-      {showDiagnostics && diagnosticsExpanded ? (
-        <View style={[styles.diagnosticsPanel, { borderTopColor: theme.colors.border }]}>
-          {evaluations.map((item) => (
-            <View key={item.key} style={styles.diagnosticRow}>
-              <View style={styles.diagnosticAction}>
-                <AppText bold>{item.label}</AppText>
-                <AppText variant="caption" color={theme.colors.mutedText}>
-                  {item.technicalMessage}
-                </AppText>
-              </View>
-              <StatusBadge
-                label={item.permissionCode}
-                tone={item.allowed ? 'info' : 'warning'}
-                style={styles.permissionBadge}
-              />
-            </View>
-          ))}
-        </View>
-      ) : null}
     </AppCard>
   );
 }
@@ -97,24 +78,8 @@ const styles = StyleSheet.create({
   card: {
     marginBottom: 12,
   },
-  diagnosticAction: {
-    flex: 1,
-    minWidth: 0,
-  },
-  diagnosticRow: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: 10,
-    justifyContent: 'space-between',
-  },
-  diagnosticsButton: {
+  permissionButton: {
     minHeight: 32,
-  },
-  diagnosticsPanel: {
-    borderTopWidth: 1,
-    gap: 10,
-    marginTop: 12,
-    paddingTop: 12,
   },
   headerRow: {
     alignItems: 'flex-start',
@@ -122,9 +87,6 @@ const styles = StyleSheet.create({
     gap: 12,
     justifyContent: 'space-between',
     marginBottom: 12,
-  },
-  permissionBadge: {
-    maxWidth: 220,
   },
   titleBlock: {
     flex: 1,

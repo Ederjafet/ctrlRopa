@@ -79,6 +79,8 @@ La UI ahora refleja esos permisos de forma mas clara, pero no sustituye la prote
 
 PERM-UX-B agrega `EXPO_PUBLIC_ENABLE_PERMISSION_DIAGNOSTICS` como bandera centralizada para mostrar u ocultar el panel tecnico expandible. El resumen de capacidades y los mensajes de acciones bloqueadas siguen funcionando aunque la bandera este apagada.
 
+PERM-UX-C reemplaza el panel expandible por el boton `Ver permisos` y la modal reusable `ScreenPermissionModal`.
+
 ## Validaciones esperadas
 
 - `/payments` no muestra dos cabeceras con `Pagos`.

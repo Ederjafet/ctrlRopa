@@ -1,5 +1,29 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-21 - PERM-UX-C modal reusable de permisos en pagos
+
+Tipo: frontend, permisos, UX, pagos, documentacion.
+
+Objetivo:
+
+- Reemplazar el diagnostico tecnico expandible de `/payments` por una modal reusable controlada por la bandera global.
+
+Cambios realizados:
+
+- Se agrega `components/ui/ScreenPermissionModal.tsx`.
+- `ScreenCapabilitySummary` queda como resumen compacto con boton opcional `Ver permisos`.
+- `/payments` abre la modal desde `Ver permisos`.
+- El resumen simple de capacidades sigue visible.
+- El diagnostico tecnico queda dentro de la modal y sigue condicionado por `EXPO_PUBLIC_ENABLE_PERMISSION_DIAGNOSTICS` y perfil autorizado.
+- Se documenta la fase en `docs/PERM_UX_C_PERMISSION_MODAL_PAYMENTS.md`.
+
+Restricciones respetadas:
+
+- No se toco backend.
+- No se hizo merge a `main`.
+- No se cambio la proteccion de pagos.
+- No se agrego `Actualizar` fuera de LIVE.
+
 ## 2026-06-21 - PERM-UX-B bandera global de diagnostico tecnico
 
 Tipo: frontend, permisos, UX, documentacion.
