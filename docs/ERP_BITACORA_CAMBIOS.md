@@ -1,5 +1,30 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-21 - BATCH-UX-A detalle de lote claro
+
+Tipo: inventario, lotes, proveedores, permisos, UX, frontend, documentacion.
+
+Objetivo:
+
+- Redisenar `/batch-detail` para que el detalle de lote sea claro, compacto y accionable antes de instalacion cliente.
+
+Cambios realizados:
+
+- `/batch-detail` ahora muestra cabecera compacta, estado del lote, proveedor, sucursal, calidad, fechas y proximo paso operativo.
+- Se agregan metricas de prendas por lote: total, disponibles, apartadas, vendidas, deshabilitadas y valor estimado cuando hay precios.
+- Se agrega listado de prendas del lote con busqueda, filtros por estado y acceso al detalle de prenda.
+- Se reorganizan proveedor, entrada, acciones, clasificacion y prendas en bloques separados y responsivos.
+- Las acciones bloqueadas explican si falta permiso, recepcion, clasificacion o si el lote esta cancelado.
+- Se agrega `batchDetail` a `services/screenPermissions.ts` y boton `Ver permisos` en cabecera.
+- Se documenta la fase en `docs/BATCH_UX_A_DETALLE_LOTE.md`.
+
+Restricciones respetadas:
+
+- No se reseteo base de datos.
+- No se toco backend.
+- No se agrego boton `Actualizar` fuera de LIVE.
+- No se implemento edicion avanzada de lote ni modulo nuevo.
+
 ## 2026-06-21 - RC-CLIENTE-C edicion Owner, proveedores/lotes y permisos cliente
 
 Tipo: release candidate, instalacion cliente, platform owner, permisos tenant, inventario, frontend, backend, migracion, documentacion.

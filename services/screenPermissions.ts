@@ -23,7 +23,8 @@ export type ScreenPermissionKey =
   | 'itemsCreate'
   | 'customersCreate'
   | 'suppliers'
-  | 'batchForm';
+  | 'batchForm'
+  | 'batchDetail';
 
 export type ScreenPermissionActionKey = string;
 
@@ -600,6 +601,62 @@ export const SCREEN_PERMISSIONS: Record<ScreenPermissionKey, ScreenPermissionDef
         permissionCode: 'MANAGE_CATALOGS',
         allowedMessage: 'Puedes crear proveedor si no existe antes de registrar el lote.',
         deniedMessage: 'No puedes crear proveedores.',
+      },
+    ],
+  },
+  batchDetail: {
+    key: 'batchDetail',
+    title: 'Detalle de lote',
+    requiredToView: ['VIEW_INVENTORY'],
+    actions: [
+      {
+        key: 'viewBatch',
+        label: 'Ver lote',
+        permissionCode: 'VIEW_INVENTORY',
+        allowedMessage: 'Puedes consultar datos, proveedor y prendas asociadas al lote.',
+        deniedMessage: 'No puedes consultar el detalle del lote.',
+      },
+      {
+        key: 'receiveBatch',
+        label: 'Registrar recepcion',
+        permissionCode: 'MANAGE_INVENTORY',
+        allowedMessage: 'Puedes registrar o ajustar la recepcion del lote.',
+        deniedMessage: 'No puedes registrar recepcion de lotes.',
+      },
+      {
+        key: 'classifyBatch',
+        label: 'Clasificar lote',
+        permissionCode: 'MANAGE_INVENTORY',
+        allowedMessage: 'Puedes guardar la clasificacion por tipo de prenda.',
+        deniedMessage: 'No puedes clasificar lotes.',
+      },
+      {
+        key: 'createBatchItems',
+        label: 'Crear prendas del lote',
+        permissionCode: 'MANAGE_INVENTORY',
+        allowedMessage: 'Puedes crear prendas asociadas a este lote.',
+        deniedMessage: 'No puedes crear prendas desde el lote.',
+      },
+      {
+        key: 'viewSupplier',
+        label: 'Ver proveedor',
+        permissionCode: 'VIEW_INVENTORY',
+        allowedMessage: 'Puedes revisar el proveedor asociado al lote.',
+        deniedMessage: 'No puedes consultar proveedores desde el lote.',
+      },
+      {
+        key: 'createSupplier',
+        label: 'Crear proveedor',
+        permissionCode: 'MANAGE_CATALOGS',
+        allowedMessage: 'Puedes crear proveedor cuando el lote no tenga uno asignado.',
+        deniedMessage: 'No puedes crear proveedores.',
+      },
+      {
+        key: 'closeOrCancelBatch',
+        label: 'Cerrar o cancelar lote',
+        permissionCode: 'MANAGE_INVENTORY',
+        allowedMessage: 'Puedes conciliar o cancelar el lote cuando aplique.',
+        deniedMessage: 'No puedes cerrar ni cancelar lotes.',
       },
     ],
   },
