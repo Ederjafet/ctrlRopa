@@ -23,6 +23,7 @@ import {
   getCustomerPackageDetailsByCustomer,
   getCustomerPackageDetail,
   getCustomerPackagesByCustomer,
+  isCustomerPackageOpen,
   prepareCustomerPackageFromReservation,
   type CustomerPackageDetail,
 } from '@/services/customerPackageService';
@@ -190,13 +191,17 @@ function getReservationCustomerLabel(reservation: Reservation) {
 
 function getPrimaryAction(
   reservation: Reservation,
-  packageLink?: ReservationPackageLink
+  packageLink?: ReservationPackageLink,
+  hasOpenPackage = false
 ): { kind: PrimaryActionKind; title: string } {
   if (!isActiveReservation(reservation)) return { kind: 'detail', title: 'Ver detalle' };
   if (packageLink) return { kind: 'viewPackage', title: 'Ver paquete' };
   if (!reservation.customerId) return { kind: 'linkCustomer', title: 'Vincular cliente' };
 
-  return { kind: 'createPackage', title: 'Crear / agregar paquete' };
+  return {
+    kind: 'createPackage',
+    title: hasOpenPackage ? 'Agregar a paquete' : 'Crear paquete',
+  };
 }
 
 function getPackageDisabledReason(
@@ -272,6 +277,7 @@ export default function ReservationsScreen() {
   const [packageFreeItems, setPackageFreeItems] = useState<Item[]>([]);
   const [packageActivePackages, setPackageActivePackages] = useState<CustomerPackageDetail[]>([]);
   const [reservationPackageMap, setReservationPackageMap] = useState<ReservationPackageMap>({});
+  const [openPackageCustomerIds, setOpenPackageCustomerIds] = useState<Set<number>>(new Set());
   const [selectedPackageReservationIds, setSelectedPackageReservationIds] = useState<number[]>([]);
   const [selectedPackageItemIds, setSelectedPackageItemIds] = useState<number[]>([]);
   const [selectedExistingPackageId, setSelectedExistingPackageId] = useState<number | null>(null);
@@ -321,12 +327,18 @@ export default function ReservationsScreen() {
     );
 
     if (customerIds.length === 0) {
-      return {};
+      return { packageMap: {}, openCustomerIds: new Set<number>() };
     }
 
     try {
       const packagesByCustomer = await Promise.all(
         customerIds.map((customerId) => getCustomerPackagesByCustomer(customerId))
+      );
+      const openCustomerIds = new Set(
+        packagesByCustomer
+          .flat()
+          .filter((customerPackage) => isCustomerPackageOpen(customerPackage))
+          .map((customerPackage) => customerPackage.customerId)
       );
       const activePackages = packagesByCustomer
         .flat()
@@ -335,7 +347,7 @@ export default function ReservationsScreen() {
         activePackages.map((customerPackage) => getCustomerPackageDetail(customerPackage.id))
       );
 
-      return packageDetails.reduce<ReservationPackageMap>((acc, customerPackage) => {
+      const packageMap = packageDetails.reduce<ReservationPackageMap>((acc, customerPackage) => {
         customerPackage.items?.forEach((packageItem) => {
           if (packageItem.reservationId) {
             acc[packageItem.reservationId] = {
@@ -348,9 +360,11 @@ export default function ReservationsScreen() {
 
         return acc;
       }, {});
+
+      return { packageMap, openCustomerIds };
     } catch (error) {
       console.log('No se pudo cargar membresia de paquetes', error);
-      return {};
+      return { packageMap: {}, openCustomerIds: new Set<number>() };
     }
   }, []);
 
@@ -362,6 +376,7 @@ export default function ReservationsScreen() {
       if (!currentSession?.branchId) {
         setReservations([]);
         setReservationPackageMap({});
+        setOpenPackageCustomerIds(new Set());
         setBoxes([]);
         setCustomers([]);
         setErrorMessage('No se encontro sucursal activa en la sesion.');
@@ -386,10 +401,11 @@ export default function ReservationsScreen() {
         ]);
 
         const active = reservationData.filter(isActiveReservation);
-        const packageMap = await loadReservationPackageMap(active);
+        const { packageMap, openCustomerIds } = await loadReservationPackageMap(active);
 
         setReservations(active);
         setReservationPackageMap(packageMap);
+        setOpenPackageCustomerIds(openCustomerIds);
         setBoxes(boxData);
         setCustomers(customerData.filter(isSelectableCustomer));
       } catch (error) {
@@ -752,13 +768,16 @@ export default function ReservationsScreen() {
       getCustomerPackageDetailsByCustomer(reservation.customerId),
       getItemsByBranch(session.branchId),
     ]);
-    const activePackages = packageData.filter((customerPackage) =>
+    const packageMemberships = packageData.filter((customerPackage) =>
       isActivePackageStatus(customerPackage.status)
+    );
+    const openPackages = packageData.filter((customerPackage) =>
+      isCustomerPackageOpen(customerPackage)
     );
     const packagedReservationIds = new Set<number>();
     const packagedItemIds = new Set<number>();
 
-    activePackages.forEach((customerPackage) => {
+    packageMemberships.forEach((customerPackage) => {
       customerPackage.items?.forEach((item) => {
         if (item.reservationId) {
           packagedReservationIds.add(item.reservationId);
@@ -790,7 +809,7 @@ export default function ReservationsScreen() {
     return {
       reservations: reservationCandidates,
       freeItems,
-      activePackages,
+      activePackages: openPackages,
     };
   };
 
@@ -832,6 +851,7 @@ export default function ReservationsScreen() {
       setPackageCandidates(candidates.reservations);
       setPackageFreeItems(candidates.freeItems);
       setPackageActivePackages(candidates.activePackages);
+      setSelectedExistingPackageId(candidates.activePackages[0]?.id ?? null);
     } catch (error: any) {
       const copy = getActionableApiError(error, t);
       setPackageReservation(null);
@@ -1001,7 +1021,8 @@ export default function ReservationsScreen() {
 
   const renderPrimaryAction = (item: Reservation) => {
     const packageLink = reservationPackageMap[item.id];
-    const primaryAction = getPrimaryAction(item, packageLink);
+    const hasOpenPackage = item.customerId ? openPackageCustomerIds.has(item.customerId) : false;
+    const primaryAction = getPrimaryAction(item, packageLink, hasOpenPackage);
     const packageDisabledReason = getPackageDisabledReason(item, session, packageLink);
     const assignBoxDisabledReason = getAssignBoxDisabledReason(item);
     const isCreatingPackage = workingReservationId === item.id && workingAction === 'createPackage';
@@ -1070,6 +1091,7 @@ export default function ReservationsScreen() {
     const isExpanded = expandedReservationId === item.id;
     const party = getPartyInfo(item);
     const packageLink = reservationPackageMap[item.id];
+    const hasOpenPackage = item.customerId ? openPackageCustomerIds.has(item.customerId) : false;
     const channelLabel =
       item.liveId
         ? getLiveLabel(item)
@@ -1086,7 +1108,7 @@ export default function ReservationsScreen() {
     const branchLabel = session?.branchName || 'Sucursal no capturada';
     const itemMetaLine = `${itemLabel} - ${branchLabel}`;
     const compactMetaLine = `${itemMetaLine} - Caja: ${boxLabel}`;
-    const primaryAction = getPrimaryAction(item, packageLink);
+    const primaryAction = getPrimaryAction(item, packageLink, hasOpenPackage);
 
     return (
       <AppCard
@@ -1181,6 +1203,8 @@ export default function ReservationsScreen() {
     const canRegisterPayments = hasPermission(session, 'REGISTER_PAYMENTS');
     const canCancelReservation = hasPermission(session, 'CANCEL_RESERVATION');
     const packageLink = reservationPackageMap[item.id];
+    const hasOpenPackage = item.customerId ? openPackageCustomerIds.has(item.customerId) : false;
+    const packageActionTitle = hasOpenPackage ? 'Agregar a paquete' : 'Crear paquete';
     const packageDisabledReason = getPackageDisabledReason(item, session, packageLink);
     const assignBoxDisabledReason = getAssignBoxDisabledReason(item);
     const isCreatingPackage = workingReservationId === item.id && workingAction === 'createPackage';
@@ -1250,25 +1274,16 @@ export default function ReservationsScreen() {
             disabled={Boolean(assignBoxDisabledReason)}
             disabledReason={assignBoxDisabledReason || undefined}
           />
-          <AppButton
-            title="Crear / agregar paquete"
-            variant="operation"
-            onPress={() => closeActionsAndRun(openPackageModal)}
-            loading={isCreatingPackage}
-            disabled={Boolean(packageDisabledReason) || Boolean(workingReservationId)}
-            disabledReason={packageDisabledReason || 'Ya hay una accion en proceso.'}
-          />
-          <AppButton
-            title="Agregar a paquete"
-            variant="neutral"
-            onPress={() => closeActionsAndRun(openPackageModal)}
-            loading={isCreatingPackage}
-            disabled={Boolean(packageDisabledReason) || Boolean(workingReservationId)}
-            disabledReason={
-              packageDisabledReason ||
-              'Selecciona un paquete activo del mismo cliente o crea uno nuevo.'
-            }
-          />
+          {!packageLink ? (
+            <AppButton
+              title={packageActionTitle}
+              variant="operation"
+              onPress={() => closeActionsAndRun(openPackageModal)}
+              loading={isCreatingPackage}
+              disabled={Boolean(packageDisabledReason) || Boolean(workingReservationId)}
+              disabledReason={packageDisabledReason || 'Ya hay una accion en proceso.'}
+            />
+          ) : null}
           <AppButton
             title="Ver pagos"
             variant="secondary"
@@ -1626,7 +1641,7 @@ export default function ReservationsScreen() {
 
       <AppBottomModal
         visible={Boolean(packageReservation)}
-        title="Crear paquete"
+        title={packageActivePackages.length > 0 ? 'Agregar a paquete' : 'Crear paquete'}
         onClose={closePackageModal}
         maxHeight="90%"
         footer={
@@ -1668,7 +1683,9 @@ export default function ReservationsScreen() {
                 {packageReservation.customerName || `Cliente #${packageReservation.customerId}`}
               </AppText>
               <AppText variant="caption" color={theme.colors.mutedText}>
-                Selecciona apartados activos, prendas libres o un paquete abierto del mismo cliente. Los interesados sin cliente formal no aparecen aqui.
+                {packageActivePackages.length > 0
+                  ? 'Selecciona un paquete abierto del mismo cliente o crea uno nuevo para esta seleccion.'
+                  : 'Crea un paquete nuevo con apartados activos o prendas libres del mismo cliente.'}
               </AppText>
             </AppCard>
 

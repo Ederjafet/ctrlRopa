@@ -1,5 +1,30 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-21 - FLOW-FAST-QA-C limpieza UX de pagos y acciones de paquete
+
+Tipo: frontend, UX operativa, pagos, apartados, paquetes, documentacion.
+
+Objetivo:
+
+- Quitar navegacion duplicada en `/payments` y reemplazar la accion ambigua `Crear / agregar paquete` por labels claros en `/reservations`.
+
+Cambios realizados:
+
+- `/payments` ya no renderiza el boton `Menu principal`; el sidebar queda como navegacion principal.
+- `/reservations` calcula clientes con paquete `OPEN` para decidir entre `Crear paquete` y `Agregar a paquete`.
+- Apartados ya incluidos en paquete mantienen `Ver paquete`.
+- Alias/interesados sin cliente formal orientan a `Vincular cliente`.
+- El modal de paquete ajusta titulo y copy segun existan paquetes abiertos del cliente.
+- En `Mas`, se retiro la segunda accion redundante de paquete cuando el apartado ya tiene paquete.
+- Se documenta la fase en `docs/FLOW_FAST_QA_C_PAGOS_APARTADOS_ACCIONES.md`.
+
+Restricciones respetadas:
+
+- No se toco backend.
+- No se hizo merge a `main`.
+- No se reintrodujo `Apartado puerta` al menu.
+- No se agrego `Actualizar` fuera de LIVE.
+
 ## 2026-06-20 - FAST-SIDEBAR-UX-L scroll global y opcion activa visible
 
 Tipo: frontend, UX global, navegacion, documentacion.

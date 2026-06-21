@@ -1,4 +1,3 @@
-﻿import AppBackButton from '@/components/ui/AppBackButton';
 import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
@@ -237,17 +236,6 @@ export default function PaymentsScreen() {
   }, [initialOrderId, initialReservationId]);
 
   const targetId = useMemo(() => normalizeNumber(targetIdText), [targetIdText]);
-
-  const fallbackRoute = useMemo(() => {
-    if (returnTo) return returnTo;
-    if (initialOrderId) {
-      return `/customer-order-detail?id=${initialOrderId}`;
-    }
-    if (initialReservationId) {
-      return `/reservation-detail?id=${initialReservationId}`;
-    }
-    return '/';
-  }, [initialOrderId, initialReservationId, returnTo]);
 
   const activePayments = useMemo(
     () => payments.filter((payment) => !isVoidedPayment(payment)),
@@ -720,11 +708,6 @@ export default function PaymentsScreen() {
       activeRoute="payments"
       compactHeader
     >
-      <AppBackButton
-        fallbackRoute={fallbackRoute}
-        onPress={hasSelectedPendingOrder ? clearSelectedPendingOrder : undefined}
-      />
-
       <AppCard variant="info" style={styles.heroCard}>
         <View style={styles.heroHeader}>
           <View style={styles.heroText}>

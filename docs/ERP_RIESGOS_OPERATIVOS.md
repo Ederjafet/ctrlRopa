@@ -25,6 +25,7 @@ Probabilidad:
 
 | Riesgo | Severidad | Probabilidad | Impacto operacional | Mitigacion | Rollback |
 |---|---|---|---|---|---|
+| Acciones ambiguas de paquete en apartados | MEDIO | BAJA despues de FLOW-FAST-QA-C | Operadores podrian crear paquetes duplicados o no entender si agregan a uno existente. | FLOW-FAST-QA-C reemplaza `Crear / agregar paquete` por `Crear paquete`, `Agregar a paquete`, `Ver paquete` o `Vincular cliente` segun estado real. | Revertir cambios de `app/reservations.tsx` y operar paquetes desde detalle mientras se ajusta el flujo. |
 | Venta sin validacion clara | CRITICO | MEDIA | Venta incompleta, prenda mal afectada, diferencia de caja. | Validaciones accionables, regresion de venta puerta, mensajes claros. | Revertir pantalla/servicio afectado y validar item/pago. |
 | Pago/anulacion con error | CRITICO | MEDIA | Saldo o caja incorrecta. | QA especifico de pagos, auditoria financiera, permisos revisados. | Revertir backend/frontend y revisar movimientos financieros. |
 | Permisos incompletos | CRITICO | ALTA | Usuario ejecuta accion indebida o queda bloqueado. | Matriz endpoint-permiso, pruebas con usuario permitido/no permitido. | Revertir cambio de permisos o rol; validar sesion. |
