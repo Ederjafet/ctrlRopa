@@ -105,6 +105,13 @@ const PLAN_MODULE_FLAGS: {
   { key: 'includesPackages', label: 'Paquetes' },
 ];
 
+type CompanyFilterKey = 'all' | 'active' | 'withoutPlan' | 'pending' | 'ready' | 'internal';
+
+type CompanyHealth = {
+  label: string;
+  tone: 'neutral' | 'success' | 'warning' | 'danger' | 'info';
+};
+
 const TENANT_ROLE_OPTIONS = [
   { code: 'ADMIN', label: 'Admin' },
   { code: 'SUPERVISOR', label: 'Supervisor' },
@@ -190,11 +197,74 @@ function normalizePlatformActionSection(value?: string | null): PlatformSection 
     : 'companies';
 }
 
+function sectionForCompanyPending(labels: string[]): PlatformSection {
+  if (labels.some((item) => item.includes('plan') || item.includes('cobro') || item.includes('Suscripcion'))) {
+    return 'subscriptions';
+  }
+  if (labels.some((item) => item.includes('limite'))) {
+    return 'limits';
+  }
+  if (labels.some((item) => item.includes('usuario') || item.includes('admin'))) {
+    return 'users';
+  }
+  if (labels.some((item) => item.includes('modulo') || item.includes('LIVE'))) {
+    return 'modules';
+  }
+  if (labels.some((item) => item.includes('sucursal'))) {
+    return 'branches';
+  }
+  return 'companies';
+}
+
 function normalizeDashboardTone(value?: string | null): 'neutral' | 'success' | 'warning' | 'danger' | 'info' {
   if (value === 'success' || value === 'warning' || value === 'danger' || value === 'info') {
     return value;
   }
   return 'neutral';
+}
+
+function normalizeBillingModelLabel(value?: string | null) {
+  switch ((value || '').toUpperCase()) {
+    case 'SUBSCRIPTION':
+      return 'Suscripcion';
+    case 'USAGE_BASED':
+      return 'Consumo';
+    case 'HYBRID':
+      return 'Hibrido';
+    case 'SIN_CONFIGURAR':
+    case '':
+      return 'Sin modelo';
+    default:
+      return value || 'Sin modelo';
+  }
+}
+
+function normalizeSubscriptionStatusLabel(value?: string | null) {
+  switch ((value || '').toUpperCase()) {
+    case 'ACTIVE':
+      return 'Suscripcion activa';
+    case 'TRIAL':
+      return 'Trial';
+    case 'PAST_DUE':
+      return 'Vencida';
+    case 'SUSPENDED':
+      return 'Suspendida';
+    case 'CANCELLED':
+      return 'Cancelada';
+    case 'SIN_CONFIGURAR':
+    case '':
+      return 'Sin suscripcion';
+    default:
+      return value || 'Sin suscripcion';
+  }
+}
+
+function formatCountLimit(current?: number | null, max?: number | null) {
+  return `${current ?? 0} / ${max ?? 'sin limite'}`;
+}
+
+function uniqueLabels(labels: string[]) {
+  return Array.from(new Set(labels.filter(Boolean)));
 }
 
 function parseNullableInteger(value: string, label: string): number | null {
@@ -268,6 +338,7 @@ export default function PlatformScreen() {
   const [showAdminForm, setShowAdminForm] = useState(false);
   const [showPlanForm, setShowPlanForm] = useState(false);
   const [companyPickerVisible, setCompanyPickerVisible] = useState(false);
+  const [companyFilter, setCompanyFilter] = useState<CompanyFilterKey>('all');
   const [loading, setLoading] = useState(true);
   const [loadingCompanyScope, setLoadingCompanyScope] = useState(false);
   const [creatingCompany, setCreatingCompany] = useState(false);
@@ -860,6 +931,152 @@ export default function PlatformScreen() {
   const selectedUsage = selectedCompany
     ? usageSummary.find((item) => item.companyId === selectedCompany.id)
     : null;
+  const companyCards = useMemo(() => {
+    const usageByCompanyId = new Map(usageSummary.map((item) => [item.companyId, item]));
+    const attentionByCompanyId = new Map(
+      (dashboardSummary?.attentionCompanies ?? []).map((item) => [item.companyId, item])
+    );
+    const pendingByCompanyId = new Map(
+      (dashboardSummary?.installationPendings ?? []).map((item) => [item.companyId, item])
+    );
+
+    return companies.map((company) => {
+      const isInternal = company.code === 'APPMODA_PLATFORM';
+      const selected = company.id === selectedCompanyId;
+      const usage = usageByCompanyId.get(company.id);
+      const attention = attentionByCompanyId.get(company.id);
+      const installationPending = pendingByCompanyId.get(company.id);
+      const inferredMissing: string[] = [];
+
+      if (!isInternal) {
+        if (!usage) {
+          inferredMissing.push('Sin configuracion SaaS');
+        } else {
+          const billingModel = (usage.billingModel || '').toUpperCase();
+          const subscriptionStatus = (usage.subscriptionStatus || '').toUpperCase();
+
+          if (!usage.planName) {
+            inferredMissing.push('Sin plan');
+          }
+          if (!billingModel || billingModel === 'SIN_CONFIGURAR') {
+            inferredMissing.push('Sin modelo de cobro');
+          }
+          if ((usage.activeBranches ?? 0) <= 0) {
+            inferredMissing.push('Sin sucursal activa');
+          }
+          if (company.adminUsers <= 0) {
+            inferredMissing.push('Sin admin cliente');
+          }
+          if ((usage.activeUsers ?? 0) <= 0) {
+            inferredMissing.push('Sin usuarios activos');
+          }
+          if ((usage.activeModules ?? 0) <= 0) {
+            inferredMissing.push('Sin modulos activos');
+          }
+          if (usage.maxUsers == null && usage.maxBranches == null) {
+            inferredMissing.push('Sin limites configurados');
+          }
+          if (usage.planName && !['ACTIVE', 'TRIAL'].includes(subscriptionStatus)) {
+            inferredMissing.push('Suscripcion no activa');
+          }
+        }
+
+        if (!company.branchName) {
+          inferredMissing.push('Sin sucursal principal');
+        }
+      }
+
+      const configurationPendings = uniqueLabels([
+        ...(installationPending?.missing ?? []),
+        ...inferredMissing,
+      ]);
+      const attentionLabels = uniqueLabels(attention?.pendingLabels ?? []);
+      const allPendingLabels = uniqueLabels([...configurationPendings, ...attentionLabels]);
+      const hasPlanIssue = configurationPendings.some((item) =>
+        item.includes('plan') || item.includes('cobro')
+      );
+      const isReady =
+        !isInternal &&
+        company.status === 'ACTIVE' &&
+        configurationPendings.length === 0;
+      const health: CompanyHealth = isInternal
+        ? { label: 'Interno', tone: 'neutral' }
+        : company.status !== 'ACTIVE' && company.status !== 'TRIAL'
+          ? { label: 'Suspendido/inactivo', tone: 'danger' }
+          : hasPlanIssue
+            ? { label: 'Sin plan', tone: 'warning' }
+            : configurationPendings.length > 0
+              ? { label: 'Incompleto', tone: 'warning' }
+              : attentionLabels.length > 0
+                ? { label: 'Requiere atencion', tone: 'info' }
+                : { label: 'Listo', tone: 'success' };
+      const modules = attention?.modules?.length
+        ? attention.modules
+        : usage?.activeModules
+          ? [`${usage.activeModules} modulos activos`]
+          : [];
+      const actionSection = installationPending?.actionSection
+        ? normalizePlatformActionSection(installationPending.actionSection)
+        : sectionForCompanyPending(configurationPendings);
+
+      return {
+        company,
+        selected,
+        isInternal,
+        usage,
+        health,
+        modules,
+        configurationPendings,
+        attentionLabels,
+        allPendingLabels,
+        actionSection,
+        isReady,
+        hasPlanIssue,
+      };
+    });
+  }, [companies, dashboardSummary, selectedCompanyId, usageSummary]);
+  const companyStats = useMemo(() => {
+    const operational = companyCards.filter((item) => !item.isInternal);
+    return {
+      totalOperational: operational.length,
+      active: operational.filter((item) => item.company.status === 'ACTIVE').length,
+      withoutPlan: operational.filter((item) => item.hasPlanIssue).length,
+      pending: operational.filter((item) => !item.isReady || item.attentionLabels.length > 0).length,
+      ready: operational.filter((item) => item.isReady).length,
+      inactive: operational.filter((item) => item.company.status !== 'ACTIVE').length,
+      internal: companyCards.filter((item) => item.isInternal).length,
+    };
+  }, [companyCards]);
+  const companyFilterOptions = useMemo(
+    () => [
+      { key: 'all' as const, label: 'Todos', count: companyCards.length },
+      { key: 'active' as const, label: 'Activos', count: companyStats.active },
+      { key: 'withoutPlan' as const, label: 'Sin plan', count: companyStats.withoutPlan },
+      { key: 'pending' as const, label: 'Con pendientes', count: companyStats.pending },
+      { key: 'ready' as const, label: 'Listos', count: companyStats.ready },
+      { key: 'internal' as const, label: 'Internos', count: companyStats.internal },
+    ],
+    [companyCards.length, companyStats]
+  );
+  const filteredCompanyCards = useMemo(() => {
+    switch (companyFilter) {
+      case 'active':
+        return companyCards.filter((item) => !item.isInternal && item.company.status === 'ACTIVE');
+      case 'withoutPlan':
+        return companyCards.filter((item) => !item.isInternal && item.hasPlanIssue);
+      case 'pending':
+        return companyCards.filter(
+          (item) => !item.isInternal && (!item.isReady || item.attentionLabels.length > 0)
+        );
+      case 'ready':
+        return companyCards.filter((item) => item.isReady);
+      case 'internal':
+        return companyCards.filter((item) => item.isInternal);
+      case 'all':
+      default:
+        return companyCards;
+    }
+  }, [companyCards, companyFilter]);
 
   const renderOwnerCompanyContext = () => (
     <View
@@ -1257,11 +1474,14 @@ export default function PlatformScreen() {
       <AppCard style={styles.panel}>
         <View style={[styles.rowBetween, isPhone ? styles.column : null]}>
           <View style={styles.flex}>
-            <AppText variant="subtitle" bold>
-              Clientes / Companias
-            </AppText>
+            <View style={styles.inlineBadges}>
+              <StatusBadge label="SAAS" tone="info" />
+              <AppText variant="subtitle" bold>
+                Clientes / Companias
+              </AppText>
+            </View>
             <AppText variant="caption" color={theme.colors.mutedText}>
-              Crea clientes, consulta companias y elige que cliente vas a administrar.
+              Administra clientes, estado, plan, sucursales, usuarios y configuracion SaaS. Elegir un cliente no cambia tu sesion ni es impersonacion.
             </AppText>
           </View>
           <AppButton
@@ -1270,7 +1490,29 @@ export default function PlatformScreen() {
             disabled={!canManageCompanies}
             disabledReason="Tu usuario necesita MANAGE_COMPANIES."
             onPress={() => setShowCompanyForm((current) => !current)}
+            style={styles.actionButton}
           />
+        </View>
+
+        <View style={styles.dashboardMetricGrid}>
+          {renderDashboardMetricTile('Clientes operativos', companyStats.totalOperational, 'Excluye AppModa Platform', 'info')}
+          {renderDashboardMetricTile('Activos', dashboardSummary?.summary.activeCompanies ?? companyStats.active, 'Listos para configuracion', companyStats.active > 0 ? 'success' : 'neutral')}
+          {renderDashboardMetricTile('Sin plan', dashboardSummary?.summary.companiesWithoutPlan ?? companyStats.withoutPlan, 'Plan o cobro pendiente', companyStats.withoutPlan > 0 ? 'warning' : 'success')}
+          {renderDashboardMetricTile('Con pendientes', companyStats.pending, 'Configuracion o atencion requerida', companyStats.pending > 0 ? 'warning' : 'success')}
+          {renderDashboardMetricTile('Listos', companyStats.ready, 'Sin pendientes criticos detectados', companyStats.ready > 0 ? 'success' : 'neutral')}
+          {renderDashboardMetricTile('Suspendidos/inactivos', dashboardSummary?.summary.suspendedCompanies ?? companyStats.inactive, 'Revisar soporte o cobranza', companyStats.inactive > 0 ? 'warning' : 'neutral')}
+        </View>
+
+        <View style={styles.companyFilterBar}>
+          {companyFilterOptions.map((filter) => (
+            <AppButton
+              key={filter.key}
+              title={`${filter.label} (${filter.count})`}
+              variant={companyFilter === filter.key ? 'primary' : 'secondary'}
+              onPress={() => setCompanyFilter(filter.key)}
+              style={styles.filterButton}
+            />
+          ))}
         </View>
 
         {showCompanyForm ? (
@@ -1309,37 +1551,129 @@ export default function PlatformScreen() {
       </AppCard>
 
       <View style={styles.companyList}>
-        {companies.map((company) => {
-          const selected = company.id === selectedCompanyId;
-          const isPlatformCompany = company.code === 'APPMODA_PLATFORM';
-          const usage = usageSummary.find((item) => item.companyId === company.id);
-          const settingsLabel = usage?.billingModel || 'SIN_CONFIGURAR';
+        {filteredCompanyCards.length === 0 ? (
+          <EmptyState title="No hay clientes con este filtro" message="Cambia el filtro o crea una nueva compania para continuar." icon="business" />
+        ) : null}
+        {filteredCompanyCards.map((item) => {
+          const { company, usage } = item;
+          const pendingPreview = item.allPendingLabels.slice(0, 4);
+          const hiddenPendingCount = Math.max(item.allPendingLabels.length - pendingPreview.length, 0);
+          const modulePreview = item.modules.slice(0, 4);
+          const branchLabel = company.branchName || 'Sin sucursal principal';
+          const planLabel = usage?.planName || 'Sin plan';
+          const billingLabel = normalizeBillingModelLabel(usage?.billingModel);
+          const subscriptionLabel = normalizeSubscriptionStatusLabel(usage?.subscriptionStatus);
+
           return (
-            <AppCard key={company.id} variant={selected ? 'selected' : 'default'} style={styles.companyCard}>
-              <View style={[styles.rowBetween, isPhone ? styles.column : null]}>
-                <View style={styles.flex}>
+            <AppCard key={company.id} variant={item.selected ? 'selected' : item.health.tone === 'danger' ? 'danger' : 'default'} style={styles.companyCard}>
+              <View style={[styles.companyCardHeader, isPhone ? styles.column : null]}>
+                <View style={styles.companyNameBlock}>
                   <View style={styles.inlineBadges}>
-                    <AppText bold>{company.name}</AppText>
-                    <StatusBadge label={isPlatformCompany ? 'Interna' : company.status} tone={company.status === 'ACTIVE' ? 'success' : 'warning'} />
+                    <AppText bold numberOfLines={1} style={styles.companyNameText}>{company.name}</AppText>
+                    <StatusBadge label={item.health.label} tone={item.health.tone} />
+                    <StatusBadge label={item.isInternal ? 'Interna' : company.status} tone={item.isInternal ? 'neutral' : company.status === 'ACTIVE' ? 'success' : 'warning'} />
+                    {item.selected ? <StatusBadge label="En administracion" tone="info" /> : null}
                   </View>
-                  <AppText variant="caption" color={theme.colors.mutedText}>
-                    {company.code} - {company.branchName || 'Sin sucursal principal'}
+                  <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={2}>
+                    {company.code} - {branchLabel}
                   </AppText>
-                  <AppText variant="caption" color={theme.colors.mutedText}>
-                    Usuarios activos / limite: {usage?.activeUsers ?? '-'} / {usage?.maxUsers ?? 'sin limite'} - Sucursales: {usage?.activeBranches ?? '-'} / {usage?.maxBranches ?? 'sin limite'}
-                  </AppText>
-                  <AppText variant="caption" color={theme.colors.mutedText}>
-                    Modelo: {settingsLabel} - Plan: {usage?.planName || 'sin plan'}
+                  {item.isInternal ? (
+                    <AppText variant="caption" color={theme.colors.mutedText}>
+                      Uso interno de plataforma. No se administra como cliente tenant.
+                    </AppText>
+                  ) : null}
+                </View>
+
+                <View style={styles.companyActions}>
+                  {!item.isInternal && !item.selected ? (
+                    <AppButton
+                      title="Administrar"
+                      variant="operation"
+                      onPress={() => updateCompanyInAdministration(company.id, company.name)}
+                      style={styles.compactButton}
+                    />
+                  ) : null}
+                  {!item.isInternal && item.selected ? (
+                    <AppButton
+                      title="Ir a configuracion"
+                      variant="secondary"
+                      onPress={() => openDashboardCompanyAction(company.id, item.actionSection)}
+                      style={styles.compactButton}
+                    />
+                  ) : null}
+                  {!item.isInternal ? (
+                    <>
+                      <AppButton
+                        title="Configurar"
+                        variant="secondary"
+                        onPress={() => openDashboardCompanyAction(company.id, item.actionSection)}
+                        style={styles.compactButton}
+                      />
+                      <AppButton
+                        title="Ver plan"
+                        variant="ghost"
+                        onPress={() => openDashboardCompanyAction(company.id, 'subscriptions')}
+                        style={styles.compactButton}
+                      />
+                    </>
+                  ) : null}
+                </View>
+              </View>
+
+              <View style={styles.companyInfoGrid}>
+                <View style={[styles.companyInfoCell, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.borderSubtle }]}>
+                  <AppText variant="caption" color={theme.colors.mutedText}>Plan / modelo</AppText>
+                  <AppText bold numberOfLines={1}>{planLabel}</AppText>
+                  <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+                    {billingLabel} - {subscriptionLabel}
                   </AppText>
                 </View>
-                <AppButton
-                  title={selected ? 'En administracion' : 'Administrar'}
-                  variant={selected ? 'neutral' : 'secondary'}
-                  disabled={selected || isPlatformCompany}
-                  disabledReason={isPlatformCompany ? 'Tenant interno.' : 'Este cliente ya esta en administracion.'}
-                  onPress={() => updateCompanyInAdministration(company.id, company.name)}
-                  style={styles.compactButton}
-                />
+                <View style={[styles.companyInfoCell, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.borderSubtle }]}>
+                  <AppText variant="caption" color={theme.colors.mutedText}>Usuarios</AppText>
+                  <AppText bold>{formatCountLimit(usage?.activeUsers, usage?.maxUsers)}</AppText>
+                  <AppText variant="caption" color={theme.colors.mutedText}>
+                    Admin inicial: {company.adminUsers > 0 ? 'configurado' : 'pendiente'}
+                  </AppText>
+                </View>
+                <View style={[styles.companyInfoCell, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.borderSubtle }]}>
+                  <AppText variant="caption" color={theme.colors.mutedText}>Sucursales</AppText>
+                  <AppText bold>{formatCountLimit(usage?.activeBranches, usage?.maxBranches)}</AppText>
+                  <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+                    {branchLabel}
+                  </AppText>
+                </View>
+                <View style={[styles.companyInfoCell, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.borderSubtle }]}>
+                  <AppText variant="caption" color={theme.colors.mutedText}>Modulos clave</AppText>
+                  {modulePreview.length > 0 ? (
+                    <View style={styles.inlineBadges}>
+                      {modulePreview.map((module) => (
+                        <StatusBadge key={module} label={module} tone="neutral" />
+                      ))}
+                    </View>
+                  ) : (
+                    <AppText bold>Sin modulos activos</AppText>
+                  )}
+                </View>
+              </View>
+
+              <View style={[styles.companyPendingRow, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.border }]}>
+                <View style={styles.flex}>
+                  <AppText variant="caption" color={theme.colors.mutedText} bold>
+                    Pendientes
+                  </AppText>
+                  {pendingPreview.length > 0 ? (
+                    <View style={styles.inlineBadges}>
+                      {pendingPreview.map((pending) => (
+                        <StatusBadge key={pending} label={pending} tone={pending.includes('Sin') ? 'warning' : 'info'} />
+                      ))}
+                      {hiddenPendingCount > 0 ? <StatusBadge label={`+${hiddenPendingCount} mas`} tone="neutral" /> : null}
+                    </View>
+                  ) : (
+                    <AppText variant="caption" color={theme.colors.mutedText}>
+                      Sin pendientes criticos detectados con los datos actuales.
+                    </AppText>
+                  )}
+                </View>
               </View>
             </AppCard>
           );
@@ -2035,6 +2369,53 @@ const styles = StyleSheet.create({
   companyCard: {
     marginBottom: 0,
   },
+  companyActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'flex-end',
+  },
+  companyCardHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  companyFilterBar: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  companyInfoCell: {
+    borderRadius: 10,
+    borderWidth: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    gap: 3,
+    minWidth: 150,
+    padding: 10,
+  },
+  companyInfoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  companyNameBlock: {
+    flex: 1,
+    gap: 3,
+    minWidth: 220,
+  },
+  companyNameText: {
+    maxWidth: 280,
+  },
+  companyPendingRow: {
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    padding: 10,
+  },
   companyPickerRow: {
     alignItems: 'center',
     borderColor: '#d8dee9',
@@ -2128,6 +2509,11 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
     minWidth: 0,
+  },
+  filterButton: {
+    minHeight: 30,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
   },
   grid: {
     alignItems: 'stretch',

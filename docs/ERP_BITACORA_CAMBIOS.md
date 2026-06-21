@@ -1,5 +1,32 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-21 - OWNER-COMPANIES-UX-A clientes accionables Panel Owner
+
+Tipo: platform owner, clientes, SaaS, frontend, UX, documentacion.
+
+Objetivo:
+
+- Convertir `Clientes / Companias` en una vista SaaS mas util, visual y accionable.
+
+Cambios realizados:
+
+- `app/platform.tsx` agrega resumen superior de clientes operativos, activos, sin plan, pendientes, listos y suspendidos/inactivos.
+- Se agregan filtros frontend: `Todos`, `Activos`, `Sin plan`, `Con pendientes`, `Listos` e `Internos`.
+- Cada cliente muestra salud/configuracion, plan/modelo, suscripcion, usuarios/limite, sucursales/limite, admin inicial, modulos y pendientes.
+- `AppModa Platform` queda diferenciado como tenant interno.
+- `En administracion` queda como badge contextual, no como boton ambiguo.
+- `Administrar` conserva el comportamiento de `selectedCompanyId`, URL y sidebar.
+- `Configurar` navega a la seccion mas util segun pendiente detectado.
+- Se documenta la fase en `docs/OWNER_COMPANIES_UX_A_CLIENTES_ACCIONABLES.md`.
+
+Restricciones respetadas:
+
+- No se reseteo base de datos.
+- No se toco backend ni se crearon endpoints nuevos.
+- No se agregaron datos fake.
+- No se implemento facturacion real ni impersonacion.
+- No se hizo merge a `main`.
+
 ## 2026-06-21 - OWNER-DASHBOARD-A dashboard SaaS accionable
 
 Tipo: platform owner, dashboard, backend read-only, frontend, UX, documentacion.
