@@ -5,6 +5,7 @@ import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
+import ScreenPermissionHeaderAction from '@/components/ui/ScreenPermissionHeaderAction';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 
@@ -549,6 +550,12 @@ export default function DoorReservationScreen() {
         title="Nuevo apartado"
         subtitle="Crea un apartado de mostrador con una o varias prendas."
         activeRoute="reservations"
+        rightContent={
+          <ScreenPermissionHeaderAction
+            screenKey="doorReservation"
+            screenTitle="Nuevo apartado"
+          />
+        }
         compactHeader
       >
         <ActivityIndicator />
@@ -562,6 +569,12 @@ export default function DoorReservationScreen() {
         title="Nuevo apartado"
         subtitle="Crea un apartado de mostrador con una o varias prendas."
         activeRoute="reservations"
+        rightContent={
+          <ScreenPermissionHeaderAction
+            screenKey="doorReservation"
+            screenTitle="Nuevo apartado"
+          />
+        }
         compactHeader
       >
 

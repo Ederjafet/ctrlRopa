@@ -21,6 +21,7 @@ import AppInput from '@/components/ui/AppInput';
 import EmptyState from '@/components/ui/EmptyState';
 import AppOptionRow from '@/components/ui/AppOptionRow';
 import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
+import ScreenPermissionHeaderAction from '@/components/ui/ScreenPermissionHeaderAction';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
@@ -4471,16 +4472,24 @@ export default function LiveScreen() {
         navSections={navSections}
         compactHeader
         rightContent={
-          shouldShowLiveRefreshControls ? (
-            <AppButton
-              title={isRefreshingLiveView ? t('live.refreshing') : t('live.refresh')}
-              variant="secondary"
-              onPress={handleRefreshLiveView}
-              loading={isRefreshingLiveView}
-              disabled={isRefreshingLiveView}
-              style={styles.liveHeaderRefreshButton}
+          <View style={styles.liveHeaderActions}>
+            <ScreenPermissionHeaderAction
+              screenKey="live"
+              screenTitle="En vivo"
+              session={session}
+              buttonStyle={styles.liveHeaderRefreshButton}
             />
-          ) : null
+            {shouldShowLiveRefreshControls ? (
+              <AppButton
+                title={isRefreshingLiveView ? t('live.refreshing') : t('live.refresh')}
+                variant="secondary"
+                onPress={handleRefreshLiveView}
+                loading={isRefreshingLiveView}
+                disabled={isRefreshingLiveView}
+                style={styles.liveHeaderRefreshButton}
+              />
+            ) : null}
+          </View>
         }
       >
         {liveLoadIssue ? (
@@ -6824,6 +6833,13 @@ const styles = StyleSheet.create({
     minWidth: 112,
     paddingHorizontal: 12,
     paddingVertical: 7,
+  },
+  liveHeaderActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'flex-end',
   },
   newReservationNoticeCard: {
     marginBottom: 10,

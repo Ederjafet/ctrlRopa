@@ -4,6 +4,7 @@ import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
 import AppShellPage from '@/components/layout/AppShellPage';
+import ScreenPermissionHeaderAction from '@/components/ui/ScreenPermissionHeaderAction';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { Customer, getCustomersByBranch } from '@/services/customerService';
@@ -368,11 +369,20 @@ export default function ShipmentDetailScreen() {
         activeRoute="shipments"
         compactHeader
         rightContent={
-          <AppButton
-            title="Volver"
-            variant="secondary"
-            onPress={() => router.replace((returnRoute || '/shipments') as any)}
-          />
+          <View style={styles.headerActions}>
+            <ScreenPermissionHeaderAction
+              screenKey="shipmentDetail"
+              screenTitle="Detalle de envio"
+              session={session}
+              buttonStyle={styles.headerButton}
+            />
+            <AppButton
+              title="Volver"
+              variant="secondary"
+              onPress={() => router.replace((returnRoute || '/shipments') as any)}
+              style={styles.headerButton}
+            />
+          </View>
         }
       >
         <AppText>No se encontró el envío.</AppText>
@@ -388,11 +398,20 @@ export default function ShipmentDetailScreen() {
         activeRoute="shipments"
         compactHeader
         rightContent={
-          <AppButton
-            title="Volver"
-            variant="secondary"
-            onPress={() => router.replace((returnRoute || '/shipments') as any)}
-          />
+          <View style={styles.headerActions}>
+            <ScreenPermissionHeaderAction
+              screenKey="shipmentDetail"
+              screenTitle="Detalle de envio"
+              session={session}
+              buttonStyle={styles.headerButton}
+            />
+            <AppButton
+              title="Volver"
+              variant="secondary"
+              onPress={() => router.replace((returnRoute || '/shipments') as any)}
+              style={styles.headerButton}
+            />
+          </View>
         }
       >
         <AppCard>
@@ -616,6 +635,16 @@ export default function ShipmentDetailScreen() {
 const styles = StyleSheet.create({
   actionStack: {
     gap: 10,
+  },
+  headerActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'flex-end',
+  },
+  headerButton: {
+    minWidth: 112,
   },
   modalSectionTitle: {
     marginTop: 14,

@@ -5,6 +5,7 @@ import AppCard from '@/components/ui/AppCard';
 import AppShell from '@/components/layout/AppShell';
 import AppOptionRow from '@/components/ui/AppOptionRow';
 import RestrictedSection from '@/components/ui/RestrictedSection';
+import ScreenPermissionHeaderAction from '@/components/ui/ScreenPermissionHeaderAction';
 import AppText from '@/components/ui/AppText';
 import DetailTemplate from '@/components/templates/DetailTemplate';
 import EmptyState from '@/components/ui/EmptyState';
@@ -508,6 +509,13 @@ export default function ReservationDetailScreen() {
       activeRoute="reservations"
       session={session}
       navSections={navSections}
+      rightContent={
+        <ScreenPermissionHeaderAction
+          screenKey="reservationDetail"
+          screenTitle="Detalle del apartado"
+          session={session}
+        />
+      }
     >
       <DetailTemplate
         header={

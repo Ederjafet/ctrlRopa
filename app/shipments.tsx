@@ -3,6 +3,7 @@ import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
+import ScreenPermissionHeaderAction from '@/components/ui/ScreenPermissionHeaderAction';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { hasRole } from '@/services/accessControl';
@@ -114,6 +115,12 @@ export default function ShipmentsScreen() {
 
   const renderHeaderActions = () => (
     <View style={styles.headerActions}>
+      <ScreenPermissionHeaderAction
+        screenKey="shipments"
+        screenTitle="Envios"
+        session={session}
+        buttonStyle={styles.headerButton}
+      />
       <AppButton
         title="Nuevo envío"
         onPress={() => setCreateModalVisible(true)}

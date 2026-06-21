@@ -7,6 +7,7 @@ import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
 import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
 import AppSelectorField from '@/components/ui/AppSelectorField';
+import ScreenPermissionHeaderAction from '@/components/ui/ScreenPermissionHeaderAction';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
@@ -415,11 +416,17 @@ export default function ItemsCreateScreen() {
       activeRoute="items-create"
       compactHeader
       rightContent={
-        <AppButton
-          title={t('operationalScreens.itemsCreate.backToFlow')}
-          variant="secondary"
-          onPress={() => router.replace(returnRoute as any)}
-        />
+        <View style={styles.headerActions}>
+          <ScreenPermissionHeaderAction
+            screenKey="itemsCreate"
+            screenTitle="Alta de prendas"
+          />
+          <AppButton
+            title={t('operationalScreens.itemsCreate.backToFlow')}
+            variant="secondary"
+            onPress={() => router.replace(returnRoute as any)}
+          />
+        </View>
       }
     >
         <AppText variant="caption" style={styles.intro}>
@@ -646,6 +653,13 @@ export default function ItemsCreateScreen() {
 }
 
 const styles = StyleSheet.create({
+  headerActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'flex-end',
+  },
   intro: {
     marginBottom: 12,
   },

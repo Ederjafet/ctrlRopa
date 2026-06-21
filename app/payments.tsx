@@ -7,7 +7,7 @@ import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
 import PermissionBlockedHint from '@/components/ui/PermissionBlockedHint';
 import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
-import ScreenPermissionModal from '@/components/ui/ScreenPermissionModal';
+import ScreenPermissionHeaderAction from '@/components/ui/ScreenPermissionHeaderAction';
 import AppText from '@/components/ui/AppText';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { useAppTheme } from '@/context/AppThemeContext';
@@ -32,7 +32,6 @@ import {
 import {
   canAccessScreen,
   canDoScreenAction,
-  canViewScreenPermissionDiagnostics,
   findScreenPermissionAction,
   getMissingPermissionMessage,
   getScreenPermissionSummary,
@@ -232,7 +231,6 @@ export default function PaymentsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingTarget, setIsLoadingTarget] = useState(false);
-  const [isPermissionModalVisible, setIsPermissionModalVisible] = useState(false);
 
   useEffect(() => {
     if (initialReservationId) {
@@ -361,7 +359,6 @@ export default function PaymentsScreen() {
   );
   const canRegisterPayments = registerPaymentCapability?.allowed ?? false;
   const canApplyCustomerBalance = applyBalanceCapability?.allowed ?? false;
-  const canShowPermissionDiagnostics = canViewScreenPermissionDiagnostics(session);
   const registerPermissionBlockedReason =
     getMissingPermissionMessage(registerPaymentCapability) ||
     'No tienes permiso para registrar abonos.';
@@ -760,11 +757,11 @@ export default function PaymentsScreen() {
       contextMetadata={PAYMENTS_HEADER_DESCRIPTION}
       activeRoute="payments"
       rightContent={
-        <AppButton
-          title="Ver permisos"
-          variant="secondary"
-          onPress={() => setIsPermissionModalVisible(true)}
-          style={styles.headerPermissionButton}
+        <ScreenPermissionHeaderAction
+          screenKey="payments"
+          screenTitle="Pagos"
+          session={session}
+          buttonStyle={styles.headerPermissionButton}
         />
       }
       compactHeader
@@ -1326,14 +1323,6 @@ export default function PaymentsScreen() {
           </AppOptionRow>
         ))}
       </AppBottomModal>
-
-      <ScreenPermissionModal
-        visible={isPermissionModalVisible}
-        screenTitle="Pagos"
-        evaluations={permissionEvaluations}
-        showTechnicalDetails={canShowPermissionDiagnostics}
-        onClose={() => setIsPermissionModalVisible(false)}
-      />
     </AppShellPage>
   );
 }

@@ -4134,3 +4134,15 @@ Resultado:
 - Quitar una prenda actualiza solo esa linea y conserva las demas.
 - `/payments` queda como pantalla financiera con resumen, filtros, pendientes, detalle contextual e historial responsivo.
 - `/payments` mantiene acceso por `VIEW_PAYMENTS` y registro por `REGISTER_PAYMENTS`.
+
+## 2026-06-21 - PERM-UX-E modal de permisos en Operacion
+
+Tipo: ajuste frontend/UX de permisos por pantalla, sin backend ni migraciones.
+
+Resultado:
+
+- Se agrega `ScreenPermissionHeaderAction` para reutilizar boton `Ver permisos` + `ScreenPermissionModal`.
+- Se agregan screenKeys operativos en `services/screenPermissions.ts`.
+- LIVE, venta puerta, nuevo apartado, apartados, detalle de apartado, paquetes, detalle de paquete, envios, detalle de envio, autorizaciones LIVE y alta de prendas muestran `Ver permisos` en cabecera.
+- `/payments` usa el mismo boton reusable sin volver a mostrar tarjeta de permisos en el cuerpo.
+- `Actualizar` se mantiene solo en LIVE.

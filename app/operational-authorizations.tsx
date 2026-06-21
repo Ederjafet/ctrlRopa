@@ -4,6 +4,7 @@ import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
+import ScreenPermissionHeaderAction from '@/components/ui/ScreenPermissionHeaderAction';
 import AppText from '@/components/ui/AppText';
 import EmptyState from '@/components/ui/EmptyState';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -314,6 +315,13 @@ export default function OperationalAuthorizationsScreen() {
       activeRoute="operational-authorizations"
       session={session}
       navSections={navSections}
+      rightContent={
+        <ScreenPermissionHeaderAction
+          screenKey="liveAuthorizations"
+          screenTitle="Autorizaciones LIVE"
+          session={session}
+        />
+      }
     >
       <View style={styles.toolbar}>
         {canRequest ? (

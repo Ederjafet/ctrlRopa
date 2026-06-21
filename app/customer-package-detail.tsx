@@ -5,6 +5,7 @@ import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppNoticeDropdown from '@/components/ui/AppNoticeDropdown';
 import AppOptionRow from '@/components/ui/AppOptionRow';
+import ScreenPermissionHeaderAction from '@/components/ui/ScreenPermissionHeaderAction';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { getBalanceByPackageFolio, type BalanceSummary } from '@/services/balanceService';
@@ -447,11 +448,20 @@ export default function CustomerPackageDetailScreen() {
       subtitle="Preparacion, etiqueta y prendas"
       activeRoute="customer-packages"
       rightContent={
-        <AppButton
-          title="Volver"
-          variant="secondary"
-          onPress={() => router.replace(fallbackRoute as any)}
-        />
+        <View style={styles.actionBarButtons}>
+          <ScreenPermissionHeaderAction
+            screenKey="customerPackageDetail"
+            screenTitle="Detalle de paquete"
+            session={session}
+            buttonStyle={styles.compactActionButton}
+          />
+          <AppButton
+            title="Volver"
+            variant="secondary"
+            onPress={() => router.replace(fallbackRoute as any)}
+            style={styles.compactActionButton}
+          />
+        </View>
       }
     >
       {notice ? (

@@ -6,6 +6,7 @@ import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
+import ScreenPermissionHeaderAction from '@/components/ui/ScreenPermissionHeaderAction';
 import AppText from '@/components/ui/AppText';
 import EmptyState from '@/components/ui/EmptyState';
 import { useAppTheme } from '@/context/AppThemeContext';
@@ -1365,6 +1366,12 @@ export default function ReservationsScreen() {
       compactHeader
       rightContent={
         <View style={styles.headerActions}>
+          <ScreenPermissionHeaderAction
+            screenKey="reservations"
+            screenTitle="Apartados"
+            session={session}
+            buttonStyle={styles.headerSecondaryButton}
+          />
           {isLiveContext ? (
             <AppButton
               title="Volver al live"

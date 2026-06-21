@@ -71,16 +71,14 @@ Vendedor/caja:
 ## Como replicar el patron
 
 1. Definir acciones en `services/screenPermissions.ts`.
-2. Calcular `getScreenPermissionSummary(screenKey, session, language)`.
-3. Agregar `AppButton title="Ver permisos"` en `rightContent` o cabecera equivalente.
-4. Renderizar `ScreenPermissionModal`.
-5. Pasar `showTechnicalDetails={canViewScreenPermissionDiagnostics(session)}`.
+2. Agregar `ScreenPermissionHeaderAction` en `rightContent` o cabecera equivalente.
+3. Pasar `screenKey`, `screenTitle` y, si la pantalla ya la tiene, `session`.
+4. Mantener los hints de botones bloqueados fuera de la modal cuando una accion critica no esta permitida.
+
+PERM-UX-E agrega `components/ui/ScreenPermissionHeaderAction.tsx` para evitar repetir estado local, boton y modal en cada pantalla.
 
 ## Backlog
 
-- `customer-package-detail`
-- `reservation-detail`
-- `shipment-detail`
 - `users`
 - `system-roles`
 - `appearance`

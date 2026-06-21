@@ -3,6 +3,7 @@ import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
+import ScreenPermissionHeaderAction from '@/components/ui/ScreenPermissionHeaderAction';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { getCustomerBalance } from '@/services/balanceService';
@@ -168,6 +169,12 @@ export default function CustomerPackagesScreen() {
 
   const renderHeaderActions = () => (
     <View style={styles.headerActions}>
+      <ScreenPermissionHeaderAction
+        screenKey="customerPackages"
+        screenTitle="Paquetes"
+        session={session}
+        buttonStyle={styles.headerButton}
+      />
       <AppButton
         title="Nuevo paquete"
         onPress={() => setCreateModalVisible(true)}

@@ -5,6 +5,7 @@ import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
+import ScreenPermissionHeaderAction from '@/components/ui/ScreenPermissionHeaderAction';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 
@@ -395,6 +396,12 @@ export default function DoorSaleScreen() {
         title={t('navigation.items.doorSale')}
         subtitle={t('operationalScreens.doorSale.subtitle')}
         activeRoute="door-sale"
+        rightContent={
+          <ScreenPermissionHeaderAction
+            screenKey="doorSale"
+            screenTitle="Venta puerta"
+          />
+        }
         compactHeader
       >
         <ActivityIndicator />
@@ -408,6 +415,12 @@ export default function DoorSaleScreen() {
         title={t('navigation.items.doorSale')}
         subtitle={t('operationalScreens.doorSale.subtitle')}
         activeRoute="door-sale"
+        rightContent={
+          <ScreenPermissionHeaderAction
+            screenKey="doorSale"
+            screenTitle="Venta puerta"
+          />
+        }
         compactHeader
       >
 

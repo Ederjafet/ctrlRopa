@@ -260,6 +260,8 @@ Probabilidad:
 - FAST-NAV-QA-B expone `Pagos` por `VIEW_PAYMENTS` y deja `/door-reservation` como ruta interna; QA debe validar roles reales para confirmar que usuarios sin permiso no ven pagos ni pueden entrar directo.
 - FLOW-FAST-QA-B conserva borrador local de `Nuevo apartado`; si el usuario abandona el flujo sin confirmar, puede restaurarse el borrador hasta que lo limpie con una nueva operacion o confirmacion.
 - FLOW-FAST-QA-B mejora `/payments` con datos reales disponibles, pero la consulta financiera global por sucursal requiere endpoint dedicado antes de prometer reporteria completa de pagos.
+- PERM-UX-E replica diagnostico de permisos en Operacion, pero no reemplaza enforcement backend; permisos amplios como `CREATE_CLOSE_CUSTOMER_PACKAGE` y `MANAGE_SHIPMENTS` siguen representando consulta y operacion hasta una fase de granularidad fina.
+- PERM-UX-E mantiene codigos tecnicos ocultos por bandera y perfil; QA debe validar roles reales con `EXPO_PUBLIC_ENABLE_PERMISSION_DIAGNOSTICS=false` antes de demo productiva.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

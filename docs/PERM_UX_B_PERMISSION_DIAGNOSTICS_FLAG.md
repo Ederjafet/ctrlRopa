@@ -66,11 +66,10 @@ PERM-UX-C mueve el diagnostico tecnico de `/payments` a una modal reusable. La b
 
 PERM-UX-D mantiene la misma bandera, pero el boton queda en la cabecera de `/payments` y la modal integra el permiso tecnico dentro de cada accion.
 
+PERM-UX-E replica el boton/modal en pantallas de Operacion usando `ScreenPermissionHeaderAction`. La bandera sigue controlando solo codigos tecnicos; la modal puede mostrar lenguaje de negocio sin exponer permisos internos.
+
 Backlog:
 
-- Paquete.
-- Apartado.
-- Envios.
 - Usuarios.
 - Roles.
 - Apariencia.
