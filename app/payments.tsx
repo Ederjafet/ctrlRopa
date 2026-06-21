@@ -1,15 +1,17 @@
 import AppBottomModal from '@/components/ui/AppBottomModal';
+import { getSessionScopeLabel } from '@/components/layout/appNavigation';
 import AppShellPage from '@/components/layout/AppShellPage';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
+import PermissionBlockedHint from '@/components/ui/PermissionBlockedHint';
 import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
+import ScreenCapabilitySummary from '@/components/ui/ScreenCapabilitySummary';
 import AppText from '@/components/ui/AppText';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
-import { canAccessByPermission } from '@/services/accessControl';
 import { apiRequest } from '@/services/apiClient';
 import { getCustomerBalance, type BalanceSummary } from '@/services/balanceService';
 import { getPaymentMethods, PaymentMethod } from '@/services/catalogService';
@@ -27,6 +29,14 @@ import {
   getPaymentsByReservation,
   Payment,
 } from '@/services/paymentService';
+import {
+  canAccessScreen,
+  canDoScreenAction,
+  canViewScreenPermissionDiagnostics,
+  findScreenPermissionAction,
+  getMissingPermissionMessage,
+  getScreenPermissionSummary,
+} from '@/services/screenPermissions';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -172,6 +182,9 @@ function getLiveLabel(reservation: ReservationSummary, t?: (key: string) => stri
   return notes ? `${label} #${reservation.liveId} - ${notes}${status}` : `${label} #${reservation.liveId}${status}`;
 }
 
+const PAYMENTS_HEADER_DESCRIPTION =
+  'Consulta abonos, pagos registrados y saldos a favor de clientes. Los cobros se registran solo cuando hay un pedido, apartado o paquete seleccionado.';
+
 export default function PaymentsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -181,7 +194,7 @@ export default function PaymentsScreen() {
   }>();
   const { theme } = useAppTheme();
   const { isPhone } = useResponsiveLayout();
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
 
   const initialOrderId = firstParam(params.orderId);
   const initialReservationId = firstParam(params.reservationId);
@@ -219,6 +232,7 @@ export default function PaymentsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingTarget, setIsLoadingTarget] = useState(false);
+  const [showPermissionDiagnostics, setShowPermissionDiagnostics] = useState(false);
 
   useEffect(() => {
     if (initialReservationId) {
@@ -332,7 +346,28 @@ export default function PaymentsScreen() {
     !!reservation?.liveId ||
     reservation?.salesChannelCode === 'LIVE' ||
     reservation?.salesChannelName?.toUpperCase() === 'LIVE';
-  const canRegisterPayments = canAccessByPermission(session, 'REGISTER_PAYMENTS');
+  const screenScopeLabel = session ? getSessionScopeLabel(session) : 'Sesion no cargada';
+  const permissionEvaluations = useMemo(
+    () => getScreenPermissionSummary('payments', session, i18n.language),
+    [i18n.language, session]
+  );
+  const registerPaymentCapability = useMemo(
+    () => findScreenPermissionAction(permissionEvaluations, 'registerPayment'),
+    [permissionEvaluations]
+  );
+  const applyBalanceCapability = useMemo(
+    () => findScreenPermissionAction(permissionEvaluations, 'applyCustomerBalance'),
+    [permissionEvaluations]
+  );
+  const canRegisterPayments = registerPaymentCapability?.allowed ?? false;
+  const canApplyCustomerBalance = applyBalanceCapability?.allowed ?? false;
+  const canShowPermissionDiagnostics = canViewScreenPermissionDiagnostics(session);
+  const registerPermissionBlockedReason =
+    getMissingPermissionMessage(registerPaymentCapability) ||
+    'No tienes permiso para registrar abonos.';
+  const applyBalanceBlockedReason =
+    getMissingPermissionMessage(applyBalanceCapability) ||
+    'Disponible en siguiente fase con confirmacion y trazabilidad de aplicacion al apartado.';
   const selectedMethodFilterLabel = methodFilterId
     ? paymentMethods.find((method) => method.id === methodFilterId)?.name ?? 'Metodo seleccionado'
     : 'Todos los metodos';
@@ -351,6 +386,7 @@ export default function PaymentsScreen() {
       : orderDetail?.status === 'CLOSED' || orderSettlement?.status === 'CLOSED';
 
   const cannotRegisterPayment =
+    !canRegisterPayments ||
     !selectedPaymentMethod ||
     !targetWasLoaded ||
     isSaving ||
@@ -360,7 +396,9 @@ export default function PaymentsScreen() {
 
   const registerPaymentBlockedReason = isSaving
     ? 'Espera a que termine el guardado actual.'
-    : !targetWasLoaded
+    : !canRegisterPayments
+      ? registerPermissionBlockedReason
+      : !targetWasLoaded
       ? 'Primero selecciona o carga una reserva/pedido.'
       : !selectedPaymentMethod
         ? 'Selecciona un metodo de pago.'
@@ -494,7 +532,7 @@ export default function PaymentsScreen() {
           setIsLoading(true);
           const currentSession = await getSession();
           setSession(currentSession);
-          if (!currentSession || !canAccessByPermission(currentSession, 'VIEW_PAYMENTS')) {
+          if (!currentSession || !canAccessScreen('payments', currentSession)) {
             router.replace('/access-denied' as any);
             return;
           }
@@ -569,8 +607,15 @@ export default function PaymentsScreen() {
       return;
     }
 
-    if (!canAccessByPermission(session, 'REGISTER_PAYMENTS')) {
-      Alert.alert('Pagos', 'No tienes permisos para registrar pagos.');
+    if (!canDoScreenAction('payments', 'registerPayment', session)) {
+      const action = findScreenPermissionAction(
+        getScreenPermissionSummary('payments', session, i18n.language),
+        'registerPayment'
+      );
+      Alert.alert(
+        'Pagos',
+        getMissingPermissionMessage(action) || 'No tienes permiso para registrar abonos.'
+      );
       return;
     }
 
@@ -689,7 +734,11 @@ export default function PaymentsScreen() {
     return (
       <AppShellPage
         title="Pagos"
-        subtitle="Cobros, abonos y saldo a favor"
+        subtitle="Cargando permisos y cobros"
+        metadata={PAYMENTS_HEADER_DESCRIPTION}
+        eyebrow="FINANZAS"
+        contextSubtitle="Cargando permisos y cobros"
+        contextMetadata={PAYMENTS_HEADER_DESCRIPTION}
         activeRoute="payments"
         compactHeader
       >
@@ -704,32 +753,20 @@ export default function PaymentsScreen() {
   return (
     <AppShellPage
       title="Pagos"
-      subtitle="Cobros, abonos y saldo a favor"
+      subtitle={screenScopeLabel}
+      metadata={PAYMENTS_HEADER_DESCRIPTION}
+      eyebrow="FINANZAS"
+      contextSubtitle={screenScopeLabel}
+      contextMetadata={PAYMENTS_HEADER_DESCRIPTION}
       activeRoute="payments"
       compactHeader
     >
-      <AppCard variant="info" style={styles.heroCard}>
-        <View style={styles.heroHeader}>
-          <View style={styles.heroText}>
-            <AppText variant="caption" color={theme.colors.accent} bold>
-              FINANZAS
-            </AppText>
-            <AppText variant="title" bold>
-              Pagos
-            </AppText>
-            <AppText color={theme.colors.mutedText}>
-              Consulta abonos, pagos registrados y saldos a favor de clientes. Los cobros se registran solo cuando hay un pedido o apartado seleccionado.
-            </AppText>
-          </View>
-          <View style={styles.permissionBadges}>
-            <StatusBadge label="VIEW_PAYMENTS" tone="info" />
-            <StatusBadge
-              label={canRegisterPayments ? 'Puede registrar abonos' : 'Solo consulta'}
-              tone={canRegisterPayments ? 'success' : 'neutral'}
-            />
-          </View>
-        </View>
-      </AppCard>
+      <ScreenCapabilitySummary
+        evaluations={permissionEvaluations}
+        showDiagnostics={canShowPermissionDiagnostics}
+        diagnosticsExpanded={showPermissionDiagnostics}
+        onToggleDiagnostics={() => setShowPermissionDiagnostics((current) => !current)}
+      />
 
       {isLiveContext ? (
         <AppButton
@@ -910,6 +947,8 @@ export default function PaymentsScreen() {
                     <AppButton
                       title="Cobrar"
                       onPress={() => selectPendingOrder(order)}
+                      disabled={!canRegisterPayments}
+                      disabledReason={registerPermissionBlockedReason}
                     />
                   </View>
                   <View style={styles.pendingActionButton}>
@@ -1077,9 +1116,16 @@ export default function PaymentsScreen() {
                 title="Aplicar saldo a favor"
                 variant="neutral"
                 disabled
-                disabledReason="Disponible en siguiente fase con confirmacion y trazabilidad de aplicacion al apartado."
+                disabledReason={
+                  canApplyCustomerBalance
+                    ? 'Disponible en siguiente fase con confirmacion y trazabilidad de aplicacion al apartado.'
+                    : applyBalanceBlockedReason
+                }
                 style={styles.creditButton}
               />
+              {!canApplyCustomerBalance ? (
+                <PermissionBlockedHint action={applyBalanceCapability} />
+              ) : null}
             </View>
 
             <AppText variant="caption" color={theme.colors.mutedText}>
@@ -1110,6 +1156,9 @@ export default function PaymentsScreen() {
             )}
 
             <View style={styles.submitButton}>
+              {!canRegisterPayments ? (
+                <PermissionBlockedHint action={registerPaymentCapability} />
+              ) : null}
               <AppButton
                 title="Registrar pago"
                 onPress={handleRegisterPayment}
@@ -1406,20 +1455,6 @@ const styles = StyleSheet.create({
   filterGroup: {
     marginBottom: 14,
   },
-  heroCard: {
-    marginBottom: 12,
-  },
-  heroHeader: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: 16,
-    justifyContent: 'space-between',
-  },
-  heroText: {
-    flex: 1,
-    gap: 4,
-    minWidth: 0,
-  },
   infoRow: {
     marginBottom: 10,
   },
@@ -1427,10 +1462,6 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     marginTop: 8,
     minHeight: 34,
-  },
-  permissionBadges: {
-    alignItems: 'flex-end',
-    gap: 8,
   },
   rowTitleBlock: {
     flex: 1,

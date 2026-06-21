@@ -25,6 +25,7 @@ Probabilidad:
 
 | Riesgo | Severidad | Probabilidad | Impacto operacional | Mitigacion | Rollback |
 |---|---|---|---|---|---|
+| Usuario no entiende permisos financieros | ALTO | BAJA despues de PAYMENTS-PERM-UX-A | Un operador podria intentar registrar pagos o aplicar saldo sin saber que permiso falta, generando soporte o errores de proceso. | PAYMENTS-PERM-UX-A agrega resumen de capacidades, diagnostico expandible y mensajes de bloqueo para `REGISTER_PAYMENTS` y `APPLY_CUSTOMER_BALANCE`. | Revertir cambios de `/payments` y mantener proteccion backend mientras se ajusta la UX. |
 | Acciones ambiguas de paquete en apartados | MEDIO | BAJA despues de FLOW-FAST-QA-C | Operadores podrian crear paquetes duplicados o no entender si agregan a uno existente. | FLOW-FAST-QA-C reemplaza `Crear / agregar paquete` por `Crear paquete`, `Agregar a paquete`, `Ver paquete` o `Vincular cliente` segun estado real. | Revertir cambios de `app/reservations.tsx` y operar paquetes desde detalle mientras se ajusta el flujo. |
 | Venta sin validacion clara | CRITICO | MEDIA | Venta incompleta, prenda mal afectada, diferencia de caja. | Validaciones accionables, regresion de venta puerta, mensajes claros. | Revertir pantalla/servicio afectado y validar item/pago. |
 | Pago/anulacion con error | CRITICO | MEDIA | Saldo o caja incorrecta. | QA especifico de pagos, auditoria financiera, permisos revisados. | Revertir backend/frontend y revisar movimientos financieros. |

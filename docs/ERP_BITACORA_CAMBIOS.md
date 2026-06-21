@@ -1,5 +1,30 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-21 - PAYMENTS-PERM-UX-A cabecera y diagnostico de permisos en pagos
+
+Tipo: frontend, UX financiera, permisos, documentacion.
+
+Objetivo:
+
+- Unificar la cabecera de `/payments` y dejar una primera matriz reusable de capacidades/permisos por pantalla.
+
+Cambios realizados:
+
+- `/payments` usa `FINANZAS` como eyebrow del AppShell y ya no renderiza una segunda tarjeta con titulo `Pagos`.
+- Se agrega `services/screenPermissions.ts` con definicion inicial para la pantalla `payments`.
+- Se agregan `ScreenCapabilitySummary` y `PermissionBlockedHint`.
+- `Registrar pago` y `Cobrar` se bloquean con mensaje si falta `REGISTER_PAYMENTS`.
+- `Aplicar saldo a favor` muestra permiso faltante si falta `APPLY_CUSTOMER_BALANCE`.
+- El diagnostico tecnico de permisos queda expandible para perfiles admin/QA/platform owner.
+- Se documenta la fase en `docs/PAYMENTS_PERM_UX_A_HEADER_PERMISSIONS.md`.
+
+Restricciones respetadas:
+
+- No se toco backend.
+- No se hizo merge a `main`.
+- No se agrego `Actualizar` fuera de LIVE.
+- No se cambio la proteccion backend de dinero.
+
 ## 2026-06-21 - FLOW-FAST-QA-C limpieza UX de pagos y acciones de paquete
 
 Tipo: frontend, UX operativa, pagos, apartados, paquetes, documentacion.
