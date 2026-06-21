@@ -61,3 +61,7 @@ Los hints de permisos faltantes siguen activos aunque la bandera tecnica este ap
 
 - `PERM-UX-D`: replicar modal de permisos en paquete, apartado, envios, usuarios, roles, apariencia y Panel Owner.
 - Evaluar si la modal debe incluir links administrativos para solicitar permisos en una fase futura.
+
+## Ajuste posterior PERM-UX-D
+
+PERM-UX-D mueve el boton `Ver permisos` a la cabecera de `/payments`, retira el resumen/tarjeta del cuerpo y unifica negocio + diagnostico tecnico en una sola lista dentro de `ScreenPermissionModal`.

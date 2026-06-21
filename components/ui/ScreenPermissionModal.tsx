@@ -46,62 +46,35 @@ export default function ScreenPermissionModal({
 
         <AppCard variant="subtle" style={styles.sectionCard}>
           <AppText variant="subtitle" bold>
-            Que puedes hacer
+            Acciones y permisos
           </AppText>
           <View style={styles.list}>
             {evaluations.map((item) => (
-              <View key={item.key} style={styles.permissionRow}>
-                <StatusBadge
-                  label={item.allowed ? 'Permitido' : 'Bloqueado'}
-                  tone={item.allowed ? 'success' : 'warning'}
-                />
+              <View
+                key={item.key}
+                style={[styles.permissionRow, { borderBottomColor: theme.colors.border }]}
+              >
+                <View style={styles.rowStatus}>
+                  <StatusBadge
+                    label={item.allowed ? 'Permitido' : 'Bloqueado'}
+                    tone={item.allowed ? 'success' : 'warning'}
+                  />
+                </View>
                 <View style={styles.permissionText}>
                   <AppText bold>{item.label}</AppText>
                   <AppText variant="caption" color={theme.colors.mutedText}>
                     {item.userMessage}
                   </AppText>
+                  {showTechnicalDetails ? (
+                    <AppText variant="caption" color={theme.colors.mutedText}>
+                      Permiso requerido: {item.permissionCode}
+                    </AppText>
+                  ) : null}
                 </View>
               </View>
             ))}
           </View>
         </AppCard>
-
-        {showTechnicalDetails ? (
-          <AppCard variant="info" style={styles.sectionCard}>
-            <AppText variant="subtitle" bold>
-              Diagnostico tecnico
-            </AppText>
-            <AppText variant="caption" color={theme.colors.mutedText}>
-              Visible solo con diagnostico habilitado y perfil autorizado.
-            </AppText>
-            <View style={styles.list}>
-              {evaluations.map((item) => (
-                <View
-                  key={item.key}
-                  style={[styles.technicalRow, { borderBottomColor: theme.colors.border }]}
-                >
-                  <View style={styles.permissionText}>
-                    <AppText bold>{item.label}</AppText>
-                    <AppText variant="caption" color={theme.colors.mutedText}>
-                      {item.technicalMessage}
-                    </AppText>
-                  </View>
-                  <View style={styles.technicalStatus}>
-                    <StatusBadge
-                      label={item.allowed ? 'Permitido' : 'Bloqueado'}
-                      tone={item.allowed ? 'success' : 'warning'}
-                    />
-                    <StatusBadge
-                      label={item.permissionCode}
-                      tone={item.allowed ? 'info' : 'warning'}
-                      style={styles.permissionCodeBadge}
-                    />
-                  </View>
-                </View>
-              ))}
-            </View>
-          </AppCard>
-        ) : null}
       </View>
     </AppBottomModal>
   );
@@ -118,31 +91,21 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 12,
   },
-  permissionCodeBadge: {
-    maxWidth: 220,
-  },
   permissionRow: {
     alignItems: 'flex-start',
+    borderBottomWidth: 1,
     flexDirection: 'row',
     gap: 10,
+    paddingBottom: 10,
   },
   permissionText: {
     flex: 1,
     minWidth: 0,
   },
+  rowStatus: {
+    minWidth: 92,
+  },
   sectionCard: {
     marginBottom: 0,
-  },
-  technicalRow: {
-    alignItems: 'flex-start',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    gap: 10,
-    justifyContent: 'space-between',
-    paddingBottom: 10,
-  },
-  technicalStatus: {
-    alignItems: 'flex-end',
-    gap: 6,
   },
 });

@@ -81,6 +81,8 @@ PERM-UX-B agrega `EXPO_PUBLIC_ENABLE_PERMISSION_DIAGNOSTICS` como bandera centra
 
 PERM-UX-C reemplaza el panel expandible por el boton `Ver permisos` y la modal reusable `ScreenPermissionModal`.
 
+PERM-UX-D mueve `Ver permisos` a la cabecera de `/payments` y retira la tarjeta fija de capacidades del cuerpo de la pantalla.
+
 ## Validaciones esperadas
 
 - `/payments` no muestra dos cabeceras con `Pagos`.

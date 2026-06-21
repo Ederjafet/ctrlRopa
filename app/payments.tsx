@@ -7,7 +7,6 @@ import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
 import PermissionBlockedHint from '@/components/ui/PermissionBlockedHint';
 import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
-import ScreenCapabilitySummary from '@/components/ui/ScreenCapabilitySummary';
 import ScreenPermissionModal from '@/components/ui/ScreenPermissionModal';
 import AppText from '@/components/ui/AppText';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -760,15 +759,16 @@ export default function PaymentsScreen() {
       contextSubtitle={screenScopeLabel}
       contextMetadata={PAYMENTS_HEADER_DESCRIPTION}
       activeRoute="payments"
+      rightContent={
+        <AppButton
+          title="Ver permisos"
+          variant="secondary"
+          onPress={() => setIsPermissionModalVisible(true)}
+          style={styles.headerPermissionButton}
+        />
+      }
       compactHeader
     >
-      <ScreenCapabilitySummary
-        evaluations={permissionEvaluations}
-        showPermissionButton={canShowPermissionDiagnostics}
-        permissionButtonTitle="Ver permisos"
-        onOpenPermissions={() => setIsPermissionModalVisible(true)}
-      />
-
       {isLiveContext ? (
         <AppButton
           title={t('payments.backToLive')}
@@ -1463,6 +1463,10 @@ const styles = StyleSheet.create({
   },
   filterGroup: {
     marginBottom: 14,
+  },
+  headerPermissionButton: {
+    minHeight: 32,
+    paddingHorizontal: 12,
   },
   infoRow: {
     marginBottom: 10,

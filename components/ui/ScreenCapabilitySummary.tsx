@@ -15,7 +15,7 @@ type Props = {
 };
 
 export default function ScreenCapabilitySummary({
-  title = 'Tu acceso en esta pantalla',
+  title = 'Capacidades',
   evaluations,
   showPermissionButton = false,
   permissionButtonTitle = 'Ver permisos',

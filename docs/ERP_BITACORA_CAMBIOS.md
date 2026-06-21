@@ -1,5 +1,29 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-21 - PERM-UX-D patron final de permisos en cabecera
+
+Tipo: frontend, permisos, UX, pagos, documentacion.
+
+Objetivo:
+
+- Retirar la tarjeta fija de capacidades del cuerpo de `/payments` y consolidar permisos en boton de cabecera + modal unificada.
+
+Cambios realizados:
+
+- `/payments` ya no renderiza `ScreenCapabilitySummary` dentro del body.
+- El boton `Ver permisos` vive en `rightContent` del `AppShellPage`.
+- `ScreenPermissionModal` muestra una sola lista de acciones y permisos.
+- El permiso tecnico requerido se integra por fila y solo aparece con diagnostico habilitado y perfil autorizado.
+- Los hints de botones bloqueados se mantienen fuera de la modal.
+- Se documenta la fase en `docs/PERM_UX_D_PERMISSION_MODAL_HEADER_PATTERN.md`.
+
+Restricciones respetadas:
+
+- No se toco backend.
+- No se hizo merge a `main`.
+- No se cambio la proteccion de pagos.
+- No se agrego `Actualizar` fuera de LIVE.
+
 ## 2026-06-21 - PERM-UX-C modal reusable de permisos en pagos
 
 Tipo: frontend, permisos, UX, pagos, documentacion.
