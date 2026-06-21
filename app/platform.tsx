@@ -21,6 +21,7 @@ import {
   getPlatformCompanyDetail,
   getPlatformCompanySettings,
   getPlatformCompanySubscription,
+  getPlatformDashboardSummary,
   getPlatformPlanPrices,
   getPlatformSubscriptionPlans,
   getPlatformUsageRates,
@@ -32,6 +33,7 @@ import {
   PlatformCompanySettings,
   PlatformCompanySubscription,
   PlatformCompanyUser,
+  PlatformDashboardSummary,
   PlatformPlanPrice,
   PlatformSubscriptionPlan,
   PlatformUsageRate,
@@ -182,6 +184,19 @@ function parseCompanyIdParam(value: unknown): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+function normalizePlatformActionSection(value?: string | null): PlatformSection {
+  return SECTION_CONFIG.some((section) => section.key === value)
+    ? (value as PlatformSection)
+    : 'companies';
+}
+
+function normalizeDashboardTone(value?: string | null): 'neutral' | 'success' | 'warning' | 'danger' | 'info' {
+  if (value === 'success' || value === 'warning' || value === 'danger' || value === 'info') {
+    return value;
+  }
+  return 'neutral';
+}
+
 function parseNullableInteger(value: string, label: string): number | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -235,6 +250,7 @@ export default function PlatformScreen() {
     useState<PlatformCompanySubscription | null>(null);
   const [usageRates, setUsageRates] = useState<PlatformUsageRate[]>([]);
   const [usageSummary, setUsageSummary] = useState<PlatformUsageSummary[]>([]);
+  const [dashboardSummary, setDashboardSummary] = useState<PlatformDashboardSummary | null>(null);
   const [subscriptionPlans, setSubscriptionPlans] = useState<PlatformSubscriptionPlan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
   const [planPrices, setPlanPrices] = useState<PlatformPlanPrice[]>([]);
@@ -428,16 +444,18 @@ export default function PlatformScreen() {
     try {
       setLoading(true);
       setErrorMessage('');
-      const [companyRows, planRows, usageRows, storedCompanyIdRaw] = await Promise.all([
+      const [companyRows, planRows, usageRows, dashboardRows, storedCompanyIdRaw] = await Promise.all([
         getPlatformCompanies(),
         getPlatformSubscriptionPlans(),
         getPlatformUsageSummary(),
+        getPlatformDashboardSummary(),
         AsyncStorage.getItem(PLATFORM_SELECTED_COMPANY_ID_KEY),
       ]);
       const storedCompanyId = parseCompanyIdParam(storedCompanyIdRaw);
       setCompanies(companyRows);
       setSubscriptionPlans(planRows);
       setUsageSummary(usageRows);
+      setDashboardSummary(dashboardRows);
       setSelectedCompanyId((current) => {
         const requestedId = routeCompanyId ?? storedCompanyId ?? current;
         const validCompany = requestedId
@@ -487,6 +505,22 @@ export default function PlatformScreen() {
     setUsageSummary(await getPlatformUsageSummary());
   };
 
+  const refreshDashboardSummary = async () => {
+    setDashboardSummary(await getPlatformDashboardSummary());
+  };
+
+  const openDashboardCompanyAction = useCallback((companyId: number, section?: string | null) => {
+    const targetSection = normalizePlatformActionSection(section);
+    const company = companies.find((item) => item.id === companyId);
+    setSelectedCompanyId(companyId);
+    void AsyncStorage.setItem(PLATFORM_SELECTED_COMPANY_ID_KEY, String(companyId));
+    router.push(buildPlatformRoute(targetSection, companyId));
+    if (company) {
+      setMessage(`Ahora administras ${company.name}.`);
+      setErrorMessage('');
+    }
+  }, [buildPlatformRoute, companies, router]);
+
   const handleCreateCompany = async () => {
     if (creatingCompany) return;
     const name = companyForm.name.trim();
@@ -512,6 +546,7 @@ export default function PlatformScreen() {
       Alert.alert('Empresa creada', `Se creo ${created.name} con sucursal principal.`);
       await refreshCompanies();
       await refreshUsageSummary();
+      await refreshDashboardSummary();
     } catch (error) {
       setErrorMessage(getActionableApiErrorMessage(error));
     } finally {
@@ -544,6 +579,7 @@ export default function PlatformScreen() {
       await loadCompanyScope(selectedCompany.id);
       await refreshCompanies();
       await refreshUsageSummary();
+      await refreshDashboardSummary();
     } catch (error) {
       setErrorMessage(getActionableApiErrorMessage(error));
     } finally {
@@ -578,6 +614,7 @@ export default function PlatformScreen() {
       await loadCompanyScope(selectedCompany.id);
       await refreshCompanies();
       await refreshUsageSummary();
+      await refreshDashboardSummary();
     } catch (error) {
       setErrorMessage(getActionableApiErrorMessage(error));
     } finally {
@@ -619,6 +656,7 @@ export default function PlatformScreen() {
       await loadCompanyScope(selectedCompany.id);
       await refreshCompanies();
       await refreshUsageSummary();
+      await refreshDashboardSummary();
     } catch (error) {
       setErrorMessage(getActionableApiErrorMessage(error));
     } finally {
@@ -684,6 +722,7 @@ export default function PlatformScreen() {
       setMessage('Modulos y limites actualizados para el cliente en administracion.');
       await loadCompanyScope(selectedCompany.id);
       await refreshUsageSummary();
+      await refreshDashboardSummary();
     } catch (error) {
       setErrorMessage(getActionableApiErrorMessage(error));
     } finally {
@@ -774,6 +813,7 @@ export default function PlatformScreen() {
       setCompanySubscription(saved);
       setMessage('Suscripcion del cliente actualizada.');
       await refreshUsageSummary();
+      await refreshDashboardSummary();
     } catch (error) {
       setErrorMessage(getActionableApiErrorMessage(error));
     } finally {
@@ -930,46 +970,287 @@ export default function PlatformScreen() {
       </AppText>
     ) : null;
 
-  const renderDashboard = () => (
-    <View style={styles.sectionStack}>
-      <AppCard style={styles.panel}>
-        <View style={styles.sectionHeader}>
-          <StatusBadge label="GLOBAL" tone="info" />
-          <View style={styles.flex}>
-            <AppText variant="subtitle" bold>
-              Dashboard SaaS AppModa
-            </AppText>
-            <AppText variant="caption" color={theme.colors.mutedText}>
-              Vista global de plataforma. Estas metricas no dependen del cliente en administracion.
-            </AppText>
-          </View>
-        </View>
-        <View style={styles.metricGrid}>
-          {renderMetric('Clientes activos', activeCompanies.length)}
-          {renderMetric('Clientes suspendidos/inactivos', inactiveCompanies.length)}
-          {renderMetric('Planes activos', subscriptionPlans.filter((plan) => plan.status === 'ACTIVE').length)}
-          {renderMetric('Clientes sin plan', clientsWithoutPlan.length)}
-          {renderMetric('Clientes con modelo consumo', usageSummary.filter((item) => item.billingModel === 'USAGE_BASED').length)}
-          {renderMetric('Clientes con suscripcion activa', usageSummary.filter((item) => item.subscriptionStatus === 'ACTIVE').length)}
-        </View>
-      </AppCard>
-      <AppCard style={styles.panel}>
-        <View style={styles.sectionHeader}>
-          <StatusBadge label="PENDIENTES" tone={clientsWithoutPlan.length > 0 ? 'warning' : 'success'} />
-          <View style={styles.flex}>
-            <AppText variant="subtitle" bold>
-              Pendientes de instalacion SaaS
-            </AppText>
-            <AppText variant="caption" color={theme.colors.mutedText}>
-              {clientsWithoutPlan.length > 0
-                ? `${clientsWithoutPlan.length} clientes siguen sin plan o modelo de cobro configurado.`
-                : 'No hay clientes pendientes de plan en el resumen actual.'}
-            </AppText>
-          </View>
-        </View>
-      </AppCard>
+  const renderDashboardMetricTile = (
+    label: string,
+    value: string | number,
+    helper?: string,
+    tone: 'neutral' | 'success' | 'warning' | 'danger' | 'info' = 'neutral'
+  ) => (
+    <View
+      key={label}
+      style={[
+        styles.dashboardMetricTile,
+        {
+          backgroundColor: theme.colors.surfaceAlt,
+          borderColor:
+            tone === 'warning'
+              ? theme.colors.warning
+              : tone === 'success'
+                ? theme.colors.success
+                : tone === 'danger'
+                  ? theme.colors.danger
+                  : tone === 'info'
+                    ? theme.colors.accent
+                    : theme.colors.border,
+        },
+      ]}
+    >
+      <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+        {label}
+      </AppText>
+      <AppText variant="subtitle" bold numberOfLines={1}>
+        {value}
+      </AppText>
+      {helper ? (
+        <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={2}>
+          {helper}
+        </AppText>
+      ) : null}
     </View>
   );
+
+  const renderDashboard = () => {
+    const summary = dashboardSummary?.summary;
+    const today = dashboardSummary?.todayActivity;
+    const pendings = dashboardSummary?.installationPendings ?? [];
+    const attentionCompanies = dashboardSummary?.attentionCompanies ?? [];
+    const alerts = dashboardSummary?.operationalAlerts ?? [];
+    const estimatedRevenue =
+      summary?.estimatedMonthlyRevenue === null || summary?.estimatedMonthlyRevenue === undefined
+        ? 'Pendiente'
+        : money(summary.estimatedMonthlyRevenue);
+    const hasTodayActivity = today
+      ? today.itemsCreated +
+          today.reservationsCreated +
+          today.packagesCreated +
+          today.paymentsRegistered +
+          today.shipmentsCreated +
+          today.liveSessions >
+        0
+      : false;
+
+    return (
+      <View style={styles.sectionStack}>
+        <AppCard style={styles.panel}>
+          <View style={[styles.rowBetween, isPhone ? styles.column : null]}>
+            <View style={styles.sectionHeader}>
+              <StatusBadge label="GLOBAL" tone="info" />
+              <View style={styles.flex}>
+                <AppText variant="subtitle" bold>
+                  Dashboard SaaS AppModa
+                </AppText>
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  Vista global de plataforma. Estas metricas no dependen del cliente en administracion.
+                </AppText>
+              </View>
+            </View>
+            <View style={styles.dashboardQuickActions}>
+              <AppButton
+                title="Crear cliente"
+                variant="operation"
+                disabled={!canManageCompanies}
+                disabledReason="Tu usuario necesita MANAGE_COMPANIES."
+                onPress={() => {
+                  setShowCompanyForm(true);
+                  router.push(buildPlatformRoute('companies', selectedCompanyId));
+                }}
+                style={styles.compactButton}
+              />
+              <AppButton
+                title="Revisar sin plan"
+                variant="secondary"
+                onPress={() => router.push(buildPlatformRoute('subscriptions', selectedCompanyId))}
+                style={styles.compactButton}
+              />
+            </View>
+          </View>
+          <View style={styles.dashboardMetricGrid}>
+            {renderDashboardMetricTile('Clientes activos', summary?.activeCompanies ?? activeCompanies.length, 'Tenants operables', 'success')}
+            {renderDashboardMetricTile('Clientes sin plan', summary?.companiesWithoutPlan ?? clientsWithoutPlan.length, 'Requieren configuracion comercial', (summary?.companiesWithoutPlan ?? clientsWithoutPlan.length) > 0 ? 'warning' : 'success')}
+            {renderDashboardMetricTile('Suspendidos/inactivos', summary?.suspendedCompanies ?? inactiveCompanies.length, 'Riesgo de soporte o cobranza', (summary?.suspendedCompanies ?? inactiveCompanies.length) > 0 ? 'warning' : 'neutral')}
+            {renderDashboardMetricTile('Ingreso mensual estimado', estimatedRevenue, 'Con suscripciones activas y precio configurado', summary?.estimatedMonthlyRevenue ? 'info' : 'neutral')}
+            {renderDashboardMetricTile('Usuarios activos', summary?.activeUsers ?? usageSummary.reduce((total, item) => total + item.activeUsers, 0), 'Global en clientes tenant', 'info')}
+            {renderDashboardMetricTile('Clientes con uso hoy', summary?.companiesWithUsageToday ?? 0, 'Actividad operativa detectada', (summary?.companiesWithUsageToday ?? 0) > 0 ? 'success' : 'neutral')}
+          </View>
+        </AppCard>
+
+        <View style={[styles.dashboardTwoColumn, isPhone ? styles.column : null]}>
+          <AppCard style={[styles.panel, styles.dashboardColumn]}>
+            <View style={styles.sectionHeader}>
+              <StatusBadge label="CRITICO" tone={pendings.length > 0 ? 'warning' : 'success'} />
+              <View style={styles.flex}>
+                <AppText variant="subtitle" bold>
+                  Pendientes criticos
+                </AppText>
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  {pendings.length > 0
+                    ? `${pendings.length} clientes requieren configuracion antes de operar sin friccion.`
+                    : 'Sin pendientes criticos de instalacion por ahora.'}
+                </AppText>
+              </View>
+            </View>
+            {pendings.length === 0 ? (
+              <EmptyState title="Instalacion en orden" message="No hay clientes incompletos en el resumen global." icon="check-circle" />
+            ) : (
+              <View style={styles.dashboardList}>
+                {pendings.slice(0, 5).map((item) => (
+                  <View key={item.companyId} style={[styles.dashboardListRow, { borderColor: theme.colors.border }]}>
+                    <View style={styles.flex}>
+                      <View style={styles.inlineBadges}>
+                        <AppText bold numberOfLines={1}>{item.companyName}</AppText>
+                        <StatusBadge label={item.status} tone={item.status === 'ACTIVE' ? 'success' : 'warning'} />
+                      </View>
+                      <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={2}>
+                        {item.missing.join(' - ')}
+                      </AppText>
+                    </View>
+                    <AppButton
+                      title="Configurar"
+                      variant="secondary"
+                      onPress={() => openDashboardCompanyAction(item.companyId, item.actionSection)}
+                      style={styles.compactButton}
+                    />
+                  </View>
+                ))}
+              </View>
+            )}
+          </AppCard>
+
+          <AppCard style={[styles.panel, styles.dashboardColumn]}>
+            <View style={styles.sectionHeader}>
+              <StatusBadge label="HOY" tone={hasTodayActivity ? 'success' : 'neutral'} />
+              <View style={styles.flex}>
+                <AppText variant="subtitle" bold>
+                  Actividad de hoy
+                </AppText>
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  Operacion global detectada desde prendas, apartados, paquetes, pagos, envios y LIVE.
+                </AppText>
+              </View>
+            </View>
+            <View style={styles.todayGrid}>
+              {renderDashboardMetricTile('Prendas', today?.itemsCreated ?? 0)}
+              {renderDashboardMetricTile('Apartados', today?.reservationsCreated ?? 0)}
+              {renderDashboardMetricTile('Paquetes', today?.packagesCreated ?? 0)}
+              {renderDashboardMetricTile('Pagos', today?.paymentsRegistered ?? 0, money(today?.paymentAmount ?? 0))}
+              {renderDashboardMetricTile('Envios', today?.shipmentsCreated ?? 0)}
+              {renderDashboardMetricTile('LIVE', today?.liveSessions ?? 0, `${today?.liveReservations ?? 0} reservas LIVE`)}
+            </View>
+          </AppCard>
+        </View>
+
+        <AppCard style={styles.panel}>
+          <View style={styles.sectionHeader}>
+            <StatusBadge label="ATENCION" tone={attentionCompanies.length > 0 ? 'warning' : 'success'} />
+            <View style={styles.flex}>
+              <AppText variant="subtitle" bold>
+                Clientes que requieren atencion
+              </AppText>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Priorizados por configuracion incompleta, limites cercanos o falta de uso hoy.
+              </AppText>
+            </View>
+          </View>
+          {attentionCompanies.length === 0 ? (
+            <EmptyState title="Sin clientes en atencion" message="No hay señales criticas con los datos actuales." icon="domain" />
+          ) : (
+            <View style={styles.dashboardTable}>
+              {attentionCompanies.map((item) => (
+                <View key={item.companyId} style={[styles.dashboardTableRow, { borderColor: theme.colors.border }]}>
+                  <View style={styles.dashboardCompanyCell}>
+                    <AppText bold numberOfLines={1}>{item.companyName}</AppText>
+                    <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+                      {item.status} - {item.planName || 'Sin plan'} - {item.billingModel}
+                    </AppText>
+                  </View>
+                  <View style={styles.dashboardCompactCell}>
+                    <AppText variant="caption" color={theme.colors.mutedText}>Usuarios</AppText>
+                    <AppText bold>{item.activeUsers}/{item.maxUsers ?? 'sin limite'}</AppText>
+                  </View>
+                  <View style={styles.dashboardCompactCell}>
+                    <AppText variant="caption" color={theme.colors.mutedText}>Sucursales</AppText>
+                    <AppText bold>{item.activeBranches}/{item.maxBranches ?? 'sin limite'}</AppText>
+                  </View>
+                  <View style={styles.dashboardPendingCell}>
+                    <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={2}>
+                      {item.pendingLabels.join(' - ')}
+                    </AppText>
+                    <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+                      {item.usageLabel} - {item.modules.length > 0 ? item.modules.join(', ') : 'Sin modulos'}
+                    </AppText>
+                  </View>
+                  <AppButton
+                    title="Revisar"
+                    variant="secondary"
+                    onPress={() => openDashboardCompanyAction(item.companyId, 'companies')}
+                    style={styles.compactButton}
+                  />
+                </View>
+              ))}
+            </View>
+          )}
+        </AppCard>
+
+        <View style={[styles.dashboardTwoColumn, isPhone ? styles.column : null]}>
+          <AppCard style={[styles.panel, styles.dashboardColumn]}>
+            <View style={styles.sectionHeader}>
+              <StatusBadge label="ALERTAS" tone={alerts.length > 0 ? 'warning' : 'success'} />
+              <View style={styles.flex}>
+                <AppText variant="subtitle" bold>
+                  Alertas operativas
+                </AppText>
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  Senales globales calculadas con datos operativos existentes.
+                </AppText>
+              </View>
+            </View>
+            {alerts.length === 0 ? (
+              <EmptyState title="Sin alertas criticas" message="No hay paquetes, envios o autorizaciones pendientes que destacar." icon="notifications" />
+            ) : (
+              <View style={styles.dashboardList}>
+                {alerts.map((alert) => (
+                  <View key={alert.type} style={[styles.dashboardListRow, { borderColor: theme.colors.border }]}>
+                    <View style={styles.flex}>
+                      <View style={styles.inlineBadges}>
+                        <StatusBadge label={String(alert.count)} tone={normalizeDashboardTone(alert.tone)} />
+                        <AppText bold numberOfLines={1}>{alert.label}</AppText>
+                      </View>
+                    </View>
+                    <AppButton
+                      title="Revisar"
+                      variant="secondary"
+                      onPress={() => router.push(buildPlatformRoute(normalizePlatformActionSection(alert.actionSection), selectedCompanyId))}
+                      style={styles.compactButton}
+                    />
+                  </View>
+                ))}
+              </View>
+            )}
+          </AppCard>
+
+          <AppCard style={[styles.panel, styles.dashboardColumn]}>
+            <View style={styles.sectionHeader}>
+              <StatusBadge label="ACCIONES" tone="info" />
+              <View style={styles.flex}>
+                <AppText variant="subtitle" bold>
+                  Acciones rapidas
+                </AppText>
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  Atajos de administracion SaaS, no navegacion duplicada.
+                </AppText>
+              </View>
+            </View>
+            <View style={styles.dashboardActionGrid}>
+              <AppButton title="Crear cliente" variant="operation" disabled={!canManageCompanies} disabledReason="Tu usuario necesita MANAGE_COMPANIES." onPress={() => { setShowCompanyForm(true); router.push(buildPlatformRoute('companies', selectedCompanyId)); }} style={styles.actionButton} />
+              <AppButton title="Configurar planes" variant="secondary" onPress={() => router.push(buildPlatformRoute('subscriptions', selectedCompanyId))} style={styles.actionButton} />
+              <AppButton title="Revisar limites" variant="secondary" onPress={() => router.push(buildPlatformRoute('limits', selectedCompanyId))} style={styles.actionButton} />
+              <AppButton title="Ver uso global" variant="secondary" onPress={() => router.push(buildPlatformRoute('usage', selectedCompanyId))} style={styles.actionButton} />
+            </View>
+          </AppCard>
+        </View>
+      </View>
+    );
+  };
 
   const renderCompanies = () => (
     <View style={styles.sectionStack}>
@@ -1772,6 +2053,78 @@ const styles = StyleSheet.create({
     gap: 14,
     paddingBottom: 28,
   },
+  dashboardActionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  dashboardColumn: {
+    flex: 1,
+    minWidth: 280,
+  },
+  dashboardCompactCell: {
+    minWidth: 92,
+  },
+  dashboardCompanyCell: {
+    flex: 1.3,
+    minWidth: 180,
+  },
+  dashboardList: {
+    gap: 8,
+  },
+  dashboardListRow: {
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
+    padding: 10,
+  },
+  dashboardMetricGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  dashboardMetricTile: {
+    borderRadius: 10,
+    borderWidth: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    gap: 3,
+    minHeight: 82,
+    minWidth: 150,
+    padding: 10,
+  },
+  dashboardPendingCell: {
+    flex: 1.2,
+    minWidth: 210,
+  },
+  dashboardQuickActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'flex-end',
+  },
+  dashboardTable: {
+    gap: 8,
+  },
+  dashboardTableRow: {
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    padding: 10,
+  },
+  dashboardTwoColumn: {
+    alignItems: 'stretch',
+    flexDirection: 'row',
+    gap: 12,
+  },
   flex: {
     flex: 1,
     minWidth: 0,
@@ -1878,6 +2231,11 @@ const styles = StyleSheet.create({
   },
   sectionStack: {
     gap: 12,
+  },
+  todayGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   usageRateRow: {
     alignItems: 'center',

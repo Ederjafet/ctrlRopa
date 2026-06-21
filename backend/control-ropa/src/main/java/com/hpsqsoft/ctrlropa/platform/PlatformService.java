@@ -16,9 +16,14 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.text.Normalizer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -736,6 +741,624 @@ public class PlatformService {
                 ),
                 PLATFORM_COMPANY_CODE
         );
+    }
+
+    @Transactional(readOnly = true)
+    public PlatformDashboardSummaryResponse findDashboardSummary() {
+        assertCanViewPlatform();
+
+        List<DashboardCompanyRow> companies = findDashboardCompanyRows();
+        Set<Long> companiesWithUsageToday = findCompaniesWithUsageToday();
+        Map<Long, List<String>> modulesByCompany = findEnabledModulesByCompany();
+
+        PlatformDashboardSummaryResponse.Summary summary = buildDashboardSummary(
+                companies,
+                companiesWithUsageToday.size()
+        );
+        PlatformDashboardSummaryResponse.TodayActivity todayActivity = findTodayActivity();
+        List<PlatformDashboardSummaryResponse.InstallationPending> installationPendings =
+                buildInstallationPendings(companies);
+        List<PlatformDashboardSummaryResponse.AttentionCompany> attentionCompanies =
+                buildAttentionCompanies(companies, modulesByCompany, companiesWithUsageToday);
+        List<PlatformDashboardSummaryResponse.OperationalAlert> operationalAlerts =
+                buildOperationalAlerts(companies);
+
+        return new PlatformDashboardSummaryResponse(
+                summary,
+                todayActivity,
+                installationPendings,
+                attentionCompanies,
+                operationalAlerts
+        );
+    }
+
+    private List<DashboardCompanyRow> findDashboardCompanyRows() {
+        return jdbcTemplate.query(
+                """
+                SELECT
+                  c.id AS company_id,
+                  c.name AS company_name,
+                  c.status,
+                  cs.plan_id,
+                  sp.name AS plan_name,
+                  COALESCE(cs.billing_model, 'SIN_CONFIGURAR') AS billing_model,
+                  COALESCE(cs.status, 'SIN_CONFIGURAR') AS subscription_status,
+                  (SELECT COUNT(*) FROM branches b WHERE b.company_id = c.id AND b.status = 'ACTIVE') AS active_branches,
+                  (
+                    SELECT COUNT(*)
+                    FROM users u
+                    JOIN branches b ON b.id = u.branch_id
+                    WHERE b.company_id = c.id
+                      AND u.status = 'ACTIVE'
+                  ) AS active_users,
+                  (
+                    SELECT COUNT(*)
+                    FROM users u
+                    JOIN branches b ON b.id = u.branch_id
+                    JOIN user_roles ur ON ur.user_id = u.id
+                    JOIN roles r ON r.id = ur.role_id
+                    WHERE b.company_id = c.id
+                      AND u.status = 'ACTIVE'
+                      AND r.code = 'ADMIN'
+                  ) AS admin_users,
+                  (
+                    SELECT COUNT(*)
+                    FROM users u
+                    JOIN branches b ON b.id = u.branch_id
+                    JOIN user_roles ur ON ur.user_id = u.id
+                    JOIN roles r ON r.id = ur.role_id
+                    WHERE b.company_id = c.id
+                      AND u.status = 'ACTIVE'
+                      AND r.code IN ('SUPERVISOR', 'SELLER', 'CASHIER')
+                  ) AS operational_users,
+                  (SELECT COUNT(*) FROM company_modules cm WHERE cm.company_id = c.id AND cm.enabled = 1) AS active_modules,
+                  CASE WHEN cl.company_id IS NULL THEN 0 ELSE 1 END AS has_limits,
+                  (SELECT COUNT(*) FROM company_modules cm WHERE cm.company_id = c.id AND cm.module_code = 'LIVE' AND cm.enabled = 1) AS live_enabled,
+                  cl.max_users,
+                  cl.max_branches
+                FROM companies c
+                LEFT JOIN company_subscriptions cs ON cs.company_id = c.id
+                LEFT JOIN subscription_plans sp ON sp.id = cs.plan_id
+                LEFT JOIN company_limits cl ON cl.company_id = c.id
+                WHERE c.code <> ?
+                ORDER BY
+                  CASE c.status WHEN 'ACTIVE' THEN 0 WHEN 'TRIAL' THEN 1 ELSE 2 END,
+                  c.name
+                """,
+                (rs, rowNum) -> new DashboardCompanyRow(
+                        rs.getLong("company_id"),
+                        rs.getString("company_name"),
+                        rs.getString("status"),
+                        rs.getObject("plan_id", Long.class),
+                        rs.getString("plan_name"),
+                        rs.getString("billing_model"),
+                        rs.getString("subscription_status"),
+                        rs.getInt("active_branches"),
+                        rs.getInt("active_users"),
+                        rs.getInt("admin_users"),
+                        rs.getInt("operational_users"),
+                        rs.getInt("active_modules"),
+                        rs.getInt("has_limits") == 1,
+                        rs.getInt("live_enabled") > 0,
+                        rs.getObject("max_users", Integer.class),
+                        rs.getObject("max_branches", Integer.class)
+                ),
+                PLATFORM_COMPANY_CODE
+        );
+    }
+
+    private PlatformDashboardSummaryResponse.Summary buildDashboardSummary(
+            List<DashboardCompanyRow> companies,
+            int companiesWithUsageToday
+    ) {
+        int activeCompanies = 0;
+        int trialCompanies = 0;
+        int suspendedCompanies = 0;
+        int companiesWithoutPlan = 0;
+        int companiesWithActiveSubscription = 0;
+        int companiesWithUsageBilling = 0;
+        int activeUsers = 0;
+        int activeBranches = 0;
+
+        for (DashboardCompanyRow company : companies) {
+            String status = normalizeCode(company.status());
+            if ("ACTIVE".equals(status)) {
+                activeCompanies++;
+            } else if ("TRIAL".equals(status)) {
+                trialCompanies++;
+            } else {
+                suspendedCompanies++;
+            }
+
+            if (company.planId() == null || "SIN_CONFIGURAR".equals(normalizeCode(company.billingModel()))) {
+                companiesWithoutPlan++;
+            }
+            if ("ACTIVE".equals(normalizeCode(company.subscriptionStatus()))) {
+                companiesWithActiveSubscription++;
+            }
+            if ("USAGE_BASED".equals(normalizeCode(company.billingModel()))) {
+                companiesWithUsageBilling++;
+            }
+
+            activeUsers += company.activeUsers();
+            activeBranches += company.activeBranches();
+        }
+
+        return new PlatformDashboardSummaryResponse.Summary(
+                activeCompanies,
+                trialCompanies,
+                suspendedCompanies,
+                companiesWithoutPlan,
+                companiesWithActiveSubscription,
+                companiesWithUsageBilling,
+                activeUsers,
+                activeBranches,
+                queryInteger("SELECT COUNT(*) FROM subscription_plans WHERE status = 'ACTIVE'"),
+                companiesWithUsageToday,
+                findEstimatedMonthlyRevenue()
+        );
+    }
+
+    private BigDecimal findEstimatedMonthlyRevenue() {
+        return jdbcTemplate.queryForObject(
+                """
+                SELECT SUM(
+                  CASE COALESCE(cs.billing_period, 'MONTHLY')
+                    WHEN 'MONTHLY' THEN spp.price_amount
+                    WHEN 'QUARTERLY' THEN spp.price_amount / 3
+                    WHEN 'SEMIANNUAL' THEN spp.price_amount / 6
+                    WHEN 'ANNUAL' THEN spp.price_amount / 12
+                    ELSE spp.price_amount
+                  END
+                )
+                FROM company_subscriptions cs
+                JOIN companies c ON c.id = cs.company_id
+                JOIN subscription_plan_prices spp
+                  ON spp.plan_id = cs.plan_id
+                 AND spp.billing_period = COALESCE(cs.billing_period, 'MONTHLY')
+                 AND spp.status = 'ACTIVE'
+                WHERE c.code <> ?
+                  AND cs.status = 'ACTIVE'
+                """,
+                BigDecimal.class,
+                PLATFORM_COMPANY_CODE
+        );
+    }
+
+    private PlatformDashboardSummaryResponse.TodayActivity findTodayActivity() {
+        return new PlatformDashboardSummaryResponse.TodayActivity(
+                queryInteger(
+                        """
+                        SELECT COUNT(*)
+                        FROM items i
+                        JOIN companies c ON c.id = i.company_id
+                        WHERE c.code <> ?
+                          AND i.created_at >= CURDATE()
+                          AND i.created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+                        """,
+                        PLATFORM_COMPANY_CODE
+                ),
+                queryInteger(
+                        """
+                        SELECT COUNT(*)
+                        FROM reservations r
+                        JOIN branches b ON b.id = r.branch_id
+                        JOIN companies c ON c.id = b.company_id
+                        WHERE c.code <> ?
+                          AND r.created_at >= CURDATE()
+                          AND r.created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+                        """,
+                        PLATFORM_COMPANY_CODE
+                ),
+                queryInteger(
+                        """
+                        SELECT COUNT(*)
+                        FROM customer_packages cp
+                        JOIN branches b ON b.id = cp.branch_id
+                        JOIN companies c ON c.id = b.company_id
+                        WHERE c.code <> ?
+                          AND cp.created_at >= CURDATE()
+                          AND cp.created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+                        """,
+                        PLATFORM_COMPANY_CODE
+                ),
+                queryInteger(
+                        """
+                        SELECT COUNT(*)
+                        FROM payments p
+                        JOIN branches b ON b.id = p.branch_id
+                        JOIN companies c ON c.id = b.company_id
+                        WHERE c.code <> ?
+                          AND p.status = 'ACTIVE'
+                          AND p.created_at >= CURDATE()
+                          AND p.created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+                        """,
+                        PLATFORM_COMPANY_CODE
+                ),
+                queryBigDecimal(
+                        """
+                        SELECT SUM(p.received_amount)
+                        FROM payments p
+                        JOIN branches b ON b.id = p.branch_id
+                        JOIN companies c ON c.id = b.company_id
+                        WHERE c.code <> ?
+                          AND p.status = 'ACTIVE'
+                          AND p.created_at >= CURDATE()
+                          AND p.created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+                        """,
+                        PLATFORM_COMPANY_CODE
+                ),
+                queryInteger(
+                        """
+                        SELECT COUNT(*)
+                        FROM shipments s
+                        JOIN branches b ON b.id = s.branch_id
+                        JOIN companies c ON c.id = b.company_id
+                        WHERE c.code <> ?
+                          AND s.created_at >= CURDATE()
+                          AND s.created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+                        """,
+                        PLATFORM_COMPANY_CODE
+                ),
+                queryInteger(
+                        """
+                        SELECT COUNT(*)
+                        FROM lives l
+                        JOIN branches b ON b.id = l.branch_id
+                        JOIN companies c ON c.id = b.company_id
+                        WHERE c.code <> ?
+                          AND l.created_at >= CURDATE()
+                          AND l.created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+                        """,
+                        PLATFORM_COMPANY_CODE
+                ),
+                queryInteger(
+                        """
+                        SELECT COUNT(*)
+                        FROM reservations r
+                        JOIN branches b ON b.id = r.branch_id
+                        JOIN companies c ON c.id = b.company_id
+                        WHERE c.code <> ?
+                          AND r.live_id IS NOT NULL
+                          AND r.created_at >= CURDATE()
+                          AND r.created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+                        """,
+                        PLATFORM_COMPANY_CODE
+                )
+        );
+    }
+
+    private Set<Long> findCompaniesWithUsageToday() {
+        return jdbcTemplate.query(
+                """
+                SELECT DISTINCT activity.company_id
+                FROM (
+                  SELECT i.company_id AS company_id
+                  FROM items i
+                  WHERE i.created_at >= CURDATE()
+                    AND i.created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+                  UNION
+                  SELECT b.company_id
+                  FROM reservations r
+                  JOIN branches b ON b.id = r.branch_id
+                  WHERE r.created_at >= CURDATE()
+                    AND r.created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+                  UNION
+                  SELECT b.company_id
+                  FROM customer_packages cp
+                  JOIN branches b ON b.id = cp.branch_id
+                  WHERE cp.created_at >= CURDATE()
+                    AND cp.created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+                  UNION
+                  SELECT b.company_id
+                  FROM payments p
+                  JOIN branches b ON b.id = p.branch_id
+                  WHERE p.status = 'ACTIVE'
+                    AND p.created_at >= CURDATE()
+                    AND p.created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+                  UNION
+                  SELECT b.company_id
+                  FROM shipments s
+                  JOIN branches b ON b.id = s.branch_id
+                  WHERE s.created_at >= CURDATE()
+                    AND s.created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+                  UNION
+                  SELECT b.company_id
+                  FROM lives l
+                  JOIN branches b ON b.id = l.branch_id
+                  WHERE l.created_at >= CURDATE()
+                    AND l.created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+                ) activity
+                JOIN companies c ON c.id = activity.company_id
+                WHERE c.code <> ?
+                """,
+                (rs, rowNum) -> rs.getLong("company_id"),
+                PLATFORM_COMPANY_CODE
+        ).stream().collect(Collectors.toSet());
+    }
+
+    private Map<Long, List<String>> findEnabledModulesByCompany() {
+        Map<Long, List<String>> result = new HashMap<>();
+        jdbcTemplate.query(
+                """
+                SELECT cm.company_id, cm.module_code
+                FROM company_modules cm
+                JOIN companies c ON c.id = cm.company_id
+                WHERE c.code <> ?
+                  AND cm.enabled = 1
+                ORDER BY cm.company_id, cm.module_code
+                """,
+                rs -> {
+                    Long companyId = rs.getLong("company_id");
+                    result.computeIfAbsent(companyId, ignored -> new ArrayList<>())
+                            .add(rs.getString("module_code"));
+                },
+                PLATFORM_COMPANY_CODE
+        );
+        return result;
+    }
+
+    private List<PlatformDashboardSummaryResponse.InstallationPending> buildInstallationPendings(
+            List<DashboardCompanyRow> companies
+    ) {
+        return companies.stream()
+                .map(company -> {
+                    List<String> missing = findMissingInstallationItems(company);
+                    if (missing.isEmpty()) {
+                        return null;
+                    }
+                    return new PlatformDashboardSummaryResponse.InstallationPending(
+                            company.companyId(),
+                            company.companyName(),
+                            company.status(),
+                            missing,
+                            actionSectionForMissing(missing)
+                    );
+                })
+                .filter(item -> item != null)
+                .limit(8)
+                .toList();
+    }
+
+    private List<PlatformDashboardSummaryResponse.AttentionCompany> buildAttentionCompanies(
+            List<DashboardCompanyRow> companies,
+            Map<Long, List<String>> modulesByCompany,
+            Set<Long> companiesWithUsageToday
+    ) {
+        return companies.stream()
+                .map(company -> {
+                    List<String> pendingLabels = new ArrayList<>(findMissingInstallationItems(company));
+                    if (isNearLimit(company.activeUsers(), company.maxUsers())) {
+                        pendingLabels.add("Cerca del limite de usuarios");
+                    }
+                    if (isNearLimit(company.activeBranches(), company.maxBranches())) {
+                        pendingLabels.add("Cerca del limite de sucursales");
+                    }
+
+                    boolean hasUsageToday = companiesWithUsageToday.contains(company.companyId());
+                    if (!hasUsageToday && pendingLabels.isEmpty()) {
+                        pendingLabels.add("Sin uso hoy");
+                    }
+
+                    if (pendingLabels.isEmpty()) {
+                        return null;
+                    }
+
+                    List<String> modules = modulesByCompany.getOrDefault(company.companyId(), List.of())
+                            .stream()
+                            .limit(5)
+                            .toList();
+
+                    return new PlatformDashboardSummaryResponse.AttentionCompany(
+                            company.companyId(),
+                            company.companyName(),
+                            company.status(),
+                            company.planName(),
+                            company.billingModel(),
+                            company.activeUsers(),
+                            company.maxUsers(),
+                            company.activeBranches(),
+                            company.maxBranches(),
+                            modules,
+                            hasUsageToday ? "Con uso hoy" : company.activeUsers() > 0 ? "Sin uso hoy" : "Sin uso operativo",
+                            pendingLabels
+                    );
+                })
+                .filter(item -> item != null)
+                .limit(8)
+                .toList();
+    }
+
+    private List<PlatformDashboardSummaryResponse.OperationalAlert> buildOperationalAlerts(
+            List<DashboardCompanyRow> companies
+    ) {
+        List<PlatformDashboardSummaryResponse.OperationalAlert> alerts = new ArrayList<>();
+        addAlert(
+                alerts,
+                "PACKAGES_READY",
+                "Paquetes listos para envio",
+                queryInteger(
+                        """
+                        SELECT COUNT(*)
+                        FROM customer_packages cp
+                        JOIN branches b ON b.id = cp.branch_id
+                        JOIN companies c ON c.id = b.company_id
+                        WHERE c.code <> ?
+                          AND cp.status = 'READY'
+                        """,
+                        PLATFORM_COMPANY_CODE
+                ),
+                "info",
+                "usage"
+        );
+        addAlert(
+                alerts,
+                "SHIPMENTS_OPEN",
+                "Envios abiertos o en ruta",
+                queryInteger(
+                        """
+                        SELECT COUNT(*)
+                        FROM shipments s
+                        JOIN branches b ON b.id = s.branch_id
+                        JOIN companies c ON c.id = b.company_id
+                        WHERE c.code <> ?
+                          AND s.status IN ('OPEN', 'OUT_FOR_DELIVERY')
+                        """,
+                        PLATFORM_COMPANY_CODE
+                ),
+                "warning",
+                "usage"
+        );
+        addAlert(
+                alerts,
+                "OLD_RESERVATIONS",
+                "Apartados activos con mas de 7 dias sin paquete",
+                queryInteger(
+                        """
+                        SELECT COUNT(*)
+                        FROM reservations r
+                        JOIN branches b ON b.id = r.branch_id
+                        JOIN companies c ON c.id = b.company_id
+                        WHERE c.code <> ?
+                          AND r.status = 'ACTIVE'
+                          AND r.created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)
+                          AND NOT EXISTS (
+                            SELECT 1
+                            FROM customer_package_items cpi
+                            WHERE cpi.reservation_id = r.id
+                          )
+                        """,
+                        PLATFORM_COMPANY_CODE
+                ),
+                "warning",
+                "companies"
+        );
+        addAlert(
+                alerts,
+                "LIVE_AUTH_REQUESTED",
+                "Autorizaciones LIVE pendientes",
+                queryInteger(
+                        """
+                        SELECT COUNT(*)
+                        FROM operational_authorization_requests oar
+                        JOIN companies c ON c.id = oar.company_id
+                        WHERE c.code <> ?
+                          AND oar.status = 'REQUESTED'
+                        """,
+                        PLATFORM_COMPANY_CODE
+                ),
+                "warning",
+                "audit"
+        );
+
+        int companiesNearLimits = (int) companies.stream()
+                .filter(company ->
+                        isNearLimit(company.activeUsers(), company.maxUsers()) ||
+                                isNearLimit(company.activeBranches(), company.maxBranches()))
+                .count();
+        addAlert(
+                alerts,
+                "CLIENTS_NEAR_LIMITS",
+                "Clientes cerca de limites configurados",
+                companiesNearLimits,
+                "warning",
+                "limits"
+        );
+
+        return alerts;
+    }
+
+    private List<String> findMissingInstallationItems(DashboardCompanyRow company) {
+        List<String> missing = new ArrayList<>();
+        String billingModel = normalizeCode(company.billingModel());
+        String subscriptionStatus = normalizeCode(company.subscriptionStatus());
+
+        if (company.planId() == null) {
+            missing.add("Sin plan");
+        }
+        if ("SIN_CONFIGURAR".equals(billingModel)) {
+            missing.add("Sin modelo de cobro");
+        }
+        if (company.activeBranches() == 0) {
+            missing.add("Sin sucursal activa");
+        }
+        if (company.adminUsers() == 0) {
+            missing.add("Sin admin cliente");
+        }
+        if (company.operationalUsers() == 0) {
+            missing.add("Sin usuarios operativos");
+        }
+        if (company.activeModules() == 0) {
+            missing.add("Sin modulos activos");
+        }
+        if (!company.hasLimits()) {
+            missing.add("Sin limites configurados");
+        }
+        if (!company.liveEnabled()) {
+            missing.add("LIVE desactivado");
+        }
+        if (company.planId() != null &&
+                !List.of("ACTIVE", "TRIAL").contains(subscriptionStatus)) {
+            missing.add("Suscripcion no activa");
+        }
+
+        return missing;
+    }
+
+    private String actionSectionForMissing(List<String> missing) {
+        if (missing.stream().anyMatch(item -> item.contains("plan") || item.contains("cobro") || item.contains("Suscripcion"))) {
+            return "subscriptions";
+        }
+        if (missing.stream().anyMatch(item -> item.contains("limite"))) {
+            return "limits";
+        }
+        if (missing.stream().anyMatch(item -> item.contains("usuario") || item.contains("admin"))) {
+            return "users";
+        }
+        if (missing.stream().anyMatch(item -> item.contains("modulo") || item.contains("LIVE"))) {
+            return "modules";
+        }
+        return "companies";
+    }
+
+    private boolean isNearLimit(int current, Integer max) {
+        if (max == null || max <= 0) {
+            return false;
+        }
+        return current >= Math.ceil(max * 0.8);
+    }
+
+    private void addAlert(
+            List<PlatformDashboardSummaryResponse.OperationalAlert> alerts,
+            String type,
+            String label,
+            Integer count,
+            String tone,
+            String actionSection
+    ) {
+        if (count != null && count > 0) {
+            alerts.add(new PlatformDashboardSummaryResponse.OperationalAlert(
+                    type,
+                    label,
+                    count,
+                    tone,
+                    actionSection
+            ));
+        }
+    }
+
+    private Integer queryInteger(String sql, Object... args) {
+        Integer value = jdbcTemplate.queryForObject(sql, Integer.class, args);
+        return value == null ? 0 : value;
+    }
+
+    private BigDecimal queryBigDecimal(String sql, Object... args) {
+        BigDecimal value = jdbcTemplate.queryForObject(sql, BigDecimal.class, args);
+        return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private String normalizeCode(String value) {
+        return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
     }
 
     private PlatformSubscriptionPlanResponse findSubscriptionPlan(Long planId) {
@@ -1768,6 +2391,26 @@ public class PlatformService {
             BigDecimal unitPrice,
             String currency,
             Boolean enabled
+    ) {
+    }
+
+    private record DashboardCompanyRow(
+            Long companyId,
+            String companyName,
+            String status,
+            Long planId,
+            String planName,
+            String billingModel,
+            String subscriptionStatus,
+            int activeBranches,
+            int activeUsers,
+            int adminUsers,
+            int operationalUsers,
+            int activeModules,
+            boolean hasLimits,
+            boolean liveEnabled,
+            Integer maxUsers,
+            Integer maxBranches
     ) {
     }
 

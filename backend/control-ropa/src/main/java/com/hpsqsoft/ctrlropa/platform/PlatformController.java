@@ -155,4 +155,9 @@ public class PlatformController {
     public List<PlatformUsageSummaryResponse> findUsageSummary() {
         return service.findUsageSummary();
     }
+
+    @GetMapping("/dashboard/summary")
+    public PlatformDashboardSummaryResponse findDashboardSummary() {
+        return service.findDashboardSummary();
+    }
 }

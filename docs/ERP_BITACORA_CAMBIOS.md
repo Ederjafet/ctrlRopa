@@ -1,5 +1,30 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-21 - OWNER-DASHBOARD-A dashboard SaaS accionable
+
+Tipo: platform owner, dashboard, backend read-only, frontend, UX, documentacion.
+
+Objetivo:
+
+- Convertir el Dashboard SaaS del Panel Owner en una consola global mas util, accionable y profesional.
+
+Cambios realizados:
+
+- Se agrega `GET /api/platform/dashboard/summary` como endpoint read-only protegido con `VIEW_PLATFORM`.
+- Se agrega `PlatformDashboardSummaryResponse`.
+- `PlatformService` calcula resumen SaaS, actividad de hoy, pendientes criticos, clientes que requieren atencion y alertas operativas.
+- `services/platformService.ts` expone `getPlatformDashboardSummary()`.
+- `app/platform.tsx` rediseña el Dashboard SaaS con bloques compactos, acciones rapidas y tablas/listas accionables.
+- Las acciones explicitas sobre un cliente seleccionan `selectedCompanyId`; solo abrir el dashboard no cambia el cliente en administracion.
+- Se documenta la fase en `docs/OWNER_DASHBOARD_A_SAAS_ACCIONABLE.md`.
+
+Restricciones respetadas:
+
+- No se reseteo base de datos.
+- No se agregaron datos fake ni migraciones.
+- No se implemento facturacion real, pasarela ni impersonacion.
+- No se hizo merge a `main`.
+
 ## 2026-06-21 - RC-CLIENTE-A validacion integral instalacion cliente
 
 Tipo: release candidate, QA, permisos, backend, frontend, documentacion.

@@ -120,6 +120,60 @@ export type PlatformUsageSummary = {
   maxBranches?: number | null;
 };
 
+export type PlatformDashboardSummary = {
+  summary: {
+    activeCompanies: number;
+    trialCompanies: number;
+    suspendedCompanies: number;
+    companiesWithoutPlan: number;
+    companiesWithActiveSubscription: number;
+    companiesWithUsageBilling: number;
+    activeUsers: number;
+    activeBranches: number;
+    activePlans: number;
+    companiesWithUsageToday: number;
+    estimatedMonthlyRevenue?: number | null;
+  };
+  todayActivity: {
+    itemsCreated: number;
+    reservationsCreated: number;
+    packagesCreated: number;
+    paymentsRegistered: number;
+    paymentAmount?: number | null;
+    shipmentsCreated: number;
+    liveSessions: number;
+    liveReservations: number;
+  };
+  installationPendings: {
+    companyId: number;
+    companyName: string;
+    status: string;
+    missing: string[];
+    actionSection: string;
+  }[];
+  attentionCompanies: {
+    companyId: number;
+    companyName: string;
+    status: string;
+    planName?: string | null;
+    billingModel: string;
+    activeUsers: number;
+    maxUsers?: number | null;
+    activeBranches: number;
+    maxBranches?: number | null;
+    modules: string[];
+    usageLabel: string;
+    pendingLabels: string[];
+  }[];
+  operationalAlerts: {
+    type: string;
+    label: string;
+    count: number;
+    tone: string;
+    actionSection: string;
+  }[];
+};
+
 export type CreatePlatformCompanyPayload = {
   name: string;
   legalName?: string;
@@ -343,4 +397,8 @@ export async function updatePlatformUsageRates(
 
 export async function getPlatformUsageSummary(): Promise<PlatformUsageSummary[]> {
   return apiRequest<PlatformUsageSummary[]>('/api/platform/usage');
+}
+
+export async function getPlatformDashboardSummary(): Promise<PlatformDashboardSummary> {
+  return apiRequest<PlatformDashboardSummary>('/api/platform/dashboard/summary');
 }
