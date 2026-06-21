@@ -21,6 +21,7 @@ import {
   getPlatformCompanyDetail,
   getPlatformCompanySettings,
   getPlatformCompanySubscription,
+  getPlatformAuditEvents,
   getPlatformDashboardSummary,
   getPlatformPlanPrices,
   getPlatformSubscriptionPlans,
@@ -33,6 +34,8 @@ import {
   PlatformCompanySettings,
   PlatformCompanySubscription,
   PlatformCompanyUser,
+  PlatformAuditEvent,
+  PlatformAuditEventsResponse,
   PlatformDashboardSummary,
   PlatformPlanPrice,
   PlatformSubscriptionPlan,
@@ -106,6 +109,15 @@ const PLAN_MODULE_FLAGS: {
 ];
 
 type CompanyFilterKey = 'all' | 'active' | 'withoutPlan' | 'pending' | 'ready' | 'internal';
+type AuditCategoryFilter =
+  | 'ALL'
+  | 'COMPANIES'
+  | 'SUBSCRIPTIONS'
+  | 'PRICES'
+  | 'CONFIGURATION'
+  | 'USERS'
+  | 'PLATFORM';
+type AuditDateFilter = 'ALL' | 'TODAY' | '7D' | '30D';
 
 type CompanyHealth = {
   label: string;
@@ -117,6 +129,23 @@ const TENANT_ROLE_OPTIONS = [
   { code: 'SUPERVISOR', label: 'Supervisor' },
   { code: 'SELLER', label: 'Vendedor' },
   { code: 'CASHIER', label: 'Caja' },
+];
+
+const AUDIT_CATEGORY_OPTIONS: { key: AuditCategoryFilter; label: string }[] = [
+  { key: 'ALL', label: 'Todos' },
+  { key: 'COMPANIES', label: 'Clientes' },
+  { key: 'SUBSCRIPTIONS', label: 'Suscripciones' },
+  { key: 'PRICES', label: 'Precios' },
+  { key: 'CONFIGURATION', label: 'Modulos / limites' },
+  { key: 'USERS', label: 'Usuarios' },
+  { key: 'PLATFORM', label: 'Plataforma' },
+];
+
+const AUDIT_DATE_OPTIONS: { key: AuditDateFilter; label: string }[] = [
+  { key: 'ALL', label: 'Todo' },
+  { key: 'TODAY', label: 'Hoy' },
+  { key: '7D', label: '7 dias' },
+  { key: '30D', label: '30 dias' },
 ];
 
 const EMPTY_COMPANY_FORM = {
@@ -312,6 +341,45 @@ function money(value: number | string | null | undefined) {
   });
 }
 
+function formatAuditTimestamp(value?: string | null) {
+  if (!value) return 'Fecha no disponible';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString('es-MX', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+}
+
+function normalizeAuditCategoryLabel(value?: string | null) {
+  const category = AUDIT_CATEGORY_OPTIONS.find((item) => item.key === value);
+  return category?.label ?? value ?? 'Plataforma';
+}
+
+function normalizeAuditCoverageTone(value?: string | null): 'neutral' | 'success' | 'warning' | 'danger' | 'info' {
+  const normalized = (value || '').toLowerCase();
+  if (normalized.includes('activo')) return 'success';
+  if (normalized.includes('pendiente')) return 'warning';
+  if (normalized.includes('parcial')) return 'info';
+  return 'neutral';
+}
+
+function matchesAuditDateFilter(value: string, filter: AuditDateFilter) {
+  if (filter === 'ALL') return true;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return true;
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+
+  if (filter === 'TODAY') {
+    return parsed >= start;
+  }
+
+  const days = filter === '7D' ? 6 : 29;
+  start.setDate(start.getDate() - days);
+  return parsed >= start;
+}
+
 function formatCompanyScopeCounts(detail: PlatformCompanyDetail) {
   const branches = `${detail.branchCount} sucursal${detail.branchCount === 1 ? '' : 'es'}`;
   const users = `${detail.activeUserCount} usuario${detail.activeUserCount === 1 ? '' : 's'}`;
@@ -341,6 +409,7 @@ export default function PlatformScreen() {
   const [usageRates, setUsageRates] = useState<PlatformUsageRate[]>([]);
   const [usageSummary, setUsageSummary] = useState<PlatformUsageSummary[]>([]);
   const [dashboardSummary, setDashboardSummary] = useState<PlatformDashboardSummary | null>(null);
+  const [platformAudit, setPlatformAudit] = useState<PlatformAuditEventsResponse | null>(null);
   const [subscriptionPlans, setSubscriptionPlans] = useState<PlatformSubscriptionPlan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
   const [planPrices, setPlanPrices] = useState<PlatformPlanPrice[]>([]);
@@ -360,6 +429,10 @@ export default function PlatformScreen() {
   const [showPlanForm, setShowPlanForm] = useState(false);
   const [companyPickerVisible, setCompanyPickerVisible] = useState(false);
   const [companyFilter, setCompanyFilter] = useState<CompanyFilterKey>('all');
+  const [auditSearch, setAuditSearch] = useState('');
+  const [auditCategoryFilter, setAuditCategoryFilter] = useState<AuditCategoryFilter>('ALL');
+  const [auditDateFilter, setAuditDateFilter] = useState<AuditDateFilter>('ALL');
+  const [selectedAuditEventId, setSelectedAuditEventId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingCompanyScope, setLoadingCompanyScope] = useState(false);
   const [creatingCompany, setCreatingCompany] = useState(false);
@@ -558,11 +631,12 @@ export default function PlatformScreen() {
     try {
       setLoading(true);
       setErrorMessage('');
-      const [companyRows, planRows, usageRows, dashboardRows, storedCompanyIdRaw] = await Promise.all([
+      const [companyRows, planRows, usageRows, dashboardRows, auditRows, storedCompanyIdRaw] = await Promise.all([
         getPlatformCompanies(),
         getPlatformSubscriptionPlans(),
         getPlatformUsageSummary(),
         getPlatformDashboardSummary(),
+        getPlatformAuditEvents(),
         AsyncStorage.getItem(PLATFORM_SELECTED_COMPANY_ID_KEY),
       ]);
       const storedCompanyId = parseCompanyIdParam(storedCompanyIdRaw);
@@ -570,6 +644,7 @@ export default function PlatformScreen() {
       setSubscriptionPlans(planRows);
       setUsageSummary(usageRows);
       setDashboardSummary(dashboardRows);
+      setPlatformAudit(auditRows);
       await refreshPlanPriceMap(planRows);
       setSelectedCompanyId((current) => {
         const requestedId = routeCompanyId ?? storedCompanyId ?? current;
@@ -624,6 +699,10 @@ export default function PlatformScreen() {
     setDashboardSummary(await getPlatformDashboardSummary());
   };
 
+  const refreshPlatformAudit = async () => {
+    setPlatformAudit(await getPlatformAuditEvents());
+  };
+
   const openDashboardCompanyAction = useCallback((companyId: number, section?: string | null) => {
     const targetSection = normalizePlatformActionSection(section);
     const company = companies.find((item) => item.id === companyId);
@@ -662,6 +741,7 @@ export default function PlatformScreen() {
       await refreshCompanies();
       await refreshUsageSummary();
       await refreshDashboardSummary();
+      await refreshPlatformAudit();
     } catch (error) {
       setErrorMessage(getActionableApiErrorMessage(error));
     } finally {
@@ -695,6 +775,7 @@ export default function PlatformScreen() {
       await refreshCompanies();
       await refreshUsageSummary();
       await refreshDashboardSummary();
+      await refreshPlatformAudit();
     } catch (error) {
       setErrorMessage(getActionableApiErrorMessage(error));
     } finally {
@@ -730,6 +811,7 @@ export default function PlatformScreen() {
       await refreshCompanies();
       await refreshUsageSummary();
       await refreshDashboardSummary();
+      await refreshPlatformAudit();
     } catch (error) {
       setErrorMessage(getActionableApiErrorMessage(error));
     } finally {
@@ -772,6 +854,7 @@ export default function PlatformScreen() {
       await refreshCompanies();
       await refreshUsageSummary();
       await refreshDashboardSummary();
+      await refreshPlatformAudit();
     } catch (error) {
       setErrorMessage(getActionableApiErrorMessage(error));
     } finally {
@@ -838,6 +921,7 @@ export default function PlatformScreen() {
       await loadCompanyScope(selectedCompany.id);
       await refreshUsageSummary();
       await refreshDashboardSummary();
+      await refreshPlatformAudit();
     } catch (error) {
       setErrorMessage(getActionableApiErrorMessage(error));
     } finally {
@@ -878,6 +962,7 @@ export default function PlatformScreen() {
       setSubscriptionPlans(plans);
       await refreshPlanPriceMap(plans);
       setMessage(`Plan creado: ${created.name}.`);
+      await refreshPlatformAudit();
     } catch (error) {
       setErrorMessage(getActionableApiErrorMessage(error));
     } finally {
@@ -903,6 +988,7 @@ export default function PlatformScreen() {
       setPlanPrices(prices);
       setPlanPricesById((current) => ({ ...current, [selectedPlanId]: prices }));
       setMessage('Precios por periodo actualizados.');
+      await refreshPlatformAudit();
     } catch (error) {
       setErrorMessage(getActionableApiErrorMessage(error));
     } finally {
@@ -940,6 +1026,7 @@ export default function PlatformScreen() {
       setMessage('Suscripcion del cliente actualizada.');
       await refreshUsageSummary();
       await refreshDashboardSummary();
+      await refreshPlatformAudit();
     } catch (error) {
       setErrorMessage(getActionableApiErrorMessage(error));
     } finally {
@@ -969,6 +1056,7 @@ export default function PlatformScreen() {
       });
       setUsageRates(saved);
       setMessage('Tarifas por consumo actualizadas.');
+      await refreshPlatformAudit();
     } catch (error) {
       setErrorMessage(getActionableApiErrorMessage(error));
     } finally {
@@ -1171,6 +1259,38 @@ export default function PlatformScreen() {
     ? planPricesById[selectedPlanId] ?? planPrices.filter((price) => price.planId === selectedPlanId)
     : [];
   const selectedPlanPricesComplete = isPriceComplete(selectedPlanPrices);
+  const filteredAuditEvents = useMemo(() => {
+    const query = auditSearch.trim().toLowerCase();
+    return (platformAudit?.items ?? []).filter((event) => {
+      const matchesCategory =
+        auditCategoryFilter === 'ALL' || event.category === auditCategoryFilter;
+      const matchesDate = matchesAuditDateFilter(event.occurredAt, auditDateFilter);
+      const searchable = [
+        event.title,
+        event.description,
+        event.actorName,
+        event.actorEmail,
+        event.companyName,
+        event.eventType,
+        event.category,
+        event.technicalDetail,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      return matchesCategory && matchesDate && (!query || searchable.includes(query));
+    });
+  }, [auditCategoryFilter, auditDateFilter, auditSearch, platformAudit]);
+  const selectedAuditEvent = useMemo(() => {
+    if (!selectedAuditEventId) return filteredAuditEvents[0] ?? null;
+    return (
+      filteredAuditEvents.find((event) => event.id === selectedAuditEventId) ??
+      platformAudit?.items.find((event) => event.id === selectedAuditEventId) ??
+      filteredAuditEvents[0] ??
+      null
+    );
+  }, [filteredAuditEvents, platformAudit, selectedAuditEventId]);
 
   const renderOwnerCompanyContext = () => (
     <View
@@ -2396,26 +2516,259 @@ export default function PlatformScreen() {
     </View>
   );
 
-  const renderAudit = () => (
-    <AppCard style={styles.panel}>
-      <View style={styles.sectionHeader}>
-        <StatusBadge label="AUDITORIA" tone="warning" />
+  const renderAuditEventRow = (event: PlatformAuditEvent) => {
+    const selected = selectedAuditEvent?.id === event.id;
+    return (
+      <View
+        key={event.id}
+        style={[
+          styles.auditEventRow,
+          {
+            backgroundColor: selected ? theme.colors.infoCardBackground : theme.colors.surfaceAlt,
+            borderColor: selected ? theme.colors.accent : theme.colors.borderSubtle,
+          },
+        ]}
+      >
         <View style={styles.flex}>
-          <AppText variant="subtitle" bold>
-            Auditoria global de Plataforma
+          <View style={styles.inlineBadges}>
+            <StatusBadge label={normalizeAuditCategoryLabel(event.category)} tone="info" />
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {formatAuditTimestamp(event.occurredAt)}
+            </AppText>
+          </View>
+          <AppText bold>{event.title}</AppText>
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            {event.description}
           </AppText>
           <AppText variant="caption" color={theme.colors.mutedText}>
-            Auditoria global pendiente de hardening. Esta seccion queda separada y no reutiliza el Panel Owner.
+            Actor: {event.actorName || 'Usuario no disponible'}
+            {event.actorEmail ? ` - ${event.actorEmail}` : ''}
+          </AppText>
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            {event.companyName ? `Cliente: ${event.companyName}` : 'Evento global de plataforma'}
+          </AppText>
+        </View>
+        <AppButton
+          title={selected ? 'Visible' : 'Ver detalle'}
+          variant={selected ? 'neutral' : 'secondary'}
+          onPress={() => setSelectedAuditEventId(event.id)}
+          style={styles.compactButton}
+        />
+      </View>
+    );
+  };
+
+  const renderAuditDetail = () => (
+    <AppCard style={[styles.panel, styles.dashboardColumn]}>
+      <View style={styles.sectionHeader}>
+        <StatusBadge label="DETALLE" tone="role" />
+        <View style={styles.flex}>
+          <AppText variant="subtitle" bold>
+            Detalle del evento
+          </AppText>
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            Datos disponibles en la bitacora global. No muestra payload sensible.
           </AppText>
         </View>
       </View>
-      <EmptyState
-        title="Auditoria global pendiente"
-        message="Eventos SaaS como plan asignado, tarifa modificada o modulo desactivado se conectaran a un endpoint auditado posterior."
-        icon="security"
-      />
+
+      {selectedAuditEvent ? (
+        <View style={styles.auditDetailGrid}>
+          <View style={[styles.companyInfoCell, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.borderSubtle }]}>
+            <AppText variant="caption" color={theme.colors.mutedText}>Evento</AppText>
+            <AppText bold>{selectedAuditEvent.title}</AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>{selectedAuditEvent.eventType}</AppText>
+          </View>
+          <View style={[styles.companyInfoCell, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.borderSubtle }]}>
+            <AppText variant="caption" color={theme.colors.mutedText}>Fecha</AppText>
+            <AppText bold>{formatAuditTimestamp(selectedAuditEvent.occurredAt)}</AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>{normalizeAuditCategoryLabel(selectedAuditEvent.category)}</AppText>
+          </View>
+          <View style={[styles.companyInfoCell, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.borderSubtle }]}>
+            <AppText variant="caption" color={theme.colors.mutedText}>Actor</AppText>
+            <AppText bold numberOfLines={1}>{selectedAuditEvent.actorName || 'Usuario no disponible'}</AppText>
+            <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>{selectedAuditEvent.actorEmail || 'Sin correo en bitacora'}</AppText>
+          </View>
+          <View style={[styles.companyInfoCell, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.borderSubtle }]}>
+            <AppText variant="caption" color={theme.colors.mutedText}>Entidad</AppText>
+            <AppText bold>{selectedAuditEvent.companyName || selectedAuditEvent.entityType || 'Plataforma'}</AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>{selectedAuditEvent.entityId ? `ID ${selectedAuditEvent.entityId}` : 'Sin ID asociado'}</AppText>
+          </View>
+          <View style={[styles.auditTechnicalBlock, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.borderSubtle }]}>
+            <AppText variant="caption" color={theme.colors.mutedText}>Resumen</AppText>
+            <AppText>{selectedAuditEvent.description}</AppText>
+            {selectedAuditEvent.beforeSummary || selectedAuditEvent.afterSummary ? (
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Antes: {selectedAuditEvent.beforeSummary || '-'} - Despues: {selectedAuditEvent.afterSummary || '-'}
+              </AppText>
+            ) : (
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Before/after detallado pendiente de hardening de auditoria SaaS.
+              </AppText>
+            )}
+            {selectedAuditEvent.technicalDetail ? (
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Tecnico: {selectedAuditEvent.technicalDetail}
+              </AppText>
+            ) : null}
+          </View>
+        </View>
+      ) : (
+        <EmptyState
+          title="Sin evento seleccionado"
+          message="Cuando exista un evento global, aqui veras actor, fecha, cliente y detalle."
+          icon="security"
+        />
+      )}
     </AppCard>
   );
+
+  const renderAudit = () => {
+    const summary = platformAudit?.summary;
+    const events = platformAudit?.items ?? [];
+    const hasEvents = events.length > 0;
+
+    return (
+      <View style={styles.sectionStack}>
+        <AppCard style={styles.panel}>
+          <View style={[styles.rowBetween, isPhone ? styles.column : null]}>
+            <View style={styles.sectionHeader}>
+              <StatusBadge label="GLOBAL" tone="info" />
+              <View style={styles.flex}>
+                <AppText variant="subtitle" bold>
+                  Auditoria global de plataforma
+                </AppText>
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  Consulta eventos globales del Panel Owner: companias, suscripciones, precios, modulos, limites y administracion SaaS. No depende del cliente en administracion.
+                </AppText>
+              </View>
+            </View>
+            <StatusBadge label={hasEvents ? `${events.length} eventos` : 'Sin eventos'} tone={hasEvents ? 'success' : 'neutral'} />
+          </View>
+          <View style={styles.dashboardMetricGrid}>
+            {renderDashboardMetricTile('Hoy', summary?.todayCount ?? 0, 'Eventos registrados hoy', (summary?.todayCount ?? 0) > 0 ? 'info' : 'neutral')}
+            {renderDashboardMetricTile('Ultimos 7 dias', summary?.last7DaysCount ?? 0, 'Actividad reciente de plataforma', (summary?.last7DaysCount ?? 0) > 0 ? 'success' : 'neutral')}
+            {renderDashboardMetricTile('Clientes', summary?.companyChangesCount ?? 0, 'Companias y sucursales', (summary?.companyChangesCount ?? 0) > 0 ? 'info' : 'neutral')}
+            {renderDashboardMetricTile('Suscripciones', summary?.subscriptionChangesCount ?? 0, 'Planes, precios y asignaciones', (summary?.subscriptionChangesCount ?? 0) > 0 ? 'info' : 'neutral')}
+            {renderDashboardMetricTile('Configuracion', summary?.configurationChangesCount ?? 0, 'Usuarios, modulos y limites', (summary?.configurationChangesCount ?? 0) > 0 ? 'warning' : 'neutral')}
+          </View>
+        </AppCard>
+
+        <AppCard style={styles.panel}>
+          <View style={[styles.rowBetween, isPhone ? styles.column : null]}>
+            <View style={styles.sectionHeader}>
+              <StatusBadge label="FILTROS" tone="role" />
+              <View style={styles.flex}>
+                <AppText variant="subtitle" bold>
+                  Buscar eventos
+                </AppText>
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  Filtra por texto, categoria o rango rapido sin cambiar el cliente en administracion.
+                </AppText>
+              </View>
+            </View>
+            <AppButton
+              title="Limpiar filtros"
+              variant="secondary"
+              onPress={() => {
+                setAuditSearch('');
+                setAuditCategoryFilter('ALL');
+                setAuditDateFilter('ALL');
+                setSelectedAuditEventId(null);
+              }}
+              style={styles.compactButton}
+            />
+          </View>
+          <AppInput
+            label="Buscar"
+            placeholder="Actor, cliente, suscripcion, modulo..."
+            value={auditSearch}
+            onChangeText={setAuditSearch}
+          />
+          <View style={styles.companyFilterBar}>
+            {AUDIT_CATEGORY_OPTIONS.map((option) => (
+              <AppButton
+                key={option.key}
+                title={option.label}
+                variant={auditCategoryFilter === option.key ? 'primary' : 'secondary'}
+                onPress={() => setAuditCategoryFilter(option.key)}
+                style={styles.filterButton}
+              />
+            ))}
+          </View>
+          <View style={styles.companyFilterBar}>
+            {AUDIT_DATE_OPTIONS.map((option) => (
+              <AppButton
+                key={option.key}
+                title={option.label}
+                variant={auditDateFilter === option.key ? 'primary' : 'secondary'}
+                onPress={() => setAuditDateFilter(option.key)}
+                style={styles.filterButton}
+              />
+            ))}
+          </View>
+        </AppCard>
+
+        <View style={[styles.dashboardTwoColumn, isPhone ? styles.column : null]}>
+          <AppCard style={[styles.panel, styles.dashboardColumn]}>
+            <View style={styles.sectionHeader}>
+              <StatusBadge label="TIMELINE" tone={filteredAuditEvents.length > 0 ? 'success' : 'neutral'} />
+              <View style={styles.flex}>
+                <AppText variant="subtitle" bold>
+                  Eventos globales
+                </AppText>
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  {filteredAuditEvents.length} eventos con los filtros actuales.
+                </AppText>
+              </View>
+            </View>
+            {filteredAuditEvents.length === 0 ? (
+              <EmptyState
+                title={hasEvents ? 'Sin resultados con estos filtros' : 'Aun no hay eventos globales registrados'}
+                message={
+                  hasEvents
+                    ? 'Cambia los filtros para ver otros eventos de plataforma.'
+                    : 'Los cambios de companias, suscripciones, precios, modulos, limites y admins apareceran aqui cuando se realicen desde Panel Owner.'
+                }
+                icon="security"
+              />
+            ) : (
+              <View style={styles.auditTimeline}>
+                {filteredAuditEvents.map(renderAuditEventRow)}
+              </View>
+            )}
+          </AppCard>
+
+          {renderAuditDetail()}
+        </View>
+
+        <AppCard style={styles.panel}>
+          <View style={styles.sectionHeader}>
+            <StatusBadge label="COBERTURA" tone="warning" />
+            <View style={styles.flex}>
+              <AppText variant="subtitle" bold>
+                Cobertura actual de auditoria
+              </AppText>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Esta fase usa eventos persistidos existentes y deja marcado lo pendiente para auditoria SaaS avanzada.
+              </AppText>
+            </View>
+          </View>
+          <View style={styles.dashboardTable}>
+            {(platformAudit?.coverage ?? []).map((item) => (
+              <View key={item.label} style={[styles.dashboardTableRow, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.borderSubtle }]}>
+                <View style={styles.dashboardCompanyCell}>
+                  <AppText bold>{item.label}</AppText>
+                  <AppText variant="caption" color={theme.colors.mutedText}>{item.description}</AppText>
+                </View>
+                <StatusBadge label={item.status} tone={normalizeAuditCoverageTone(item.status)} />
+              </View>
+            ))}
+          </View>
+        </AppCard>
+      </View>
+    );
+  };
 
   const renderActiveSection = () => {
     if (loadingCompanyScope && activeSection !== 'dashboard' && activeSection !== 'companies') {
@@ -2621,6 +2974,28 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 8,
+  },
+  auditDetailGrid: {
+    gap: 8,
+  },
+  auditEventRow: {
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
+    padding: 10,
+  },
+  auditTechnicalBlock: {
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 6,
+    padding: 10,
+  },
+  auditTimeline: {
     gap: 8,
   },
   column: {

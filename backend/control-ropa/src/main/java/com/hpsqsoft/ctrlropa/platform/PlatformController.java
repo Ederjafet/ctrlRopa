@@ -160,4 +160,9 @@ public class PlatformController {
     public PlatformDashboardSummaryResponse findDashboardSummary() {
         return service.findDashboardSummary();
     }
+
+    @GetMapping("/audit-events")
+    public PlatformAuditEventsResponse findAuditEvents() {
+        return service.findAuditEvents();
+    }
 }

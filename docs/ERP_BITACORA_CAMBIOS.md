@@ -1,5 +1,30 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-21 - OWNER-AUDIT-UX-A auditoria global accionable
+
+Tipo: platform owner, auditoria SaaS, backend read-only, frontend, UX, documentacion.
+
+Objetivo:
+
+- Convertir `Auditoria global` del Panel Owner en una consola util para revisar cambios globales de plataforma.
+
+Cambios realizados:
+
+- Se agrega `GET /api/platform/audit-events` como endpoint read-only protegido por `VIEW_PLATFORM`.
+- El endpoint reutiliza `system_movement_audit_log` y filtra movimientos reales de `/api/platform`.
+- `services/platformService.ts` expone `getPlatformAuditEvents()` y tipos de respuesta.
+- `app/platform.tsx` reemplaza el placeholder por resumen, filtros, timeline, detalle de evento y cobertura de auditoria.
+- La UI aclara que la auditoria es global y no depende del cliente en administracion.
+- Se documentan limites actuales: sin payload/diff before-after, sin severidad real y sin export SaaS especifico.
+- Se documenta la fase en `docs/OWNER_AUDIT_UX_A_AUDITORIA_GLOBAL_ACCIONABLE.md`.
+
+Restricciones respetadas:
+
+- No se reseteo base de datos.
+- No se agregaron migraciones ni datos fake.
+- No se implemento SIEM ni auditoria enterprise.
+- No se hizo merge a `main`.
+
 ## 2026-06-21 - OWNER-SUBSCRIPTIONS-UX-A planes y suscripciones accionables
 
 Tipo: platform owner, planes SaaS, suscripciones, frontend, UX, documentacion.

@@ -16,14 +16,19 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.text.Normalizer;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @Transactional
@@ -31,6 +36,10 @@ public class PlatformService {
 
     private static final String PLATFORM_COMPANY_CODE = "APPMODA_PLATFORM";
     private static final String TENANT_ADMIN_ROLE = "ADMIN";
+    private static final Pattern PLATFORM_COMPANY_ID_PATTERN =
+            Pattern.compile("^/api/platform/companies/(\\d+)(?:/.*)?$");
+    private static final Pattern PLATFORM_PLAN_ID_PATTERN =
+            Pattern.compile("^/api/platform/subscription-plans/(\\d+)(?:/.*)?$");
     private static final List<ModuleDefinition> MODULE_DEFINITIONS = List.of(
             new ModuleDefinition("INVENTORY", "Inventario"),
             new ModuleDefinition("DOOR_SALES", "Venta puerta"),
@@ -772,6 +781,59 @@ public class PlatformService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public PlatformAuditEventsResponse findAuditEvents() {
+        assertCanViewPlatform();
+
+        List<PlatformAuditLogRow> rows = jdbcTemplate.query(
+                """
+                SELECT
+                  sal.id,
+                  sal.event_type,
+                  sal.http_method,
+                  sal.request_path,
+                  sal.query_string,
+                  sal.status_code,
+                  sal.user_id,
+                  sal.user_name,
+                  u.email AS actor_email,
+                  sal.detail,
+                  sal.created_at
+                FROM system_movement_audit_log sal
+                LEFT JOIN users u ON u.id = sal.user_id
+                WHERE sal.request_path LIKE '/api/platform%'
+                ORDER BY sal.created_at DESC, sal.id DESC
+                LIMIT 100
+                """,
+                (rs, rowNum) -> new PlatformAuditLogRow(
+                        rs.getLong("id"),
+                        rs.getString("event_type"),
+                        rs.getString("http_method"),
+                        rs.getString("request_path"),
+                        rs.getString("query_string"),
+                        rs.getObject("status_code", Integer.class),
+                        rs.getObject("user_id", Long.class),
+                        rs.getString("user_name"),
+                        rs.getString("actor_email"),
+                        rs.getString("detail"),
+                        rs.getTimestamp("created_at").toLocalDateTime()
+                )
+        );
+
+        Map<Long, String> companyNames = findAuditCompanyNames();
+        Map<Long, String> planNames = findAuditPlanNames();
+        List<PlatformAuditEventsResponse.AuditEvent> events = rows.stream()
+                .map(row -> toPlatformAuditEvent(row, companyNames, planNames))
+                .sorted(Comparator.comparing(PlatformAuditEventsResponse.AuditEvent::occurredAt).reversed())
+                .toList();
+
+        return new PlatformAuditEventsResponse(
+                events,
+                buildPlatformAuditSummary(events),
+                buildPlatformAuditCoverage(events)
+        );
+    }
+
     private List<DashboardCompanyRow> findDashboardCompanyRows() {
         return jdbcTemplate.query(
                 """
@@ -1266,6 +1328,268 @@ public class PlatformService {
         );
 
         return alerts;
+    }
+
+    private PlatformAuditEventsResponse.AuditEvent toPlatformAuditEvent(
+            PlatformAuditLogRow row,
+            Map<Long, String> companyNames,
+            Map<Long, String> planNames
+    ) {
+        String path = valueOrFallback(row.requestPath(), "");
+        String method = normalizeCode(row.httpMethod());
+        Long companyId = extractId(PLATFORM_COMPANY_ID_PATTERN, path);
+        Long planId = extractId(PLATFORM_PLAN_ID_PATTERN, path);
+        String companyName = companyId == null ? null : companyNames.get(companyId);
+        String planName = planId == null ? null : planNames.get(planId);
+        String eventType = resolvePlatformAuditEventType(method, path);
+        String category = resolvePlatformAuditCategory(eventType);
+        String entityType = resolvePlatformAuditEntityType(eventType);
+        String entityId = companyId != null
+                ? String.valueOf(companyId)
+                : planId != null ? String.valueOf(planId) : null;
+
+        return new PlatformAuditEventsResponse.AuditEvent(
+                row.id(),
+                eventType,
+                category,
+                row.createdAt(),
+                row.actorEmail(),
+                valueOrFallback(row.userName(), "Usuario no disponible"),
+                companyId,
+                companyName,
+                resolvePlatformAuditTitle(eventType),
+                buildPlatformAuditDescription(eventType, companyId, companyName, planId, planName),
+                row.statusCode() != null && row.statusCode() >= 400 ? "warning" : null,
+                entityType,
+                entityId,
+                null,
+                null,
+                buildPlatformAuditTechnicalDetail(row)
+        );
+    }
+
+    private PlatformAuditEventsResponse.Summary buildPlatformAuditSummary(
+            List<PlatformAuditEventsResponse.AuditEvent> events
+    ) {
+        LocalDate today = LocalDate.now();
+        LocalDate sevenDaysAgo = today.minusDays(6);
+        int todayCount = 0;
+        int last7DaysCount = 0;
+        int companyChanges = 0;
+        int subscriptionChanges = 0;
+        int configurationChanges = 0;
+
+        for (PlatformAuditEventsResponse.AuditEvent event : events) {
+            LocalDate eventDate = event.occurredAt().toLocalDate();
+            if (today.equals(eventDate)) {
+                todayCount++;
+            }
+            if (!eventDate.isBefore(sevenDaysAgo)) {
+                last7DaysCount++;
+            }
+
+            String category = normalizeCode(event.category());
+            if ("COMPANIES".equals(category)) {
+                companyChanges++;
+            } else if ("SUBSCRIPTIONS".equals(category) || "PRICES".equals(category)) {
+                subscriptionChanges++;
+            } else if ("CONFIGURATION".equals(category) || "USERS".equals(category)) {
+                configurationChanges++;
+            }
+        }
+
+        return new PlatformAuditEventsResponse.Summary(
+                todayCount,
+                last7DaysCount,
+                companyChanges,
+                subscriptionChanges,
+                configurationChanges,
+                events.size()
+        );
+    }
+
+    private List<PlatformAuditEventsResponse.CoverageItem> buildPlatformAuditCoverage(
+            List<PlatformAuditEventsResponse.AuditEvent> events
+    ) {
+        return List.of(
+                new PlatformAuditEventsResponse.CoverageItem(
+                        "Eventos del Panel Owner",
+                        events.isEmpty() ? "Sin eventos registrados" : "Activo",
+                        "Se leen escrituras reales registradas en system_movement_audit_log para rutas /api/platform."
+                ),
+                new PlatformAuditEventsResponse.CoverageItem(
+                        "Actor y fecha",
+                        "Parcial",
+                        "La bitacora conserva usuario, fecha, metodo y ruta cuando la solicitud usa sesion autenticada."
+                ),
+                new PlatformAuditEventsResponse.CoverageItem(
+                        "Antes / despues",
+                        "Pendiente",
+                        "El log actual no guarda payload ni diff de campos; queda para hardening de auditoria SaaS."
+                ),
+                new PlatformAuditEventsResponse.CoverageItem(
+                        "Severidad y exportacion",
+                        "Pendiente",
+                        "La vista prepara categorias, pero severidad real, retencion avanzada y CSV quedan fuera de esta fase."
+                )
+        );
+    }
+
+    private Map<Long, String> findAuditCompanyNames() {
+        Map<Long, String> names = new HashMap<>();
+        jdbcTemplate.query(
+                "SELECT id, name FROM companies",
+                (rs, rowNum) -> Map.entry(rs.getLong("id"), rs.getString("name"))
+        ).forEach(entry -> names.put(entry.getKey(), entry.getValue()));
+        return names;
+    }
+
+    private Map<Long, String> findAuditPlanNames() {
+        Map<Long, String> names = new HashMap<>();
+        jdbcTemplate.query(
+                "SELECT id, name FROM subscription_plans",
+                (rs, rowNum) -> Map.entry(rs.getLong("id"), rs.getString("name"))
+        ).forEach(entry -> names.put(entry.getKey(), entry.getValue()));
+        return names;
+    }
+
+    private String resolvePlatformAuditEventType(String method, String path) {
+        if ("POST".equals(method) && "/api/platform/companies".equals(path)) {
+            return "COMPANY_CREATED";
+        }
+        if ("PATCH".equals(method) && path.matches("^/api/platform/companies/\\d+$")) {
+            return "COMPANY_UPDATED";
+        }
+        if ("POST".equals(method) && path.matches("^/api/platform/companies/\\d+/branches$")) {
+            return "BRANCH_CREATED";
+        }
+        if ("PATCH".equals(method) && path.matches("^/api/platform/companies/\\d+/branches/\\d+$")) {
+            return "BRANCH_UPDATED";
+        }
+        if ("POST".equals(method) && path.matches("^/api/platform/companies/\\d+/admin-user$")) {
+            return "TENANT_ADMIN_CREATED";
+        }
+        if ("POST".equals(method) && path.matches("^/api/platform/companies/\\d+/users$")) {
+            return "TENANT_USER_CREATED";
+        }
+        if ("PATCH".equals(method) && path.matches("^/api/platform/companies/\\d+/users/\\d+$")) {
+            return "TENANT_USER_UPDATED";
+        }
+        if ("POST".equals(method) && "/api/platform/subscription-plans".equals(path)) {
+            return "SUBSCRIPTION_PLAN_CREATED";
+        }
+        if ("PATCH".equals(method) && path.matches("^/api/platform/subscription-plans/\\d+$")) {
+            return "SUBSCRIPTION_PLAN_UPDATED";
+        }
+        if ("PUT".equals(method) && path.matches("^/api/platform/subscription-plans/\\d+/prices$")) {
+            return "PLAN_PRICES_UPDATED";
+        }
+        if ("PUT".equals(method) && path.matches("^/api/platform/companies/\\d+/subscription$")) {
+            return "SUBSCRIPTION_ASSIGNED";
+        }
+        if ("PATCH".equals(method) && path.matches("^/api/platform/companies/\\d+/settings$")) {
+            return "COMPANY_SETTINGS_UPDATED";
+        }
+        if ("PUT".equals(method) && path.matches("^/api/platform/companies/\\d+/usage-rates$")) {
+            return "USAGE_RATES_UPDATED";
+        }
+        return "PLATFORM_CHANGE_RECORDED";
+    }
+
+    private String resolvePlatformAuditCategory(String eventType) {
+        return switch (eventType) {
+            case "COMPANY_CREATED", "COMPANY_UPDATED", "BRANCH_CREATED", "BRANCH_UPDATED" -> "COMPANIES";
+            case "TENANT_ADMIN_CREATED", "TENANT_USER_CREATED", "TENANT_USER_UPDATED" -> "USERS";
+            case "SUBSCRIPTION_PLAN_CREATED", "SUBSCRIPTION_PLAN_UPDATED", "SUBSCRIPTION_ASSIGNED" -> "SUBSCRIPTIONS";
+            case "PLAN_PRICES_UPDATED", "USAGE_RATES_UPDATED" -> "PRICES";
+            case "COMPANY_SETTINGS_UPDATED" -> "CONFIGURATION";
+            default -> "PLATFORM";
+        };
+    }
+
+    private String resolvePlatformAuditEntityType(String eventType) {
+        return switch (eventType) {
+            case "COMPANY_CREATED", "COMPANY_UPDATED", "BRANCH_CREATED", "BRANCH_UPDATED",
+                    "TENANT_ADMIN_CREATED", "TENANT_USER_CREATED", "TENANT_USER_UPDATED",
+                    "SUBSCRIPTION_ASSIGNED", "COMPANY_SETTINGS_UPDATED", "USAGE_RATES_UPDATED" -> "COMPANY";
+            case "SUBSCRIPTION_PLAN_CREATED", "SUBSCRIPTION_PLAN_UPDATED", "PLAN_PRICES_UPDATED" -> "SUBSCRIPTION_PLAN";
+            default -> "PLATFORM";
+        };
+    }
+
+    private String resolvePlatformAuditTitle(String eventType) {
+        return switch (eventType) {
+            case "COMPANY_CREATED" -> "Compania creada";
+            case "COMPANY_UPDATED" -> "Cliente actualizado";
+            case "BRANCH_CREATED" -> "Sucursal creada";
+            case "BRANCH_UPDATED" -> "Sucursal actualizada";
+            case "TENANT_ADMIN_CREATED" -> "Admin de cliente creado";
+            case "TENANT_USER_CREATED" -> "Usuario de cliente creado";
+            case "TENANT_USER_UPDATED" -> "Usuario de cliente actualizado";
+            case "SUBSCRIPTION_PLAN_CREATED" -> "Plan SaaS creado";
+            case "SUBSCRIPTION_PLAN_UPDATED" -> "Plan SaaS actualizado";
+            case "PLAN_PRICES_UPDATED" -> "Precios del plan actualizados";
+            case "SUBSCRIPTION_ASSIGNED" -> "Suscripcion del cliente actualizada";
+            case "COMPANY_SETTINGS_UPDATED" -> "Modulos o limites actualizados";
+            case "USAGE_RATES_UPDATED" -> "Tarifas por consumo actualizadas";
+            default -> "Cambio global de plataforma";
+        };
+    }
+
+    private String buildPlatformAuditDescription(
+            String eventType,
+            Long companyId,
+            String companyName,
+            Long planId,
+            String planName
+    ) {
+        String companyLabel = companyName != null
+                ? companyName
+                : companyId != null ? "cliente ID " + companyId : "cliente no identificado en ruta";
+        String planLabel = planName != null
+                ? planName
+                : planId != null ? "plan ID " + planId : "plan no identificado en ruta";
+
+        return switch (eventType) {
+            case "COMPANY_CREATED" ->
+                    "Se registro una solicitud de creacion de compania desde Panel Owner. El log actual no conserva el ID creado en la respuesta.";
+            case "COMPANY_UPDATED" -> "Se actualizaron datos generales de " + companyLabel + ".";
+            case "BRANCH_CREATED" -> "Se creo una sucursal para " + companyLabel + ".";
+            case "BRANCH_UPDATED" -> "Se actualizo una sucursal de " + companyLabel + ".";
+            case "TENANT_ADMIN_CREATED" -> "Se creo un administrador para " + companyLabel + ".";
+            case "TENANT_USER_CREATED" -> "Se creo un usuario operativo para " + companyLabel + ".";
+            case "TENANT_USER_UPDATED" -> "Se actualizo un usuario operativo de " + companyLabel + ".";
+            case "SUBSCRIPTION_PLAN_CREATED" -> "Se creo un plan del catalogo global de suscripciones.";
+            case "SUBSCRIPTION_PLAN_UPDATED" -> "Se actualizo el plan " + planLabel + ".";
+            case "PLAN_PRICES_UPDATED" -> "Se actualizaron precios por periodo del plan " + planLabel + ".";
+            case "SUBSCRIPTION_ASSIGNED" -> "Se actualizo la suscripcion SaaS de " + companyLabel + ".";
+            case "COMPANY_SETTINGS_UPDATED" -> "Se actualizaron modulos o limites de " + companyLabel + ".";
+            case "USAGE_RATES_UPDATED" -> "Se actualizaron tarifas por consumo de " + companyLabel + ".";
+            default -> "Se registro una accion global de plataforma.";
+        };
+    }
+
+    private String buildPlatformAuditTechnicalDetail(PlatformAuditLogRow row) {
+        String query = valueOrFallback(row.queryString(), "");
+        String suffix = query.isBlank() ? "" : "?" + query;
+        String status = row.statusCode() == null ? "sin status" : "HTTP " + row.statusCode();
+        return row.httpMethod() + " " + row.requestPath() + suffix + " - " + status;
+    }
+
+    private Long extractId(Pattern pattern, String path) {
+        Matcher matcher = pattern.matcher(path);
+        if (!matcher.matches()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(matcher.group(1));
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private String valueOrFallback(String value, String fallback) {
+        return value == null || value.trim().isEmpty() ? fallback : value.trim();
     }
 
     private List<String> findMissingInstallationItems(DashboardCompanyRow company) {
@@ -2391,6 +2715,21 @@ public class PlatformService {
             BigDecimal unitPrice,
             String currency,
             Boolean enabled
+    ) {
+    }
+
+    private record PlatformAuditLogRow(
+            Long id,
+            String eventType,
+            String httpMethod,
+            String requestPath,
+            String queryString,
+            Integer statusCode,
+            Long userId,
+            String userName,
+            String actorEmail,
+            String detail,
+            LocalDateTime createdAt
     ) {
     }
 

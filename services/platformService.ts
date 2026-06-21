@@ -174,6 +174,42 @@ export type PlatformDashboardSummary = {
   }[];
 };
 
+export type PlatformAuditEventsResponse = {
+  items: PlatformAuditEvent[];
+  summary: {
+    todayCount: number;
+    last7DaysCount: number;
+    companyChangesCount: number;
+    subscriptionChangesCount: number;
+    configurationChangesCount: number;
+    totalEvents: number;
+  };
+  coverage: {
+    label: string;
+    status: string;
+    description: string;
+  }[];
+};
+
+export type PlatformAuditEvent = {
+  id: number;
+  eventType: string;
+  category: string;
+  occurredAt: string;
+  actorEmail?: string | null;
+  actorName?: string | null;
+  companyId?: number | null;
+  companyName?: string | null;
+  title: string;
+  description: string;
+  severity?: string | null;
+  entityType?: string | null;
+  entityId?: string | null;
+  beforeSummary?: string | null;
+  afterSummary?: string | null;
+  technicalDetail?: string | null;
+};
+
 export type CreatePlatformCompanyPayload = {
   name: string;
   legalName?: string;
@@ -401,4 +437,8 @@ export async function getPlatformUsageSummary(): Promise<PlatformUsageSummary[]>
 
 export async function getPlatformDashboardSummary(): Promise<PlatformDashboardSummary> {
   return apiRequest<PlatformDashboardSummary>('/api/platform/dashboard/summary');
+}
+
+export async function getPlatformAuditEvents(): Promise<PlatformAuditEventsResponse> {
+  return apiRequest<PlatformAuditEventsResponse>('/api/platform/audit-events');
 }

@@ -47,6 +47,16 @@ class PlatformServiceAccessTests {
     }
 
     @Test
+    void findAuditEventsRequiresViewPlatform() {
+        when(currentUser.getUserId()).thenReturn(10L);
+        doThrow(new AccessDeniedException("missing"))
+                .when(accessService)
+                .assertCan(10L, PermissionCode.VIEW_PLATFORM);
+
+        assertThrows(AccessDeniedException.class, service::findAuditEvents);
+    }
+
+    @Test
     void findCompanyUsersRequiresViewPlatform() {
         when(currentUser.getUserId()).thenReturn(10L);
         doThrow(new AccessDeniedException("missing"))
