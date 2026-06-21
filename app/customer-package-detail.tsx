@@ -42,7 +42,7 @@ function formatDate(value?: string | null) {
 
 function statusLabel(status?: string) {
   if (status === 'OPEN') return 'Abierto';
-  if (status === 'READY') return 'Preparación cerrada';
+  if (status === 'READY') return 'Listo para envio';
   if (status === 'SHIPPED') return 'Enviado';
   if (status === 'DELIVERED') return 'Entregado';
   if (status === 'CANCELLED') return 'Cancelado';
@@ -182,7 +182,7 @@ export default function CustomerPackageDetailScreen() {
 
     return branchItems
       .filter((item) => !existingItemIds.has(item.id))
-      .filter((item) => item.status === 'SOLD' || item.status === 'RESERVED' || item.status === 'AVAILABLE')
+      .filter((item) => item.status === 'AVAILABLE')
       .filter((item) => {
         if (!term) return true;
         return `${item.code ?? ''} ${item.qrCode ?? ''} ${item.productTypeName ?? ''} ${item.brandName ?? ''} ${item.sizeName ?? ''}`
@@ -370,30 +370,30 @@ export default function CustomerPackageDetailScreen() {
       setNotice({
         title: 'Falta completar el paquete',
         message: hasPending
-          ? 'Antes de cerrar la preparación, liquida el saldo pendiente del paquete.'
-          : 'Antes de cerrar la preparación, agrega al menos una prenda al paquete.',
+          ? 'Antes de marcar listo para envio, liquida el saldo pendiente del paquete.'
+          : 'Antes de marcar listo para envio, agrega al menos una prenda al paquete.',
         tone: 'warning',
       });
       return;
     }
 
-    Alert.alert('Cerrar preparación', `¿Quieres dejar listo el paquete ${detail.folio} para envío o entrega?`, [
+    Alert.alert('Marcar listo para envio', `¿Quieres marcar el paquete ${detail.folio} como listo para envio?`, [
       { text: 'Cancelar', style: 'cancel' },
       {
-        text: 'Cerrar preparación',
+        text: 'Marcar listo',
         onPress: async () => {
           try {
             setIsWorking(true);
             const updated = await markCustomerPackageReady(detail.id, session.userId);
             setDetail(updated);
             setNotice({
-              title: 'Paquete listo',
-              message: 'La preparación se cerró correctamente. Ya puedes enviarlo o entregarlo.',
+              title: 'Paquete listo para envio',
+              message: 'El paquete quedo listo para envio. Ya puede agregarse a Envios.',
               tone: 'success',
             });
           } catch (error: any) {
             setNotice({
-              title: 'No se pudo cerrar',
+              title: 'No se pudo marcar listo',
               message: error.message || 'No se pudo marcar el paquete como listo.',
               tone: 'danger',
             });
@@ -629,14 +629,14 @@ export default function CustomerPackageDetailScreen() {
       {canEdit ? (
         <View style={styles.bottomActions}>
           <AppButton
-            title="Cerrar preparación"
+            title="Marcar listo para envio"
             onPress={handleMarkReady}
             loading={isWorking}
             disabled={isWorking}
           />
           {hasPending ? (
             <AppText variant="caption" color={theme.colors.danger}>
-              Para cerrar la preparación, el paquete no debe tener saldo pendiente.
+              Para marcar listo para envio, el paquete no debe tener saldo pendiente.
             </AppText>
           ) : null}
           <AppButton

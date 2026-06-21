@@ -100,11 +100,11 @@ export default function ItemsCreateScreen() {
   const preselectedBatchId = typeof batchId === 'string' ? Number(batchId) : null;
   const preselectedBatchFolio = typeof batchFolio === 'string' ? batchFolio : null;
   const quickItemTarget: QuickItemTarget | null =
-    returnRoute === '/door-sale'
+    returnRoute.startsWith('/door-sale')
       ? 'door-sale'
-      : returnRoute === '/door-reservation'
+      : returnRoute.startsWith('/door-reservation')
         ? 'door-reservation'
-        : returnRoute === '/live'
+        : returnRoute.startsWith('/live')
           ? 'live'
           : null;
   const requiresPrice = quickItemTarget !== null;

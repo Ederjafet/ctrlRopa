@@ -113,13 +113,13 @@ export default function CustomersScreen() {
       session={session}
       navSections={navSections}
       rightContent={
-        canCreateCustomer ? (
-          <AppButton
-            title="Nuevo cliente"
-            variant="secondary"
-            onPress={() => router.push('/customers-create' as any)}
-          />
-        ) : null
+        <AppButton
+          title="Nuevo cliente"
+          variant="secondary"
+          onPress={() => router.push('/customers-create' as any)}
+          disabled={!canCreateCustomer}
+          disabledReason="No tienes permiso para crear clientes. Solicita el permiso Crear cliente."
+        />
       }
     >
       <View style={styles.search}>

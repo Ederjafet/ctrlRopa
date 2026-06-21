@@ -299,8 +299,13 @@ public class CustomerPackageService {
             throw new IllegalArgumentException("Solo paquetes en OPEN pueden pasar a READY");
         }
 
-        if (itemRepository.findByCustomerPackageIdOrderByCreatedAtAsc(packageId).isEmpty()) {
+        CustomerPackageDetailResponse detail = toDetail(customerPackage);
+        if (detail.getItems().isEmpty()) {
             throw new IllegalArgumentException("No se puede cerrar un paquete vacío");
+        }
+
+        if (detail.getPendingAmount().compareTo(BigDecimal.ZERO) > 0) {
+            throw new IllegalArgumentException("Este paquete tiene saldo pendiente.");
         }
 
         customerPackage.setStatus(CustomerPackageStatus.READY);

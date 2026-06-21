@@ -3974,3 +3974,18 @@ Resultado:
 - `/system`, `/system-channels` y `/system-roles` usan headers compactos y listados en grids/cards operativas.
 - `/appearance` se mantiene vigente, con aviso de alcance y layout mas compacto para identidad, colores y guardado.
 - Se documenta backlog para apariencia por compania y roles/permisos por compania.
+
+## 2026-06-20 - FLOW-FAST-QA-A cierre QA alias-paquetes-pagos-envios
+
+Tipo: correccion funcional frontend/backend del flujo alias -> cliente -> paquete -> pago -> envio.
+
+Resultado:
+
+- LIVE ya no precarga alias al vincular cliente y bloquea cliente formal + alias en la misma reserva.
+- `Convertir alias en cliente formal` funciona desde LIVE y Apartados con permiso `CREATE_CUSTOMER`.
+- El detalle de apartado muestra origen/alias original cuando el cliente formal viene de alias.
+- Paquetes muestran accion `Crear / agregar paquete` y la busqueda de prendas libres excluye reservadas/vendidas.
+- Backend impide marcar paquete como listo si tiene saldo pendiente.
+- `Cerrar preparacion` se renombra a `Marcar listo para envio`.
+- `/shipment-detail` usa `AppShellPage` y recupera menu lateral.
+- `Apartado puerta` conserva cliente al volver desde alta rapida y agrega feedback de prenda agregada.

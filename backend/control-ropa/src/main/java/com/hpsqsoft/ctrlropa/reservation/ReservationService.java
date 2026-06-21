@@ -163,6 +163,10 @@ public class ReservationService {
         String interestedAlias = normalizeInterestedAlias(request.getInterestedAlias());
         request.setInterestedAlias(interestedAlias);
 
+        if (request.getCustomerId() != null && interestedAlias != null) {
+            throw new IllegalArgumentException("Elige cliente formal o alias/interesado, no ambos.");
+        }
+
         if (request.getCustomerId() == null && interestedAlias == null) {
             traceReservationRejection(
                     item.getCompany().getId(),

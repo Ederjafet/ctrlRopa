@@ -21,7 +21,7 @@ import {
 import { validateRouteAccess } from '@/services/routeGuard';
 import { getSession } from '@/services/sessionStorage';
 
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -47,8 +47,12 @@ type ReservationValidationIssue =
 
 export default function DoorReservationScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ customerId?: string | string[] }>();
   const { theme } = useAppTheme();
   const { t } = useTranslation('common');
+  const preselectedCustomerId = params.customerId
+    ? Number(Array.isArray(params.customerId) ? params.customerId[0] : params.customerId)
+    : null;
 
   const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -84,7 +88,7 @@ export default function DoorReservationScreen() {
   useFocusEffect(
     useCallback(() => {
       checkAccessAndLoad();
-    }, [])
+    }, [preselectedCustomerId])
   );
 
   const checkAccessAndLoad = async () => {
@@ -128,14 +132,26 @@ export default function DoorReservationScreen() {
       const availableItems = itemData.filter((item) => item.status === 'AVAILABLE');
 
       setItems(availableItems);
-      setCustomers(
-        customerData.filter(
-          (customer) =>
-            customer.status !== 'INACTIVE' &&
-            customer.isGeneric !== true &&
-            !customer.genericType
-        )
+      const selectableCustomers = customerData.filter(
+        (customer) =>
+          customer.status !== 'INACTIVE' &&
+          customer.isGeneric !== true &&
+          !customer.genericType
       );
+
+      setCustomers(selectableCustomers);
+      if (
+        preselectedCustomerId &&
+        Number.isFinite(preselectedCustomerId) &&
+        selectedCustomer?.id !== preselectedCustomerId
+      ) {
+        const matchedCustomer = selectableCustomers.find(
+          (customer) => customer.id === preselectedCustomerId
+        );
+        if (matchedCustomer) {
+          setSelectedCustomer(matchedCustomer);
+        }
+      }
       setPaymentMethods(paymentData);
       await addPendingQuickItemsToCart(availableItems);
 
@@ -231,6 +247,12 @@ export default function DoorReservationScreen() {
 
       return [...prev, ...newLines];
     });
+    Alert.alert(
+      'Alta rapida',
+      createdItems.length === 1
+        ? 'Prenda agregada al apartado.'
+        : `${createdItems.length} prendas agregadas al apartado.`
+    );
   };
 
   const addItemByCode = (code: string) => {
@@ -558,9 +580,12 @@ export default function DoorReservationScreen() {
             <AppButton
               title={t('operationalScreens.doorReservation.quickItem')}
               variant="secondary"
-              onPress={() =>
-                router.push('/items-create?returnTo=/door-reservation' as any)
-              }
+              onPress={() => {
+                const returnPath = selectedCustomer
+                  ? `/door-reservation?customerId=${selectedCustomer.id}`
+                  : '/door-reservation';
+                router.push(`/items-create?returnTo=${encodeURIComponent(returnPath)}` as any);
+              }}
               style={styles.compactButton}
             />
           </View>

@@ -168,13 +168,13 @@ export default function CustomerPackagesScreen() {
 
   const renderHeaderActions = () => (
     <View style={styles.headerActions}>
-      {selectedCustomerId ? (
-        <AppButton
-          title="Nuevo paquete"
-          onPress={() => setCreateModalVisible(true)}
-          style={styles.headerButton}
-        />
-      ) : null}
+      <AppButton
+        title="Nuevo paquete"
+        onPress={() => setCreateModalVisible(true)}
+        disabled={!selectedCustomerId}
+        disabledReason="Selecciona un cliente formal o crea el paquete desde Apartados para elegir prendas elegibles."
+        style={styles.headerButton}
+      />
       {selectedCustomerId ? (
         <AppButton
           title="Ver todos"

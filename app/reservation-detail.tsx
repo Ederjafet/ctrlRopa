@@ -641,6 +641,12 @@ export default function ReservationDetailScreen() {
                 { label: 'Nombre', value: customerName },
                 { label: 'Telefono', value: customerPhone },
                 { label: 'Email', value: customer?.email || 'No capturado' },
+                ...(reservation.customerId && reservation.interestedAlias
+                  ? [
+                      { label: 'Origen', value: 'Alias vinculado a cliente formal' },
+                      { label: 'Alias original', value: reservation.interestedAlias },
+                    ]
+                  : []),
                 { label: 'Compras pasadas', value: 'No disponible' },
                 { label: 'Compras activas', value: 'No disponible' },
                 { label: 'Saldo a favor', value: formatMoney(customerBalance?.balance) },

@@ -27,7 +27,7 @@ import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { hasEffectivePermission } from '@/services/accessControl';
 import { getActionableApiError } from '@/services/apiError';
 import { ApiError } from '@/services/apiClient';
-import { Customer, getCustomersByBranch } from '@/services/customerService';
+import { Customer, createCustomer, getCustomersByBranch } from '@/services/customerService';
 import { getItemsByBranch, Item } from '@/services/itemService';
 import {
   consumePendingQuickItems,
@@ -440,6 +440,11 @@ export default function LiveScreen() {
   const [linkCustomerSearch, setLinkCustomerSearch] = useState('');
   const [selectedLinkCustomer, setSelectedLinkCustomer] = useState<Customer | null>(null);
   const [isLinkingCustomer, setIsLinkingCustomer] = useState(false);
+  const [isAliasConvertFormVisible, setIsAliasConvertFormVisible] = useState(false);
+  const [aliasCustomerName, setAliasCustomerName] = useState('');
+  const [aliasCustomerPhone, setAliasCustomerPhone] = useState('');
+  const [aliasCustomerEmail, setAliasCustomerEmail] = useState('');
+  const [isConvertingAliasCustomer, setIsConvertingAliasCustomer] = useState(false);
   const [reservationIssue, setReservationIssue] = useState<LiveReservationIssue | null>(null);
   const [showDemoMetrics, setShowDemoMetrics] = useState(true);
   const [liveLayoutPreferences, setLiveLayoutPreferences] =
@@ -1439,15 +1444,23 @@ export default function LiveScreen() {
     setRecentReservationActions(null);
     setLinkCustomerReservation(reservation);
     setSelectedLinkCustomer(null);
-    setLinkCustomerSearch(reservation.interestedAlias ?? '');
+    setLinkCustomerSearch('');
+    setIsAliasConvertFormVisible(false);
+    setAliasCustomerName(reservation.interestedAlias?.trim() || '');
+    setAliasCustomerPhone('');
+    setAliasCustomerEmail('');
   };
 
   const closeLinkCustomerModal = () => {
-    if (isLinkingCustomer) return;
+    if (isLinkingCustomer || isConvertingAliasCustomer) return;
 
     setLinkCustomerReservation(null);
     setSelectedLinkCustomer(null);
     setLinkCustomerSearch('');
+    setIsAliasConvertFormVisible(false);
+    setAliasCustomerName('');
+    setAliasCustomerPhone('');
+    setAliasCustomerEmail('');
   };
 
   const applyUpdatedReservation = (updatedReservation: Reservation) => {
@@ -1492,6 +1505,82 @@ export default function LiveScreen() {
       });
     } finally {
       setIsLinkingCustomer(false);
+    }
+  };
+
+  const openAliasConvertForm = () => {
+    if (!linkCustomerReservation) return;
+
+    if (!mayCreateCustomer) {
+      setLiveNotice({
+        title: 'Crear cliente',
+        message: 'No tienes permiso para crear clientes. Solicita el permiso Crear cliente.',
+        tone: 'warning',
+      });
+      return;
+    }
+
+    setAliasCustomerName(linkCustomerReservation.interestedAlias?.trim() || '');
+    setAliasCustomerPhone('');
+    setAliasCustomerEmail('');
+    setIsAliasConvertFormVisible(true);
+  };
+
+  const handleConvertAliasToCustomer = async () => {
+    if (!session || !linkCustomerReservation) return;
+
+    const name = aliasCustomerName.trim();
+    if (name.length < 2) {
+      setLiveNotice({
+        title: 'Convertir alias',
+        message: 'Captura un nombre de cliente de al menos 2 caracteres.',
+        tone: 'warning',
+      });
+      return;
+    }
+
+    setIsConvertingAliasCustomer(true);
+
+    try {
+      const createdCustomer = await createCustomer(session.branchId, {
+        ownerUserId: null,
+        createdByUserId: session.userId,
+        name,
+        phone: aliasCustomerPhone.trim() || 'Sin telefono',
+        email: aliasCustomerEmail.trim() || null,
+        isGeneric: false,
+        genericType: null,
+        status: 'ACTIVE',
+      });
+
+      const updatedReservation = await linkReservationCustomer(
+        linkCustomerReservation.id,
+        createdCustomer.id
+      );
+      applyUpdatedReservation(updatedReservation);
+      setLinkCustomerReservation(null);
+      setSelectedLinkCustomer(null);
+      setLinkCustomerSearch('');
+      setIsAliasConvertFormVisible(false);
+      setAliasCustomerName('');
+      setAliasCustomerPhone('');
+      setAliasCustomerEmail('');
+      setLiveNotice({
+        title: 'Cliente creado',
+        message: `Cliente ${createdCustomer.name} creado y vinculado al apartado. Alias original: ${
+          linkCustomerReservation.interestedAlias || 'Sin alias'
+        }.`,
+        tone: 'success',
+      });
+      await loadData();
+    } catch (error) {
+      setLiveNotice({
+        title: 'No se pudo convertir alias',
+        message: getActionableMessage(error),
+        tone: 'warning',
+      });
+    } finally {
+      setIsConvertingAliasCustomer(false);
     }
   };
 
@@ -2129,8 +2218,12 @@ export default function LiveScreen() {
               <AppButton
                 title={t('live.convertAliasToCustomer')}
                 variant="secondary"
-                disabled
-                disabledReason={t('live.convertAliasToCustomerPendingReason')}
+                onPress={() => {
+                  openLinkCustomerModal(reservation);
+                  setIsAliasConvertFormVisible(true);
+                }}
+                disabled={!mayCreateCustomer}
+                disabledReason="No tienes permiso para crear clientes. Solicita el permiso Crear cliente."
               />
             </>
           ) : null}
@@ -2457,6 +2550,7 @@ export default function LiveScreen() {
     }
 
     setSelectedCustomer(customer);
+    setInterestedAliasText('');
     setCustomerSearch('');
     setIsCustomerModalVisible(false);
     setReservationIssue(null);
@@ -2902,6 +2996,17 @@ export default function LiveScreen() {
 
   const persistReservation = async (price: number, alias: string) => {
     if (!session || !hasCustomerOrInterestedAlias || !activeItem || !selectedLive || !liveChannelId) {
+      return;
+    }
+
+    if (selectedCustomer && alias.trim()) {
+      const message = 'Elige cliente formal o alias/interesado, no ambos.';
+      setLiveNotice({
+        title: 'Cliente o alias',
+        message,
+        tone: 'warning',
+      });
+      openReservationIssue(message, 'customer');
       return;
     }
 
@@ -4749,13 +4854,15 @@ export default function LiveScreen() {
                       placeholder={t('live.interestedAliasPlaceholder')}
                       value={interestedAliasText}
                       onChangeText={setInterestedAliasText}
-                      editable={!!activeItem && hasValidReservationPrice}
+                      editable={!!activeItem && hasValidReservationPrice && !selectedCustomer}
                     />
                     <AppText
                       variant="caption"
                       color={interestedAliasValidationReason ? theme.colors.danger : theme.colors.mutedText}
                     >
-                      {interestedAliasValidationReason || t('live.interestedAliasHelp')}
+                      {selectedCustomer
+                        ? 'Ya seleccionaste cliente formal. Quita o cambia cliente para usar alias.'
+                        : interestedAliasValidationReason || t('live.interestedAliasHelp')}
                     </AppText>
                   </LiveCompactCard>
 
@@ -5669,13 +5776,15 @@ export default function LiveScreen() {
               placeholder={t('live.interestedAliasPlaceholder')}
               value={interestedAliasText}
               onChangeText={setInterestedAliasText}
-              editable={!!activeItem && hasValidReservationPrice}
+              editable={!!activeItem && hasValidReservationPrice && !selectedCustomer}
             />
             <AppText
               variant="caption"
               color={interestedAliasValidationReason ? theme.colors.danger : theme.colors.mutedText}
             >
-              {interestedAliasValidationReason || t('live.interestedAliasHelp')}
+              {selectedCustomer
+                ? 'Ya seleccionaste cliente formal. Quita o cambia cliente para usar alias.'
+                : interestedAliasValidationReason || t('live.interestedAliasHelp')}
             </AppText>
 
             {mayCreateCustomer ? (
@@ -6070,7 +6179,7 @@ export default function LiveScreen() {
               title={t('common.cancel')}
               variant="cancel"
               onPress={closeLinkCustomerModal}
-              disabled={isLinkingCustomer}
+              disabled={isLinkingCustomer || isConvertingAliasCustomer}
               style={styles.linkCustomerFooterAction}
             />
             <AppButton
@@ -6078,7 +6187,7 @@ export default function LiveScreen() {
               variant="warning"
               onPress={handleLinkCustomer}
               loading={isLinkingCustomer}
-              disabled={!selectedLinkCustomer || isLinkingCustomer}
+              disabled={!selectedLinkCustomer || isLinkingCustomer || isConvertingAliasCustomer}
               disabledReason={t('live.linkCustomerSelectRequired')}
               style={styles.linkCustomerFooterAction}
             />
@@ -6149,9 +6258,46 @@ export default function LiveScreen() {
           <AppButton
             title={t('live.convertAliasToCustomer')}
             variant="secondary"
-            disabled
-            disabledReason={t('live.convertAliasToCustomerPendingReason')}
+            onPress={openAliasConvertForm}
+            disabled={isLinkingCustomer || isConvertingAliasCustomer}
+            disabledReason="Ya hay una accion en proceso."
           />
+          {isAliasConvertFormVisible ? (
+            <AppCard variant="subtle" style={styles.linkCustomerAliasPanel}>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Crear cliente formal desde alias
+              </AppText>
+              <AppInput
+                label="Nombre"
+                placeholder="Nombre formal"
+                value={aliasCustomerName}
+                onChangeText={setAliasCustomerName}
+              />
+              <AppInput
+                label="Telefono"
+                placeholder="Opcional"
+                value={aliasCustomerPhone}
+                onChangeText={setAliasCustomerPhone}
+                keyboardType="phone-pad"
+              />
+              <AppInput
+                label="Correo"
+                placeholder="Opcional"
+                value={aliasCustomerEmail}
+                onChangeText={setAliasCustomerEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+              <AppButton
+                title="Crear y vincular"
+                variant="operation"
+                onPress={handleConvertAliasToCustomer}
+                loading={isConvertingAliasCustomer}
+                disabled={isConvertingAliasCustomer || aliasCustomerName.trim().length < 2}
+                disabledReason="Confirma el nombre del cliente formal antes de vincular."
+              />
+            </AppCard>
+          ) : null}
         </View>
       </AppBottomModal>
 

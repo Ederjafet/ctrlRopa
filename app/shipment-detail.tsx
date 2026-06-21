@@ -1,10 +1,9 @@
-import AppBackButton from '@/components/ui/AppBackButton';
 import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
-import AppScreen from '@/components/ui/AppScreen';
+import AppShellPage from '@/components/layout/AppShellPage';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { Customer, getCustomersByBranch } from '@/services/customerService';
@@ -350,30 +349,52 @@ export default function ShipmentDetailScreen() {
 
   if (isLoading) {
     return (
-      <AppScreen>
+      <AppShellPage
+        title="Detalle de envio"
+        subtitle="Paquetes y entrega"
+        activeRoute="shipments"
+        compactHeader
+      >
         <ActivityIndicator />
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   if (!detail) {
     return (
-      <AppScreen>
-        <AppBackButton fallbackRoute={returnRoute || '/shipments'} />
+      <AppShellPage
+        title="Detalle de envio"
+        subtitle="Paquetes y entrega"
+        activeRoute="shipments"
+        compactHeader
+        rightContent={
+          <AppButton
+            title="Volver"
+            variant="secondary"
+            onPress={() => router.replace((returnRoute || '/shipments') as any)}
+          />
+        }
+      >
         <AppText>No se encontró el envío.</AppText>
-      </AppScreen>
+      </AppShellPage>
     );
   }
 
   return (
     <>
-      <AppScreen>
-        <AppBackButton fallbackRoute={returnRoute || '/shipments'} />
-
-        <AppText variant="title" bold>
-          Envío {detail.folio}
-        </AppText>
-
+      <AppShellPage
+        title={`Envio ${detail.folio}`}
+        subtitle="Paquetes y entrega"
+        activeRoute="shipments"
+        compactHeader
+        rightContent={
+          <AppButton
+            title="Volver"
+            variant="secondary"
+            onPress={() => router.replace((returnRoute || '/shipments') as any)}
+          />
+        }
+      >
         <AppCard>
           <AppText variant="subtitle" bold>
             Información
@@ -439,7 +460,7 @@ export default function ShipmentDetailScreen() {
             ))
           )}
         </AppCard>
-      </AppScreen>
+      </AppShellPage>
 
       <AppBottomModal
         visible={addModalVisible}

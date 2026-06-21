@@ -16,7 +16,7 @@ import {
   getActionableApiErrorMessage,
 } from '@/services/apiError';
 import { Box, getActiveBoxesByBranch } from '@/services/boxService';
-import { Customer, getCustomersByBranch } from '@/services/customerService';
+import { Customer, createCustomer, getCustomersByBranch } from '@/services/customerService';
 import {
   addCustomerPackageItem,
   createCustomerPackage,
@@ -50,7 +50,7 @@ type ReservationFilter =
   | 'READY_TO_SHIP'
   | 'SHIPPED';
 
-type ReservationAction = 'assignBox' | 'createPackage' | 'linkCustomer';
+type ReservationAction = 'assignBox' | 'createPackage' | 'linkCustomer' | 'convertAlias';
 type PrimaryActionKind =
   | 'linkCustomer'
   | 'createPackage'
@@ -196,7 +196,7 @@ function getPrimaryAction(
   if (packageLink) return { kind: 'viewPackage', title: 'Ver paquete' };
   if (!reservation.customerId) return { kind: 'linkCustomer', title: 'Vincular cliente' };
 
-  return { kind: 'createPackage', title: 'Crear paquete' };
+  return { kind: 'createPackage', title: 'Crear / agregar paquete' };
 }
 
 function getPackageDisabledReason(
@@ -263,6 +263,10 @@ export default function ReservationsScreen() {
   const [linkCustomerReservation, setLinkCustomerReservation] = useState<Reservation | null>(null);
   const [linkCustomerSearch, setLinkCustomerSearch] = useState('');
   const [selectedLinkCustomer, setSelectedLinkCustomer] = useState<Customer | null>(null);
+  const [convertAliasReservation, setConvertAliasReservation] = useState<Reservation | null>(null);
+  const [aliasCustomerName, setAliasCustomerName] = useState('');
+  const [aliasCustomerPhone, setAliasCustomerPhone] = useState('');
+  const [aliasCustomerEmail, setAliasCustomerEmail] = useState('');
   const [packageReservation, setPackageReservation] = useState<Reservation | null>(null);
   const [packageCandidates, setPackageCandidates] = useState<Reservation[]>([]);
   const [packageFreeItems, setPackageFreeItems] = useState<Item[]>([]);
@@ -650,6 +654,90 @@ export default function ReservationsScreen() {
       Alert.alert(copy.title, copy.message, [{ text: copy.primaryActionLabel }]);
     } finally {
       setIsLinkingCustomer(false);
+      setWorkingReservationId(null);
+      setWorkingAction(null);
+    }
+  };
+
+  const openConvertAliasModal = (reservation: Reservation) => {
+    if (reservation.customerId) {
+      Alert.alert('Convertir alias', 'Este apartado ya tiene cliente formal.');
+      return;
+    }
+
+    if (!hasInterestedAlias(reservation)) {
+      Alert.alert('Convertir alias', 'El apartado no tiene alias/interesado para convertir.');
+      return;
+    }
+
+    if (!hasPermission(session, 'CREATE_CUSTOMER')) {
+      Alert.alert(
+        'Crear cliente',
+        'No tienes permiso para crear clientes. Solicita el permiso Crear cliente.'
+      );
+      return;
+    }
+
+    setConvertAliasReservation(reservation);
+    setAliasCustomerName(reservation.interestedAlias?.trim() || '');
+    setAliasCustomerPhone('');
+    setAliasCustomerEmail('');
+  };
+
+  const closeConvertAliasModal = () => {
+    if (workingAction === 'convertAlias') return;
+
+    setConvertAliasReservation(null);
+    setAliasCustomerName('');
+    setAliasCustomerPhone('');
+    setAliasCustomerEmail('');
+  };
+
+  const handleConvertAliasToCustomer = async () => {
+    if (!session || !convertAliasReservation) return;
+
+    const name = aliasCustomerName.trim();
+    if (name.length < 2) {
+      Alert.alert('Convertir alias', 'Captura un nombre de cliente de al menos 2 caracteres.');
+      return;
+    }
+
+    try {
+      setWorkingReservationId(convertAliasReservation.id);
+      setWorkingAction('convertAlias');
+
+      const createdCustomer = await createCustomer(session.branchId, {
+        ownerUserId: null,
+        createdByUserId: session.userId,
+        name,
+        phone: aliasCustomerPhone.trim() || 'Sin telefono',
+        email: aliasCustomerEmail.trim() || null,
+        isGeneric: false,
+        genericType: null,
+        status: 'ACTIVE',
+      });
+
+      const updated = await linkReservationCustomer(
+        convertAliasReservation.id,
+        createdCustomer.id
+      );
+
+      applyUpdatedReservation(updated);
+      setConvertAliasReservation(null);
+      setAliasCustomerName('');
+      setAliasCustomerPhone('');
+      setAliasCustomerEmail('');
+      Alert.alert(
+        'Cliente creado',
+        `Cliente ${createdCustomer.name} creado y vinculado al apartado. Alias original: ${
+          convertAliasReservation.interestedAlias || 'Sin alias'
+        }.`
+      );
+      await loadReservations(false);
+    } catch (error: any) {
+      const copy = getActionableApiError(error, t);
+      Alert.alert(copy.title, copy.message, [{ text: copy.primaryActionLabel }]);
+    } finally {
       setWorkingReservationId(null);
       setWorkingAction(null);
     }
@@ -1141,14 +1229,15 @@ export default function ReservationsScreen() {
               <AppButton
                 title="Convertir alias en cliente formal"
                 variant="neutral"
-                disabled
-                disabledReason="Pendiente: crear cliente con decision explicita del usuario, sin clientes fake."
+                onPress={() => closeActionsAndRun(openConvertAliasModal)}
+                disabled={Boolean(workingReservationId)}
+                disabledReason="Ya hay una accion en proceso."
               />
               <AppButton
                 title="Editar alias"
                 variant="neutral"
                 disabled
-                disabledReason="Pendiente: requiere endpoint auditado para modificar el alias del interesado."
+                disabledReason="Disponible en siguiente fase: requiere endpoint auditado para corregir alias sin perder trazabilidad."
               />
             </>
           ) : null}
@@ -1162,7 +1251,7 @@ export default function ReservationsScreen() {
             disabledReason={assignBoxDisabledReason || undefined}
           />
           <AppButton
-            title="Crear paquete"
+            title="Crear / agregar paquete"
             variant="operation"
             onPress={() => closeActionsAndRun(openPackageModal)}
             loading={isCreatingPackage}
@@ -1469,6 +1558,69 @@ export default function ReservationsScreen() {
               ? `Cliente seleccionado: ${selectedLinkCustomer.name}`
               : 'El alias no se crea como cliente automaticamente; selecciona un cliente formal existente.'}
           </AppText>
+        </View>
+      </AppBottomModal>
+
+      <AppBottomModal
+        visible={Boolean(convertAliasReservation)}
+        title="Convertir alias en cliente"
+        onClose={closeConvertAliasModal}
+        scroll={false}
+        footer={
+          <View style={styles.modalFooterActions}>
+            <AppButton
+              title="Cancelar"
+              variant="cancel"
+              onPress={closeConvertAliasModal}
+              disabled={workingAction === 'convertAlias'}
+              style={styles.modalFooterButton}
+            />
+            <AppButton
+              title="Crear y vincular"
+              variant="operation"
+              onPress={handleConvertAliasToCustomer}
+              loading={workingAction === 'convertAlias'}
+              disabled={workingAction === 'convertAlias' || aliasCustomerName.trim().length < 2}
+              disabledReason="Confirma el nombre del cliente formal antes de vincular."
+              style={styles.modalFooterButton}
+            />
+          </View>
+        }
+      >
+        <View style={styles.linkCustomerModalContent}>
+          <AppCard variant="subtle" style={styles.actionModalSummary}>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              Alias actual
+            </AppText>
+            <AppText bold numberOfLines={1}>
+              {convertAliasReservation?.interestedAlias || 'Sin alias'}
+            </AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              Se creara un cliente formal y este apartado quedara vinculado. No es un cliente fake.
+            </AppText>
+          </AppCard>
+
+          <AppInput
+            label="Nombre del cliente"
+            placeholder="Nombre formal"
+            value={aliasCustomerName}
+            onChangeText={setAliasCustomerName}
+          />
+          <AppInput
+            label="Telefono"
+            placeholder="Opcional"
+            value={aliasCustomerPhone}
+            onChangeText={setAliasCustomerPhone}
+            keyboardType="phone-pad"
+          />
+          <AppInput
+            label="Correo"
+            placeholder="Opcional"
+            value={aliasCustomerEmail}
+            onChangeText={setAliasCustomerEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
         </View>
       </AppBottomModal>
 

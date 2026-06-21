@@ -248,6 +248,10 @@ Probabilidad:
 - FAST-FORMS-UX-B compacta `/system-roles` sin cambiar RBAC; no prometer roles/permisos por compania hasta implementar `FAST-RBAC-TENANT-A`.
 - FAST-FORMS-UX-B confirma `/appearance` como funcional, pero el hardening por compania queda pendiente; no prometer personalizacion SaaS aislada hasta `FAST-APPEARANCE-A`.
 - FAST-FORMS-UX-B detecta textos heredados con mojibake en formularios; no afecta compilacion, pero conviene normalizar encoding/i18n antes de demo final pulida.
+- FLOW-FAST-QA-A deja `Editar alias` como accion deshabilitada; requiere endpoint auditado antes de permitir cambios historicos de alias/interesado.
+- FLOW-FAST-QA-A no implementa unir paquetes, mover prendas entre paquetes ni paquetes cross-customer; esos casos requieren autorizacion/auditoria explicita antes de venderlos como funcionales.
+- FLOW-FAST-QA-A refuerza que paquetes con saldo pendiente no avanzan a listo/envio; QA debe validar roles reales porque permisos agregados en backend pueden requerir relogin para verse en frontend.
+- FLOW-FAST-QA-A convierte alias en cliente con telefono opcional usando contrato actual de clientes; conviene definir deduplicacion/normalizacion de telefono antes de produccion masiva.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.
