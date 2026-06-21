@@ -396,12 +396,18 @@ export function getActionableApiError(
     kind === 'unknown' &&
     normalized.message &&
     normalized.message !== DEFAULT_ERROR_TEXT['errors.unknown.message'];
+  const permissionMessage =
+    kind === 'forbidden' && normalized.requiredPermission
+      ? `No tienes permiso para realizar esta accion. Permiso requerido: ${normalized.requiredPermission}.`
+      : null;
 
   return {
     kind,
     status: normalized.status,
     title: translateError(t, `errors.${kindKey}.title`),
-    message: isSafeUnknown
+    message: permissionMessage
+      ? permissionMessage
+      : isSafeUnknown
       ? normalized.message
       : translateError(t, `errors.${kindKey}.message`),
     primaryActionLabel: translateError(t, getActionKey(kind)),

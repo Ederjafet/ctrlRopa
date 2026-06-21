@@ -20,7 +20,10 @@ export type ScreenPermissionKey =
   | 'shipments'
   | 'shipmentDetail'
   | 'liveAuthorizations'
-  | 'itemsCreate';
+  | 'itemsCreate'
+  | 'customersCreate'
+  | 'suppliers'
+  | 'batchForm';
 
 export type ScreenPermissionActionKey = string;
 
@@ -506,6 +509,97 @@ export const SCREEN_PERMISSIONS: Record<ScreenPermissionKey, ScreenPermissionDef
         permissionCode: 'MANAGE_INVENTORY',
         allowedMessage: 'Puedes clasificar prendas con catalogos operativos.',
         deniedMessage: 'No puedes editar clasificacion de prendas.',
+      },
+    ],
+  },
+  customersCreate: {
+    key: 'customersCreate',
+    title: 'Nuevo cliente',
+    requiredToView: ['CREATE_CUSTOMER'],
+    actions: [
+      {
+        key: 'viewCustomers',
+        label: 'Ver clientes',
+        permissionCode: 'VIEW_CUSTOMERS',
+        allowedMessage: 'Puedes consultar clientes finales de tu compania.',
+        deniedMessage: 'No puedes consultar clientes finales.',
+      },
+      {
+        key: 'createCustomer',
+        label: 'Crear cliente',
+        permissionCode: 'CREATE_CUSTOMER',
+        allowedMessage: 'Puedes crear clientes finales para tu compania.',
+        deniedMessage: 'No puedes crear clientes finales.',
+      },
+      {
+        key: 'editCustomer',
+        label: 'Editar cliente',
+        permissionCode: 'EDIT_CUSTOMER',
+        allowedMessage: 'Puedes corregir datos de clientes existentes.',
+        deniedMessage: 'No puedes editar clientes existentes.',
+      },
+    ],
+  },
+  suppliers: {
+    key: 'suppliers',
+    title: 'Proveedores',
+    requiredToView: ['VIEW_INVENTORY'],
+    actions: [
+      {
+        key: 'viewSuppliers',
+        label: 'Ver proveedores',
+        permissionCode: 'VIEW_INVENTORY',
+        allowedMessage: 'Puedes consultar proveedores para lotes y recepcion.',
+        deniedMessage: 'No puedes consultar proveedores.',
+      },
+      {
+        key: 'createSupplier',
+        label: 'Crear proveedor',
+        permissionCode: 'MANAGE_CATALOGS',
+        allowedMessage: 'Puedes registrar proveedores para usar en lotes.',
+        deniedMessage: 'No puedes crear proveedores.',
+      },
+      {
+        key: 'editSupplier',
+        label: 'Editar proveedor',
+        permissionCode: 'MANAGE_CATALOGS',
+        allowedMessage: 'Puedes actualizar datos de proveedores.',
+        deniedMessage: 'No puedes editar proveedores.',
+      },
+    ],
+  },
+  batchForm: {
+    key: 'batchForm',
+    title: 'Nuevo lote',
+    requiredToView: ['MANAGE_INVENTORY'],
+    actions: [
+      {
+        key: 'viewBatches',
+        label: 'Ver lotes',
+        permissionCode: 'VIEW_INVENTORY',
+        allowedMessage: 'Puedes consultar lotes de la sucursal activa.',
+        deniedMessage: 'No puedes consultar lotes.',
+      },
+      {
+        key: 'createBatch',
+        label: 'Crear lote',
+        permissionCode: 'MANAGE_INVENTORY',
+        allowedMessage: 'Puedes crear lotes para controlar recepcion y clasificacion.',
+        deniedMessage: 'No puedes crear lotes.',
+      },
+      {
+        key: 'selectSupplier',
+        label: 'Seleccionar proveedor',
+        permissionCode: 'VIEW_INVENTORY',
+        allowedMessage: 'Puedes seleccionar proveedores activos para un lote.',
+        deniedMessage: 'No puedes consultar proveedores para el lote.',
+      },
+      {
+        key: 'createSupplier',
+        label: 'Crear proveedor',
+        permissionCode: 'MANAGE_CATALOGS',
+        allowedMessage: 'Puedes crear proveedor si no existe antes de registrar el lote.',
+        deniedMessage: 'No puedes crear proveedores.',
       },
     ],
   },

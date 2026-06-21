@@ -265,6 +265,11 @@ export type CreatePlatformCompanyPayload = {
   branchName: string;
 };
 
+export type UpdatePlatformCompanyPayload = {
+  name?: string;
+  status?: string;
+};
+
 export type CreateTenantAdminPayload = {
   name: string;
   email: string;
@@ -277,6 +282,12 @@ export type CreatePlatformBranchPayload = {
   code?: string;
 };
 
+export type UpdatePlatformBranchPayload = {
+  name?: string;
+  code?: string;
+  status?: string;
+};
+
 export type CreatePlatformCompanyUserPayload = {
   name: string;
   email: string;
@@ -284,6 +295,14 @@ export type CreatePlatformCompanyUserPayload = {
   role: string;
   branchId?: number | null;
   phone?: string | null;
+};
+
+export type UpdatePlatformCompanyUserPayload = {
+  name?: string;
+  phone?: string | null;
+  status?: string;
+  role?: string;
+  branchId?: number | null;
 };
 
 export type UpdatePlatformCompanySettingsPayload = {
@@ -393,6 +412,16 @@ export async function createPlatformCompany(
   });
 }
 
+export async function updatePlatformCompany(
+  companyId: number,
+  payload: UpdatePlatformCompanyPayload
+): Promise<PlatformCompanyDetail> {
+  return apiRequest<PlatformCompanyDetail>(`/api/platform/companies/${companyId}`, {
+    method: 'PATCH',
+    body: payload,
+  });
+}
+
 export async function getPlatformCompanyDetail(
   companyId: number
 ): Promise<PlatformCompanyDetail> {
@@ -409,6 +438,17 @@ export async function createPlatformBranch(
 ): Promise<PlatformBranch> {
   return apiRequest<PlatformBranch>(`/api/platform/companies/${companyId}/branches`, {
     method: 'POST',
+    body: payload,
+  });
+}
+
+export async function updatePlatformBranch(
+  companyId: number,
+  branchId: number,
+  payload: UpdatePlatformBranchPayload
+): Promise<PlatformBranch> {
+  return apiRequest<PlatformBranch>(`/api/platform/companies/${companyId}/branches/${branchId}`, {
+    method: 'PATCH',
     body: payload,
   });
 }
@@ -439,6 +479,17 @@ export async function createPlatformUser(
 ): Promise<PlatformCompanyUser> {
   return apiRequest<PlatformCompanyUser>(`/api/platform/companies/${companyId}/users`, {
     method: 'POST',
+    body: payload,
+  });
+}
+
+export async function updatePlatformCompanyUser(
+  companyId: number,
+  userId: number,
+  payload: UpdatePlatformCompanyUserPayload
+): Promise<PlatformCompanyUser> {
+  return apiRequest<PlatformCompanyUser>(`/api/platform/companies/${companyId}/users/${userId}`, {
+    method: 'PATCH',
     body: payload,
   });
 }

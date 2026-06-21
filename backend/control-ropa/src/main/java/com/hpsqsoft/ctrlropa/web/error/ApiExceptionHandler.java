@@ -33,16 +33,24 @@ public class ApiExceptionHandler {
             HttpServletRequest request
     ) {
         String path = request.getRequestURI();
-        String message = path.equals("/api/auth/login")
+        String requiredPermission = extractRequiredPermission(ex.getMessage());
+        String message = requiredPermission != null
+                ? "No tienes permiso para realizar esta accion."
+                : path.equals("/api/auth/login")
                 ? "Credenciales invalidas o usuario bloqueado temporalmente."
                 : "No tienes permisos para acceder a este recurso.";
 
-        return buildResponse(
+        Map<String, Object> body = baseBody(
                 HttpStatus.FORBIDDEN,
                 "FORBIDDEN",
                 message,
                 path
         );
+        if (requiredPermission != null) {
+            body.put("requiredPermission", requiredPermission);
+        }
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -317,5 +325,20 @@ public class ApiExceptionHandler {
 
     private String defaultMessage(String actual, String fallback) {
         return (actual != null && !actual.isBlank()) ? actual : fallback;
+    }
+
+    private String extractRequiredPermission(String message) {
+        if (message == null || message.isBlank()) {
+            return null;
+        }
+
+        String marker = "Permiso requerido:";
+        int markerIndex = message.indexOf(marker);
+        if (markerIndex < 0) {
+            return null;
+        }
+
+        String permission = message.substring(markerIndex + marker.length()).trim();
+        return permission.isBlank() ? null : permission;
     }
 }

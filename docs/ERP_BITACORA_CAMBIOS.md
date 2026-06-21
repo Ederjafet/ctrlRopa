@@ -1,5 +1,33 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-21 - RC-CLIENTE-C edicion Owner, proveedores/lotes y permisos cliente
+
+Tipo: release candidate, instalacion cliente, platform owner, permisos tenant, inventario, frontend, backend, migracion, documentacion.
+
+Objetivo:
+
+- Cerrar bloqueadores P0/P1 del smoke visual final antes de instalacion cliente.
+
+Cambios realizados:
+
+- `Clientes / Companias` agrega accion `Editar` para companias cliente.
+- `Sucursales` agrega edicion de nombre, codigo y estado.
+- `Usuarios` agrega edicion de nombre, telefono, rol, sucursal y estado, sin mezclar cambio de password.
+- Se agrega `V64__rc_cliente_c_customer_supplier_lot_permissions.sql` para backfill de `CREATE_CUSTOMER`, `EDIT_CUSTOMER`, inventario y catalogos al rol tenant `ADMIN`.
+- `/customers-create` muestra `Ver permisos` y acceso restringido claro cuando falta `CREATE_CUSTOMER`.
+- El backend incluye `requiredPermission` en respuestas 403 generadas desde `Permiso requerido: X`.
+- El frontend muestra el permiso requerido en errores 403 accionables.
+- Se agrega pantalla MVP `/suppliers` y menu `Inventario -> Proveedores`.
+- `Nuevo lote` bloquea guardado sin proveedor activo y muestra CTA para crear proveedor.
+- Se documenta la fase en `docs/RC_CLIENTE_C_EDITAR_PROVEEDORES_LOTES_PERMISOS.md`.
+
+Restricciones respetadas:
+
+- No se reseteo base de datos.
+- No se otorgaron permisos platform a tenant admin.
+- No se implemento modulo avanzado de proveedores ni roles tenant personalizados.
+- No se hizo merge a `main`.
+
 ## 2026-06-21 - OWNER-LICENSE-B licencia perpetua y hosting anual
 
 Tipo: platform owner, licencias comerciales, hosting anual, backend, frontend, migracion, documentacion.

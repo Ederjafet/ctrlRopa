@@ -43,6 +43,9 @@ import {
   PlatformSubscriptionPlan,
   PlatformUsageRate,
   PlatformUsageSummary,
+  updatePlatformBranch,
+  updatePlatformCompany,
+  updatePlatformCompanyUser,
   updatePlatformCompanySettings,
   updatePlatformCompanySubscription,
   updatePlatformCommercialAgreement,
@@ -184,6 +187,7 @@ const EMPTY_COMPANY_FORM = {
   name: '',
   legalName: '',
   branchName: 'Sucursal Principal',
+  status: 'ACTIVE',
 };
 
 const EMPTY_ADMIN_FORM = {
@@ -195,6 +199,7 @@ const EMPTY_ADMIN_FORM = {
 const EMPTY_BRANCH_FORM = {
   name: '',
   code: '',
+  status: 'ACTIVE',
 };
 
 const EMPTY_USER_FORM = {
@@ -204,6 +209,7 @@ const EMPTY_USER_FORM = {
   phone: '',
   role: 'SELLER',
   branchId: null as number | null,
+  status: 'ACTIVE',
 };
 
 const EMPTY_SETTINGS_FORM = {
@@ -547,6 +553,9 @@ export default function PlatformScreen() {
   const [showPlanForm, setShowPlanForm] = useState(false);
   const [companyPickerVisible, setCompanyPickerVisible] = useState(false);
   const [companyFilter, setCompanyFilter] = useState<CompanyFilterKey>('all');
+  const [editingCompanyId, setEditingCompanyId] = useState<number | null>(null);
+  const [editingBranchId, setEditingBranchId] = useState<number | null>(null);
+  const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [auditSearch, setAuditSearch] = useState('');
   const [auditCategoryFilter, setAuditCategoryFilter] = useState<AuditCategoryFilter>('ALL');
   const [auditDateFilter, setAuditDateFilter] = useState<AuditDateFilter>('ALL');
@@ -841,13 +850,77 @@ export default function PlatformScreen() {
     }
   }, [buildPlatformRoute, companies, router]);
 
+  const resetCompanyEditor = () => {
+    setEditingCompanyId(null);
+    setCompanyForm(EMPTY_COMPANY_FORM);
+    setShowCompanyForm(false);
+  };
+
+  const openCompanyEditor = (company: PlatformCompany) => {
+    setEditingCompanyId(company.id);
+    setCompanyForm({
+      name: company.name,
+      legalName: '',
+      branchName: company.branchName || 'Sucursal Principal',
+      status: company.status || 'ACTIVE',
+    });
+    setShowCompanyForm(true);
+    setMessage('');
+    setErrorMessage('');
+  };
+
+  const resetBranchEditor = () => {
+    setEditingBranchId(null);
+    setBranchForm(EMPTY_BRANCH_FORM);
+    setShowBranchForm(false);
+  };
+
+  const openBranchEditor = (branch: PlatformBranch) => {
+    setEditingBranchId(branch.id);
+    setBranchForm({
+      name: branch.name,
+      code: branch.code,
+      status: branch.status || 'ACTIVE',
+    });
+    setShowBranchForm(true);
+    setMessage('');
+    setErrorMessage('');
+  };
+
+  const resetUserEditor = () => {
+    setEditingUserId(null);
+    setUserForm((current) => ({
+      ...EMPTY_USER_FORM,
+      role: current.role,
+      branchId: current.branchId,
+    }));
+    setShowUserForm(false);
+  };
+
+  const openUserEditor = (user: PlatformCompanyUser) => {
+    setEditingUserId(user.id);
+    setUserForm({
+      name: user.name,
+      email: user.email,
+      password: '',
+      phone: user.phone ?? '',
+      role: user.roles[0] || 'SELLER',
+      branchId: user.branchId,
+      status: user.status || 'ACTIVE',
+    });
+    setShowUserForm(true);
+    setShowAdminForm(false);
+    setMessage('');
+    setErrorMessage('');
+  };
+
   const handleCreateCompany = async () => {
     if (creatingCompany) return;
     const name = companyForm.name.trim();
     const branchName = companyForm.branchName.trim();
 
-    if (!name || !branchName) {
-      setErrorMessage('Captura nombre de empresa y sucursal principal.');
+    if (!name || (!editingCompanyId && !branchName)) {
+      setErrorMessage(editingCompanyId ? 'Captura nombre de empresa.' : 'Captura nombre de empresa y sucursal principal.');
       return;
     }
 
@@ -855,13 +928,30 @@ export default function PlatformScreen() {
       setCreatingCompany(true);
       setErrorMessage('');
       setMessage('');
+      if (editingCompanyId) {
+        await updatePlatformCompany(editingCompanyId, {
+          name,
+          status: companyForm.status,
+        });
+        const edited = companies.find((company) => company.id === editingCompanyId);
+        resetCompanyEditor();
+        setMessage(`Empresa actualizada: ${name}.`);
+        if (selectedCompanyId === editingCompanyId && edited) {
+          updateCompanyInAdministration(editingCompanyId, name);
+        }
+        await refreshCompanies();
+        await refreshUsageSummary();
+        await refreshDashboardSummary();
+        await refreshPlatformAudit();
+        return;
+      }
+
       const created = await createPlatformCompany({
         name,
         legalName: companyForm.legalName.trim() || undefined,
         branchName,
       });
-      setCompanyForm(EMPTY_COMPANY_FORM);
-      setShowCompanyForm(false);
+      resetCompanyEditor();
       updateCompanyInAdministration(created.id, created.name);
       Alert.alert('Empresa creada', `Se creo ${created.name} con sucursal principal.`);
       await refreshCompanies();
@@ -889,12 +979,27 @@ export default function PlatformScreen() {
       setCreatingBranch(true);
       setErrorMessage('');
       setMessage('');
+      if (editingBranchId) {
+        const updated = await updatePlatformBranch(selectedCompany.id, editingBranchId, {
+          name,
+          code: code || undefined,
+          status: branchForm.status,
+        });
+        resetBranchEditor();
+        setMessage(`Sucursal actualizada: ${updated.name}.`);
+        await loadCompanyScope(selectedCompany.id);
+        await refreshCompanies();
+        await refreshUsageSummary();
+        await refreshDashboardSummary();
+        await refreshPlatformAudit();
+        return;
+      }
+
       const created = await createPlatformBranch(selectedCompany.id, {
         name,
         code: code || undefined,
       });
-      setBranchForm(EMPTY_BRANCH_FORM);
-      setShowBranchForm(false);
+      resetBranchEditor();
       setUserForm((current) => ({ ...current, branchId: created.id }));
       setMessage(`Sucursal creada: ${created.name}.`);
       await loadCompanyScope(selectedCompany.id);
@@ -952,8 +1057,8 @@ export default function PlatformScreen() {
     const password = userForm.password;
     const role = userForm.role.trim();
 
-    if (!canUseSelectedCompany || !name || !email || !password || !role) {
-      setErrorMessage('Captura empresa, sucursal, nombre, correo, rol y password inicial.');
+    if (!canUseSelectedCompany || !name || !role || (!editingUserId && (!email || !password))) {
+      setErrorMessage(editingUserId ? 'Captura empresa, sucursal, nombre y rol.' : 'Captura empresa, sucursal, nombre, correo, rol y password inicial.');
       return;
     }
 
@@ -961,6 +1066,24 @@ export default function PlatformScreen() {
       setCreatingUser(true);
       setErrorMessage('');
       setMessage('');
+      if (editingUserId) {
+        const updated = await updatePlatformCompanyUser(selectedCompany.id, editingUserId, {
+          name,
+          role,
+          branchId: userForm.branchId,
+          phone: userForm.phone.trim() || null,
+          status: userForm.status,
+        });
+        resetUserEditor();
+        setMessage(`Usuario actualizado: ${updated.email}.`);
+        await loadCompanyScope(selectedCompany.id);
+        await refreshCompanies();
+        await refreshUsageSummary();
+        await refreshDashboardSummary();
+        await refreshPlatformAudit();
+        return;
+      }
+
       const created = await createPlatformUser(selectedCompany.id, {
         name,
         email,
@@ -969,12 +1092,7 @@ export default function PlatformScreen() {
         branchId: userForm.branchId,
         phone: userForm.phone.trim() || null,
       });
-      setUserForm((current) => ({
-        ...EMPTY_USER_FORM,
-        role: current.role,
-        branchId: current.branchId,
-      }));
-      setShowUserForm(false);
+      resetUserEditor();
       setMessage(`Usuario creado: ${created.email}.`);
       await loadCompanyScope(selectedCompany.id);
       await refreshCompanies();
@@ -1911,11 +2029,19 @@ export default function PlatformScreen() {
             </AppText>
           </View>
           <AppButton
-            title={showCompanyForm ? 'Ocultar formulario' : 'Crear compania'}
+            title={showCompanyForm ? (editingCompanyId ? 'Cancelar edicion' : 'Ocultar formulario') : 'Crear compania'}
             variant="operation"
             disabled={!canManageCompanies}
             disabledReason="Tu usuario necesita MANAGE_COMPANIES."
-            onPress={() => setShowCompanyForm((current) => !current)}
+            onPress={() => {
+              if (showCompanyForm) {
+                resetCompanyEditor();
+                return;
+              }
+              setEditingCompanyId(null);
+              setCompanyForm(EMPTY_COMPANY_FORM);
+              setShowCompanyForm(true);
+            }}
             style={styles.actionButton}
           />
         </View>
@@ -1944,6 +2070,7 @@ export default function PlatformScreen() {
 
         {showCompanyForm ? (
           <View style={styles.inlineForm}>
+            <AppText bold>{editingCompanyId ? 'Editar compania' : 'Crear compania cliente'}</AppText>
             <AppInput
               label="Nombre comercial"
               placeholder="Cliente Demo AppModa"
@@ -1963,10 +2090,23 @@ export default function PlatformScreen() {
               placeholder="Sucursal Principal"
               value={companyForm.branchName}
               onChangeText={(value) => setCompanyForm((current) => ({ ...current, branchName: value }))}
-              editable={!creatingCompany && canManageCompanies}
+              editable={!creatingCompany && canManageCompanies && !editingCompanyId}
             />
+            {editingCompanyId ? (
+              <View style={styles.actionsRow}>
+                {['ACTIVE', 'SUSPENDED', 'INACTIVE'].map((status) => (
+                  <AppButton
+                    key={status}
+                    title={status}
+                    variant={companyForm.status === status ? 'primary' : 'secondary'}
+                    onPress={() => setCompanyForm((current) => ({ ...current, status }))}
+                    style={styles.compactButton}
+                  />
+                ))}
+              </View>
+            ) : null}
             <AppButton
-              title="Crear empresa"
+              title={editingCompanyId ? 'Guardar cambios' : 'Crear empresa'}
               loading={creatingCompany}
               disabled={creatingCompany || !canManageCompanies}
               disabledReason="Tu usuario necesita MANAGE_COMPANIES."
@@ -2032,6 +2172,14 @@ export default function PlatformScreen() {
                   ) : null}
                   {!item.isInternal ? (
                     <>
+                      <AppButton
+                        title="Editar"
+                        variant="secondary"
+                        disabled={!canManageCompanies}
+                        disabledReason="Tu usuario necesita MANAGE_COMPANIES."
+                        onPress={() => openCompanyEditor(company)}
+                        style={styles.compactButton}
+                      />
                       <AppButton
                         title="Configurar"
                         variant="secondary"
@@ -2136,16 +2284,25 @@ export default function PlatformScreen() {
             {renderCompanyScopeLine()}
           </View>
           <AppButton
-            title={showBranchForm ? 'Ocultar formulario' : 'Nueva sucursal'}
+            title={showBranchForm ? (editingBranchId ? 'Cancelar edicion' : 'Ocultar formulario') : 'Nueva sucursal'}
             variant="operation"
             disabled={!canManageCompanies || !canUseSelectedCompany}
             disabledReason="Selecciona un cliente y confirma permiso MANAGE_COMPANIES."
-            onPress={() => setShowBranchForm((current) => !current)}
+            onPress={() => {
+              if (showBranchForm) {
+                resetBranchEditor();
+                return;
+              }
+              setEditingBranchId(null);
+              setBranchForm(EMPTY_BRANCH_FORM);
+              setShowBranchForm(true);
+            }}
           />
         </View>
 
         {showBranchForm ? (
           <View style={styles.inlineForm}>
+            <AppText bold>{editingBranchId ? 'Editar sucursal' : 'Nueva sucursal'}</AppText>
             <AppInput
               label="Nombre"
               placeholder="Sucursal Centro"
@@ -2160,8 +2317,21 @@ export default function PlatformScreen() {
               onChangeText={(value) => setBranchForm((current) => ({ ...current, code: value }))}
               editable={!creatingBranch && canManageCompanies}
             />
+            {editingBranchId ? (
+              <View style={styles.actionsRow}>
+                {['ACTIVE', 'INACTIVE'].map((status) => (
+                  <AppButton
+                    key={status}
+                    title={status}
+                    variant={branchForm.status === status ? 'primary' : 'secondary'}
+                    onPress={() => setBranchForm((current) => ({ ...current, status }))}
+                    style={styles.compactButton}
+                  />
+                ))}
+              </View>
+            ) : null}
             <AppButton
-              title="Crear sucursal"
+              title={editingBranchId ? 'Guardar cambios' : 'Crear sucursal'}
               loading={creatingBranch}
               disabled={creatingBranch || !canManageCompanies || !canUseSelectedCompany}
               disabledReason="Selecciona un cliente valido."
@@ -2198,14 +2368,31 @@ export default function PlatformScreen() {
               variant="secondary"
               disabled={!canManageAdmins || !canUseSelectedCompany}
               disabledReason="Selecciona cliente y permiso MANAGE_TENANT_ADMINS."
-              onPress={() => setShowAdminForm((current) => !current)}
+              onPress={() => {
+                setEditingUserId(null);
+                resetUserEditor();
+                setShowAdminForm((current) => !current);
+              }}
             />
             <AppButton
-              title={showUserForm ? 'Ocultar usuario' : 'Nuevo usuario'}
+              title={showUserForm ? (editingUserId ? 'Cancelar edicion' : 'Ocultar usuario') : 'Nuevo usuario'}
               variant="operation"
               disabled={!canManageAdmins || !canUseSelectedCompany}
               disabledReason="Selecciona cliente y permiso MANAGE_TENANT_ADMINS."
-              onPress={() => setShowUserForm((current) => !current)}
+              onPress={() => {
+                if (showUserForm) {
+                  resetUserEditor();
+                  return;
+                }
+                setEditingUserId(null);
+                setUserForm((current) => ({
+                  ...EMPTY_USER_FORM,
+                  role: current.role,
+                  branchId: current.branchId,
+                }));
+                setShowAdminForm(false);
+                setShowUserForm(true);
+              }}
             />
           </View>
         </View>
@@ -3328,12 +3515,22 @@ export default function PlatformScreen() {
       ) : (
         companyBranches.map((branch) => (
           <AppCard key={branch.id} style={styles.listCard}>
-            <View style={styles.rowBetween}>
+            <View style={[styles.rowBetween, isPhone ? styles.column : null]}>
               <View style={styles.flex}>
                 <AppText bold>{branch.code} - {branch.name}</AppText>
                 <AppText variant="caption" color={theme.colors.mutedText}>ID {branch.id}</AppText>
               </View>
-              <StatusBadge label={branch.status} tone={branch.status === 'ACTIVE' ? 'success' : 'neutral'} />
+              <View style={styles.actionsRow}>
+                <StatusBadge label={branch.status} tone={branch.status === 'ACTIVE' ? 'success' : 'neutral'} />
+                <AppButton
+                  title="Editar"
+                  variant="secondary"
+                  disabled={!canManageCompanies}
+                  disabledReason="Tu usuario necesita MANAGE_COMPANIES."
+                  onPress={() => openBranchEditor(branch)}
+                  style={styles.compactButton}
+                />
+              </View>
             </View>
           </AppCard>
         ))
@@ -3354,18 +3551,50 @@ export default function PlatformScreen() {
 
   const renderUserForm = () => (
     <View style={styles.inlineForm}>
-      <AppText bold>Crear usuario operativo</AppText>
+      <AppText bold>{editingUserId ? 'Editar usuario del cliente' : 'Crear usuario operativo'}</AppText>
       <AppInput label="Nombre" placeholder="Vendedor Centro" value={userForm.name} onChangeText={(value) => setUserForm((current) => ({ ...current, name: value }))} editable={!creatingUser && canManageAdmins} />
-      <AppInput label="Correo" placeholder="vendedor.centro@cliente.test" autoCapitalize="none" keyboardType="email-address" value={userForm.email} onChangeText={(value) => setUserForm((current) => ({ ...current, email: value }))} editable={!creatingUser && canManageAdmins} />
-      <AppInput label="Password inicial" placeholder="Vendedor123!" secureTextEntry value={userForm.password} onChangeText={(value) => setUserForm((current) => ({ ...current, password: value }))} editable={!creatingUser && canManageAdmins} />
+      <AppInput label="Correo" placeholder="vendedor.centro@cliente.test" autoCapitalize="none" keyboardType="email-address" value={userForm.email} onChangeText={(value) => setUserForm((current) => ({ ...current, email: value }))} editable={!creatingUser && canManageAdmins && !editingUserId} />
+      {!editingUserId ? (
+        <AppInput label="Password inicial" placeholder="Vendedor123!" secureTextEntry value={userForm.password} onChangeText={(value) => setUserForm((current) => ({ ...current, password: value }))} editable={!creatingUser && canManageAdmins} />
+      ) : (
+        <AppText variant="caption" color={theme.colors.mutedText}>
+          El cambio de password se maneja por el flujo dedicado de usuarios; esta edicion conserva el acceso actual.
+        </AppText>
+      )}
       <AppInput label="Telefono opcional" placeholder="Opcional" value={userForm.phone} onChangeText={(value) => setUserForm((current) => ({ ...current, phone: value }))} editable={!creatingUser && canManageAdmins} />
       <View style={styles.actionsRow}>
         {TENANT_ROLE_OPTIONS.map((role) => (
           <AppButton key={role.code} title={role.label} variant={userForm.role === role.code ? 'primary' : 'secondary'} onPress={() => setUserForm((current) => ({ ...current, role: role.code }))} style={styles.compactButton} />
         ))}
       </View>
+      {companyBranches.length > 1 ? (
+        <View style={styles.actionsRow}>
+          {companyBranches.map((branch) => (
+            <AppButton
+              key={branch.id}
+              title={branch.name}
+              variant={userForm.branchId === branch.id ? 'primary' : 'secondary'}
+              onPress={() => setUserForm((current) => ({ ...current, branchId: branch.id }))}
+              style={styles.compactButton}
+            />
+          ))}
+        </View>
+      ) : null}
+      {editingUserId ? (
+        <View style={styles.actionsRow}>
+          {['ACTIVE', 'INACTIVE'].map((status) => (
+            <AppButton
+              key={status}
+              title={status}
+              variant={userForm.status === status ? 'primary' : 'secondary'}
+              onPress={() => setUserForm((current) => ({ ...current, status }))}
+              style={styles.compactButton}
+            />
+          ))}
+        </View>
+      ) : null}
       <AppText variant="caption" color={theme.colors.mutedText}>Sucursal asignada: {selectedBranchName}</AppText>
-      <AppButton title="Crear usuario" loading={creatingUser} disabled={creatingUser || !canManageAdmins || !canUseSelectedCompany || companyBranches.length === 0} disabledReason="Selecciona una empresa con sucursal y permiso MANAGE_TENANT_ADMINS." onPress={handleCreateUser} style={styles.actionButton} />
+      <AppButton title={editingUserId ? 'Guardar cambios' : 'Crear usuario'} loading={creatingUser} disabled={creatingUser || !canManageAdmins || !canUseSelectedCompany || companyBranches.length === 0} disabledReason="Selecciona una empresa con sucursal y permiso MANAGE_TENANT_ADMINS." onPress={handleCreateUser} style={styles.actionButton} />
     </View>
   );
 
@@ -3382,7 +3611,17 @@ export default function PlatformScreen() {
                 <AppText variant="caption" color={theme.colors.mutedText}>{user.email} - {user.branchName}</AppText>
                 <AppText variant="caption" color={theme.colors.mutedText}>Roles: {user.roles.join(', ') || 'Sin rol'}</AppText>
               </View>
-              <StatusBadge label={user.status} tone={user.status === 'ACTIVE' ? 'success' : 'neutral'} />
+              <View style={styles.actionsRow}>
+                <StatusBadge label={user.status} tone={user.status === 'ACTIVE' ? 'success' : 'neutral'} />
+                <AppButton
+                  title="Editar"
+                  variant="secondary"
+                  disabled={!canManageAdmins}
+                  disabledReason="Tu usuario necesita MANAGE_TENANT_ADMINS."
+                  onPress={() => openUserEditor(user)}
+                  style={styles.compactButton}
+                />
+              </View>
             </View>
           </AppCard>
         ))

@@ -230,6 +230,9 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
       ? { key: 'items-create', label: 'Alta de prendas', labelKey: 'navigation.items.createItems', route: '/items-create', activeFor: ['items-create', '/items-create'], icon: 'add-box' as const }
       : null,
     inventoryAllowed
+      ? { key: 'suppliers', label: 'Proveedores', route: '/suppliers', activeFor: ['suppliers', '/suppliers'], icon: 'store' as const }
+      : null,
+    inventoryAllowed
       ? { key: 'batches', label: 'Lotes', labelKey: 'navigation.items.batches', route: '/batches', activeFor: ['batches', '/batches', 'batch-form', '/batch-form', 'batch-detail', '/batch-detail'], icon: 'inventory' as const }
       : null,
   ].filter(Boolean);

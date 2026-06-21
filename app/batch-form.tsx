@@ -5,9 +5,11 @@ import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
 import AppText from '@/components/ui/AppText';
+import ScreenPermissionHeaderAction from '@/components/ui/ScreenPermissionHeaderAction';
 import { useAppTheme } from '@/context/AppThemeContext';
+import { getActionableApiErrorMessage } from '@/services/apiError';
 import { createBatch } from '@/services/batchService';
-import { getSession } from '@/services/sessionStorage';
+import { getSession, UserSession } from '@/services/sessionStorage';
 import { getActiveSuppliers, getSuppliers, Supplier } from '@/services/supplierService';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
@@ -21,22 +23,35 @@ export default function BatchFormScreen() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [notes, setNotes] = useState('');
+  const [session, setSession] = useState<UserSession | null>(null);
   const [saving, setSaving] = useState(false);
   const [canManageInventory, setCanManageInventory] = useState<boolean | null>(null);
+  const [canManageCatalogs, setCanManageCatalogs] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [isSupplierModalVisible, setIsSupplierModalVisible] = useState(false);
   const [supplierSearch, setSupplierSearch] = useState('');
 
   useFocusEffect(
     useCallback(() => {
       const loadAccess = async () => {
-        const session = await getSession();
+        const currentSession = await getSession();
+        setSession(currentSession);
         const allowed =
-          session?.effectivePermissions?.some(
+          currentSession?.effectivePermissions?.some(
             (permission) => permission.code === 'MANAGE_INVENTORY'
           ) ?? false;
+        const catalogsAllowed =
+          currentSession?.effectivePermissions?.some(
+            (permission) => permission.code === 'MANAGE_CATALOGS'
+          ) ?? false;
         setCanManageInventory(allowed);
-        const supplierData = await getSuppliers();
-        setSuppliers(getActiveSuppliers(supplierData));
+        setCanManageCatalogs(catalogsAllowed);
+        try {
+          const supplierData = await getSuppliers();
+          setSuppliers(getActiveSuppliers(supplierData));
+        } catch (error) {
+          setErrorMessage(getActionableApiErrorMessage(error));
+        }
       };
 
       loadAccess();
@@ -86,7 +101,9 @@ export default function BatchFormScreen() {
       Alert.alert('Lotes', 'Lote creado correctamente.');
       router.replace({ pathname: '/batch-detail', params: { id: String(batch.id) } });
     } catch (err: any) {
-      Alert.alert('Lotes', err?.message || 'No se pudo crear el lote.');
+      const message = getActionableApiErrorMessage(err);
+      setErrorMessage(message);
+      Alert.alert('Lotes', message || 'No se pudo crear el lote.');
     } finally {
       setSaving(false);
     }
@@ -99,11 +116,14 @@ export default function BatchFormScreen() {
         subtitle="Registro de recepcion y clasificacion"
         activeRoute="batches"
         rightContent={
-          <AppButton
-            title="Volver"
-            variant="secondary"
-            onPress={() => router.replace('/batches' as any)}
-          />
+          <View style={styles.headerActions}>
+            <ScreenPermissionHeaderAction screenKey="batchForm" screenTitle="Nuevo lote" session={session} />
+            <AppButton
+              title="Volver"
+              variant="secondary"
+              onPress={() => router.replace('/batches' as any)}
+            />
+          </View>
         }
       >
 
@@ -116,6 +136,12 @@ export default function BatchFormScreen() {
             Tu rol puede consultar lotes, pero no crear nuevos. Pide a soporte
             asignar MANAGE_INVENTORY si este usuario debe operar recepcion.
           </AppText>
+        </AppCard>
+      ) : null}
+
+      {errorMessage ? (
+        <AppCard style={{ borderColor: theme.colors.danger }}>
+          <AppText color={theme.colors.danger}>{errorMessage}</AppText>
         </AppCard>
       ) : null}
 
@@ -149,6 +175,26 @@ export default function BatchFormScreen() {
           onPress={() => setIsSupplierModalVisible(true)}
         />
 
+        {suppliers.length === 0 ? (
+          <AppCard style={{ borderColor: theme.colors.warning }}>
+            <AppText color={theme.colors.warning} bold>
+              Se requiere proveedor para crear lote.
+            </AppText>
+            <AppText>
+              Para crear un lote primero necesitas registrar un proveedor activo.
+            </AppText>
+            <View style={styles.ctaRow}>
+              <AppButton
+                title="Crear proveedor"
+                variant="operation"
+                disabled={!canManageCatalogs}
+                disabledReason="Tu usuario necesita MANAGE_CATALOGS."
+                onPress={() => router.push('/suppliers' as any)}
+              />
+            </View>
+          </AppCard>
+        ) : null}
+
         <AppInput
           label="Notas"
           value={notes}
@@ -164,7 +210,8 @@ export default function BatchFormScreen() {
         title={saving ? 'Guardando...' : 'Guardar lote'}
         onPress={handleSave}
         loading={saving}
-        disabled={saving}
+        disabled={saving || suppliers.length === 0}
+        disabledReason={suppliers.length === 0 ? 'Registra un proveedor activo antes de crear el lote.' : undefined}
       />
       ) : null}
       </AppShellPage>
@@ -197,7 +244,19 @@ export default function BatchFormScreen() {
             />
           )}
           ListEmptyComponent={
+            <View style={styles.emptySupplierState}>
             <AppText>No hay proveedores activos con esa búsqueda. Alta proveedores desde Catálogos.</AppText>
+              <AppButton
+                title="Crear proveedor"
+                variant="operation"
+                disabled={!canManageCatalogs}
+                disabledReason="Tu usuario necesita MANAGE_CATALOGS."
+                onPress={() => {
+                  setIsSupplierModalVisible(false);
+                  router.push('/suppliers' as any);
+                }}
+              />
+            </View>
           }
         />
       </AppBottomModal>
@@ -206,6 +265,18 @@ export default function BatchFormScreen() {
 }
 
 const styles = StyleSheet.create({
+  ctaRow: {
+    alignItems: 'flex-start',
+    marginTop: 12,
+  },
+  emptySupplierState: {
+    gap: 12,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
   helpText: {
     marginBottom: 12,
   },
