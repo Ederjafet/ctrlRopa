@@ -32,6 +32,7 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
   const shipmentsAllowed =
     canAccessByPermission(session, 'MANAGE_SHIPMENTS') &&
     hasModuleEnabled(session, 'SHIPMENTS');
+  const paymentsAllowed = canAccessByPermission(session, 'VIEW_PAYMENTS');
   const operationalAuthorizationsAllowed = hasAnyPermission(session, [
     'VIEW_LIVE_OPERATION_AUTHORIZATIONS',
     'REQUEST_LIVE_OPERATION_AUTHORIZATION',
@@ -171,18 +172,22 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
     doorSaleAllowed
       ? { key: 'door-sale', label: 'Venta puerta', labelKey: 'navigation.items.doorSale', route: '/door-sale', activeFor: ['door-sale', '/door-sale'], icon: 'point-of-sale' as const }
       : null,
-    doorReservationAllowed
-      ? {
-          key: 'door-reservation',
-          label: 'Apartado puerta',
-          labelKey: 'navigation.items.doorHold',
-          route: '/door-reservation',
-          activeFor: ['door-reservation', '/door-reservation'],
-          icon: 'assignment' as const,
-        }
-      : null,
     reservationsAllowed
-      ? { key: 'reservations', label: 'Apartados', labelKey: 'navigation.items.holds', route: '/reservations', activeFor: ['reservations', '/reservations', 'reservation-detail', '/reservation-detail'], icon: 'bookmark' as const }
+      ? {
+          key: 'reservations',
+          label: 'Apartados',
+          labelKey: 'navigation.items.holds',
+          route: '/reservations',
+          activeFor: [
+            'reservations',
+            '/reservations',
+            'reservation-detail',
+            '/reservation-detail',
+            'door-reservation',
+            '/door-reservation',
+          ],
+          icon: 'bookmark' as const,
+        }
       : null,
     packagesAllowed
       ? { key: 'customer-packages', label: 'Paquetes', labelKey: 'navigation.items.packages', route: '/customer-packages', activeFor: ['customer-packages', '/customer-packages', 'customer-package-detail', '/customer-package-detail'], icon: 'inventory' as const }
@@ -202,6 +207,18 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
       : null,
     customersAllowed
       ? { key: 'customers', label: 'Clientes', labelKey: 'navigation.items.customers', route: '/customers', activeFor: ['customers', '/customers', 'customers-create', '/customers-create'], icon: 'groups' as const }
+      : null,
+  ].filter(Boolean);
+
+  const financeItems = [
+    paymentsAllowed
+      ? {
+          key: 'payments',
+          label: 'Pagos',
+          route: '/payments',
+          activeFor: ['payments', '/payments'],
+          icon: 'payments' as const,
+        }
       : null,
   ].filter(Boolean);
 
@@ -295,6 +312,7 @@ export function buildMainNavSections(session: UserSession | null): SidebarSectio
     { title: 'Plataforma', items: platformItems },
     { title: 'Inicio', titleKey: 'navigation.sections.home', items: homeItems },
     { title: 'Operacion', titleKey: 'navigation.sections.operation', items: operationItems },
+    { title: 'Finanzas', items: financeItems },
     { title: 'Inventario', titleKey: 'navigation.sections.inventory', items: inventoryItems },
     { title: 'Administracion', titleKey: 'navigation.sections.administration', items: adminItems },
     { title: 'Reportes', titleKey: 'navigation.sections.reports', items: reportItems },

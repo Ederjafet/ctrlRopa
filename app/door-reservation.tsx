@@ -188,7 +188,7 @@ export default function DoorReservationScreen() {
     );
 
     if (!channel) {
-      throw new Error('El canal Apartado puerta no está habilitado.');
+      throw new Error('El canal de apartado de mostrador no está habilitado.');
     }
 
     return channel.id;
@@ -442,7 +442,7 @@ export default function DoorReservationScreen() {
       }
 
       Alert.alert(
-        'Apartado puerta',
+        'Nuevo apartado',
         advance > 0
           ? 'Apartado creado con anticipo correctamente.'
           : 'Apartado creado correctamente.'
@@ -467,9 +467,9 @@ export default function DoorReservationScreen() {
   if (isAllowed === null || isLoading) {
     return (
       <AppShellPage
-        title={t('navigation.items.doorHold')}
-        subtitle={t('operationalScreens.doorReservation.subtitle')}
-        activeRoute="door-reservation"
+        title="Nuevo apartado"
+        subtitle="Crea un apartado de mostrador con una o varias prendas."
+        activeRoute="reservations"
         compactHeader
       >
         <ActivityIndicator />
@@ -480,9 +480,9 @@ export default function DoorReservationScreen() {
   return (
     <>
       <AppShellPage
-        title={t('navigation.items.doorHold')}
-        subtitle={t('operationalScreens.doorReservation.subtitle')}
-        activeRoute="door-reservation"
+        title="Nuevo apartado"
+        subtitle="Crea un apartado de mostrador con una o varias prendas."
+        activeRoute="reservations"
         compactHeader
       >
 

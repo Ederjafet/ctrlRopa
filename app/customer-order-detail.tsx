@@ -55,7 +55,7 @@ function orderLineTypeLabel(type?: string) {
 
 function salesChannelLabel(code?: string) {
   if (code === 'DOOR_SALE') return 'Venta puerta';
-  if (code === 'DOOR_RESERVATION') return 'Apartado puerta';
+  if (code === 'DOOR_RESERVATION') return 'Apartado mostrador';
   return code || 'Sin canal';
 }
 

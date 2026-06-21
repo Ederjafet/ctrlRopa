@@ -100,7 +100,7 @@ function getSalesChannelLabel(code?: string | null, name?: string | null) {
     case 'LIVE':
       return 'Live';
     case 'DOOR_RESERVATION':
-      return 'Apartado puerta';
+      return 'Apartado mostrador';
     case 'DOOR_SALE':
       return 'Venta puerta';
     case 'CONSIGNMENT':

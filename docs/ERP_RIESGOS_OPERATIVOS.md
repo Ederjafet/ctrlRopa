@@ -252,6 +252,7 @@ Probabilidad:
 - FLOW-FAST-QA-A no implementa unir paquetes, mover prendas entre paquetes ni paquetes cross-customer; esos casos requieren autorizacion/auditoria explicita antes de venderlos como funcionales.
 - FLOW-FAST-QA-A refuerza que paquetes con saldo pendiente no avanzan a listo/envio; QA debe validar roles reales porque permisos agregados en backend pueden requerir relogin para verse en frontend.
 - FLOW-FAST-QA-A convierte alias en cliente con telefono opcional usando contrato actual de clientes; conviene definir deduplicacion/normalizacion de telefono antes de produccion masiva.
+- FAST-NAV-QA-B expone `Pagos` por `VIEW_PAYMENTS` y deja `/door-reservation` como ruta interna; QA debe validar roles reales para confirmar que usuarios sin permiso no ven pagos ni pueden entrar directo.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

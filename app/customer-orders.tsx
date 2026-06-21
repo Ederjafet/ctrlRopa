@@ -34,7 +34,7 @@ function statusLabel(status?: string) {
 
 function salesChannelLabel(code?: string | null) {
   if (code === 'DOOR_SALE') return 'Venta puerta';
-  if (code === 'DOOR_RESERVATION') return 'Apartado puerta';
+  if (code === 'DOOR_RESERVATION') return 'Apartado mostrador';
   if (code === 'MIXED') return 'Mixto';
   return code || 'Sin canal';
 }

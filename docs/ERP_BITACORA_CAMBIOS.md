@@ -3989,3 +3989,15 @@ Resultado:
 - `Cerrar preparacion` se renombra a `Marcar listo para envio`.
 - `/shipment-detail` usa `AppShellPage` y recupera menu lateral.
 - `Apartado puerta` conserva cliente al volver desde alta rapida y agrega feedback de prenda agregada.
+
+## 2026-06-20 - FAST-NAV-QA-B menu operativo apartados y pagos
+
+Tipo: ajuste frontend de navegacion operativa, sin backend ni migraciones.
+
+Resultado:
+
+- `Apartado puerta` sale del menu lateral principal.
+- `/door-reservation` queda como ruta interna accesible desde `Apartados -> Nuevo apartado`.
+- `/door-reservation` muestra titulo `Nuevo apartado` y resalta `Apartados` en el sidebar.
+- Se agrega seccion `Finanzas` con `Pagos` visible solo para usuarios con `VIEW_PAYMENTS`.
+- `/payments` conserva `AppShellPage` y guards existentes para consulta y registro.
