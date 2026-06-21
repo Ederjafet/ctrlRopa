@@ -171,6 +171,9 @@ const EMPTY_SUBSCRIPTION_FORM = {
   billingModel: 'SUBSCRIPTION',
   billingPeriod: 'MONTHLY',
   status: 'TRIAL',
+  startedAt: '',
+  endsAt: '',
+  nextBillingAt: '',
 };
 
 const PLATFORM_SELECTED_COMPANY_ID_KEY = 'appmoda.platform.selectedCompanyId';
@@ -259,6 +262,23 @@ function normalizeSubscriptionStatusLabel(value?: string | null) {
   }
 }
 
+function getBillingPeriodLabel(value?: string | null) {
+  return BILLING_PERIODS.find((period) => period.code === value)?.label ?? value ?? 'Sin periodicidad';
+}
+
+function getPlanModuleLabels(plan: PlatformSubscriptionPlan) {
+  return PLAN_MODULE_FLAGS
+    .filter(({ key }) => plan[key])
+    .map(({ label }) => label);
+}
+
+function isPriceComplete(prices?: PlatformPlanPrice[]) {
+  if (!prices) return false;
+  return BILLING_PERIODS.every((period) =>
+    prices.some((price) => price.billingPeriod === period.code && price.status === 'ACTIVE')
+  );
+}
+
 function formatCountLimit(current?: number | null, max?: number | null) {
   return `${current ?? 0} / ${max ?? 'sin limite'}`;
 }
@@ -324,6 +344,7 @@ export default function PlatformScreen() {
   const [subscriptionPlans, setSubscriptionPlans] = useState<PlatformSubscriptionPlan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
   const [planPrices, setPlanPrices] = useState<PlatformPlanPrice[]>([]);
+  const [planPricesById, setPlanPricesById] = useState<Record<number, PlatformPlanPrice[]>>({});
   const [priceForm, setPriceForm] = useState<Record<string, string>>({});
   const [companyForm, setCompanyForm] = useState(EMPTY_COMPANY_FORM);
   const [adminForm, setAdminForm] = useState(EMPTY_ADMIN_FORM);
@@ -414,6 +435,7 @@ export default function PlatformScreen() {
 
     const prices = await getPlatformPlanPrices(planId);
     setPlanPrices(prices);
+    setPlanPricesById((current) => ({ ...current, [planId]: prices }));
     setPriceForm(
       BILLING_PERIODS.reduce<Record<string, string>>((acc, period) => {
         const price = prices.find((item) => item.billingPeriod === period.code);
@@ -421,6 +443,24 @@ export default function PlatformScreen() {
         return acc;
       }, {})
     );
+  }, []);
+
+  const refreshPlanPriceMap = useCallback(async (plans: PlatformSubscriptionPlan[]) => {
+    if (plans.length === 0) {
+      setPlanPricesById({});
+      return;
+    }
+
+    const entries = await Promise.all(
+      plans.map(async (plan) => {
+        try {
+          return [plan.id, await getPlatformPlanPrices(plan.id)] as const;
+        } catch {
+          return [plan.id, []] as const;
+        }
+      })
+    );
+    setPlanPricesById(Object.fromEntries(entries));
   }, []);
 
   const loadCompanyScope = useCallback(async (companyId: number | null) => {
@@ -480,6 +520,9 @@ export default function PlatformScreen() {
           subscription.status && subscription.status !== 'SIN_CONFIGURAR'
             ? subscription.status
             : 'TRIAL',
+        startedAt: subscription.startedAt ?? '',
+        endsAt: subscription.endsAt ?? '',
+        nextBillingAt: subscription.nextBillingAt ?? '',
       });
       setUserForm((current) => ({
         ...current,
@@ -527,6 +570,7 @@ export default function PlatformScreen() {
       setSubscriptionPlans(planRows);
       setUsageSummary(usageRows);
       setDashboardSummary(dashboardRows);
+      await refreshPlanPriceMap(planRows);
       setSelectedCompanyId((current) => {
         const requestedId = routeCompanyId ?? storedCompanyId ?? current;
         const validCompany = requestedId
@@ -553,7 +597,7 @@ export default function PlatformScreen() {
     } finally {
       setLoading(false);
     }
-  }, [buildPlatformRoute, params.section, routeCompanyId, router]);
+  }, [buildPlatformRoute, params.section, refreshPlanPriceMap, routeCompanyId, router]);
 
   useFocusEffect(
     useCallback(() => {
@@ -830,7 +874,9 @@ export default function PlatformScreen() {
       setPlanForm(EMPTY_PLAN_FORM);
       setShowPlanForm(false);
       setSelectedPlanId(created.id);
-      setSubscriptionPlans(await getPlatformSubscriptionPlans());
+      const plans = await getPlatformSubscriptionPlans();
+      setSubscriptionPlans(plans);
+      await refreshPlanPriceMap(plans);
       setMessage(`Plan creado: ${created.name}.`);
     } catch (error) {
       setErrorMessage(getActionableApiErrorMessage(error));
@@ -855,6 +901,7 @@ export default function PlatformScreen() {
         })),
       });
       setPlanPrices(prices);
+      setPlanPricesById((current) => ({ ...current, [selectedPlanId]: prices }));
       setMessage('Precios por periodo actualizados.');
     } catch (error) {
       setErrorMessage(getActionableApiErrorMessage(error));
@@ -871,6 +918,11 @@ export default function PlatformScreen() {
       return;
     }
 
+    if (subscriptionForm.billingModel !== 'USAGE_BASED' && !subscriptionForm.planId) {
+      setErrorMessage('Selecciona un plan para modelos de suscripcion o hibrido.');
+      return;
+    }
+
     try {
       setSavingSubscription(true);
       setErrorMessage('');
@@ -880,6 +932,9 @@ export default function PlatformScreen() {
         billingModel: subscriptionForm.billingModel,
         billingPeriod: subscriptionForm.billingPeriod,
         status: subscriptionForm.status,
+        startedAt: subscriptionForm.startedAt.trim() || null,
+        endsAt: subscriptionForm.endsAt.trim() || null,
+        nextBillingAt: subscriptionForm.nextBillingAt.trim() || null,
       });
       setCompanySubscription(saved);
       setMessage('Suscripcion del cliente actualizada.');
@@ -1077,6 +1132,45 @@ export default function PlatformScreen() {
         return companyCards;
     }
   }, [companyCards, companyFilter]);
+  const planCards = useMemo(() => {
+    return subscriptionPlans.map((plan) => {
+      const prices = planPricesById[plan.id];
+      const completePrices = isPriceComplete(prices);
+      const clientsUsing = usageSummary.filter((item) => item.planName === plan.name).length;
+      return {
+        plan,
+        prices,
+        completePrices,
+        clientsUsing,
+        modules: getPlanModuleLabels(plan),
+        selected: selectedPlanId === plan.id,
+      };
+    });
+  }, [planPricesById, selectedPlanId, subscriptionPlans, usageSummary]);
+  const subscriptionStats = useMemo(() => {
+    const activePlans = subscriptionPlans.filter((plan) => plan.status === 'ACTIVE').length;
+    return {
+      activePlans,
+      plansWithoutCompletePrices: planCards.filter((item) => !item.completePrices).length,
+      companiesWithoutPlan:
+        dashboardSummary?.summary.companiesWithoutPlan ??
+        usageSummary.filter((item) => !item.planName || item.billingModel === 'SIN_CONFIGURAR').length,
+      companiesWithActiveSubscription:
+        dashboardSummary?.summary.companiesWithActiveSubscription ??
+        usageSummary.filter((item) => item.subscriptionStatus === 'ACTIVE').length,
+      currentCustomerStatus: !canUseSelectedCompany
+        ? 'Sin cliente'
+        : companySubscription?.planName
+          ? companySubscription.planName
+          : normalizeBillingModelLabel(companySubscription?.billingModel) === 'Consumo'
+            ? 'Consumo'
+            : 'Sin plan',
+    };
+  }, [canUseSelectedCompany, companySubscription, dashboardSummary, planCards, subscriptionPlans, usageSummary]);
+  const selectedPlanPrices = selectedPlanId
+    ? planPricesById[selectedPlanId] ?? planPrices.filter((price) => price.planId === selectedPlanId)
+    : [];
+  const selectedPlanPricesComplete = isPriceComplete(selectedPlanPrices);
 
   const renderOwnerCompanyContext = () => (
     <View
@@ -1885,29 +1979,354 @@ export default function PlatformScreen() {
     <View style={styles.sectionStack}>
       <AppCard style={styles.panel}>
         <View style={[styles.rowBetween, isPhone ? styles.column : null]}>
-          <View style={styles.flex}>
-            <AppText variant="subtitle" bold>
-              Planes / Suscripciones
-            </AppText>
-            <AppText variant="caption" color={theme.colors.mutedText}>
-              Catalogo global de planes y suscripcion del cliente en administracion cuando aplique.
-            </AppText>
+          <View style={styles.sectionHeader}>
+            <StatusBadge label="SAAS" tone="info" />
+            <View style={styles.flex}>
+              <AppText variant="subtitle" bold>
+                Planes / Suscripciones
+              </AppText>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Administra el catalogo global de planes y asigna una suscripcion al cliente en administracion. No implementa cobro real ni pasarela.
+              </AppText>
+            </View>
           </View>
           <AppButton
-            title={showPlanForm ? 'Ocultar plan' : 'Crear plan'}
+            title={showPlanForm ? 'Ocultar formulario' : 'Crear plan'}
             variant="operation"
             disabled={!canManagePlans}
             disabledReason="Tu usuario necesita MANAGE_SUBSCRIPTION_PLANS."
             onPress={() => setShowPlanForm((current) => !current)}
+            style={styles.actionButton}
           />
         </View>
+
+        <View style={styles.dashboardMetricGrid}>
+          {renderDashboardMetricTile('Planes activos', subscriptionStats.activePlans, 'Catalogo global', subscriptionStats.activePlans > 0 ? 'success' : 'neutral')}
+          {renderDashboardMetricTile('Planes sin precios completos', subscriptionStats.plansWithoutCompletePrices, 'Mensual, trimestral, semestral y anual', subscriptionStats.plansWithoutCompletePrices > 0 ? 'warning' : 'success')}
+          {renderDashboardMetricTile('Clientes sin plan', subscriptionStats.companiesWithoutPlan, 'Requieren configuracion comercial', subscriptionStats.companiesWithoutPlan > 0 ? 'warning' : 'success')}
+          {renderDashboardMetricTile('Suscripciones activas', subscriptionStats.companiesWithActiveSubscription, 'Clientes con estado ACTIVE', subscriptionStats.companiesWithActiveSubscription > 0 ? 'info' : 'neutral')}
+          {renderDashboardMetricTile('Cliente actual', subscriptionStats.currentCustomerStatus, 'Cliente en administracion', canUseSelectedCompany && companySubscription?.planName ? 'success' : 'warning')}
+        </View>
+
         {showPlanForm ? renderPlanForm() : null}
       </AppCard>
-      {renderPlanCatalog()}
-      {renderPlanPrices()}
-      {renderCompanySubscription()}
+
+      <View style={[styles.subscriptionLayout, isPhone ? styles.column : null]}>
+        <View style={styles.subscriptionColumn}>
+          {renderPlanCatalog()}
+        </View>
+        <View style={styles.subscriptionColumn}>
+          {renderPlanPrices()}
+          {renderCompanySubscription()}
+        </View>
+      </View>
     </View>
   );
+
+  const renderPlanForm = () => (
+    <View style={styles.inlineForm}>
+      <View style={styles.sectionHeader}>
+        <StatusBadge label="NUEVO PLAN" tone="info" />
+        <View style={styles.flex}>
+          <AppText bold>Crear plan global</AppText>
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            El plan queda disponible para todos los clientes. Los precios se configuran despues de crearlo.
+          </AppText>
+        </View>
+      </View>
+      <View style={[styles.grid, isPhone ? styles.column : null]}>
+        <AppInput label="Codigo" placeholder="PRO" value={planForm.code} onChangeText={(value) => setPlanForm((current) => ({ ...current, code: value }))} editable={!creatingPlan && canManagePlans} />
+        <AppInput label="Nombre" placeholder="Plan Pro" value={planForm.name} onChangeText={(value) => setPlanForm((current) => ({ ...current, name: value }))} editable={!creatingPlan && canManagePlans} />
+      </View>
+      <AppInput label="Descripcion" placeholder="Plan para tienda en crecimiento" value={planForm.description} onChangeText={(value) => setPlanForm((current) => ({ ...current, description: value }))} editable={!creatingPlan && canManagePlans} />
+      <View style={[styles.grid, isPhone ? styles.column : null]}>
+        <AppInput label="Usuarios incluidos" placeholder="5" keyboardType="numeric" value={planForm.includedMaxUsers} onChangeText={(value) => setPlanForm((current) => ({ ...current, includedMaxUsers: value }))} editable={!creatingPlan && canManagePlans} />
+        <AppInput label="Sucursales incluidas" placeholder="1" keyboardType="numeric" value={planForm.includedMaxBranches} onChangeText={(value) => setPlanForm((current) => ({ ...current, includedMaxBranches: value }))} editable={!creatingPlan && canManagePlans} />
+      </View>
+      <View style={styles.actionsRow}>
+        {PLAN_MODULE_FLAGS.map(({ key, label }) => (
+          <AppButton
+            key={key}
+            title={`${label}: ${planForm[key] ? 'Si' : 'No'}`}
+            variant={planForm[key] ? 'primary' : 'secondary'}
+            onPress={() => setPlanForm((current) => ({ ...current, [key]: !current[key] }))}
+            style={styles.compactButton}
+          />
+        ))}
+      </View>
+      <AppButton title="Crear plan" loading={creatingPlan} disabled={creatingPlan || !canManagePlans} disabledReason="Tu usuario necesita MANAGE_SUBSCRIPTION_PLANS." onPress={handleCreatePlan} style={styles.actionButton} />
+    </View>
+  );
+
+  const renderPlanCatalog = () => (
+    <AppCard style={styles.panel}>
+      <View style={styles.sectionHeader}>
+        <StatusBadge label="GLOBAL" tone="info" />
+        <View style={styles.flex}>
+          <AppText variant="subtitle" bold>Catalogo global de planes</AppText>
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            Planes disponibles para todos los clientes. No dependen del cliente en administracion.
+          </AppText>
+        </View>
+      </View>
+      <View style={styles.compactList}>
+        {planCards.length === 0 ? (
+          <EmptyState title="Sin planes" message="Crea un plan para iniciar la configuracion SaaS." icon="payments" />
+        ) : (
+          planCards.map(({ plan, completePrices, clientsUsing, modules, selected }) => (
+            <View
+              key={plan.id}
+              style={[
+                styles.planRow,
+                {
+                  backgroundColor: selected ? theme.colors.infoSoft : theme.colors.surfaceAlt,
+                  borderColor: selected ? theme.colors.accent : theme.colors.border,
+                },
+              ]}
+            >
+              <View style={styles.flex}>
+                <View style={styles.inlineBadges}>
+                  <AppText bold numberOfLines={1}>{plan.name}</AppText>
+                  <StatusBadge label={plan.status} tone={plan.status === 'ACTIVE' ? 'success' : 'neutral'} />
+                  <StatusBadge label={completePrices ? 'Precios completos' : 'Faltan precios'} tone={completePrices ? 'success' : 'warning'} />
+                  {selected ? <StatusBadge label="Editando precios" tone="info" /> : null}
+                </View>
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  Codigo {plan.code} - Usuarios {plan.includedMaxUsers ?? 'sin limite'} - Sucursales {plan.includedMaxBranches ?? 'sin limite'}
+                </AppText>
+                <View style={styles.inlineBadges}>
+                  {modules.length > 0 ? (
+                    modules.map((module) => <StatusBadge key={module} label={module} tone="neutral" />)
+                  ) : (
+                    <StatusBadge label="Sin modulos incluidos" tone="warning" />
+                  )}
+                  <StatusBadge label={`${clientsUsing} cliente${clientsUsing === 1 ? '' : 's'} usando`} tone={clientsUsing > 0 ? 'info' : 'neutral'} />
+                </View>
+              </View>
+              <View style={styles.companyActions}>
+                <AppButton
+                  title={selected ? 'Editando precios' : 'Editar precios'}
+                  variant={selected ? 'neutral' : 'secondary'}
+                  onPress={() => setSelectedPlanId(plan.id)}
+                  style={styles.compactButton}
+                />
+                <AppButton
+                  title="Usar en cliente"
+                  variant="ghost"
+                  disabled={!canUseSelectedCompany}
+                  disabledReason="Selecciona un cliente en administracion."
+                  onPress={() => setSubscriptionForm((current) => ({ ...current, planId: plan.id }))}
+                  style={styles.compactButton}
+                />
+              </View>
+            </View>
+          ))
+        )}
+      </View>
+    </AppCard>
+  );
+
+  const renderPlanPrices = () => (
+    <AppCard style={styles.panel}>
+      <View style={[styles.rowBetween, isPhone ? styles.column : null]}>
+        <View style={styles.sectionHeader}>
+          <StatusBadge label="PRECIOS GLOBALES" tone="info" />
+          <View style={styles.flex}>
+            <AppText variant="subtitle" bold>
+              {selectedPlan ? `Precios de ${selectedPlan.name}` : 'Precios por periodo'}
+            </AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {selectedPlan
+                ? 'Estos precios pertenecen al catalogo global del plan, no a un cliente especifico.'
+                : 'Selecciona un plan del catalogo global para configurar sus precios.'}
+            </AppText>
+          </View>
+        </View>
+        <StatusBadge label={selectedPlanPricesComplete ? 'Completo' : 'Incompleto'} tone={selectedPlanPricesComplete ? 'success' : 'warning'} />
+      </View>
+
+      {!selectedPlan ? (
+        <EmptyState title="Selecciona un plan" message="Elige un plan en el catalogo global para editar sus precios por periodo." icon="payments" />
+      ) : (
+        <>
+          <View style={styles.priceGrid}>
+            {BILLING_PERIODS.map((period) => {
+              const savedPrice = selectedPlanPrices.find((price) => price.billingPeriod === period.code);
+              return (
+                <View
+                  key={period.code}
+                  style={[styles.pricePeriodCard, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.borderSubtle }]}
+                >
+                  <View style={styles.inlineBadges}>
+                    <StatusBadge label={period.label} tone="neutral" />
+                    <StatusBadge label={savedPrice ? 'Guardado' : 'Pendiente'} tone={savedPrice ? 'success' : 'warning'} />
+                  </View>
+                  <AppText variant="subtitle" bold numberOfLines={1}>
+                    {savedPrice ? `${money(savedPrice.priceAmount)} ${savedPrice.currency || 'MXN'}` : 'Sin precio'}
+                  </AppText>
+                  <AppInput
+                    label={`Editar ${period.label.toLowerCase()}`}
+                    placeholder="0.00"
+                    keyboardType="decimal-pad"
+                    value={priceForm[period.code] ?? ''}
+                    onChangeText={(value) => setPriceForm((current) => ({ ...current, [period.code]: value }))}
+                    editable={!savingPrices && canManagePlans && Boolean(selectedPlanId)}
+                  />
+                </View>
+              );
+            })}
+          </View>
+          <AppButton title="Guardar precios" loading={savingPrices} disabled={savingPrices || !canManagePlans || !selectedPlanId} disabledReason="Selecciona plan y permiso MANAGE_SUBSCRIPTION_PLANS." onPress={handleSavePlanPrices} style={styles.actionButton} />
+        </>
+      )}
+    </AppCard>
+  );
+
+  const renderCompanySubscription = () => {
+    if (!canUseSelectedCompany) {
+      return (
+        <AppCard style={styles.panel}>
+          <View style={styles.sectionHeader}>
+            <StatusBadge label="CLIENTE" tone="warning" />
+            <View style={styles.flex}>
+              <AppText variant="subtitle" bold>
+                Suscripcion del cliente en administracion
+              </AppText>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Selecciona un cliente para asignar o revisar su suscripcion. El catalogo global de planes sigue visible.
+              </AppText>
+            </View>
+          </View>
+          <AppButton
+            title="Ir a Clientes / Companias"
+            variant="secondary"
+            onPress={() => router.push(buildPlatformRoute('companies', selectedCompanyId))}
+            style={styles.actionButton}
+          />
+        </AppCard>
+      );
+    }
+
+    const savedBillingLabel = normalizeBillingModelLabel(companySubscription?.billingModel);
+    const savedStatusLabel = normalizeSubscriptionStatusLabel(companySubscription?.status);
+    const selectedSubscriptionPlan = subscriptionPlans.find((plan) => plan.id === subscriptionForm.planId);
+    const isUsageOnly = subscriptionForm.billingModel === 'USAGE_BASED';
+    const hasSavedSubscription =
+      Boolean(companySubscription?.planName) ||
+      Boolean(companySubscription?.billingModel && companySubscription.billingModel !== 'SIN_CONFIGURAR');
+
+    return (
+      <AppCard style={styles.panel}>
+        <View style={[styles.rowBetween, isPhone ? styles.column : null]}>
+          <View style={styles.sectionHeader}>
+            <StatusBadge label="CLIENTE" tone="role" />
+            <View style={styles.flex}>
+              <AppText variant="subtitle" bold>
+                Suscripcion del cliente en administracion
+              </AppText>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Esta configuracion si depende del cliente en administracion: {selectedCompany?.name}
+              </AppText>
+              {renderCompanyScopeLine()}
+            </View>
+          </View>
+          <StatusBadge
+            label={hasSavedSubscription ? savedStatusLabel : 'Sin suscripcion'}
+            tone={companySubscription?.status === 'ACTIVE' || companySubscription?.status === 'TRIAL' ? 'success' : 'warning'}
+          />
+        </View>
+
+        <View style={styles.companyInfoGrid}>
+          <View style={[styles.companyInfoCell, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.borderSubtle }]}>
+            <AppText variant="caption" color={theme.colors.mutedText}>Plan actual</AppText>
+            <AppText bold numberOfLines={1}>{companySubscription?.planName || 'Sin plan'}</AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>{savedBillingLabel}</AppText>
+          </View>
+          <View style={[styles.companyInfoCell, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.borderSubtle }]}>
+            <AppText variant="caption" color={theme.colors.mutedText}>Periodicidad</AppText>
+            <AppText bold>{getBillingPeriodLabel(companySubscription?.billingPeriod)}</AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>Estado {savedStatusLabel}</AppText>
+          </View>
+          <View style={[styles.companyInfoCell, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.borderSubtle }]}>
+            <AppText variant="caption" color={theme.colors.mutedText}>Proxima fecha</AppText>
+            <AppText bold numberOfLines={1}>{companySubscription?.nextBillingAt || companySubscription?.endsAt || 'Sin fecha'}</AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>No genera cobro automatico</AppText>
+          </View>
+        </View>
+
+        <View style={styles.formBlock}>
+          <AppText variant="caption" color={theme.colors.mutedText} bold>
+            Modelo de cobro
+          </AppText>
+          <View style={styles.actionsRow}>
+            {BILLING_MODELS.map((model) => (
+              <AppButton key={model.code} title={model.label} variant={subscriptionForm.billingModel === model.code ? 'primary' : 'secondary'} onPress={() => setSubscriptionForm((current) => ({ ...current, billingModel: model.code, planId: model.code === 'USAGE_BASED' ? null : current.planId }))} style={styles.compactButton} />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.formBlock}>
+          <AppText variant="caption" color={theme.colors.mutedText} bold>
+            Plan para el cliente
+          </AppText>
+          <View style={styles.actionsRow}>
+            <AppButton
+              title="Sin plan / solo consumo"
+              variant={subscriptionForm.planId === null ? 'primary' : 'secondary'}
+              onPress={() => setSubscriptionForm((current) => ({ ...current, planId: null, billingModel: 'USAGE_BASED' }))}
+              style={styles.compactButton}
+            />
+            {subscriptionPlans.map((plan) => (
+              <AppButton key={plan.id} title={plan.name} variant={subscriptionForm.planId === plan.id ? 'primary' : 'secondary'} onPress={() => setSubscriptionForm((current) => ({ ...current, planId: plan.id, billingModel: current.billingModel === 'USAGE_BASED' ? 'SUBSCRIPTION' : current.billingModel }))} style={styles.compactButton} />
+            ))}
+          </View>
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            {isUsageOnly
+              ? 'El modelo por consumo puede operar sin plan asignado.'
+              : selectedSubscriptionPlan
+                ? `Se asignara ${selectedSubscriptionPlan.name}.`
+                : 'Selecciona un plan para suscripcion o modelo hibrido.'}
+          </AppText>
+        </View>
+
+        <View style={styles.formBlock}>
+          <AppText variant="caption" color={theme.colors.mutedText} bold>
+            Periodicidad
+          </AppText>
+          <View style={styles.actionsRow}>
+            {BILLING_PERIODS.map((period) => (
+              <AppButton key={period.code} title={period.label} variant={subscriptionForm.billingPeriod === period.code ? 'primary' : 'secondary'} onPress={() => setSubscriptionForm((current) => ({ ...current, billingPeriod: period.code }))} style={styles.compactButton} />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.formBlock}>
+          <AppText variant="caption" color={theme.colors.mutedText} bold>
+            Estado de suscripcion
+          </AppText>
+          <View style={styles.actionsRow}>
+            {SUBSCRIPTION_STATUSES.map((status) => (
+              <AppButton key={status.code} title={status.label} variant={subscriptionForm.status === status.code ? 'primary' : 'secondary'} onPress={() => setSubscriptionForm((current) => ({ ...current, status: status.code }))} style={styles.compactButton} />
+            ))}
+          </View>
+        </View>
+
+        <View style={[styles.grid, isPhone ? styles.column : null]}>
+          <AppInput label="Inicio" placeholder="YYYY-MM-DD" value={subscriptionForm.startedAt} onChangeText={(value) => setSubscriptionForm((current) => ({ ...current, startedAt: value }))} editable={!savingSubscription && canManageSubscriptions} />
+          <AppInput label="Vence" placeholder="YYYY-MM-DD" value={subscriptionForm.endsAt} onChangeText={(value) => setSubscriptionForm((current) => ({ ...current, endsAt: value }))} editable={!savingSubscription && canManageSubscriptions} />
+          <AppInput label="Proximo corte" placeholder="YYYY-MM-DD" value={subscriptionForm.nextBillingAt} onChangeText={(value) => setSubscriptionForm((current) => ({ ...current, nextBillingAt: value }))} editable={!savingSubscription && canManageSubscriptions} />
+        </View>
+
+        <View style={styles.actionsRow}>
+          <AppButton title={companySubscription?.id ? 'Guardar suscripcion' : 'Asignar plan al cliente'} loading={savingSubscription} disabled={savingSubscription || !canManageSubscriptions || !canUseSelectedCompany} disabledReason="Selecciona cliente y permiso MANAGE_COMPANY_SUBSCRIPTIONS." onPress={handleSaveSubscription} style={styles.actionButton} />
+          <AppButton title="Ver tarifas por consumo" variant="secondary" onPress={() => router.push(buildPlatformRoute('usageRates', selectedCompanyId))} style={styles.actionButton} />
+        </View>
+        <AppText variant="caption" color={theme.colors.mutedText}>
+          Esto solo configura el modelo SaaS administrativo. No genera cargos, facturas ni pasarela de pago.
+        </AppText>
+      </AppCard>
+    );
+  };
 
   const renderUsageRates = () => (
     <View style={styles.sectionStack}>
@@ -2107,156 +2526,6 @@ export default function PlatformScreen() {
         ))
       )}
     </View>
-  );
-
-  const renderPlanForm = () => (
-    <View style={styles.inlineForm}>
-      <AppInput label="Codigo" placeholder="PRO" value={planForm.code} onChangeText={(value) => setPlanForm((current) => ({ ...current, code: value }))} editable={!creatingPlan && canManagePlans} />
-      <AppInput label="Nombre" placeholder="Plan Pro" value={planForm.name} onChangeText={(value) => setPlanForm((current) => ({ ...current, name: value }))} editable={!creatingPlan && canManagePlans} />
-      <AppInput label="Descripcion" placeholder="Plan para tienda en crecimiento" value={planForm.description} onChangeText={(value) => setPlanForm((current) => ({ ...current, description: value }))} editable={!creatingPlan && canManagePlans} />
-      <View style={[styles.grid, isPhone ? styles.column : null]}>
-        <AppInput label="Usuarios incluidos" placeholder="5" keyboardType="numeric" value={planForm.includedMaxUsers} onChangeText={(value) => setPlanForm((current) => ({ ...current, includedMaxUsers: value }))} editable={!creatingPlan && canManagePlans} />
-        <AppInput label="Sucursales incluidas" placeholder="1" keyboardType="numeric" value={planForm.includedMaxBranches} onChangeText={(value) => setPlanForm((current) => ({ ...current, includedMaxBranches: value }))} editable={!creatingPlan && canManagePlans} />
-      </View>
-      <View style={styles.actionsRow}>
-        {PLAN_MODULE_FLAGS.map(({ key, label }) => (
-          <AppButton
-            key={key}
-            title={`${label}: ${planForm[key] ? 'Si' : 'No'}`}
-            variant={planForm[key] ? 'primary' : 'secondary'}
-            onPress={() => setPlanForm((current) => ({ ...current, [key]: !current[key] }))}
-            style={styles.compactButton}
-          />
-        ))}
-      </View>
-      <AppButton title="Crear plan" loading={creatingPlan} disabled={creatingPlan || !canManagePlans} disabledReason="Tu usuario necesita MANAGE_SUBSCRIPTION_PLANS." onPress={handleCreatePlan} style={styles.actionButton} />
-    </View>
-  );
-
-  const renderPlanCatalog = () => (
-    <AppCard style={styles.panel}>
-      <View style={styles.sectionHeader}>
-        <StatusBadge label="GLOBAL" tone="info" />
-        <View style={styles.flex}>
-          <AppText variant="subtitle" bold>Catalogo global de planes</AppText>
-          <AppText variant="caption" color={theme.colors.mutedText}>
-            Planes disponibles para todos los clientes. No dependen del cliente en administracion.
-          </AppText>
-        </View>
-      </View>
-      <View style={styles.compactList}>
-        {subscriptionPlans.length === 0 ? (
-          <EmptyState title="Sin planes" message="Crea un plan para iniciar la configuracion SaaS." icon="payments" />
-        ) : (
-          subscriptionPlans.map((plan) => (
-            <View key={plan.id} style={styles.listRow}>
-              <View style={styles.flex}>
-                <AppText bold>{plan.name}</AppText>
-                <AppText variant="caption" color={theme.colors.mutedText}>
-                  {plan.code} - Usuarios {plan.includedMaxUsers ?? 'sin limite'} - Sucursales {plan.includedMaxBranches ?? 'sin limite'}
-                </AppText>
-                <AppText variant="caption" color={theme.colors.mutedText}>
-                  LIVE {plan.includesLive ? 'si' : 'no'} - Reportes {plan.includesReports ? 'si' : 'no'} - Envios {plan.includesShipments ? 'si' : 'no'} - Paquetes {plan.includesPackages ? 'si' : 'no'}
-                </AppText>
-              </View>
-              <AppButton title={selectedPlanId === plan.id ? 'Plan para precios' : 'Configurar precios'} variant={selectedPlanId === plan.id ? 'neutral' : 'secondary'} onPress={() => setSelectedPlanId(plan.id)} style={styles.compactButton} />
-            </View>
-          ))
-        )}
-      </View>
-    </AppCard>
-  );
-
-  const renderPlanPrices = () => (
-    <AppCard style={styles.panel}>
-      <View style={styles.sectionHeader}>
-        <StatusBadge label="PRECIOS" tone="info" />
-        <View style={styles.flex}>
-          <AppText variant="subtitle" bold>
-            Precios por periodo
-          </AppText>
-          <AppText variant="caption" color={theme.colors.mutedText}>
-            {selectedPlan
-              ? `${selectedPlan.name} - precios globales del plan`
-              : 'Selecciona un plan del catalogo global'}
-          </AppText>
-        </View>
-      </View>
-      <View style={[styles.grid, isPhone ? styles.column : null]}>
-        {BILLING_PERIODS.map((period) => (
-          <AppInput
-            key={period.code}
-            label={period.label}
-            placeholder="0.00"
-            keyboardType="decimal-pad"
-            value={priceForm[period.code] ?? ''}
-            onChangeText={(value) => setPriceForm((current) => ({ ...current, [period.code]: value }))}
-            editable={!savingPrices && canManagePlans && Boolean(selectedPlanId)}
-          />
-        ))}
-      </View>
-      <AppText variant="caption" color={theme.colors.mutedText}>
-        Precios guardados: {planPrices.map((price) => `${price.billingPeriod} ${money(price.priceAmount)}`).join(' - ') || 'sin precios'}
-      </AppText>
-      <AppButton title="Guardar precios" loading={savingPrices} disabled={savingPrices || !canManagePlans || !selectedPlanId} disabledReason="Selecciona plan y permiso MANAGE_SUBSCRIPTION_PLANS." onPress={handleSavePlanPrices} style={styles.actionButton} />
-    </AppCard>
-  );
-
-  const renderCompanySubscription = () => (
-    !canUseSelectedCompany ? (
-      renderCompanyRequired('Elige un cliente en Clientes / Companias o usa Cambiar en el menu lateral para asignar o revisar su suscripcion.')
-    ) : (
-    <AppCard style={styles.panel}>
-      <View style={styles.sectionHeader}>
-        <StatusBadge label="CLIENTE" tone="role" />
-        <View style={styles.flex}>
-          <AppText variant="subtitle" bold>
-            Suscripcion del cliente en administracion
-          </AppText>
-          <AppText variant="caption" color={theme.colors.mutedText}>
-            {selectedCompany ? selectedCompany.name : 'Selecciona un cliente'}
-          </AppText>
-          {renderCompanyScopeLine()}
-        </View>
-      </View>
-      <AppText variant="caption" color={theme.colors.mutedText} bold>
-        Modelo de cobro
-      </AppText>
-      <View style={styles.actionsRow}>
-        {BILLING_MODELS.map((model) => (
-          <AppButton key={model.code} title={model.label} variant={subscriptionForm.billingModel === model.code ? 'primary' : 'secondary'} onPress={() => setSubscriptionForm((current) => ({ ...current, billingModel: model.code }))} style={styles.compactButton} />
-        ))}
-      </View>
-      <AppText variant="caption" color={theme.colors.mutedText} bold>
-        Plan asignado
-      </AppText>
-      <View style={styles.actionsRow}>
-        {subscriptionPlans.map((plan) => (
-          <AppButton key={plan.id} title={plan.name} variant={subscriptionForm.planId === plan.id ? 'primary' : 'secondary'} onPress={() => setSubscriptionForm((current) => ({ ...current, planId: plan.id }))} style={styles.compactButton} />
-        ))}
-      </View>
-      <AppText variant="caption" color={theme.colors.mutedText} bold>
-        Periodicidad
-      </AppText>
-      <View style={styles.actionsRow}>
-        {BILLING_PERIODS.map((period) => (
-          <AppButton key={period.code} title={period.label} variant={subscriptionForm.billingPeriod === period.code ? 'primary' : 'secondary'} onPress={() => setSubscriptionForm((current) => ({ ...current, billingPeriod: period.code }))} style={styles.compactButton} />
-        ))}
-      </View>
-      <AppText variant="caption" color={theme.colors.mutedText} bold>
-        Estado
-      </AppText>
-      <View style={styles.actionsRow}>
-        {SUBSCRIPTION_STATUSES.map((status) => (
-          <AppButton key={status.code} title={status.label} variant={subscriptionForm.status === status.code ? 'primary' : 'secondary'} onPress={() => setSubscriptionForm((current) => ({ ...current, status: status.code }))} style={styles.compactButton} />
-        ))}
-      </View>
-      <AppText variant="caption" color={theme.colors.mutedText}>
-        Actual: {companySubscription?.planName || 'sin plan'} - {companySubscription?.billingModel || 'sin modelo'} - {companySubscription?.status || 'sin estado'}
-      </AppText>
-      <AppButton title="Guardar suscripcion" loading={savingSubscription} disabled={savingSubscription || !canManageSubscriptions || !canUseSelectedCompany} disabledReason="Selecciona cliente y permiso MANAGE_COMPANY_SUBSCRIPTIONS." onPress={handleSaveSubscription} style={styles.actionButton} />
-    </AppCard>
-    )
   );
 
   const renderUsageList = (compact: boolean) => (
@@ -2515,6 +2784,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
+  formBlock: {
+    gap: 8,
+  },
   grid: {
     alignItems: 'stretch',
     flexDirection: 'row',
@@ -2604,6 +2876,30 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 0,
   },
+  planRow: {
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
+    padding: 10,
+  },
+  priceGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  pricePeriodCard: {
+    borderRadius: 10,
+    borderWidth: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    gap: 8,
+    minWidth: 180,
+    padding: 10,
+  },
   rowBetween: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -2616,6 +2912,15 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   sectionStack: {
+    gap: 12,
+  },
+  subscriptionColumn: {
+    flex: 1,
+    minWidth: 300,
+  },
+  subscriptionLayout: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
     gap: 12,
   },
   todayGrid: {

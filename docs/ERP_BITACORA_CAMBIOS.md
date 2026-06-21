@@ -1,5 +1,30 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-21 - OWNER-SUBSCRIPTIONS-UX-A planes y suscripciones accionables
+
+Tipo: platform owner, planes SaaS, suscripciones, frontend, UX, documentacion.
+
+Objetivo:
+
+- Separar visualmente catalogo global de planes, precios del plan seleccionado y suscripcion del cliente en administracion.
+
+Cambios realizados:
+
+- `app/platform.tsx` redisenia `Planes / Suscripciones` con resumen superior, catalogo global, precios y suscripcion del cliente.
+- Se reemplaza el boton ambiguo `Plan para precios` por `Editar precios`.
+- Los planes muestran estado, modulos incluidos, precios completos/incompletos y clientes usando el plan.
+- Los precios se muestran por periodo en tarjetas compactas con moneda y estado `Guardado`/`Pendiente`.
+- La suscripcion del cliente muestra plan actual, modelo, periodicidad, estado y fechas administrativas.
+- Se agrega validacion frontend: modelos `Suscripcion` e `Hibrido` requieren plan; `Consumo` puede quedar sin plan.
+- Se documenta la fase en `docs/OWNER_SUBSCRIPTIONS_UX_A_PLANES_ACCIONABLES.md`.
+
+Restricciones respetadas:
+
+- No se reseteo base de datos.
+- No se toco backend ni se agregaron endpoints.
+- No se implemento facturacion real, cobro automatico, recibos ni pasarela.
+- No se hizo merge a `main`.
+
 ## 2026-06-21 - OWNER-COMPANIES-UX-A clientes accionables Panel Owner
 
 Tipo: platform owner, clientes, SaaS, frontend, UX, documentacion.
