@@ -7,7 +7,9 @@ import AppInput from '@/components/ui/AppInput';
 import AppOptionRow from '@/components/ui/AppOptionRow';
 import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
 import AppText from '@/components/ui/AppText';
+import StatusBadge from '@/components/ui/StatusBadge';
 import { useAppTheme } from '@/context/AppThemeContext';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { canAccessByPermission } from '@/services/accessControl';
 import { apiRequest } from '@/services/apiClient';
 import { getCustomerBalance, type BalanceSummary } from '@/services/balanceService';
@@ -26,13 +28,14 @@ import {
   getPaymentsByReservation,
   Payment,
 } from '@/services/paymentService';
-import { getSession } from '@/services/sessionStorage';
+import { getSession, UserSession } from '@/services/sessionStorage';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 
 type PaymentTargetType = 'reservation' | 'order';
+type PaymentStatusFilter = 'ALL' | 'ACTIVE' | 'VOIDED';
 
 type ReservationSummary = {
   id: number;
@@ -70,6 +73,19 @@ function formatMoney(value?: number | null) {
   return `$${normalizeNumber(value).toFixed(2)}`;
 }
 
+function formatDate(value?: string | null) {
+  if (!value) return 'Sin fecha';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleDateString('es-MX', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
+
 function getPaymentAmount(payment: Payment) {
   return normalizeNumber(payment.receivedAmount ?? payment.amount ?? 0);
 }
@@ -91,6 +107,13 @@ function isClosedReservationStatus(status?: string | null) {
 
 function normalizeText(value?: string | null) {
   return (value || '').trim().toLowerCase();
+}
+
+function getStatusTone(status?: string | null) {
+  const normalized = normalizeStatus(status);
+  if (['VOID', 'VOIDED', 'CANCELLED', 'CANCELED'].includes(normalized)) return 'danger';
+  if (['ACTIVE', 'PAID', 'COMPLETED', 'SETTLED'].includes(normalized)) return 'success';
+  return 'neutral';
 }
 
 function getPaymentMethodLabel(
@@ -158,6 +181,7 @@ export default function PaymentsScreen() {
     returnTo?: string | string[];
   }>();
   const { theme } = useAppTheme();
+  const { isPhone } = useResponsiveLayout();
   const { t } = useTranslation('common');
 
   const initialOrderId = firstParam(params.orderId);
@@ -178,6 +202,10 @@ export default function PaymentsScreen() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
     useState<PaymentMethod | null>(null);
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
+  const [isMethodFilterModalVisible, setIsMethodFilterModalVisible] = useState(false);
+  const [searchText, setSearchText] = useState('');
+  const [statusFilter, setStatusFilter] = useState<PaymentStatusFilter>('ALL');
+  const [methodFilterId, setMethodFilterId] = useState<number | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [reservation, setReservation] = useState<ReservationSummary | null>(null);
   const [customerBalance, setCustomerBalance] = useState<BalanceSummary | null>(null);
@@ -188,6 +216,7 @@ export default function PaymentsScreen() {
     PayableOrderReservation[]
   >([]);
   const [pendingOrders, setPendingOrders] = useState<CustomerOrderPendingPayment[]>([]);
+  const [session, setSession] = useState<UserSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingTarget, setIsLoadingTarget] = useState(false);
@@ -225,9 +254,70 @@ export default function PaymentsScreen() {
     [payments]
   );
 
+  const filteredPayments = useMemo(() => {
+    const text = normalizeText(searchText);
+
+    return payments
+      .filter((payment) => {
+        if (statusFilter === 'ACTIVE' && isVoidedPayment(payment)) return false;
+        if (statusFilter === 'VOIDED' && !isVoidedPayment(payment)) return false;
+        return true;
+      })
+      .filter((payment) => {
+        if (!methodFilterId) return true;
+        return payment.paymentMethodId === methodFilterId || payment.paymentMethod?.id === methodFilterId;
+      })
+      .filter((payment) => {
+        if (!text) return true;
+        return normalizeText(
+          [
+            payment.id,
+            payment.reference,
+            payment.status,
+            getPaymentMethodLabel(payment, paymentMethods),
+            reservation?.customerName,
+            orderDetail?.customerName,
+            reservation?.itemCode,
+          ]
+            .filter(Boolean)
+            .join(' ')
+        ).includes(text);
+      });
+  }, [methodFilterId, orderDetail?.customerName, paymentMethods, payments, reservation?.customerName, reservation?.itemCode, searchText, statusFilter]);
+
+  const filteredPendingOrders = useMemo(() => {
+    const text = normalizeText(searchText);
+
+    return pendingOrders.filter((order) => {
+      if (!text) return true;
+      return normalizeText(
+        [
+          order.id,
+          order.customerName,
+          order.customerId,
+          order.status,
+          order.salesChannelCode,
+        ]
+          .filter(Boolean)
+          .join(' ')
+      ).includes(text);
+    });
+  }, [pendingOrders, searchText]);
+
   const totalPaid = useMemo(
     () => activePayments.reduce((sum, payment) => sum + getPaymentAmount(payment), 0),
     [activePayments]
+  );
+  const filteredPaidTotal = useMemo(
+    () =>
+      filteredPayments
+        .filter((payment) => !isVoidedPayment(payment))
+        .reduce((sum, payment) => sum + getPaymentAmount(payment), 0),
+    [filteredPayments]
+  );
+  const pendingOrdersTotal = useMemo(
+    () => filteredPendingOrders.reduce((sum, order) => sum + normalizeNumber(order.pending), 0),
+    [filteredPendingOrders]
   );
 
   const total =
@@ -254,6 +344,10 @@ export default function PaymentsScreen() {
     !!reservation?.liveId ||
     reservation?.salesChannelCode === 'LIVE' ||
     reservation?.salesChannelName?.toUpperCase() === 'LIVE';
+  const canRegisterPayments = canAccessByPermission(session, 'REGISTER_PAYMENTS');
+  const selectedMethodFilterLabel = methodFilterId
+    ? paymentMethods.find((method) => method.id === methodFilterId)?.name ?? 'Metodo seleccionado'
+    : 'Todos los metodos';
 
   const isReservationSettled =
     targetType === 'reservation' &&
@@ -410,8 +504,9 @@ export default function PaymentsScreen() {
       const load = async () => {
         try {
           setIsLoading(true);
-          const session = await getSession();
-          if (!session || !canAccessByPermission(session, 'VIEW_PAYMENTS')) {
+          const currentSession = await getSession();
+          setSession(currentSession);
+          if (!currentSession || !canAccessByPermission(currentSession, 'VIEW_PAYMENTS')) {
             router.replace('/access-denied' as any);
             return;
           }
@@ -460,6 +555,12 @@ export default function PaymentsScreen() {
     setPayments([]);
     setAmountText('');
     setReference('');
+  };
+
+  const clearFilters = () => {
+    setSearchText('');
+    setStatusFilter('ALL');
+    setMethodFilterId(null);
   };
 
   const getAmountToPay = () => {
@@ -624,9 +725,28 @@ export default function PaymentsScreen() {
         onPress={hasSelectedPendingOrder ? clearSelectedPendingOrder : undefined}
       />
 
-      <AppText variant="title" bold>
-        {t('payments.title')}
-      </AppText>
+      <AppCard variant="info" style={styles.heroCard}>
+        <View style={styles.heroHeader}>
+          <View style={styles.heroText}>
+            <AppText variant="caption" color={theme.colors.accent} bold>
+              FINANZAS
+            </AppText>
+            <AppText variant="title" bold>
+              Pagos
+            </AppText>
+            <AppText color={theme.colors.mutedText}>
+              Consulta abonos, pagos registrados y saldos a favor de clientes. Los cobros se registran solo cuando hay un pedido o apartado seleccionado.
+            </AppText>
+          </View>
+          <View style={styles.permissionBadges}>
+            <StatusBadge label="VIEW_PAYMENTS" tone="info" />
+            <StatusBadge
+              label={canRegisterPayments ? 'Puede registrar abonos' : 'Solo consulta'}
+              tone={canRegisterPayments ? 'success' : 'neutral'}
+            />
+          </View>
+        </View>
+      </AppCard>
 
       {isLiveContext ? (
         <AppButton
@@ -637,19 +757,112 @@ export default function PaymentsScreen() {
         />
       ) : null}
 
-      {hasSelectedTarget ? (
-        <AppCard>
-          <AppText variant="subtitle" bold>
-            {targetType === 'order'
-              ? `Cobrar pedido #${targetIdText}`
-              : `Cobrar reserva #${targetIdText}`}
-          </AppText>
+      <AppResponsiveGrid tabletColumns={2} desktopColumns={4} style={styles.summaryGrid}>
+        <PaymentSummaryTile
+          label="Pendientes filtrados"
+          value={String(filteredPendingOrders.length)}
+          tone={filteredPendingOrders.length > 0 ? 'warning' : 'success'}
+        />
+        <PaymentSummaryTile
+          label="Saldo pendiente"
+          value={formatMoney(pendingOrdersTotal)}
+          tone={pendingOrdersTotal > 0 ? 'warning' : 'success'}
+        />
+        <PaymentSummaryTile
+          label="Pagos en contexto"
+          value={String(filteredPayments.length)}
+        />
+        <PaymentSummaryTile
+          label="Abonado visible"
+          value={formatMoney(filteredPaidTotal)}
+          tone={filteredPaidTotal > 0 ? 'success' : 'default'}
+        />
+      </AppResponsiveGrid>
 
-          <AppText color={theme.colors.mutedText}>
-            {hasSelectedPendingOrder
-              ? 'Este cobro viene de la lista de pendientes, por eso ya esta vinculado.'
-              : 'Este cobro viene desde el detalle del movimiento, por eso ya esta vinculado.'}
-          </AppText>
+      <AppCard style={styles.filterCard}>
+        <View style={styles.sectionTitleRow}>
+          <View style={styles.sectionTitleText}>
+            <AppText variant="subtitle" bold>
+              Filtros
+            </AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              Busca por cliente, folio, referencia, metodo o estado.
+            </AppText>
+          </View>
+          <AppButton
+            title="Limpiar"
+            variant="secondary"
+            onPress={clearFilters}
+            style={styles.compactAction}
+          />
+        </View>
+
+        <AppResponsiveGrid tabletColumns={2} desktopColumns={3}>
+          <AppInput
+            label="Buscar"
+            value={searchText}
+            onChangeText={setSearchText}
+            placeholder="Cliente, referencia, pedido..."
+          />
+          <View style={styles.filterGroup}>
+            <AppText variant="subtitle" bold>
+              Estado
+            </AppText>
+            <View style={styles.filterButtons}>
+              <AppButton
+                title="Todos"
+                variant={statusFilter === 'ALL' ? 'primary' : 'neutral'}
+                onPress={() => setStatusFilter('ALL')}
+                style={styles.filterButton}
+              />
+              <AppButton
+                title="Activos"
+                variant={statusFilter === 'ACTIVE' ? 'primary' : 'neutral'}
+                onPress={() => setStatusFilter('ACTIVE')}
+                style={styles.filterButton}
+              />
+              <AppButton
+                title="Anulados"
+                variant={statusFilter === 'VOIDED' ? 'primary' : 'neutral'}
+                onPress={() => setStatusFilter('VOIDED')}
+                style={styles.filterButton}
+              />
+            </View>
+          </View>
+          <View style={styles.filterGroup}>
+            <AppText variant="subtitle" bold>
+              Metodo
+            </AppText>
+            <AppButton
+              title={selectedMethodFilterLabel}
+              variant="secondary"
+              onPress={() => setIsMethodFilterModalVisible(true)}
+              style={styles.methodFilterButton}
+            />
+          </View>
+        </AppResponsiveGrid>
+      </AppCard>
+
+      {hasSelectedTarget ? (
+        <AppCard style={styles.contextCard}>
+          <View style={styles.sectionTitleRow}>
+            <View style={styles.sectionTitleText}>
+              <AppText variant="subtitle" bold>
+                {targetType === 'order'
+                  ? `Pedido #${targetIdText}`
+                  : `Apartado #${targetIdText}`}
+              </AppText>
+              <AppText color={theme.colors.mutedText}>
+                {hasSelectedPendingOrder
+                  ? 'Cobro seleccionado desde pendientes.'
+                  : 'Cobro abierto desde el detalle del movimiento.'}
+              </AppText>
+            </View>
+            <StatusBadge
+              label={remaining > 0 ? `Saldo ${formatMoney(remaining)}` : 'Liquidado'}
+              tone={remaining > 0 ? 'warning' : 'success'}
+            />
+          </View>
 
           {hasSelectedPendingOrder ? (
             <View style={styles.methodButton}>
@@ -664,28 +877,46 @@ export default function PaymentsScreen() {
         </AppCard>
       ) : (
         <AppCard>
-          <AppText variant="subtitle" bold>
-            Pendientes por cobrar
-          </AppText>
+          <View style={styles.sectionTitleRow}>
+            <View style={styles.sectionTitleText}>
+              <AppText variant="subtitle" bold>
+                Pendientes por cobrar
+              </AppText>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Selecciona un pedido para registrar abono. No hay registro global sin contexto.
+              </AppText>
+            </View>
+            <StatusBadge
+              label={`${filteredPendingOrders.length} pendiente${filteredPendingOrders.length === 1 ? '' : 's'}`}
+              tone={filteredPendingOrders.length > 0 ? 'warning' : 'success'}
+            />
+          </View>
 
-          {pendingOrders.length === 0 ? (
+          {filteredPendingOrders.length === 0 ? (
             <AppText color={theme.colors.mutedText}>
-              No hay pedidos con apartados pendientes de pago.
+              No hay pagos registrados o pendientes con los filtros actuales.
             </AppText>
           ) : (
-            pendingOrders.map((order) => (
+            filteredPendingOrders.map((order) => (
               <View
                 key={order.id}
                 style={[styles.pendingOrderRow, { borderBottomColor: theme.colors.border }]}
               >
                 <View style={styles.paymentHeader}>
-                  <AppText bold>Pedido #{order.id}</AppText>
-                  <AppText bold>{formatMoney(order.pending)}</AppText>
+                  <View style={styles.rowTitleBlock}>
+                    <AppText bold>Pedido #{order.id}</AppText>
+                    <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+                      {order.customerName || `Cliente #${order.customerId}`}
+                    </AppText>
+                  </View>
+                  <View style={styles.amountBlock}>
+                    <AppText bold>{formatMoney(order.pending)}</AppText>
+                    <StatusBadge label={order.status || 'Pendiente'} tone="warning" />
+                  </View>
                 </View>
 
-                <AppText>{order.customerName || `Cliente #${order.customerId}`}</AppText>
                 <AppText variant="caption" color={theme.colors.mutedText}>
-                  {getSalesChannelLabel(order.salesChannelCode, t)} | Prendas: {order.itemCount}
+                  {getSalesChannelLabel(order.salesChannelCode, t)} | {order.itemCount} prenda{order.itemCount === 1 ? '' : 's'}
                 </AppText>
                 <AppText variant="caption" color={theme.colors.mutedText}>
                   Total {formatMoney(order.total)} | Pagado {formatMoney(order.paid)}
@@ -908,35 +1139,97 @@ export default function PaymentsScreen() {
         )}
       </AppCard>
 
-      {payments.length > 0 ? (
+      {hasSelectedTarget ? (
         <AppCard>
-          <AppText variant="subtitle" bold>
-            Pagos registrados
-          </AppText>
-
-          {payments.map((payment) => (
-            <View
-              key={payment.id}
-              style={[styles.paymentRow, { borderBottomColor: theme.colors.border }]}
-            >
-              <View style={styles.paymentHeader}>
-                <AppText bold>{formatMoney(getPaymentAmount(payment))}</AppText>
-                <AppText variant="caption" color={theme.colors.mutedText}>
-                  {payment.status || 'Registrado'}
-                </AppText>
-              </View>
-
-              <AppText variant="caption" color={theme.colors.mutedText}>
-                Metodo: {getPaymentMethodLabel(payment, paymentMethods)}
+          <View style={styles.sectionTitleRow}>
+            <View style={styles.sectionTitleText}>
+              <AppText variant="subtitle" bold>
+                Pagos registrados
               </AppText>
-
-              {payment.reference ? (
-                <AppText variant="caption" color={theme.colors.mutedText}>
-                  Ref: {payment.reference}
-                </AppText>
-              ) : null}
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Historial del movimiento seleccionado.
+              </AppText>
             </View>
-          ))}
+            <StatusBadge
+              label={`${filteredPayments.length} registro${filteredPayments.length === 1 ? '' : 's'}`}
+              tone={filteredPayments.length > 0 ? 'success' : 'neutral'}
+            />
+          </View>
+
+          {!isPhone && filteredPayments.length > 0 ? (
+            <View style={[styles.tableHeader, { borderBottomColor: theme.colors.border }]}>
+              <AppText variant="caption" bold style={styles.tableDate}>Fecha</AppText>
+              <AppText variant="caption" bold style={styles.tableOrigin}>Origen</AppText>
+              <AppText variant="caption" bold style={styles.tableMethod}>Metodo</AppText>
+              <AppText variant="caption" bold style={styles.tableAmount}>Monto</AppText>
+              <AppText variant="caption" bold style={styles.tableStatus}>Estado</AppText>
+            </View>
+          ) : null}
+
+          {filteredPayments.length === 0 ? (
+            <AppText color={theme.colors.mutedText}>
+              No hay pagos registrados con los filtros actuales.
+            </AppText>
+          ) : (
+            filteredPayments.map((payment) => (
+              <View
+                key={payment.id}
+                style={[styles.paymentRow, { borderBottomColor: theme.colors.border }]}
+              >
+                {isPhone ? (
+                  <>
+                    <View style={styles.paymentHeader}>
+                      <View style={styles.rowTitleBlock}>
+                        <AppText bold>Pago #{payment.id}</AppText>
+                        <AppText variant="caption" color={theme.colors.mutedText}>
+                          {formatDate(payment.createdAt)}
+                        </AppText>
+                      </View>
+                      <View style={styles.amountBlock}>
+                        <AppText bold>{formatMoney(getPaymentAmount(payment))}</AppText>
+                        <StatusBadge
+                          label={payment.status || 'Registrado'}
+                          tone={getStatusTone(payment.status)}
+                        />
+                      </View>
+                    </View>
+                    <AppText variant="caption" color={theme.colors.mutedText}>
+                      {targetType === 'order' ? `Pedido #${targetIdText}` : `Apartado #${targetIdText}`} | Metodo: {getPaymentMethodLabel(payment, paymentMethods)}
+                    </AppText>
+                    {payment.reference ? (
+                      <AppText variant="caption" color={theme.colors.mutedText}>
+                        Ref: {payment.reference}
+                      </AppText>
+                    ) : null}
+                  </>
+                ) : (
+                  <View style={styles.tableRow}>
+                    <AppText style={styles.tableDate}>{formatDate(payment.createdAt)}</AppText>
+                    <AppText style={styles.tableOrigin}>
+                      {targetType === 'order' ? `Pedido #${targetIdText}` : `Apartado #${targetIdText}`}
+                    </AppText>
+                    <AppText style={styles.tableMethod} numberOfLines={1}>
+                      {getPaymentMethodLabel(payment, paymentMethods)}
+                    </AppText>
+                    <AppText bold style={styles.tableAmount}>
+                      {formatMoney(getPaymentAmount(payment))}
+                    </AppText>
+                    <View style={styles.tableStatus}>
+                      <StatusBadge
+                        label={payment.status || 'Registrado'}
+                        tone={getStatusTone(payment.status)}
+                      />
+                    </View>
+                  </View>
+                )}
+                {payment.reference && !isPhone ? (
+                  <AppText variant="caption" color={theme.colors.mutedText}>
+                    Ref: {payment.reference}
+                  </AppText>
+                ) : null}
+              </View>
+            ))
+          )}
         </AppCard>
       ) : null}
         </>
@@ -955,6 +1248,44 @@ export default function PaymentsScreen() {
             onPress={() => selectPaymentMethod(method)}
           >
             {selectedPaymentMethod?.id === method.id ? (
+              <AppText variant="caption" color={theme.colors.accent} bold>
+                Seleccionado
+              </AppText>
+            ) : null}
+          </AppOptionRow>
+        ))}
+      </AppBottomModal>
+
+      <AppBottomModal
+        visible={isMethodFilterModalVisible}
+        title="Filtrar por metodo"
+        onClose={() => setIsMethodFilterModalVisible(false)}
+      >
+        <AppOptionRow
+          title="Todos los metodos"
+          subtitle="No limitar por metodo de pago"
+          onPress={() => {
+            setMethodFilterId(null);
+            setIsMethodFilterModalVisible(false);
+          }}
+        >
+          {!methodFilterId ? (
+            <AppText variant="caption" color={theme.colors.accent} bold>
+              Seleccionado
+            </AppText>
+          ) : null}
+        </AppOptionRow>
+        {paymentMethods.map((method) => (
+          <AppOptionRow
+            key={method.id}
+            title={method.name}
+            subtitle={method.code || undefined}
+            onPress={() => {
+              setMethodFilterId(method.id);
+              setIsMethodFilterModalVisible(false);
+            }}
+          >
+            {methodFilterId === method.id ? (
               <AppText variant="caption" color={theme.colors.accent} bold>
                 Seleccionado
               </AppText>
@@ -1067,8 +1398,100 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
   },
+  amountBlock: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  compactAction: {
+    minHeight: 34,
+  },
+  contextCard: {
+    marginBottom: 12,
+  },
+  filterButton: {
+    minHeight: 34,
+  },
+  filterButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  filterCard: {
+    marginBottom: 12,
+  },
+  filterGroup: {
+    marginBottom: 14,
+  },
+  heroCard: {
+    marginBottom: 12,
+  },
+  heroHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 16,
+    justifyContent: 'space-between',
+  },
+  heroText: {
+    flex: 1,
+    gap: 4,
+    minWidth: 0,
+  },
   infoRow: {
     marginBottom: 10,
+  },
+  methodFilterButton: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    minHeight: 34,
+  },
+  permissionBadges: {
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  rowTitleBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  sectionTitleRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  sectionTitleText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  tableAmount: {
+    flexBasis: 110,
+    textAlign: 'right',
+  },
+  tableDate: {
+    flexBasis: 96,
+  },
+  tableHeader: {
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    paddingBottom: 8,
+  },
+  tableMethod: {
+    flex: 1,
+    minWidth: 0,
+  },
+  tableOrigin: {
+    flexBasis: 120,
+  },
+  tableRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  tableStatus: {
+    alignItems: 'flex-end',
+    flexBasis: 120,
   },
   detailGrid: {
     marginTop: 12,

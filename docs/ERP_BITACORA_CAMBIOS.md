@@ -4001,3 +4001,15 @@ Resultado:
 - `/door-reservation` muestra titulo `Nuevo apartado` y resalta `Apartados` en el sidebar.
 - Se agrega seccion `Finanzas` con `Pagos` visible solo para usuarios con `VIEW_PAYMENTS`.
 - `/payments` conserva `AppShellPage` y guards existentes para consulta y registro.
+
+## 2026-06-21 - FLOW-FAST-QA-B prendas multiples y pagos UX
+
+Tipo: correccion frontend del flujo `Nuevo apartado` y rediseño UX de `/payments`, sin backend ni migraciones.
+
+Resultado:
+
+- `/door-reservation` guarda un borrador local del apartado en curso para conservar cliente, anticipo, metodo y varias prendas al volver desde alta rapida.
+- Las prendas rapidas se fusionan por ID y ya no reemplazan visualmente a las anteriores.
+- Quitar una prenda actualiza solo esa linea y conserva las demas.
+- `/payments` queda como pantalla financiera con resumen, filtros, pendientes, detalle contextual e historial responsivo.
+- `/payments` mantiene acceso por `VIEW_PAYMENTS` y registro por `REGISTER_PAYMENTS`.

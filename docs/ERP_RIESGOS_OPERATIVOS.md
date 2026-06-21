@@ -253,6 +253,8 @@ Probabilidad:
 - FLOW-FAST-QA-A refuerza que paquetes con saldo pendiente no avanzan a listo/envio; QA debe validar roles reales porque permisos agregados en backend pueden requerir relogin para verse en frontend.
 - FLOW-FAST-QA-A convierte alias en cliente con telefono opcional usando contrato actual de clientes; conviene definir deduplicacion/normalizacion de telefono antes de produccion masiva.
 - FAST-NAV-QA-B expone `Pagos` por `VIEW_PAYMENTS` y deja `/door-reservation` como ruta interna; QA debe validar roles reales para confirmar que usuarios sin permiso no ven pagos ni pueden entrar directo.
+- FLOW-FAST-QA-B conserva borrador local de `Nuevo apartado`; si el usuario abandona el flujo sin confirmar, puede restaurarse el borrador hasta que lo limpie con una nueva operacion o confirmacion.
+- FLOW-FAST-QA-B mejora `/payments` con datos reales disponibles, pero la consulta financiera global por sucursal requiere endpoint dedicado antes de prometer reporteria completa de pagos.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

@@ -11,6 +11,11 @@ import { useAppTheme } from '@/context/AppThemeContext';
 import { getActionableApiError } from '@/services/apiError';
 import { getPaymentMethods, PaymentMethod } from '@/services/catalogService';
 import { Customer, getCustomersByBranch } from '@/services/customerService';
+import {
+  clearDoorReservationDraft,
+  getDoorReservationDraft,
+  saveDoorReservationDraft,
+} from '@/services/doorReservationDraft';
 import { getItemsByBranch, Item } from '@/services/itemService';
 import { createPayment } from '@/services/paymentService';
 import { consumePendingQuickItems } from '@/services/pendingQuickItems';
@@ -85,6 +90,43 @@ export default function DoorReservationScreen() {
     Alert.alert(copy.title, copy.message, [{ text: copy.primaryActionLabel }]);
   };
 
+  const persistDraft = (
+    nextCart = cart,
+    nextCustomer = selectedCustomer,
+    nextAdvanceText = advanceText,
+    nextPaymentMethod = selectedPaymentMethod
+  ) => {
+    const hasDraftData =
+      nextCart.length > 0 ||
+      !!nextCustomer ||
+      !!nextAdvanceText.trim() ||
+      !!nextPaymentMethod;
+
+    if (!hasDraftData) {
+      void clearDoorReservationDraft();
+      return;
+    }
+
+    void saveDoorReservationDraft({
+      customerId: nextCustomer?.id ?? null,
+      paymentMethodId: nextPaymentMethod?.id ?? null,
+      advanceText: nextAdvanceText,
+      lines: nextCart.map((line) => ({
+        itemId: line.item.id,
+        priceText: line.priceText,
+      })),
+    });
+  };
+
+  const createCartLine = (item: Item, priceText?: string): CartLine => ({
+    item,
+    priceText:
+      priceText ??
+      (item.price !== null && item.price !== undefined
+        ? String(item.price)
+        : ''),
+  });
+
   useFocusEffect(
     useCallback(() => {
       checkAccessAndLoad();
@@ -130,6 +172,7 @@ export default function DoorReservationScreen() {
       const paymentData = paymentResult.status === 'fulfilled' ? paymentResult.value : [];
 
       const availableItems = itemData.filter((item) => item.status === 'AVAILABLE');
+      const draft = await getDoorReservationDraft();
 
       setItems(availableItems);
       const selectableCustomers = customerData.filter(
@@ -140,19 +183,55 @@ export default function DoorReservationScreen() {
       );
 
       setCustomers(selectableCustomers);
-      if (
-        preselectedCustomerId &&
-        Number.isFinite(preselectedCustomerId) &&
-        selectedCustomer?.id !== preselectedCustomerId
-      ) {
+      const draftCustomerId = draft?.customerId ?? null;
+      const customerIdToRestore =
+        preselectedCustomerId && Number.isFinite(preselectedCustomerId)
+          ? preselectedCustomerId
+          : draftCustomerId && Number.isFinite(draftCustomerId)
+            ? draftCustomerId
+            : null;
+      if (customerIdToRestore && selectedCustomer?.id !== customerIdToRestore) {
         const matchedCustomer = selectableCustomers.find(
-          (customer) => customer.id === preselectedCustomerId
+          (customer) => customer.id === customerIdToRestore
         );
         if (matchedCustomer) {
           setSelectedCustomer(matchedCustomer);
         }
       }
       setPaymentMethods(paymentData);
+
+      if (draft?.paymentMethodId && !selectedPaymentMethod) {
+        const matchedMethod = paymentData.find(
+          (method) => method.id === draft.paymentMethodId
+        );
+        if (matchedMethod) {
+          setSelectedPaymentMethod(matchedMethod);
+        }
+      }
+
+      if (draft?.advanceText && !advanceText) {
+        setAdvanceText(draft.advanceText);
+      }
+
+      if (draft?.lines.length) {
+        const restoredLines = draft.lines
+          .map((line) => {
+            const item = availableItems.find((candidate) => candidate.id === line.itemId);
+            return item ? createCartLine(item, line.priceText) : null;
+          })
+          .filter((line): line is CartLine => Boolean(line));
+
+        if (restoredLines.length > 0) {
+          setCart((prev) => {
+            const existingIds = new Set(prev.map((line) => line.item.id));
+            return [
+              ...prev,
+              ...restoredLines.filter((line) => !existingIds.has(line.item.id)),
+            ];
+          });
+        }
+      }
+
       await addPendingQuickItemsToCart(availableItems);
 
       const errorCopies = [itemResult, customerResult, paymentResult]
@@ -202,16 +281,11 @@ export default function DoorReservationScreen() {
       return;
     }
 
-    setCart((prev) => [
-      ...prev,
-      {
-        item,
-        priceText:
-          item.price !== null && item.price !== undefined
-            ? String(item.price)
-            : '',
-      },
-    ]);
+    setCart((prev) => {
+      const next = [...prev, createCartLine(item)];
+      persistDraft(next);
+      return next;
+    });
 
     setIsItemModalVisible(false);
     setItemSearch('');
@@ -237,15 +311,11 @@ export default function DoorReservationScreen() {
       const existingIds = new Set(prev.map((line) => line.item.id));
       const newLines = createdItems
         .filter((item) => !existingIds.has(item.id))
-        .map((item) => ({
-          item,
-          priceText:
-            item.price !== null && item.price !== undefined
-              ? String(item.price)
-              : '',
-        }));
+        .map((item) => createCartLine(item));
 
-      return [...prev, ...newLines];
+      const next = [...prev, ...newLines];
+      persistDraft(next);
+      return next;
     });
     Alert.alert(
       'Alta rapida',
@@ -283,25 +353,33 @@ export default function DoorReservationScreen() {
   };
 
   const removeItemFromCart = (itemId: number) => {
-    setCart((prev) => prev.filter((line) => line.item.id !== itemId));
+    setCart((prev) => {
+      const next = prev.filter((line) => line.item.id !== itemId);
+      persistDraft(next);
+      return next;
+    });
   };
 
   const updateLinePrice = (itemId: number, value: string) => {
-    setCart((prev) =>
-      prev.map((line) =>
+    setCart((prev) => {
+      const next = prev.map((line) =>
         line.item.id === itemId ? { ...line, priceText: value } : line
-      )
-    );
+      );
+      persistDraft(next);
+      return next;
+    });
   };
 
   const selectCustomer = (customer: Customer) => {
     setSelectedCustomer(customer);
+    persistDraft(cart, customer);
     setIsCustomerModalVisible(false);
     setCustomerSearch('');
   };
 
   const selectPaymentMethod = (method: PaymentMethod) => {
     setSelectedPaymentMethod(method);
+    persistDraft(cart, selectedCustomer, advanceText, method);
     setIsPaymentModalVisible(false);
   };
 
@@ -449,6 +527,7 @@ export default function DoorReservationScreen() {
       );
 
       setCart([]);
+      await clearDoorReservationDraft();
       setSelectedCustomer(null);
       setSelectedPaymentMethod(null);
       setAdvanceText('');
@@ -581,6 +660,7 @@ export default function DoorReservationScreen() {
               title={t('operationalScreens.doorReservation.quickItem')}
               variant="secondary"
               onPress={() => {
+                persistDraft();
                 const returnPath = selectedCustomer
                   ? `/door-reservation?customerId=${selectedCustomer.id}`
                   : '/door-reservation';
@@ -671,7 +751,10 @@ export default function DoorReservationScreen() {
             <AppInput
               label={t('operationalScreens.doorReservation.optionalAdvance')}
               value={advanceText}
-              onChangeText={setAdvanceText}
+              onChangeText={(value) => {
+                setAdvanceText(value);
+                persistDraft(cart, selectedCustomer, value, selectedPaymentMethod);
+              }}
               keyboardType="numeric"
               placeholder={t('operationalScreens.doorReservation.advancePlaceholder')}
             />
