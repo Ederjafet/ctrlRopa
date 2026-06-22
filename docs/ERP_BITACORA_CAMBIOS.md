@@ -1,5 +1,31 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-22 - ITEM-DETAIL-UX-A detalle de prenda compacto
+
+Tipo: frontend, UX operativa, inventario, paquetes, permisos, documentacion.
+
+Objetivo:
+
+- Compactar `/items/[id]` para entender rapido codigo, estado, precio, ubicacion, lote, proveedor, paquete relacionado y acciones disponibles.
+
+Cambios realizados:
+
+- La pantalla ahora usa ficha operativa con cabecera compacta y `Ver permisos`.
+- `returnTo` se conserva como ruta exacta y muestra `Volver al paquete` cuando viene desde `/customer-package-detail`.
+- Se agrega resumen superior con estado, precio, sucursal, ubicacion, lote y paquete.
+- Se carga contexto de paquete solo cuando `returnTo` apunta a paquete y el usuario tiene permiso para paquetes.
+- Se carga lote para mostrar proveedor, estado y recepcion cuando el backend lo entrega.
+- Edicion y guardado quedan bloqueados en frontend si falta `MANAGE_INVENTORY`, con mensaje visible.
+- Se agrega `itemDetail` a la matriz reusable de permisos.
+- Se documenta la fase en `docs/ITEM_DETAIL_UX_A_COMPACTO.md`.
+
+Restricciones respetadas:
+
+- No se toco backend.
+- No se cambiaron reglas de negocio.
+- No se agrego `Actualizar` fuera de LIVE.
+- No se agregaron permisos nuevos.
+
 ## 2026-06-22 - PACKAGE-DETAIL-UX-A detalle de paquete compacto
 
 Tipo: frontend, UX operativa, paquetes, pagos, envios, permisos, documentacion.

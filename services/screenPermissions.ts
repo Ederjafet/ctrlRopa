@@ -21,6 +21,7 @@ export type ScreenPermissionKey =
   | 'shipmentDetail'
   | 'liveAuthorizations'
   | 'itemsCreate'
+  | 'itemDetail'
   | 'customersCreate'
   | 'suppliers'
   | 'batchForm'
@@ -510,6 +511,55 @@ export const SCREEN_PERMISSIONS: Record<ScreenPermissionKey, ScreenPermissionDef
         permissionCode: 'MANAGE_INVENTORY',
         allowedMessage: 'Puedes clasificar prendas con catalogos operativos.',
         deniedMessage: 'No puedes editar clasificacion de prendas.',
+      },
+    ],
+  },
+  itemDetail: {
+    key: 'itemDetail',
+    title: 'Detalle de prenda',
+    requiredToView: ['VIEW_INVENTORY'],
+    actions: [
+      {
+        key: 'viewItem',
+        label: 'Ver prenda',
+        permissionCode: 'VIEW_INVENTORY',
+        allowedMessage: 'Puedes consultar datos operativos de la prenda.',
+        deniedMessage: 'No puedes consultar el detalle de prendas.',
+      },
+      {
+        key: 'editItem',
+        label: 'Editar prenda',
+        permissionCode: 'MANAGE_INVENTORY',
+        allowedMessage: 'Puedes modificar clasificacion, precio, ubicacion y comentarios.',
+        deniedMessage: 'No puedes modificar prendas.',
+      },
+      {
+        key: 'changeLocation',
+        label: 'Cambiar ubicacion',
+        permissionCode: 'MANAGE_INVENTORY',
+        allowedMessage: 'Puedes actualizar la ubicacion de inventario de la prenda.',
+        deniedMessage: 'No puedes cambiar la ubicacion de prendas.',
+      },
+      {
+        key: 'viewBatch',
+        label: 'Ver lote',
+        permissionCode: 'VIEW_INVENTORY',
+        allowedMessage: 'Puedes revisar el lote de origen de la prenda.',
+        deniedMessage: 'No puedes consultar lotes de inventario.',
+      },
+      {
+        key: 'viewPackage',
+        label: 'Ver paquete',
+        permissionCode: 'CREATE_CLOSE_CUSTOMER_PACKAGE',
+        allowedMessage: 'Puedes revisar el paquete relacionado cuando la prenda forme parte de uno.',
+        deniedMessage: 'No puedes consultar paquetes de clientes.',
+      },
+      {
+        key: 'viewReservation',
+        label: 'Ver apartado',
+        permissionCode: 'DO_DOOR_RESERVATION',
+        allowedMessage: 'Puedes revisar apartados relacionados con la prenda.',
+        deniedMessage: 'No puedes consultar apartados relacionados.',
       },
     ],
   },
