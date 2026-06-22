@@ -60,6 +60,10 @@ type ValidationDialogState = {
   firstField?: FormErrorKey;
 };
 
+const INVENTORY_WRITE_PERMISSION = 'MANAGE_INVENTORY';
+const inventoryWriteDeniedMessage =
+  `No tienes permiso para crear o modificar prendas. Permiso requerido: ${INVENTORY_WRITE_PERMISSION}. Solicita a un administrador el permiso de inventario.`;
+
 const mapBatchToOption = (batch: Batch): CatalogOption => ({
   id: batch.id,
   code: batch.folio,
@@ -151,7 +155,7 @@ export default function ItemsCreateScreen() {
   const loadCatalogs = async () => {
     const session = await getSession();
     if (!session) return;
-    setCanManageInventory(hasPermission(session, 'MANAGE_INVENTORY'));
+    setCanManageInventory(hasPermission(session, INVENTORY_WRITE_PERMISSION));
 
     try {
       const [bootstrapResult, batchResult] = await Promise.allSettled([
@@ -317,6 +321,14 @@ export default function ItemsCreateScreen() {
   };
 
   const handleCreate = async () => {
+    const session = await getSession();
+    if (!session) return;
+
+    if (!hasPermission(session, INVENTORY_WRITE_PERMISSION)) {
+      Alert.alert('Permiso requerido', inventoryWriteDeniedMessage);
+      return;
+    }
+
     if (!validateForm()) {
       return;
     }
@@ -355,17 +367,6 @@ export default function ItemsCreateScreen() {
       return;
     }
 
-    const session = await getSession();
-    if (!session) return;
-
-    if (!hasPermission(session, 'MANAGE_INVENTORY')) {
-      Alert.alert(
-        'Permiso requerido',
-        'No tienes permiso para crear prendas. Permiso requerido: MANAGE_INVENTORY.'
-      );
-      return;
-    }
-
     try {
       setIsSaving(true);
       setSuccessMessage('');
@@ -396,7 +397,7 @@ export default function ItemsCreateScreen() {
 
       const message =
         qty === 1
-          ? 'Se creó 1 prenda correctamente.'
+          ? 'Prenda creada correctamente.'
           : `Se crearon ${qty} prendas correctamente.`;
 
       setSuccessMessage(message);
@@ -466,10 +467,16 @@ export default function ItemsCreateScreen() {
         {!canManageInventory ? (
           <AppCard variant="warning">
             <AppText variant="subtitle" bold>
-              Accion bloqueada
+              No puedes crear o modificar prendas
             </AppText>
-            <AppText variant="caption" color={theme.colors.textSecondary}>
-              No tienes permiso para crear prendas. Permiso requerido: MANAGE_INVENTORY.
+            <AppText color={theme.colors.textSecondary} style={styles.permissionText}>
+              Tu usuario no tiene permiso para guardar cambios de inventario.
+            </AppText>
+            <AppText variant="caption" color={theme.colors.textSecondary} style={styles.permissionText}>
+              Permiso requerido: MANAGE_INVENTORY.
+            </AppText>
+            <AppText variant="caption" color={theme.colors.textSecondary} style={styles.permissionText}>
+              Solicita a un administrador el permiso de inventario.
             </AppText>
           </AppCard>
         ) : null}
@@ -493,6 +500,7 @@ export default function ItemsCreateScreen() {
                 ? 'Seleccionar lote'
                 : 'No hay lotes disponibles'
             }
+            disabled={!canManageInventory}
             onPress={() =>
               openSelector({
                 title: 'Seleccionar lote',
@@ -508,6 +516,7 @@ export default function ItemsCreateScreen() {
             value={selectedProductType?.name}
             placeholder="Seleccionar tipo"
             error={formErrors.productType}
+            disabled={!canManageInventory}
             onPress={openProductTypeSelector}
           />
 
@@ -515,6 +524,7 @@ export default function ItemsCreateScreen() {
             label="Marca"
             value={selectedBrand?.name}
             placeholder="Sin marca"
+            disabled={!canManageInventory}
             onPress={() =>
               openSelector({
                 title: 'Seleccionar marca',
@@ -530,6 +540,7 @@ export default function ItemsCreateScreen() {
             value={selectedSize?.name}
             placeholder="Seleccionar talla"
             error={formErrors.size}
+            disabled={!canManageInventory}
             onPress={openSizeSelector}
           />
 
@@ -537,6 +548,7 @@ export default function ItemsCreateScreen() {
             label="Ubicación"
             value={selectedLocation?.name}
             placeholder="Sin ubicación"
+            disabled={!canManageInventory}
             onPress={() =>
               openSelector({
                 title: 'Seleccionar ubicación',
@@ -571,6 +583,7 @@ export default function ItemsCreateScreen() {
             keyboardType="numeric"
             placeholder={requiresPrice ? 'Obligatorio' : 'Opcional'}
             error={formErrors.price}
+            editable={canManageInventory}
           />
 
           <AppInput
@@ -584,6 +597,7 @@ export default function ItemsCreateScreen() {
             keyboardType="numeric"
             placeholder="Ej. 1"
             error={formErrors.quantity}
+            editable={canManageInventory}
           />
 
           <AppInput
@@ -591,17 +605,27 @@ export default function ItemsCreateScreen() {
             value={comments}
             onChangeText={setComments}
             placeholder="Opcional"
+            editable={canManageInventory}
           />
           </AppResponsiveGrid>
         </AppCard>
 
         <View style={styles.actionBar}>
+          {!canManageInventory ? (
+            <AppText variant="caption" color={theme.colors.textSecondary} style={styles.actionHint}>
+              No se guardara ninguna prenda porque falta MANAGE_INVENTORY.
+            </AppText>
+          ) : null}
           <AppButton
-            title={t('operationalScreens.itemsCreate.generateItems')}
+            title={
+              canManageInventory
+                ? t('operationalScreens.itemsCreate.generateItems')
+                : 'Sin permiso para guardar'
+            }
             onPress={handleCreate}
             loading={isSaving}
             disabled={!canManageInventory}
-            disabledReason="No tienes permiso para crear prendas. Permiso requerido: MANAGE_INVENTORY."
+            disabledReason={inventoryWriteDeniedMessage}
             style={isPhone ? styles.mobilePrimaryAction : styles.desktopPrimaryAction}
           />
         </View>
@@ -691,9 +715,17 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 10,
   },
+  permissionText: {
+    marginTop: 6,
+  },
   actionBar: {
     alignItems: 'flex-end',
     marginBottom: 12,
+  },
+  actionHint: {
+    marginBottom: 8,
+    maxWidth: 360,
+    textAlign: 'right',
   },
   desktopPrimaryAction: {
     minWidth: 220,

@@ -102,9 +102,9 @@ export default function AppButton({
         isBlocked
           ? () =>
               Alert.alert(
-                'Falta completar información',
+                'Accion no disponible',
                 disabledReason || 'Revisa los datos requeridos antes de continuar.',
-                [{ text: 'Revisar' }]
+                [{ text: 'Entendido' }]
               )
           : onPress
       }

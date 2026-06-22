@@ -111,6 +111,22 @@ Se agrego/ajusto cobertura para:
 - Aun conviene una suite e2e por rol para validar todos los botones de operacion en navegador.
 - Revisar en fase posterior otros catalogos historicos para asegurar que todos los `POST/PUT/PATCH/DELETE` tengan `assertCan` explicito.
 
+## Ajuste posterior RC-UX-PERM-A
+
+Fecha: 2026-06-22
+
+Se valido que el backend ya bloquea la escritura de inventario sin `MANAGE_INVENTORY`, pero el feedback de `/items-create` era poco claro cuando un vendedor entraba directo a la ruta.
+
+Correccion UX:
+
+- `/items-create` evalua `MANAGE_INVENTORY` antes de validar campos.
+- El formulario queda no editable cuando falta permiso.
+- El boton final cambia a `Sin permiso para guardar`.
+- Se muestra el permiso requerido y la instruccion de solicitar acceso a un administrador.
+- La edicion de prenda confirma `Prenda actualizada correctamente.`
+
+No se cambiaron roles, permisos, migraciones ni backend.
+
 ## Decision
 
 GO tecnico para el P0 detectado: vendedor ya no debe crear prendas rapidas si el modal indica bloqueo, y una llamada directa a `POST /api/items` queda protegida por backend.

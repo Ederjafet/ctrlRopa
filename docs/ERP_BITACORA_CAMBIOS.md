@@ -1,5 +1,30 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-22 - RC-UX-PERM-A mensajes de permisos y confirmacion de prendas
+
+Tipo: release candidate, UX, permisos, inventario, frontend, documentacion.
+
+Objetivo:
+
+- Hacer claro para vendedor por que `/items-create` no permite guardar prendas sin `MANAGE_INVENTORY`.
+- Confirmar visualmente creacion y edicion de prendas para admin cliente.
+
+Cambios realizados:
+
+- `/items-create` revisa `MANAGE_INVENTORY` antes de validar el formulario, para mostrar primero el bloqueo real de permiso.
+- `/items-create` muestra aviso visible con permiso requerido, bloquea la edicion del formulario y cambia el CTA a `Sin permiso para guardar`.
+- `AppButton` usa un titulo generico de accion no disponible cuando un boton bloqueado se presiona para ver la razon.
+- La creacion individual confirma `Prenda creada correctamente.`
+- El detalle de prenda muestra alerta y banda de exito `Prenda actualizada correctamente.` al guardar cambios.
+- Se documenta la fase en `docs/RC_UX_PERM_A_ITEMS_FEEDBACK.md`.
+
+Restricciones respetadas:
+
+- No se toco backend.
+- No se cambiaron roles ni permisos.
+- No se otorgo `MANAGE_INVENTORY` al vendedor.
+- No se reseteo base de datos.
+
 ## 2026-06-21 - SEC-RBAC-AUDIT-A permisos por rol, pantalla y endpoint
 
 Tipo: seguridad, RBAC, permisos, inventario, vendedor, backend, frontend, tests, documentacion.

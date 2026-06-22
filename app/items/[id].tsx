@@ -76,6 +76,7 @@ export default function ItemDetailScreen() {
   const [price, setPrice] = useState('');
   const [comments, setComments] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   const [isPrinting, setIsPrinting] = useState(false);
 
   const [selector, setSelector] = useState<SelectorConfig | null>(null);
@@ -190,6 +191,7 @@ export default function ItemDetailScreen() {
 
     try {
       setIsSaving(true);
+      setSuccessMessage('');
 
       const updated = await updateItem(item.id, {
         code: item.code,
@@ -206,7 +208,9 @@ export default function ItemDetailScreen() {
       setItem(updated);
       syncForm(updated);
 
-      Alert.alert('Exito', 'Datos actualizados.');
+      const message = 'Prenda actualizada correctamente.';
+      setSuccessMessage(message);
+      Alert.alert('Inventario', message);
     } catch (e: any) {
       Alert.alert('Error', e.message || 'No se pudo actualizar.');
     } finally {
@@ -267,6 +271,17 @@ export default function ItemDetailScreen() {
         </AppText>
         <AppText>{getItemStatusLabel(item.status)}</AppText>
       </AppCard>
+
+      {successMessage ? (
+        <View
+          style={[
+            styles.successBox,
+            { backgroundColor: theme.colors.success, borderRadius: theme.radius.md },
+          ]}
+        >
+          <AppText>{successMessage}</AppText>
+        </View>
+      ) : null}
 
       {!canEditProperties ? (
         <AppCard>
@@ -437,6 +452,9 @@ export default function ItemDetailScreen() {
 const styles = StyleSheet.create({
   mt: {
     marginTop: 10,
+  },
+  successBox: {
+    padding: 12,
   },
   actionSpacing: {
     marginTop: 10,
