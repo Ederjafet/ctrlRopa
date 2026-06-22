@@ -1,5 +1,34 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-22 - PACKAGE-SHIPPING-A costo de envio en paquetes
+
+Tipo: backend, frontend, paquetes, pagos, envios, permisos, documentacion.
+
+Objetivo:
+
+- Capturar o confirmar costo de envio antes de marcar un paquete como listo para envio.
+
+Cambios realizados:
+
+- Se agrega migracion `V65__package_shipping_cost.sql` con campos de costo/confirmacion de envio en `customer_packages`.
+- Se agrega `payment_allocations.customer_package_id` para aplicar pagos al cargo de envio confirmado sin tratarlo como pago separado.
+- `CustomerPackageDetailResponse` expone subtotal de prendas, costo de envio, confirmacion, total y saldo recalculados.
+- Nuevo endpoint `PATCH /api/customer-packages/{id}/shipping-cost`.
+- `markReady` exige costo de envio confirmado y saldo pendiente 0.
+- `/customer-package-detail` agrega bloque `Envio / Paqueteria` para costo, envio sin costo, paqueteria, guia y notas.
+- El resumen financiero muestra subtotal de prendas, envio, total, abonado, saldo pendiente y saldo a favor.
+- `Ver permisos` incluye `Definir costo de envio` en `customerPackageDetail`.
+- Se agregan tests de costo de envio, bloqueo de listo y asignacion de pago a envio.
+- Se documenta la fase en `docs/PACKAGE_SHIPPING_A_COSTO_ENVIO.md`.
+
+Restricciones respetadas:
+
+- No se implemento integracion real con paqueterias.
+- No se implemento facturacion.
+- No se mezclo costo de envio con pagos operativos como si fuera un pago.
+- No se agrego `Actualizar` fuera de LIVE.
+- No se reseteo base de datos.
+
 ## 2026-06-22 - ITEM-DETAIL-UX-A detalle de prenda compacto
 
 Tipo: frontend, UX operativa, inventario, paquetes, permisos, documentacion.

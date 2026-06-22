@@ -22,6 +22,9 @@ public class PaymentAllocation {
     @Column(name = "sale_id")
     private Long saleId;
 
+    @Column(name = "customer_package_id")
+    private Long customerPackageId;
+
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
 
@@ -62,6 +65,14 @@ public class PaymentAllocation {
 
     public void setSaleId(Long saleId) {
         this.saleId = saleId;
+    }
+
+    public Long getCustomerPackageId() {
+        return customerPackageId;
+    }
+
+    public void setCustomerPackageId(Long customerPackageId) {
+        this.customerPackageId = customerPackageId;
     }
 
     public BigDecimal getAmount() {

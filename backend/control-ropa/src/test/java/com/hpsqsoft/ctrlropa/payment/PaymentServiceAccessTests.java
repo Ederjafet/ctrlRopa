@@ -252,6 +252,55 @@ class PaymentServiceAccessTests {
         verify(balanceService, never()).registerOverage(anyLong(), anyLong(), any(), anyLong(), anyLong(), any());
     }
 
+    @Test
+    void createPaymentByPackageFolioAllocatesRemainingAmountToShippingCost() {
+        List<PaymentAllocation> savedAllocations = new ArrayList<>();
+        Reservation reservation = liveReservation(45L, 20L, 6L, BigDecimal.valueOf(250));
+        CustomerPackage customerPackage = customerPackage(900L, "PKG-900", reservation);
+        customerPackage.setShippingCostConfirmed(true);
+        customerPackage.setShippingCostWaived(false);
+        customerPackage.setShippingCostAmount(BigDecimal.valueOf(50));
+        CustomerPackageItem packageItem = packageReservationItem(901L, 900L, 45L);
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(customerPackageRepository.findByFolio("PKG-900")).thenReturn(Optional.of(customerPackage));
+        when(customerPackageItemRepository.findByCustomerPackageIdOrderByCreatedAtAsc(900L)).thenReturn(List.of(packageItem));
+        when(paymentMethodRepository.findById(10L)).thenReturn(Optional.of(paymentMethod(10L)));
+        when(reservationRepository.findById(45L)).thenReturn(Optional.of(reservation));
+        when(tenantResolver.resolveCurrent()).thenReturn(tenant(2L, 6L));
+        when(customerOrderService.findOrderIdByReservationId(45L)).thenReturn(14L);
+        when(allocationRepository.findByReservationIdOrderByCreatedAtAsc(45L)).thenReturn(List.of());
+        when(allocationRepository.findByCustomerPackageIdOrderByCreatedAtAsc(900L)).thenReturn(List.of());
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> {
+            Payment payment = invocation.getArgument(0);
+            ReflectionTestUtils.setField(payment, "id", 503L);
+            ReflectionTestUtils.setField(payment, "createdAt", LocalDateTime.now());
+            return payment;
+        });
+        when(allocationRepository.save(any(PaymentAllocation.class))).thenAnswer(invocation -> {
+            PaymentAllocation allocation = invocation.getArgument(0);
+            ReflectionTestUtils.setField(allocation, "id", 703L + savedAllocations.size());
+            ReflectionTestUtils.setField(allocation, "createdAt", LocalDateTime.now());
+            savedAllocations.add(allocation);
+            return allocation;
+        });
+        when(allocationRepository.findByPaymentIdOrderByCreatedAtAsc(503L)).thenAnswer(invocation -> savedAllocations);
+
+        PaymentResponse response = service.createByPackageFolio(
+                "PKG-900",
+                packagePaymentRequest(BigDecimal.valueOf(300))
+        );
+
+        assertEquals(2, response.getAllocations().size());
+        assertEquals(45L, response.getAllocations().get(0).getReservationId());
+        assertEquals(null, response.getAllocations().get(0).getCustomerPackageId());
+        assertEquals(900L, response.getAllocations().get(1).getCustomerPackageId());
+        assertEquals(null, response.getAllocations().get(1).getReservationId());
+        assertEquals(0, BigDecimal.valueOf(50).compareTo(response.getAllocations().get(1).getAmount()));
+        verify(customerOrderService).refreshStatus(14L);
+        verify(balanceService, never()).registerOverage(anyLong(), anyLong(), any(), anyLong(), anyLong(), any());
+    }
+
     private static CurrentTenantContext tenant(Long companyId, Long branchId) {
         return new CurrentTenantContext(companyId, "QA_A", "Empresa QA A", branchId, "QA_A_CTR", "QA A Centro", 99L);
     }

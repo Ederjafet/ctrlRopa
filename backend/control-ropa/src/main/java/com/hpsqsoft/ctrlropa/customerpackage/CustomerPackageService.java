@@ -20,7 +20,10 @@ import com.hpsqsoft.ctrlropa.reservation.ReservationStatus;
 import com.hpsqsoft.ctrlropa.sale.Sale;
 import com.hpsqsoft.ctrlropa.sale.SaleRepository;
 import com.hpsqsoft.ctrlropa.sale.SaleStatus;
+import com.hpsqsoft.ctrlropa.security.access.AccessService;
 import com.hpsqsoft.ctrlropa.security.access.ChannelCode;
+import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
+import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
 import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -48,6 +51,8 @@ public class CustomerPackageService {
     private final CustomerOrderItemRepository customerOrderItemRepository;
     private final JdbcTemplate jdbcTemplate;
     private final TenantAccessGuard tenantAccessGuard;
+    private final AccessService accessService;
+    private final CurrentUser currentUser;
 
     public CustomerPackageService(CustomerPackageRepository repository,
                                   CustomerPackageItemRepository itemRepository,
@@ -60,7 +65,9 @@ public class CustomerPackageService {
                                   CustomerOrderService customerOrderService,
                                   CustomerOrderItemRepository customerOrderItemRepository,
                                   JdbcTemplate jdbcTemplate,
-                                  TenantAccessGuard tenantAccessGuard) {
+                                  TenantAccessGuard tenantAccessGuard,
+                                  AccessService accessService,
+                                  CurrentUser currentUser) {
         this.repository = repository;
         this.itemRepository = itemRepository;
         this.customerRepository = customerRepository;
@@ -73,6 +80,8 @@ public class CustomerPackageService {
         this.customerOrderItemRepository = customerOrderItemRepository;
         this.jdbcTemplate = jdbcTemplate;
         this.tenantAccessGuard = tenantAccessGuard;
+        this.accessService = accessService;
+        this.currentUser = currentUser;
     }
 
     public CustomerPackageResponse create(CreateCustomerPackageRequest request) {
@@ -293,10 +302,15 @@ public class CustomerPackageService {
     }
 
     public CustomerPackageDetailResponse markReady(Long packageId, CloseCustomerPackageRequest request) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.CREATE_CLOSE_CUSTOMER_PACKAGE);
         CustomerPackage customerPackage = findEntity(packageId);
 
         if (customerPackage.getStatus() != CustomerPackageStatus.OPEN) {
             throw new IllegalArgumentException("Solo paquetes en OPEN pueden pasar a READY");
+        }
+
+        if (!customerPackage.isShippingCostConfirmed()) {
+            throw new IllegalArgumentException("Antes de marcar listo para envio, captura el costo de paqueteria o marca el envio como sin costo.");
         }
 
         CustomerPackageDetailResponse detail = toDetail(customerPackage);
@@ -314,6 +328,49 @@ public class CustomerPackageService {
 
         repository.save(customerPackage);
 
+        return findDetail(packageId);
+    }
+
+    public CustomerPackageDetailResponse updateShippingCost(Long packageId, UpdateCustomerPackageShippingRequest request) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.CREATE_CLOSE_CUSTOMER_PACKAGE);
+        if (request == null) {
+            throw new IllegalArgumentException("Datos de envio requeridos");
+        }
+        CustomerPackage customerPackage = findEntity(packageId);
+
+        if (customerPackage.getStatus() != CustomerPackageStatus.OPEN) {
+            throw new IllegalArgumentException("Solo paquetes en preparacion pueden modificar datos de envio");
+        }
+
+        boolean waived = Boolean.TRUE.equals(request.getShippingCostWaived());
+        if (waived) {
+            customerPackage.setShippingCostAmount(BigDecimal.ZERO);
+            customerPackage.setShippingCostConfirmed(true);
+            customerPackage.setShippingCostWaived(true);
+        } else {
+            BigDecimal shippingCost = request.getShippingCostAmount();
+            if (shippingCost == null) {
+                throw new IllegalArgumentException("Captura el costo de paqueteria o marca envio sin costo.");
+            }
+
+            if (shippingCost.signum() < 0) {
+                throw new IllegalArgumentException("El costo de envio no puede ser negativo.");
+            }
+
+            if (shippingCost.compareTo(BigDecimal.ZERO) == 0) {
+                throw new IllegalArgumentException("Para costo 0 marca explicitamente envio sin costo.");
+            }
+
+            customerPackage.setShippingCostAmount(shippingCost);
+            customerPackage.setShippingCostConfirmed(true);
+            customerPackage.setShippingCostWaived(false);
+        }
+
+        customerPackage.setShippingCarrier(cleanNullable(request.getShippingCarrier()));
+        customerPackage.setTrackingNumber(cleanNullable(request.getTrackingNumber()));
+        customerPackage.setShippingNotes(cleanNullable(request.getShippingNotes()));
+
+        repository.save(customerPackage);
         return findDetail(packageId);
     }
 
@@ -441,14 +498,20 @@ public class CustomerPackageService {
                 .map(this::toItemLine)
                 .toList();
 
-        BigDecimal totalAmount = items.stream()
+        BigDecimal itemSubtotalAmount = items.stream()
                 .map(CustomerPackageDetailResponse.ItemLine::getPrice)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal paidAmount = items.stream()
+        BigDecimal itemPaidAmount = items.stream()
                 .map(CustomerPackageDetailResponse.ItemLine::getPaidAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        BigDecimal shippingCostAmount = customerPackage.isShippingCostConfirmed()
+                ? safe(customerPackage.getShippingCostAmount())
+                : BigDecimal.ZERO;
+        BigDecimal paidShippingAmount = getPackageLevelPaidAmount(customerPackage.getId());
+        BigDecimal totalAmount = itemSubtotalAmount.add(shippingCostAmount);
+        BigDecimal paidAmount = itemPaidAmount.add(paidShippingAmount);
         BigDecimal pendingAmount = totalAmount.subtract(paidAmount);
         if (pendingAmount.signum() < 0) {
             pendingAmount = BigDecimal.ZERO;
@@ -475,12 +538,36 @@ public class CustomerPackageService {
                 customerPackage.getClosedAt(),
                 customerPackage.getClosedByUserId(),
                 items.size(),
+                itemSubtotalAmount,
+                customerPackage.isShippingCostConfirmed() ? shippingCostAmount : null,
+                customerPackage.isShippingCostConfirmed(),
+                customerPackage.isShippingCostWaived(),
+                customerPackage.getShippingNotes(),
+                customerPackage.getShippingCarrier(),
+                customerPackage.getTrackingNumber(),
                 totalAmount,
                 paidAmount,
                 pendingAmount,
                 items,
                 shipments
         );
+    }
+
+    private BigDecimal getPackageLevelPaidAmount(Long packageId) {
+        BigDecimal value = jdbcTemplate.queryForObject(
+                """
+                SELECT COALESCE(SUM(CASE
+                    WHEN p.status = 'ACTIVE' THEN pa.amount
+                    ELSE 0
+                END), 0)
+                FROM payment_allocations pa
+                JOIN payments p ON p.id = pa.payment_id
+                WHERE pa.customer_package_id = ?
+                """,
+                BigDecimal.class,
+                packageId
+        );
+        return safe(value);
     }
 
     private List<CustomerPackageDetailResponse.ShipmentLine> findShipmentLines(Long packageId) {
@@ -730,6 +817,13 @@ public class CustomerPackageService {
 
     private BigDecimal safe(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private String cleanNullable(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
     private void validateCustomerInActiveTenant(Long customerId) {

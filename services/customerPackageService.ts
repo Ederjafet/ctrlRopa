@@ -58,6 +58,13 @@ export type CustomerPackageDetail = CustomerPackage & {
   branchName?: string;
   paymentStatus?: CustomerPackagePaymentStatus;
   totalItems?: number;
+  itemSubtotalAmount?: number;
+  shippingCostAmount?: number | null;
+  shippingCostConfirmed?: boolean;
+  shippingCostWaived?: boolean;
+  shippingNotes?: string | null;
+  shippingCarrier?: string | null;
+  trackingNumber?: string | null;
   totalAmount?: number;
   paidAmount?: number;
   pendingAmount?: number;
@@ -84,6 +91,14 @@ export type PrepareCustomerPackageFromOrderRequest = {
 
 export type PrepareCustomerPackageFromReservationRequest = {
   createdByUserId: number;
+};
+
+export type UpdateCustomerPackageShippingRequest = {
+  shippingCostAmount?: number | null;
+  shippingCostWaived: boolean;
+  shippingNotes?: string | null;
+  shippingCarrier?: string | null;
+  trackingNumber?: string | null;
 };
 
 export async function createCustomerPackage(
@@ -185,6 +200,16 @@ export async function markCustomerPackageReady(
   });
 }
 
+export async function updateCustomerPackageShippingCost(
+  id: number,
+  payload: UpdateCustomerPackageShippingRequest
+): Promise<CustomerPackageDetail> {
+  return apiRequest<CustomerPackageDetail>(`/api/customer-packages/${id}/shipping-cost`, {
+    method: 'PATCH',
+    body: payload,
+  });
+}
+
 export async function cancelCustomerPackage(
   id: number,
   notes: string,
@@ -205,6 +230,7 @@ export function canMarkCustomerPackageReady(customerPackage?: CustomerPackageDet
   return (
     customerPackage.status === 'OPEN' &&
     Number(customerPackage.totalItems ?? 0) > 0 &&
+    customerPackage.shippingCostConfirmed === true &&
     Number(customerPackage.pendingAmount ?? 0) <= 0
   );
 }

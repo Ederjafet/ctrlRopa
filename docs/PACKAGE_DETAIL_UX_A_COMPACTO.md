@@ -21,10 +21,11 @@ En escritorio se usa layout de dos columnas. En tablet/movil se apila en una sol
 ## Datos visibles arriba
 
 - Total del paquete.
+- Subtotal de prendas.
+- Costo de envio confirmado o pendiente.
 - Abonado.
 - Saldo pendiente.
 - Saldo a favor del cliente.
-- Envio por cobrar y cobrado cuando existe envio asociado.
 - Numero de prendas.
 - Estado del paquete.
 - Estado de pago.
@@ -35,6 +36,7 @@ En escritorio se usa layout de dos columnas. En tablet/movil se apila en una sol
 La accion destacada depende del estado:
 
 - Si hay saldo pendiente: `Registrar abono`.
+- Si falta costo de envio: `Definir envio`.
 - Si esta pagado y en preparacion: `Marcar listo para envio`.
 - Si esta listo/enviado: `Ir a envios` o `Ver envio`.
 - Si esta cancelado/entregado: `Volver a paquetes`.
@@ -60,23 +62,28 @@ Si el paquete no tiene prendas se muestra estado vacio con CTA contextual.
 
 La pantalla muestra resumen financiero de abonos con total, abonado, pendiente y estado. El endpoint actual devuelve acumulados, no historial detallado de pagos por paquete, por lo que no se inventan lineas de pago.
 
+Despues de PACKAGE-SHIPPING-A, el resumen separa subtotal de prendas y costo de envio. Los pagos se aplican contra prendas y contra el cargo de envio confirmado, pero el costo de envio no se registra como pago.
+
 Backlog: endpoint read-only de historial de pagos por paquete.
 
 ## Envio
 
-El panel de envio muestra:
+El panel `Envio / Paqueteria` muestra y permite guardar:
 
-- estado de envio;
-- envio por cobrar;
-- monto cobrado;
-- ultimo envio asociado;
+- costo de envio;
+- envio sin costo confirmado;
+- paqueteria;
+- guia o referencia;
+- notas;
+- estado logistico de envios asociados;
 - acceso a envio si el usuario tiene `MANAGE_SHIPMENTS`.
 
-Si no hay envio, se indica de forma clara.
+Si no hay costo confirmado, la pantalla indica que falta capturar paqueteria o marcar envio sin costo antes de liberar el paquete.
 
 ## Permisos considerados
 
 - `CREATE_CLOSE_CUSTOMER_PACKAGE` para preparar/cancelar paquete.
+- `CREATE_CLOSE_CUSTOMER_PACKAGE` para definir costo de envio.
 - `REGISTER_PAYMENTS` para registrar abonos.
 - `APPLY_CUSTOMER_BALANCE` para aplicar saldo a favor.
 - `MANAGE_INVENTORY` para agregar prendas al paquete.
@@ -88,9 +95,12 @@ El modal `Ver permisos` se mantiene en cabecera con `customerPackageDetail`.
 
 - No se creo historial detallado de pagos.
 - No se implemento aplicacion directa de saldo a favor al paquete.
-- No se cambio backend.
 - No se cambiaron reglas de negocio.
 - No se agregaron permisos nuevos.
+
+## Continuidad PACKAGE-SHIPPING-A
+
+PACKAGE-SHIPPING-A si agrega backend para guardar costo de envio y bloquear `Marcar listo para envio` si falta confirmacion de paqueteria o saldo.
 
 ## Validaciones
 
@@ -100,4 +110,4 @@ El modal `Ver permisos` se mantiene en cabecera con `customerPackageDetail`.
 
 ## Decision
 
-GO UX frontend: la pantalla queda mas compacta y accionable sin cambiar reglas de negocio ni contratos backend.
+GO UX frontend en PACKAGE-DETAIL-UX-A; PACKAGE-SHIPPING-A completa la regla funcional de costo de envio dentro del paquete.

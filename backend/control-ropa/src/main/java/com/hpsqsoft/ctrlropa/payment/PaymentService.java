@@ -317,6 +317,17 @@ public class PaymentService {
         List<PackagePaymentTarget> targets = packageItems.stream()
                 .map(item -> resolvePackagePaymentTarget(customerPackage, item))
                 .toList();
+        BigDecimal shippingPending = getPackageShippingPending(customerPackage);
+        if (shippingPending.compareTo(BigDecimal.ZERO) > 0) {
+            targets = new java.util.ArrayList<>(targets);
+            targets.add(new PackagePaymentTarget(
+                    null,
+                    null,
+                    customerPackage.getId(),
+                    shippingPending,
+                    null
+            ));
+        }
 
         BigDecimal totalPending = targets.stream()
                 .map(PackagePaymentTarget::pendingAmount)
@@ -356,6 +367,7 @@ public class PaymentService {
             allocation.setPaymentId(savedPayment.getId());
             allocation.setSaleId(target.saleId());
             allocation.setReservationId(target.reservationId());
+            allocation.setCustomerPackageId(target.customerPackageId());
             allocation.setAmount(appliedAmount);
             allocationRepository.save(allocation);
 
@@ -640,6 +652,7 @@ public class PaymentService {
             return new PackagePaymentTarget(
                     sale.getId(),
                     null,
+                    null,
                     getSalePending(sale),
                     sale.getCustomerOrderId()
             );
@@ -678,9 +691,40 @@ public class PaymentService {
         return new PackagePaymentTarget(
                 null,
                 reservation.getId(),
+                null,
                 getReservationPending(reservation),
                 customerOrderId
         );
+    }
+
+    private BigDecimal getPackageShippingPending(CustomerPackage customerPackage) {
+        if (!customerPackage.isShippingCostConfirmed()) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal shippingCost = safe(customerPackage.getShippingCostAmount());
+        if (shippingCost.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal paid = calculateActiveAppliedToPackage(customerPackage.getId());
+        BigDecimal pending = shippingCost.subtract(paid);
+        return pending.signum() < 0 ? BigDecimal.ZERO : pending;
+    }
+
+    private BigDecimal calculateActiveAppliedToPackage(Long customerPackageId) {
+        return allocationRepository.findByCustomerPackageIdOrderByCreatedAtAsc(customerPackageId)
+                .stream()
+                .map(allocation -> {
+                    Payment payment = paymentRepository.findById(allocation.getPaymentId())
+                            .orElseThrow(() -> new IllegalArgumentException("Pago no encontrado"));
+                    return payment.getStatus() == PaymentStatus.ACTIVE ? allocation.getAmount() : BigDecimal.ZERO;
+                })
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal safe(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 
     private BigDecimal calculateActiveAppliedToSale(Long saleId) {
@@ -750,6 +794,7 @@ public class PaymentService {
                         a.getId(),
                         a.getSaleId(),
                         a.getReservationId(),
+                        a.getCustomerPackageId(),
                         a.getAmount(),
                         a.getCreatedAt()
                 ))
@@ -802,6 +847,7 @@ public class PaymentService {
     private record PackagePaymentTarget(
             Long saleId,
             Long reservationId,
+            Long customerPackageId,
             BigDecimal pendingAmount,
             Long customerOrderId
     ) {

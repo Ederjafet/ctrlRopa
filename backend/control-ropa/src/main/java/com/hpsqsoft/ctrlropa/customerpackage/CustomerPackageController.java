@@ -81,6 +81,12 @@ public class CustomerPackageController {
         return service.markReady(id, request);
     }
 
+    @PatchMapping("/{id}/shipping-cost")
+    public CustomerPackageDetailResponse updateShippingCost(@PathVariable Long id,
+                                                            @RequestBody UpdateCustomerPackageShippingRequest request) {
+        return service.updateShippingCost(id, request);
+    }
+
     @PatchMapping("/folio/{folio}/ready")
     public CustomerPackageDetailResponse markReadyByFolio(@PathVariable String folio,
                                                           @Valid @RequestBody CloseCustomerPackageRequest request) {

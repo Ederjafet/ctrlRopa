@@ -23,6 +23,13 @@ public class CustomerPackageDetailResponse {
     private Long closedByUserId;
 
     private Integer totalItems;
+    private BigDecimal itemSubtotalAmount;
+    private BigDecimal shippingCostAmount;
+    private Boolean shippingCostConfirmed;
+    private Boolean shippingCostWaived;
+    private String shippingNotes;
+    private String shippingCarrier;
+    private String trackingNumber;
     private BigDecimal totalAmount;
     private BigDecimal paidAmount;
     private BigDecimal pendingAmount;
@@ -46,6 +53,13 @@ public class CustomerPackageDetailResponse {
                                          LocalDateTime closedAt,
                                          Long closedByUserId,
                                          Integer totalItems,
+                                         BigDecimal itemSubtotalAmount,
+                                         BigDecimal shippingCostAmount,
+                                         Boolean shippingCostConfirmed,
+                                         Boolean shippingCostWaived,
+                                         String shippingNotes,
+                                         String shippingCarrier,
+                                         String trackingNumber,
                                          BigDecimal totalAmount,
                                          BigDecimal paidAmount,
                                          BigDecimal pendingAmount,
@@ -67,6 +81,13 @@ public class CustomerPackageDetailResponse {
         this.closedAt = closedAt;
         this.closedByUserId = closedByUserId;
         this.totalItems = totalItems;
+        this.itemSubtotalAmount = itemSubtotalAmount;
+        this.shippingCostAmount = shippingCostAmount;
+        this.shippingCostConfirmed = shippingCostConfirmed;
+        this.shippingCostWaived = shippingCostWaived;
+        this.shippingNotes = shippingNotes;
+        this.shippingCarrier = shippingCarrier;
+        this.trackingNumber = trackingNumber;
         this.totalAmount = totalAmount;
         this.paidAmount = paidAmount;
         this.pendingAmount = pendingAmount;
@@ -90,6 +111,13 @@ public class CustomerPackageDetailResponse {
     public LocalDateTime getClosedAt() { return closedAt; }
     public Long getClosedByUserId() { return closedByUserId; }
     public Integer getTotalItems() { return totalItems; }
+    public BigDecimal getItemSubtotalAmount() { return itemSubtotalAmount; }
+    public BigDecimal getShippingCostAmount() { return shippingCostAmount; }
+    public Boolean getShippingCostConfirmed() { return shippingCostConfirmed; }
+    public Boolean getShippingCostWaived() { return shippingCostWaived; }
+    public String getShippingNotes() { return shippingNotes; }
+    public String getShippingCarrier() { return shippingCarrier; }
+    public String getTrackingNumber() { return trackingNumber; }
     public BigDecimal getTotalAmount() { return totalAmount; }
     public BigDecimal getPaidAmount() { return paidAmount; }
     public BigDecimal getPendingAmount() { return pendingAmount; }

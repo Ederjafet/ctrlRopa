@@ -18,6 +18,8 @@ import com.hpsqsoft.ctrlropa.reservation.Reservation;
 import com.hpsqsoft.ctrlropa.reservation.ReservationRepository;
 import com.hpsqsoft.ctrlropa.reservation.ReservationStatus;
 import com.hpsqsoft.ctrlropa.sale.SaleRepository;
+import com.hpsqsoft.ctrlropa.security.access.AccessService;
+import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
 import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -54,6 +56,8 @@ class CustomerPackageServiceTests {
     private final CustomerOrderItemRepository customerOrderItemRepository = mock(CustomerOrderItemRepository.class);
     private final JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
     private final TenantAccessGuard tenantAccessGuard = mock(TenantAccessGuard.class);
+    private final AccessService accessService = mock(AccessService.class);
+    private final CurrentUser currentUser = mock(CurrentUser.class);
 
     private final CustomerPackageService service = new CustomerPackageService(
             repository,
@@ -67,7 +71,9 @@ class CustomerPackageServiceTests {
             customerOrderService,
             customerOrderItemRepository,
             jdbcTemplate,
-            tenantAccessGuard
+            tenantAccessGuard,
+            accessService,
+            currentUser
     );
 
     @Test
@@ -244,6 +250,60 @@ class CustomerPackageServiceTests {
         verify(itemRepository).save(any(CustomerPackageItem.class));
     }
 
+    @Test
+    void updateShippingCostWaivedConfirmsZeroCost() {
+        CustomerPackage customerPackage = customerPackage(activeReservation(false));
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(501L)).thenReturn(Optional.of(customerPackage));
+        when(repository.save(any(CustomerPackage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(itemRepository.findByCustomerPackageIdOrderByCreatedAtAsc(501L)).thenReturn(List.of());
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(501L))).thenReturn(List.of());
+        when(jdbcTemplate.queryForObject(anyString(), eq(BigDecimal.class), eq(501L)))
+                .thenReturn(BigDecimal.ZERO);
+
+        UpdateCustomerPackageShippingRequest request = new UpdateCustomerPackageShippingRequest();
+        request.setShippingCostWaived(true);
+        request.setShippingNotes("Envio sin costo autorizado");
+
+        CustomerPackageDetailResponse response = service.updateShippingCost(501L, request);
+
+        assertEquals(true, response.getShippingCostConfirmed());
+        assertEquals(true, response.getShippingCostWaived());
+        assertEquals(BigDecimal.ZERO, response.getShippingCostAmount());
+        assertEquals(BigDecimal.ZERO, response.getTotalAmount());
+        verify(repository).save(any(CustomerPackage.class));
+    }
+
+    @Test
+    void updateShippingCostRejectsNegativeAmount() {
+        CustomerPackage customerPackage = customerPackage(activeReservation(false));
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(501L)).thenReturn(Optional.of(customerPackage));
+
+        UpdateCustomerPackageShippingRequest request = new UpdateCustomerPackageShippingRequest();
+        request.setShippingCostWaived(false);
+        request.setShippingCostAmount(BigDecimal.valueOf(-1));
+
+        assertThrows(IllegalArgumentException.class, () -> service.updateShippingCost(501L, request));
+        verify(repository, never()).save(any(CustomerPackage.class));
+    }
+
+    @Test
+    void markReadyWithoutShippingConfirmedIsRejected() {
+        CustomerPackage customerPackage = customerPackage(activeReservation(false));
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(501L)).thenReturn(Optional.of(customerPackage));
+
+        CloseCustomerPackageRequest request = new CloseCustomerPackageRequest();
+        request.setClosedByUserId(99L);
+
+        assertThrows(IllegalArgumentException.class, () -> service.markReady(501L, request));
+        verify(repository, never()).save(any(CustomerPackage.class));
+    }
+
     private void stubFinancialSummary() {
         stubFinancialSummary(10L);
     }
@@ -258,6 +318,8 @@ class CustomerPackageServiceTests {
             when(resultSet.getString("source_status")).thenReturn("ACTIVE");
             return mapper.mapRow(resultSet, 0);
         });
+        when(jdbcTemplate.queryForObject(anyString(), eq(BigDecimal.class), eq(501L)))
+                .thenReturn(BigDecimal.ZERO.setScale(2));
     }
 
     private Reservation activeReservation(boolean withBox) {

@@ -11,4 +11,6 @@ public interface PaymentAllocationRepository extends JpaRepository<PaymentAlloca
     List<PaymentAllocation> findBySaleIdOrderByCreatedAtAsc(Long saleId);
 
     List<PaymentAllocation> findByReservationIdOrderByCreatedAtAsc(Long reservationId);
+
+    List<PaymentAllocation> findByCustomerPackageIdOrderByCreatedAtAsc(Long customerPackageId);
 }

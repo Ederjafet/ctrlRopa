@@ -359,10 +359,17 @@ export const SCREEN_PERMISSIONS: Record<ScreenPermissionKey, ScreenPermissionDef
         deniedMessage: 'No puedes aplicar saldo a favor.',
       },
       {
+        key: 'defineShippingCost',
+        label: 'Definir costo de envio',
+        permissionCode: 'CREATE_CLOSE_CUSTOMER_PACKAGE',
+        allowedMessage: 'Puedes capturar costo de paqueteria o confirmar envio sin costo.',
+        deniedMessage: 'No puedes modificar el costo de envio del paquete.',
+      },
+      {
         key: 'markReadyForShipping',
         label: 'Marcar listo para envio',
         permissionCode: 'CREATE_CLOSE_CUSTOMER_PACKAGE',
-        allowedMessage: 'Puedes marcar paquetes como listos para envio cuando cumplan reglas.',
+        allowedMessage: 'Puedes marcar paquetes como listos para envio cuando el envio y saldo esten confirmados.',
         deniedMessage: 'No puedes preparar paquetes para envio.',
       },
       {

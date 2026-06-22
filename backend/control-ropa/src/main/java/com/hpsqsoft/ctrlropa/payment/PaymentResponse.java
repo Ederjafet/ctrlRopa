@@ -90,17 +90,20 @@ public class PaymentResponse {
         private Long id;
         private Long saleId;
         private Long reservationId;
+        private Long customerPackageId;
         private BigDecimal amount;
         private LocalDateTime createdAt;
 
         public AllocationLine(Long id,
                               Long saleId,
                               Long reservationId,
+                              Long customerPackageId,
                               BigDecimal amount,
                               LocalDateTime createdAt) {
             this.id = id;
             this.saleId = saleId;
             this.reservationId = reservationId;
+            this.customerPackageId = customerPackageId;
             this.amount = amount;
             this.createdAt = createdAt;
         }
@@ -115,6 +118,10 @@ public class PaymentResponse {
 
         public Long getReservationId() {
             return reservationId;
+        }
+
+        public Long getCustomerPackageId() {
+            return customerPackageId;
         }
 
         public BigDecimal getAmount() {

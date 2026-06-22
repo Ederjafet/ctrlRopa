@@ -25,6 +25,7 @@ import {
   getCustomerPackageDetailByFolio,
   isCustomerPackageOpen,
   markCustomerPackageReady,
+  updateCustomerPackageShippingCost,
 } from '@/services/customerPackageService';
 import { getItemsByBranch, Item } from '@/services/itemService';
 import { createPaymentByPackageFolio } from '@/services/paymentService';
@@ -102,6 +103,7 @@ function getNextStep(
   detail: CustomerPackageDetail,
   hasPending: boolean,
   canReady: boolean,
+  shippingConfirmed: boolean,
   shipments: CustomerPackageShipmentLine[]
 ) {
   if (detail.status === 'CANCELLED') return 'Paquete cancelado. No requiere acciones operativas.';
@@ -110,6 +112,7 @@ function getNextStep(
     return 'Enviado. Da seguimiento desde el detalle del envio asociado.';
   }
   if (detail.status === 'READY') return 'Listo para envio. Registra o revisa el envio asociado.';
+  if (!shippingConfirmed) return 'Falta definir costo de paqueteria o confirmar envio sin costo.';
   if (hasPending) return 'Falta registrar abono para liberar el envio.';
   if ((detail.totalItems ?? 0) <= 0) return 'Agrega prendas antes de preparar el envio.';
   if (canReady) return 'Paquete pagado. Puedes marcarlo listo para envio.';
@@ -323,6 +326,12 @@ export default function CustomerPackageDetailScreen() {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentReference, setPaymentReference] = useState('');
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<number | null>(null);
+  const [shippingCostInput, setShippingCostInput] = useState('');
+  const [shippingCostWaived, setShippingCostWaived] = useState(false);
+  const [shippingCarrier, setShippingCarrier] = useState('');
+  const [trackingNumber, setTrackingNumber] = useState('');
+  const [shippingNotes, setShippingNotes] = useState('');
+  const [isSavingShipping, setIsSavingShipping] = useState(false);
   const [cancelNotes, setCancelNotes] = useState('');
   const [branchItems, setBranchItems] = useState<Item[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -332,6 +341,19 @@ export default function CustomerPackageDetailScreen() {
     message: string;
     tone: 'success' | 'warning' | 'danger' | 'info';
   } | null>(null);
+
+  const syncShippingForm = useCallback((packageDetail: CustomerPackageDetail) => {
+    const confirmed = packageDetail.shippingCostConfirmed === true;
+    setShippingCostWaived(packageDetail.shippingCostWaived === true);
+    setShippingCostInput(
+      confirmed && packageDetail.shippingCostAmount != null
+        ? Number(packageDetail.shippingCostAmount).toFixed(2)
+        : ''
+    );
+    setShippingCarrier(packageDetail.shippingCarrier ?? '');
+    setTrackingNumber(packageDetail.trackingNumber ?? '');
+    setShippingNotes(packageDetail.shippingNotes ?? '');
+  }, []);
 
   const loadData = useCallback(async () => {
     try {
@@ -350,6 +372,7 @@ export default function CustomerPackageDetailScreen() {
         : await getCustomerPackageDetailByFolio(String(folio || ''));
 
       setDetail(packageDetail);
+      syncShippingForm(packageDetail);
       const [itemsData, methodsData, balanceData] = await Promise.all([
         getItemsByBranch(packageDetail.branchId),
         getPaymentMethods(packageDetail.branchId),
@@ -364,7 +387,7 @@ export default function CustomerPackageDetailScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [folio, packageId, router]);
+  }, [folio, packageId, router, syncShippingForm]);
 
   useFocusEffect(
     useCallback(() => {
@@ -382,6 +405,14 @@ export default function CustomerPackageDetailScreen() {
   const hasPending = Number(detail?.pendingAmount ?? 0) > 0;
   const items = useMemo(() => detail?.items ?? [], [detail?.items]);
   const shipments = useMemo(() => detail?.shipments ?? [], [detail?.shipments]);
+  const shippingConfirmed = detail?.shippingCostConfirmed === true;
+  const currentShippingCost = shippingConfirmed ? Number(detail?.shippingCostAmount ?? 0) : 0;
+  const currentShippingWaived = detail?.shippingCostWaived === true;
+  const shippingStatusText = !shippingConfirmed
+    ? 'No definido'
+    : currentShippingWaived
+      ? 'Sin costo'
+      : 'Confirmado';
 
   const canManagePackage = hasPermission(session, 'CREATE_CLOSE_CUSTOMER_PACKAGE');
   const canRegisterPayments = hasPermission(session, 'REGISTER_PAYMENTS');
@@ -619,6 +650,72 @@ export default function CustomerPackageDetailScreen() {
     }
   };
 
+  const handleSaveShipping = async () => {
+    if (!detail) return;
+
+    if (!canManagePackage) {
+      setNotice({
+        title: 'Permiso requerido',
+        message: 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.',
+        tone: 'warning',
+      });
+      return;
+    }
+
+    if (!canEdit) {
+      setNotice({
+        title: 'Paquete cerrado',
+        message: 'Solo paquetes en preparacion pueden modificar datos de envio.',
+        tone: 'warning',
+      });
+      return;
+    }
+
+    const shippingCost = shippingCostWaived ? 0 : Number(shippingCostInput.replace(',', '.'));
+
+    if (!shippingCostWaived && (!Number.isFinite(shippingCost) || shippingCost <= 0)) {
+      setNotice({
+        title: 'Costo de envio requerido',
+        message:
+          shippingCost === 0
+            ? 'Para costo 0 marca explicitamente envio sin costo.'
+            : 'Captura un costo de paqueteria mayor a 0 o marca envio sin costo.',
+        tone: 'warning',
+      });
+      return;
+    }
+
+    try {
+      setIsWorking(true);
+      setIsSavingShipping(true);
+      const updated = await updateCustomerPackageShippingCost(detail.id, {
+        shippingCostAmount: shippingCostWaived ? 0 : shippingCost,
+        shippingCostWaived,
+        shippingCarrier: shippingCarrier.trim() || null,
+        trackingNumber: trackingNumber.trim() || null,
+        shippingNotes: shippingNotes.trim() || null,
+      });
+      setDetail(updated);
+      syncShippingForm(updated);
+      setNotice({
+        title: shippingCostWaived ? 'Envio sin costo' : 'Datos de envio guardados',
+        message: shippingCostWaived
+          ? 'Envio confirmado sin costo.'
+          : 'Datos de envio guardados correctamente. El total y saldo del paquete fueron actualizados.',
+        tone: 'success',
+      });
+    } catch (error: any) {
+      setNotice({
+        title: 'No se pudo guardar envio',
+        message: error.message || 'No se pudieron guardar los datos de envio.',
+        tone: 'danger',
+      });
+    } finally {
+      setIsSavingShipping(false);
+      setIsWorking(false);
+    }
+  };
+
   const handleMarkReady = async () => {
     if (!detail || !session) return;
 
@@ -626,6 +723,15 @@ export default function CustomerPackageDetailScreen() {
       setNotice({
         title: 'Permiso requerido',
         message: 'No tienes permiso para marcar listo para envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.',
+        tone: 'warning',
+      });
+      return;
+    }
+
+    if (!shippingConfirmed) {
+      setNotice({
+        title: 'Envio pendiente',
+        message: 'Antes de marcar listo para envio, captura el costo de paqueteria o marca el envio como sin costo.',
         tone: 'warning',
       });
       return;
@@ -714,6 +820,10 @@ export default function CustomerPackageDetailScreen() {
   }
 
   const totalAmount = Number(detail.totalAmount ?? 0);
+  const itemSubtotalAmount = Number(
+    detail.itemSubtotalAmount ??
+      items.reduce((sum, item) => sum + Number(item.price ?? 0), 0)
+  );
   const paidAmount = Number(detail.paidAmount ?? 0);
   const pendingAmount = Number(detail.pendingAmount ?? 0);
   const customerBalance = Number(balanceSummary?.balance ?? 0);
@@ -728,7 +838,7 @@ export default function CustomerPackageDetailScreen() {
   );
   const latestShipment = shipments[0] ?? null;
   const shipmentState = getShipmentState(detail, shipments);
-  const nextStep = getNextStep(detail, hasPending, canReady, shipments);
+  const nextStep = getNextStep(detail, hasPending, canReady, shippingConfirmed, shipments);
   const isTerminalPackage = detail.status === 'CANCELLED' || detail.status === 'DELIVERED';
   const primaryAction =
     isTerminalPackage
@@ -748,6 +858,17 @@ export default function CustomerPackageDetailScreen() {
           disabled: !canManageShipments,
           disabledReason: 'No tienes permiso para gestionar envios. Permiso requerido: MANAGE_SHIPMENTS.',
         }
+        : !shippingConfirmed
+          ? {
+              title: 'Definir envio',
+              onPress: handleSaveShipping,
+              disabled: !canEdit || !canManagePackage || isWorking || isSavingShipping,
+              disabledReason: !canManagePackage
+                ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
+                : !canEdit
+                  ? 'Solo paquetes en preparacion pueden modificar datos de envio.'
+                  : 'Captura costo de paqueteria o marca envio sin costo.',
+            }
         : hasPending
           ? {
               title: 'Registrar abono',
@@ -763,7 +884,9 @@ export default function CustomerPackageDetailScreen() {
               disabled: !canReady || !canManagePackage || isWorking,
               disabledReason: !canManagePackage
                 ? 'No tienes permiso para preparar paquetes. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
-                : hasPending
+                : !shippingConfirmed
+                  ? 'Antes de marcar listo para envio, captura el costo de paqueteria o marca envio sin costo.'
+                  : hasPending
                   ? 'Liquida el saldo pendiente antes de liberar envio.'
                   : itemCount <= 0
                     ? 'Agrega al menos una prenda antes de liberar envio.'
@@ -821,8 +944,19 @@ export default function CustomerPackageDetailScreen() {
           </View>
         </View>
 
-        <AppResponsiveGrid phoneColumns={2} tabletColumns={3} desktopColumns={6} gap={8} style={styles.metricsGrid}>
-          <MetricCard label="Total paquete" value={money(totalAmount)} />
+        <AppResponsiveGrid phoneColumns={2} tabletColumns={3} desktopColumns={7} gap={8} style={styles.metricsGrid}>
+          <MetricCard label="Subtotal prendas" value={money(itemSubtotalAmount)} />
+          <MetricCard
+            label="Costo envio"
+            value={shippingConfirmed ? money(currentShippingCost) : 'Pendiente'}
+            helper={shippingConfirmed ? shippingStatusText : 'Define antes de liberar'}
+            tone={!shippingConfirmed ? 'warning' : currentShippingWaived ? 'success' : 'info'}
+          />
+          <MetricCard
+            label="Total paquete"
+            value={money(totalAmount)}
+            helper={!shippingConfirmed ? 'Parcial sin envio' : undefined}
+          />
           <MetricCard label="Abonado" value={money(paidAmount)} tone={paidAmount > 0 ? 'success' : 'default'} />
           <MetricCard
             label="Saldo pendiente"
@@ -833,12 +967,6 @@ export default function CustomerPackageDetailScreen() {
             label="Saldo a favor"
             value={money(customerBalance)}
             tone={customerBalance > 0 ? 'success' : 'default'}
-          />
-          <MetricCard
-            label="Envio por cobrar"
-            value={shipments.length > 0 ? money(shipmentCollectAmount) : 'Sin envio'}
-            helper={shipments.length > 0 ? `Cobrado ${money(shipmentCollectedAmount)}` : undefined}
-            tone={shipmentCollectAmount > shipmentCollectedAmount ? 'warning' : 'default'}
           />
           <MetricCard label="Prendas" value={String(itemCount)} helper={`${items.length} lineas`} />
         </AppResponsiveGrid>
@@ -951,8 +1079,14 @@ export default function CustomerPackageDetailScreen() {
               />
             </View>
 
-            <AppResponsiveGrid phoneColumns={1} tabletColumns={2} desktopColumns={4} gap={8}>
-              <MetricCard label="Total" value={money(totalAmount)} />
+            <AppResponsiveGrid phoneColumns={1} tabletColumns={2} desktopColumns={6} gap={8}>
+              <MetricCard label="Subtotal prendas" value={money(itemSubtotalAmount)} />
+              <MetricCard
+                label="Envio"
+                value={shippingConfirmed ? money(currentShippingCost) : 'Pendiente'}
+                tone={!shippingConfirmed ? 'warning' : currentShippingWaived ? 'success' : 'info'}
+              />
+              <MetricCard label="Total" value={money(totalAmount)} helper={!shippingConfirmed ? 'Parcial sin envio' : undefined} />
               <MetricCard label="Abonado" value={money(paidAmount)} tone={paidAmount > 0 ? 'success' : 'default'} />
               <MetricCard label="Pendiente" value={money(pendingAmount)} tone={pendingAmount > 0 ? 'danger' : 'success'} />
               <MetricCard label="Estado" value={paymentStatusLabel(detail.paymentStatus)} tone={pendingAmount > 0 ? 'warning' : 'success'} />
@@ -963,7 +1097,7 @@ export default function CustomerPackageDetailScreen() {
                 {paidAmount > 0 ? 'Abonos aplicados al paquete' : 'Aun no hay pagos registrados para este paquete.'}
               </AppText>
               <AppText variant="caption" color={theme.colors.mutedText}>
-                El endpoint actual devuelve acumulados de pago por paquete. El historial detallado queda disponible como backlog read-only.
+                Los abonos se aplican contra prendas y, si esta confirmado, contra el costo de envio. El historial detallado queda disponible como backlog read-only.
               </AppText>
             </View>
           </AppCard>
@@ -1019,6 +1153,8 @@ export default function CustomerPackageDetailScreen() {
                 disabledReason={
                   !canManagePackage
                     ? 'No tienes permiso para preparar paquetes. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
+                    : !shippingConfirmed
+                      ? 'Antes de marcar listo para envio, captura el costo de paqueteria o marca envio sin costo.'
                     : hasPending
                       ? 'Liquida el saldo pendiente antes de liberar envio.'
                       : itemCount <= 0
@@ -1044,36 +1180,128 @@ export default function CustomerPackageDetailScreen() {
 
           <AppCard>
             <AppText variant="subtitle" bold>
-              Envio
+              Envio / Paqueteria
             </AppText>
-            <InfoRow label="Estado" value={shipmentState} />
-            <InfoRow label="Por cobrar" value={shipments.length > 0 ? money(shipmentCollectAmount) : 'Sin envio'} />
-            <InfoRow label="Cobrado" value={shipments.length > 0 ? money(shipmentCollectedAmount) : 'Sin envio'} />
-            <InfoRow label="Ultimo envio" value={latestShipment?.shipmentFolio || 'Sin envio'} />
-            <View style={styles.sideAction}>
+            <View style={styles.shippingSummary}>
+              <InfoRow
+                label="Costo"
+                value={shippingConfirmed ? money(currentShippingCost) : 'Pendiente'}
+                tone={!shippingConfirmed ? 'warning' : 'success'}
+              />
+              <InfoRow label="Confirmacion" value={shippingStatusText} tone={!shippingConfirmed ? 'warning' : 'success'} />
+              <InfoRow label="Paqueteria" value={detail.shippingCarrier || 'Sin definir'} />
+              <InfoRow label="Guia" value={detail.trackingNumber || 'Pendiente'} />
+            </View>
+
+            {!shippingConfirmed ? (
+              <View style={[styles.shippingNotice, { borderColor: theme.colors.warning, backgroundColor: theme.colors.surfaceAlt }]}>
+                <AppText variant="caption" bold color={theme.colors.warning}>
+                  Envio pendiente de definir
+                </AppText>
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  Antes de marcar listo para envio, captura el costo de paqueteria o confirma envio sin costo.
+                </AppText>
+              </View>
+            ) : null}
+
+            <View style={styles.shippingForm}>
               <AppButton
-                title={latestShipment ? 'Ver envio' : 'Ir a envios'}
-                variant="secondary"
-                onPress={() =>
-                  latestShipment
-                    ? router.push(`/shipment-detail?id=${latestShipment.shipmentId}` as any)
-                    : router.push('/shipments' as any)
+                title={`${shippingCostWaived ? '[x]' : '[ ]'} Envio sin costo`}
+                variant={shippingCostWaived ? 'operation' : 'neutral'}
+                onPress={() => {
+                  setShippingCostWaived((current) => {
+                    const next = !current;
+                    if (next) {
+                      setShippingCostInput('0.00');
+                    }
+                    return next;
+                  });
+                }}
+                disabled={!canEdit || !canManagePackage || isWorking}
+                disabledReason={
+                  !canManagePackage
+                    ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
+                    : !canEdit
+                      ? 'Solo paquetes en preparacion pueden modificar datos de envio.'
+                      : 'Ya hay una accion en proceso.'
                 }
-                disabled={!canManageShipments}
-                disabledReason="No tienes permiso para gestionar envios. Permiso requerido: MANAGE_SHIPMENTS."
+              />
+              <AppInput
+                label="Costo de envio"
+                value={shippingCostWaived ? '0.00' : shippingCostInput}
+                onChangeText={setShippingCostInput}
+                placeholder="0.00"
+                keyboardType="decimal-pad"
+                editable={!shippingCostWaived && canEdit && canManagePackage && !isWorking}
+              />
+              <AppInput
+                label="Paqueteria"
+                value={shippingCarrier}
+                onChangeText={setShippingCarrier}
+                placeholder="Ej. Estafeta"
+                editable={canEdit && canManagePackage && !isWorking}
+              />
+              <AppInput
+                label="Guia / referencia"
+                value={trackingNumber}
+                onChangeText={setTrackingNumber}
+                placeholder="Pendiente"
+                editable={canEdit && canManagePackage && !isWorking}
+              />
+              <AppInput
+                label="Notas"
+                value={shippingNotes}
+                onChangeText={setShippingNotes}
+                placeholder="Cliente paga envio, entrega local, etc."
+                multiline
+                editable={canEdit && canManagePackage && !isWorking}
+              />
+              <AppButton
+                title="Guardar datos de envio"
+                variant="operation"
+                onPress={handleSaveShipping}
+                loading={isSavingShipping}
+                disabled={!canEdit || !canManagePackage || isWorking}
+                disabledReason={
+                  !canManagePackage
+                    ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
+                    : !canEdit
+                      ? 'Solo paquetes en preparacion pueden modificar datos de envio.'
+                      : 'Ya hay una accion en proceso.'
+                }
               />
             </View>
-            {shipments.length > 0 ? (
-              <View style={styles.lineList}>
-                {shipments.map((shipment) => (
-                  <ShipmentLine key={shipment.shipmentPackageId} shipment={shipment} />
-                ))}
+
+            <View style={[styles.shippingLogistics, { borderTopColor: theme.colors.borderSubtle }]}>
+              <InfoRow label="Estado logistico" value={shipmentState} />
+              <InfoRow label="Por cobrar en envio" value={shipments.length > 0 ? money(shipmentCollectAmount) : 'Sin envio'} />
+              <InfoRow label="Cobrado en envio" value={shipments.length > 0 ? money(shipmentCollectedAmount) : 'Sin envio'} />
+              <InfoRow label="Ultimo envio" value={latestShipment?.shipmentFolio || 'Sin envio'} />
+              <View style={styles.sideAction}>
+                <AppButton
+                  title={latestShipment ? 'Ver envio' : 'Ir a envios'}
+                  variant="secondary"
+                  onPress={() =>
+                    latestShipment
+                      ? router.push(`/shipment-detail?id=${latestShipment.shipmentId}` as any)
+                      : router.push('/shipments' as any)
+                  }
+                  disabled={!canManageShipments}
+                  disabledReason="No tienes permiso para gestionar envios. Permiso requerido: MANAGE_SHIPMENTS."
+                />
               </View>
-            ) : (
-              <AppText variant="caption" color={theme.colors.mutedText}>
-                Este paquete todavia no tiene envio asociado.
-              </AppText>
-            )}
+              {shipments.length > 0 ? (
+                <View style={styles.lineList}>
+                  {shipments.map((shipment) => (
+                    <ShipmentLine key={shipment.shipmentPackageId} shipment={shipment} />
+                  ))}
+                </View>
+              ) : (
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  Este paquete todavia no tiene envio asociado.
+                </AppText>
+              )}
+            </View>
           </AppCard>
 
           <AppCard>
@@ -1163,6 +1391,17 @@ export default function CustomerPackageDetailScreen() {
           <InfoRow label="Pendiente actual" value={money(detail.pendingAmount)} tone={hasPending ? 'danger' : 'success'} />
           <InfoRow label="Saldo a favor" value={money(balanceSummary?.balance)} tone={customerBalance > 0 ? 'success' : 'default'} />
         </AppCard>
+
+        {!shippingConfirmed ? (
+          <View style={[styles.shippingNotice, { borderColor: theme.colors.warning, backgroundColor: theme.colors.surfaceAlt }]}>
+            <AppText variant="caption" bold color={theme.colors.warning}>
+              Costo de envio pendiente
+            </AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              Puedes registrar abonos, pero el saldo final puede cambiar cuando confirmes la paqueteria.
+            </AppText>
+          </View>
+        ) : null}
 
         <AppInput
           label="Monto"
@@ -1362,6 +1601,28 @@ const styles = StyleSheet.create({
   sideAction: {
     marginBottom: 10,
     marginTop: 8,
+  },
+  shippingSummary: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 10,
+    marginTop: 8,
+  },
+  shippingNotice: {
+    borderWidth: 1,
+    gap: 4,
+    marginBottom: 12,
+    padding: 10,
+  },
+  shippingForm: {
+    gap: 2,
+  },
+  shippingLogistics: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 12,
   },
   lineList: {
     gap: 8,
