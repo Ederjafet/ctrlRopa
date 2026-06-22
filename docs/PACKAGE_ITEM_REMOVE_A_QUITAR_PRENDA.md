@@ -137,6 +137,18 @@ Caso de regresion cubierto:
 - Se quita linea de `$1,600.00` con pagado `$0.00`.
 - Despues: subtotal `$699.00`, envio `$190.00`, total `$889.00`, abonado `$699.00`, pendiente `$190.00`, 2 prendas.
 
+## Correccion PACKAGE-ITEM-REMOVE-C
+
+Se detecto que `Quitar` podia quedar como accion sin respuesta visible porque la confirmacion y el aviso de bloqueo dependian de `Alert.alert`.
+
+La accion ahora:
+
+- abre modal propio de confirmacion cuando puede ejecutarse;
+- muestra aviso visible si esta bloqueada;
+- muestra razon corta en la linea si no aplica;
+- llama el endpoint con `packageItemId`;
+- muestra error del backend dentro del modal si el DELETE es rechazado.
+
 ## Backlog
 
 - Quitar prenda con abono aplicado generando saldo a favor.

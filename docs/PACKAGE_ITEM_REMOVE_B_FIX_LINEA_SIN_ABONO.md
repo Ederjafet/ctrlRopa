@@ -119,6 +119,17 @@ Para el caso reportado:
 4. El envio de `$190.00` se conserva.
 5. El saldo pendiente baja a `$190.00`.
 
+## Correccion PACKAGE-ITEM-REMOVE-C
+
+El smoke posterior aclaro que el problema visible era tambien de interaccion: el boton `Quitar` podia depender de `Alert.alert` para confirmar o explicar bloqueos, y en web no siempre mostraba feedback.
+
+Se corrigio en `PACKAGE-ITEM-REMOVE-C`:
+
+- `Quitar` abre un `AppBottomModal` cuando la linea puede retirarse.
+- Si la linea esta bloqueada, el boton responde con aviso visible y la linea muestra una razon corta.
+- El modal confirma con `packageItemId`, vista previa de recalculo y errores del backend visibles.
+- El endpoint y la regla por linea se mantienen como autoridad final.
+
 ## Decision
 
 GO para la correccion: la regla queda por linea, el backend devuelve la decision a la UI y existe prueba de regresion con pagos parciales y envio confirmado.

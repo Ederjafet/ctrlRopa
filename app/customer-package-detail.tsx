@@ -105,6 +105,16 @@ function getRemoveItemBlockedReason(
   return '';
 }
 
+function getRemoveBlockedSummary(reason: string) {
+  if (reason.includes('abono')) return 'Tiene abono aplicado.';
+  if (reason.includes('permiso')) return 'Sin permiso para quitar.';
+  if (reason.includes('listo') || reason.includes('enviado') || reason.includes('cancelado')) {
+    return 'Paquete no editable.';
+  }
+  if (reason.includes('accion en proceso')) return 'Accion en proceso.';
+  return reason;
+}
+
 function getShipmentState(detail: CustomerPackageDetail, shipments: CustomerPackageShipmentLine[]) {
   if (shipments.length > 0) {
     const latest = shipments[0];
@@ -295,10 +305,13 @@ function PackageItemLine({
           title="Quitar"
           variant="neutral"
           onPress={() => onRemoveItem(item)}
-          disabled={Boolean(removeBlockedReason)}
-          disabledReason={removeBlockedReason || 'No se puede quitar esta prenda del paquete.'}
           style={styles.lineButton}
         />
+        {removeBlockedReason ? (
+          <AppText variant="caption" color={theme.colors.mutedText} style={styles.removeBlockedText}>
+            {getRemoveBlockedSummary(removeBlockedReason)}
+          </AppText>
+        ) : null}
       </View>
     </View>
   );
@@ -347,6 +360,8 @@ export default function CustomerPackageDetailScreen() {
   const [codeModalVisible, setCodeModalVisible] = useState(false);
   const [qrModalVisible, setQrModalVisible] = useState(false);
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
+  const [removeItemCandidate, setRemoveItemCandidate] = useState<CustomerPackageItemLine | null>(null);
+  const [removeItemError, setRemoveItemError] = useState<string | null>(null);
   const [itemSearchModalVisible, setItemSearchModalVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [paymentMethodPickerVisible, setPaymentMethodPickerVisible] = useState(false);
@@ -449,6 +464,23 @@ export default function CustomerPackageDetailScreen() {
   const canApplyCustomerBalance = hasPermission(session, 'APPLY_CUSTOMER_BALANCE');
   const canManageInventory = hasPermission(session, 'MANAGE_INVENTORY');
   const canManageShipments = hasPermission(session, 'MANAGE_SHIPMENTS');
+
+  const removeItemPreview = useMemo(() => {
+    if (!detail || !removeItemCandidate) return null;
+
+    const nextSubtotal = Math.max(0, Number(detail.itemSubtotalAmount ?? 0) - Number(removeItemCandidate.price ?? 0));
+    const nextPaid = Math.max(0, Number(detail.paidAmount ?? 0) - Number(removeItemCandidate.paidAmount ?? 0));
+    const nextTotal = nextSubtotal + currentShippingCost;
+    const nextPending = Math.max(0, nextTotal - nextPaid);
+
+    return {
+      subtotal: nextSubtotal,
+      shipping: currentShippingCost,
+      total: nextTotal,
+      paid: nextPaid,
+      pending: nextPending,
+    };
+  }, [currentShippingCost, detail, removeItemCandidate]);
 
   const filteredBranchItems = useMemo(() => {
     const term = itemSearch.trim().toLowerCase();
@@ -597,38 +629,53 @@ export default function CustomerPackageDetailScreen() {
       return;
     }
 
-    Alert.alert(
-      'Quitar prenda del paquete',
-      `Vas a quitar esta prenda del paquete:\n\n${item.itemCode || `Prenda #${item.itemId}`}\nPrecio: ${money(item.price)}\nPagado aplicado: ${money(item.paidAmount)}\n\nEl total del paquete y el saldo pendiente se recalcularan.\n\nSi venia de un apartado, permanecera como apartado fuera del paquete. Si fue agregada desde inventario libre, conservara la reserva creada por el flujo actual.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Quitar prenda',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setIsWorking(true);
-              const updated = await removeCustomerPackageItem(detail.id, item.id);
-              setDetail(updated);
-              syncShippingForm(updated);
-              setNotice({
-                title: 'Prenda quitada',
-                message: 'Prenda quitada del paquete correctamente.',
-                tone: 'success',
-              });
-            } catch (error: any) {
-              setNotice({
-                title: 'No se pudo quitar',
-                message: error.message || 'No se pudo quitar la prenda. Intenta de nuevo.',
-                tone: 'danger',
-              });
-            } finally {
-              setIsWorking(false);
-            }
-          },
-        },
-      ]
-    );
+    setRemoveItemError(null);
+    setRemoveItemCandidate(item);
+  };
+
+  const closeRemoveItemModal = () => {
+    if (isWorking) return;
+    setRemoveItemCandidate(null);
+    setRemoveItemError(null);
+  };
+
+  const handleConfirmRemovePackageItem = async () => {
+    if (!detail || !removeItemCandidate) return;
+
+    const blockedReason = getRemoveItemBlockedReason(removeItemCandidate, canEdit, canManagePackage, isWorking);
+    if (blockedReason) {
+      setRemoveItemError(blockedReason);
+      setNotice({
+        title: 'No se puede quitar',
+        message: blockedReason,
+        tone: 'warning',
+      });
+      return;
+    }
+
+    try {
+      setIsWorking(true);
+      setRemoveItemError(null);
+      const updated = await removeCustomerPackageItem(detail.id, removeItemCandidate.id);
+      setDetail(updated);
+      syncShippingForm(updated);
+      setRemoveItemCandidate(null);
+      setNotice({
+        title: 'Prenda quitada',
+        message: 'Prenda quitada del paquete correctamente.',
+        tone: 'success',
+      });
+    } catch (error: any) {
+      const message = error.message || 'No se pudo quitar la prenda. Intenta de nuevo.';
+      setRemoveItemError(message);
+      setNotice({
+        title: 'No se pudo quitar',
+        message,
+        tone: 'danger',
+      });
+    } finally {
+      setIsWorking(false);
+    }
   };
 
   const openPaymentModal = () => {
@@ -1461,6 +1508,71 @@ export default function CustomerPackageDetailScreen() {
       </AppBottomModal>
 
       <AppBottomModal
+        visible={Boolean(removeItemCandidate)}
+        title="Quitar prenda del paquete"
+        onClose={closeRemoveItemModal}
+        footer={
+          <View style={styles.modalActions}>
+            <AppButton
+              title="Cancelar"
+              variant="cancel"
+              onPress={closeRemoveItemModal}
+              disabled={isWorking}
+              disabledReason="Espera a que termine la operacion."
+            />
+            <AppButton
+              title="Quitar prenda"
+              variant="danger"
+              onPress={handleConfirmRemovePackageItem}
+              loading={isWorking}
+              disabled={isWorking}
+            />
+          </View>
+        }
+      >
+        {removeItemCandidate ? (
+          <View style={styles.removeConfirmContent}>
+            <AppCard variant="subtle">
+              <InfoRow label="Prenda" value={removeItemCandidate.itemCode || `Prenda #${removeItemCandidate.itemId}`} />
+              <InfoRow label="Precio" value={money(removeItemCandidate.price)} />
+              <InfoRow label="Pagado aplicado" value={money(removeItemCandidate.paidAmount)} />
+              <InfoRow label="Pendiente linea" value={money(removeItemCandidate.pendingAmount)} />
+            </AppCard>
+
+            <View style={[styles.shippingNotice, { borderColor: theme.colors.warning, backgroundColor: theme.colors.surfaceAlt }]}>
+              <AppText variant="caption" bold color={theme.colors.warning}>
+                El total y saldo se recalcularan
+              </AppText>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                No se tocaran pagos ya registrados. Si venia de un apartado, permanecera fuera del paquete; si fue agregada desde inventario libre, conservara la reserva creada por el flujo actual.
+              </AppText>
+            </View>
+
+            {removeItemPreview ? (
+              <AppResponsiveGrid phoneColumns={1} tabletColumns={2} desktopColumns={5} gap={8}>
+                <MetricCard label="Subtotal despues" value={money(removeItemPreview.subtotal)} />
+                <MetricCard label="Envio" value={money(removeItemPreview.shipping)} />
+                <MetricCard label="Total despues" value={money(removeItemPreview.total)} />
+                <MetricCard label="Abonado" value={money(removeItemPreview.paid)} />
+                <MetricCard label="Pendiente" value={money(removeItemPreview.pending)} tone={removeItemPreview.pending > 0 ? 'danger' : 'success'} />
+              </AppResponsiveGrid>
+            ) : null}
+
+            {removeItemError ? (
+              <View style={[styles.shippingNotice, { borderColor: theme.colors.danger, backgroundColor: theme.colors.surfaceAlt }]}>
+                <AppText variant="caption" bold color={theme.colors.danger}>
+                  No se pudo quitar
+                </AppText>
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  {removeItemError}
+                </AppText>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+      </AppBottomModal>
+
+      <AppBottomModal
         visible={paymentModalVisible}
         title="Registrar abono"
         onClose={closePaymentModal}
@@ -1737,6 +1849,19 @@ const styles = StyleSheet.create({
     minWidth: 104,
     paddingHorizontal: 10,
     paddingVertical: 6,
+  },
+  removeBlockedText: {
+    flexBasis: '100%',
+    textAlign: 'right',
+  },
+  removeConfirmContent: {
+    gap: 12,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'flex-end',
   },
   infoRow: {
     flexGrow: 1,

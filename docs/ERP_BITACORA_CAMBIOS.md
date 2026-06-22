@@ -1,5 +1,31 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-22 - PACKAGE-ITEM-REMOVE-C boton Quitar sin no-op
+
+Tipo: frontend, UX operativa, paquetes, pagos, envios, documentacion.
+
+Objetivo:
+
+- Corregir el boton `Quitar` de `/customer-package-detail` para que siempre tenga respuesta visible: confirmacion si aplica o razon clara si esta bloqueado.
+
+Cambios realizados:
+
+- Se reemplaza la confirmacion basada en `Alert.alert` por un `AppBottomModal` propio.
+- `Quitar` ya no se renderiza como `disabled` para bloqueos de negocio; al presionarlo muestra aviso con la razon exacta.
+- La linea muestra una razon corta cuando no puede quitarse: abono aplicado, sin permiso, paquete no editable o accion en proceso.
+- El modal muestra prenda, precio, pagado aplicado, pendiente de linea y vista previa de subtotal/envio/total/abonado/pendiente despues de quitar.
+- Confirmar llama `removeCustomerPackageItem(detail.id, line.id)`, donde `line.id` es `packageItemId`.
+- Si backend rechaza, el error queda visible en el modal y en el aviso superior.
+- Se documenta la fase en `docs/PACKAGE_ITEM_REMOVE_C_BOTON_QUITAR_NOOP.md`.
+
+Restricciones respetadas:
+
+- No se cambio backend ni reglas financieras.
+- No se permitio quitar lineas con pago aplicado.
+- No se uso pago global para bloquear linea sin pago.
+- No se borra envio al quitar prenda.
+- No se reseteo base de datos.
+
 ## 2026-06-22 - PACKAGE-ITEM-REMOVE-B fix quitar linea sin abono con pagos/envio
 
 Tipo: backend, frontend, paquetes, pagos, envios, tests, documentacion.
