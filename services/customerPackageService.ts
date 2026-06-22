@@ -70,6 +70,8 @@ export type CustomerPackageDetail = CustomerPackage & {
   totalAmount?: number;
   paidAmount?: number;
   pendingAmount?: number;
+  canMarkReadyForShipment?: boolean;
+  markReadyForShipmentBlockedReason?: string | null;
   items?: CustomerPackageItemLine[];
   shipments?: CustomerPackageShipmentLine[];
 };
@@ -238,10 +240,13 @@ export function isCustomerPackageOpen(customerPackage?: CustomerPackageDetail | 
 
 export function canMarkCustomerPackageReady(customerPackage?: CustomerPackageDetail | null) {
   if (!customerPackage) return false;
+  if (typeof customerPackage.canMarkReadyForShipment === 'boolean') {
+    return customerPackage.canMarkReadyForShipment;
+  }
   return (
     customerPackage.status === 'OPEN' &&
     Number(customerPackage.totalItems ?? 0) > 0 &&
     customerPackage.shippingCostConfirmed === true &&
-    Number(customerPackage.pendingAmount ?? 0) <= 0
+    Number(Number(customerPackage.pendingAmount ?? 0).toFixed(2)) <= 0
   );
 }

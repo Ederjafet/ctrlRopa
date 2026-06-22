@@ -43,6 +43,8 @@ La accion destacada depende del estado:
 
 Las acciones secundarias quedan en el panel lateral: registrar abono, aplicar saldo a favor, agregar por QR, marcar listo y cancelar paquete.
 
+Despues de PACKAGE-READY-A, `Marcar listo para envio` usa `canMarkReadyForShipment` y `markReadyForShipmentBlockedReason` del backend. Si se puede liberar, abre un modal de confirmacion con resumen financiero; si no se puede, muestra la causa exacta en aviso visible.
+
 ## Prendas
 
 La lista de prendas ahora usa filas compactas con:

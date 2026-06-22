@@ -33,6 +33,8 @@ public class CustomerPackageDetailResponse {
     private BigDecimal totalAmount;
     private BigDecimal paidAmount;
     private BigDecimal pendingAmount;
+    private Boolean canMarkReadyForShipment;
+    private String markReadyForShipmentBlockedReason;
 
     private List<ItemLine> items;
     private List<ShipmentLine> shipments;
@@ -63,6 +65,8 @@ public class CustomerPackageDetailResponse {
                                          BigDecimal totalAmount,
                                          BigDecimal paidAmount,
                                          BigDecimal pendingAmount,
+                                         Boolean canMarkReadyForShipment,
+                                         String markReadyForShipmentBlockedReason,
                                          List<ItemLine> items,
                                          List<ShipmentLine> shipments) {
         this.id = id;
@@ -91,6 +95,8 @@ public class CustomerPackageDetailResponse {
         this.totalAmount = totalAmount;
         this.paidAmount = paidAmount;
         this.pendingAmount = pendingAmount;
+        this.canMarkReadyForShipment = canMarkReadyForShipment;
+        this.markReadyForShipmentBlockedReason = markReadyForShipmentBlockedReason;
         this.items = items;
         this.shipments = shipments;
     }
@@ -121,6 +127,8 @@ public class CustomerPackageDetailResponse {
     public BigDecimal getTotalAmount() { return totalAmount; }
     public BigDecimal getPaidAmount() { return paidAmount; }
     public BigDecimal getPendingAmount() { return pendingAmount; }
+    public Boolean getCanMarkReadyForShipment() { return canMarkReadyForShipment; }
+    public String getMarkReadyForShipmentBlockedReason() { return markReadyForShipmentBlockedReason; }
     public List<ItemLine> getItems() { return items; }
     public List<ShipmentLine> getShipments() { return shipments; }
 

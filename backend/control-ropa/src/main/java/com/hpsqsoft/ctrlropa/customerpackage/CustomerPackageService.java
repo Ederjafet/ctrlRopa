@@ -30,6 +30,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -309,7 +310,7 @@ public class CustomerPackageService {
             throw new IllegalArgumentException("Solo paquetes en OPEN pueden pasar a READY");
         }
 
-        if (!customerPackage.isShippingCostConfirmed()) {
+        if (!isShippingConfirmedForReady(customerPackage)) {
             throw new IllegalArgumentException("Antes de marcar listo para envio, captura el costo de paqueteria o marca el envio como sin costo.");
         }
 
@@ -318,8 +319,9 @@ public class CustomerPackageService {
             throw new IllegalArgumentException("No se puede cerrar un paquete vacío");
         }
 
-        if (detail.getPendingAmount().compareTo(BigDecimal.ZERO) > 0) {
-            throw new IllegalArgumentException("Este paquete tiene saldo pendiente.");
+        BigDecimal pendingAmount = normalizeMoney(detail.getPendingAmount());
+        if (pendingAmount.compareTo(BigDecimal.ZERO) > 0) {
+            throw new IllegalArgumentException("No puedes marcar listo para envio porque el paquete tiene saldo pendiente de " + formatMoney(pendingAmount) + ".");
         }
 
         customerPackage.setStatus(CustomerPackageStatus.READY);
@@ -544,8 +546,15 @@ public class CustomerPackageService {
         if (pendingAmount.signum() < 0) {
             pendingAmount = BigDecimal.ZERO;
         }
+        pendingAmount = normalizeMoney(pendingAmount);
 
         String paymentStatus = resolvePaymentStatus(totalAmount, paidAmount);
+        String markReadyBlockedReason = getMarkReadyBlockedReason(
+                customerPackage,
+                items.size(),
+                pendingAmount,
+                canRemoveItems
+        );
 
         List<CustomerPackageDetailResponse.ShipmentLine> shipments = findShipmentLines(customerPackage.getId());
 
@@ -576,6 +585,8 @@ public class CustomerPackageService {
                 totalAmount,
                 paidAmount,
                 pendingAmount,
+                markReadyBlockedReason == null,
+                markReadyBlockedReason,
                 items,
                 shipments
         );
@@ -805,12 +816,61 @@ public class CustomerPackageService {
         return null;
     }
 
+    private String getMarkReadyBlockedReason(CustomerPackage customerPackage,
+                                             int itemCount,
+                                             BigDecimal pendingAmount,
+                                             boolean canManagePackage) {
+        if (!canManagePackage) {
+            return "No tienes permiso para marcar listo para envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.";
+        }
+
+        if (customerPackage.getStatus() != CustomerPackageStatus.OPEN) {
+            return "El paquete no puede prepararse para envio en su estado actual: " + customerPackage.getStatus().name() + ".";
+        }
+
+        if (itemCount <= 0) {
+            return "Agrega al menos una prenda antes de liberar envio.";
+        }
+
+        if (!isShippingConfirmedForReady(customerPackage)) {
+            return "Antes de marcar listo para envio, captura el costo de paqueteria o marca envio sin costo.";
+        }
+
+        BigDecimal normalizedPending = normalizeMoney(pendingAmount);
+        if (normalizedPending.compareTo(BigDecimal.ZERO) > 0) {
+            return "No puedes marcar listo para envio porque el paquete tiene saldo pendiente de " + formatMoney(normalizedPending) + ".";
+        }
+
+        return null;
+    }
+
+    private boolean isShippingConfirmedForReady(CustomerPackage customerPackage) {
+        if (!customerPackage.isShippingCostConfirmed()) {
+            return false;
+        }
+
+        if (customerPackage.isShippingCostWaived()) {
+            return true;
+        }
+
+        return customerPackage.getShippingCostAmount() != null
+                && customerPackage.getShippingCostAmount().compareTo(BigDecimal.ZERO) >= 0;
+    }
+
     private boolean isEditableForItemRemoval(CustomerPackageStatus status) {
         return status == CustomerPackageStatus.OPEN;
     }
 
     private boolean hasLinePayment(SourceFinancialData financialData) {
         return financialData.paidAmount().compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    private BigDecimal normalizeMoney(BigDecimal value) {
+        return safe(value).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private String formatMoney(BigDecimal value) {
+        return "$" + normalizeMoney(value).toPlainString() + " MXN";
     }
 
     private SourceFinancialData getSourceFinancialData(CustomerPackageItem packageItem) {
@@ -868,7 +928,8 @@ public class CustomerPackageService {
             return "UNPAID";
         }
 
-        if (paid.compareTo(total) < 0) {
+        BigDecimal pending = normalizeMoney(total.subtract(paid));
+        if (pending.compareTo(BigDecimal.ZERO) > 0) {
             return "PARTIALLY_PAID";
         }
 

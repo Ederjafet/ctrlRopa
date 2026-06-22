@@ -1,5 +1,31 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-22 - PACKAGE-READY-A liberar paquete pagado para envio
+
+Tipo: backend, frontend, paquetes, pagos, envios, UX operativa, tests, documentacion.
+
+Objetivo:
+
+- Corregir la liberacion a envio cuando un paquete ya esta pagado y tiene envio confirmado.
+
+Cambios realizados:
+
+- `CustomerPackageDetailResponse` expone `canMarkReadyForShipment` y `markReadyForShipmentBlockedReason`.
+- `CustomerPackageService` calcula la disponibilidad de `Marcar listo para envio` desde backend con permiso, estado, prendas, envio confirmado y saldo normalizado.
+- La comparacion de saldo para liberar envio usa escala monetaria a 2 decimales y evita bloqueos por residuos sub-centavo.
+- El error por saldo pendiente ahora incluye monto exacto.
+- `/customer-package-detail` usa el DTO del backend para habilitar/explicar la accion.
+- Se reemplaza la confirmacion nativa por `AppBottomModal`, con resumen financiero y errores visibles.
+- Se agregan pruebas de paquete pagado con envio confirmado, envio sin costo, saldo pendiente por envio y residuo sub-centavo.
+- Se documenta la fase en `docs/PACKAGE_READY_A_LIBERAR_ENVIO_PAGADO.md`.
+
+Restricciones respetadas:
+
+- No se permitio liberar envio con saldo pendiente.
+- No se permitio liberar envio sin costo de envio confirmado.
+- No se tocaron pagos existentes ni tenant isolation.
+- No se reseteo base de datos.
+
 ## 2026-06-22 - PACKAGE-ITEM-REMOVE-C boton Quitar sin no-op
 
 Tipo: frontend, UX operativa, paquetes, pagos, envios, documentacion.

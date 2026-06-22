@@ -36,6 +36,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -305,6 +306,112 @@ class CustomerPackageServiceTests {
 
         assertThrows(IllegalArgumentException.class, () -> service.markReady(501L, request));
         verify(repository, never()).save(any(CustomerPackage.class));
+    }
+
+    @Test
+    void markReadyPaidPackageWithShippingConfirmedIsAllowed() {
+        Reservation reservation = activeReservation(false);
+        CustomerPackage customerPackage = customerPackage(reservation);
+        customerPackage.setShippingCostConfirmed(true);
+        customerPackage.setShippingCostAmount(BigDecimal.valueOf(190).setScale(2));
+        CustomerPackageItem packageItem = packageItem(customerPackage, reservation);
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(501L)).thenReturn(Optional.of(customerPackage));
+        when(repository.save(any(CustomerPackage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(itemRepository.findByCustomerPackageIdOrderByCreatedAtAsc(501L)).thenReturn(List.of(packageItem));
+        stubFinancialSummary(BigDecimal.valueOf(300).setScale(2));
+        when(jdbcTemplate.queryForObject(anyString(), eq(BigDecimal.class), eq(501L)))
+                .thenReturn(BigDecimal.valueOf(190).setScale(2));
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(501L))).thenReturn(List.of());
+
+        CloseCustomerPackageRequest request = new CloseCustomerPackageRequest();
+        request.setClosedByUserId(99L);
+
+        CustomerPackageDetailResponse response = service.markReady(501L, request);
+
+        assertEquals(CustomerPackageStatus.READY.name(), response.getStatus());
+        assertEquals(0, response.getPendingAmount().compareTo(BigDecimal.ZERO));
+        verify(repository).save(customerPackage);
+    }
+
+    @Test
+    void markReadyPaidPackageWithWaivedShippingIsAllowed() {
+        Reservation reservation = activeReservation(false);
+        CustomerPackage customerPackage = customerPackage(reservation);
+        customerPackage.setShippingCostConfirmed(true);
+        customerPackage.setShippingCostWaived(true);
+        customerPackage.setShippingCostAmount(BigDecimal.ZERO);
+        CustomerPackageItem packageItem = packageItem(customerPackage, reservation);
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(501L)).thenReturn(Optional.of(customerPackage));
+        when(repository.save(any(CustomerPackage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(itemRepository.findByCustomerPackageIdOrderByCreatedAtAsc(501L)).thenReturn(List.of(packageItem));
+        stubFinancialSummary(BigDecimal.valueOf(300).setScale(2));
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(501L))).thenReturn(List.of());
+
+        CloseCustomerPackageRequest request = new CloseCustomerPackageRequest();
+        request.setClosedByUserId(99L);
+
+        CustomerPackageDetailResponse response = service.markReady(501L, request);
+
+        assertEquals(CustomerPackageStatus.READY.name(), response.getStatus());
+        assertEquals(0, response.getPendingAmount().compareTo(BigDecimal.ZERO));
+    }
+
+    @Test
+    void markReadyWithShippingBalancePendingIsRejectedWithAmount() {
+        Reservation reservation = activeReservation(false);
+        CustomerPackage customerPackage = customerPackage(reservation);
+        customerPackage.setShippingCostConfirmed(true);
+        customerPackage.setShippingCostAmount(BigDecimal.valueOf(190).setScale(2));
+        CustomerPackageItem packageItem = packageItem(customerPackage, reservation);
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(501L)).thenReturn(Optional.of(customerPackage));
+        when(itemRepository.findByCustomerPackageIdOrderByCreatedAtAsc(501L)).thenReturn(List.of(packageItem));
+        stubFinancialSummary(BigDecimal.valueOf(300).setScale(2));
+        when(jdbcTemplate.queryForObject(anyString(), eq(BigDecimal.class), eq(501L)))
+                .thenReturn(BigDecimal.ZERO.setScale(2));
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(501L))).thenReturn(List.of());
+
+        CloseCustomerPackageRequest request = new CloseCustomerPackageRequest();
+        request.setClosedByUserId(99L);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.markReady(501L, request)
+        );
+
+        assertTrue(exception.getMessage().contains("$190.00 MXN"));
+        verify(repository, never()).save(any(CustomerPackage.class));
+    }
+
+    @Test
+    void markReadyIgnoresSubCentRoundingResidue() {
+        Reservation reservation = activeReservation(false);
+        CustomerPackage customerPackage = customerPackage(reservation);
+        customerPackage.setShippingCostConfirmed(true);
+        customerPackage.setShippingCostAmount(BigDecimal.valueOf(190).setScale(2));
+        CustomerPackageItem packageItem = packageItem(customerPackage, reservation);
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(501L)).thenReturn(Optional.of(customerPackage));
+        when(repository.save(any(CustomerPackage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(itemRepository.findByCustomerPackageIdOrderByCreatedAtAsc(501L)).thenReturn(List.of(packageItem));
+        stubFinancialSummary(BigDecimal.valueOf(300).setScale(2));
+        when(jdbcTemplate.queryForObject(anyString(), eq(BigDecimal.class), eq(501L)))
+                .thenReturn(new BigDecimal("189.996"));
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(501L))).thenReturn(List.of());
+
+        CloseCustomerPackageRequest request = new CloseCustomerPackageRequest();
+        request.setClosedByUserId(99L);
+
+        CustomerPackageDetailResponse response = service.markReady(501L, request);
+
+        assertEquals(CustomerPackageStatus.READY.name(), response.getStatus());
+        verify(repository).save(customerPackage);
     }
 
     @Test

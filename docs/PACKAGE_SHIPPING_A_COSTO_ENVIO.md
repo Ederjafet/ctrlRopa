@@ -120,8 +120,10 @@ El resumen financiero superior muestra:
 Mensajes principales:
 
 - `Antes de marcar listo para envio, captura el costo de paqueteria o marca el envio como sin costo.`
-- `Liquida el saldo pendiente antes de liberar envio.`
+- `No puedes marcar listo para envio porque el paquete tiene saldo pendiente de $X.XX MXN.`
 - `No tienes permiso para preparar paquetes. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.`
+
+Despues de PACKAGE-READY-A, el detalle del paquete expone `canMarkReadyForShipment` y `markReadyForShipmentBlockedReason`. La pantalla usa esos campos del backend para que la accion y el motivo de bloqueo coincidan. El saldo se normaliza a 2 decimales antes de decidir si el paquete esta liquidado.
 
 ## Pagos
 
@@ -137,6 +139,10 @@ Tests agregados o ajustados:
 - rechazar costo negativo;
 - bloquear `markReady` si envio no esta confirmado;
 - asignar remanente de pago del paquete al cargo de envio.
+- permitir `markReady` si el paquete esta pagado y el envio confirmado;
+- permitir `markReady` si el envio esta confirmado sin costo;
+- bloquear con monto exacto si falta saldo de envio;
+- permitir `markReady` cuando solo existe residuo sub-centavo que redondea a `0.00`.
 
 ## Backlog
 

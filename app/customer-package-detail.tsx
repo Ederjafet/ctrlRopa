@@ -115,6 +115,27 @@ function getRemoveBlockedSummary(reason: string) {
   return reason;
 }
 
+function getMarkReadyBlockedReason(
+  detail: CustomerPackageDetail | null,
+  canManagePackage: boolean,
+  isWorking: boolean
+) {
+  if (isWorking) return 'Ya hay una accion en proceso.';
+  if (!detail) return 'No se pudo cargar el paquete.';
+  if (detail.canMarkReadyForShipment === true) return '';
+  if (detail.markReadyForShipmentBlockedReason) return detail.markReadyForShipmentBlockedReason;
+  if (!canManagePackage) return 'No tienes permiso para marcar listo para envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.';
+  if (detail.status !== 'OPEN') return `El paquete no puede prepararse para envio en su estado actual: ${statusLabel(detail.status)}.`;
+  if (Number(detail.totalItems ?? 0) <= 0) return 'Agrega al menos una prenda antes de liberar envio.';
+  if (detail.shippingCostConfirmed !== true) {
+    return 'Antes de marcar listo para envio, captura el costo de paqueteria o marca envio sin costo.';
+  }
+  if (Number(Number(detail.pendingAmount ?? 0).toFixed(2)) > 0) {
+    return `No puedes marcar listo para envio porque el paquete tiene saldo pendiente de ${money(detail.pendingAmount)}.`;
+  }
+  return '';
+}
+
 function getShipmentState(detail: CustomerPackageDetail, shipments: CustomerPackageShipmentLine[]) {
   if (shipments.length > 0) {
     const latest = shipments[0];
@@ -362,6 +383,8 @@ export default function CustomerPackageDetailScreen() {
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [removeItemCandidate, setRemoveItemCandidate] = useState<CustomerPackageItemLine | null>(null);
   const [removeItemError, setRemoveItemError] = useState<string | null>(null);
+  const [markReadyModalVisible, setMarkReadyModalVisible] = useState(false);
+  const [markReadyError, setMarkReadyError] = useState<string | null>(null);
   const [itemSearchModalVisible, setItemSearchModalVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [paymentMethodPickerVisible, setPaymentMethodPickerVisible] = useState(false);
@@ -447,7 +470,7 @@ export default function CustomerPackageDetailScreen() {
 
   const canEdit = isCustomerPackageOpen(detail);
   const canReady = canMarkCustomerPackageReady(detail);
-  const hasPending = Number(detail?.pendingAmount ?? 0) > 0;
+  const hasPending = Number(Number(detail?.pendingAmount ?? 0).toFixed(2)) > 0;
   const items = useMemo(() => detail?.items ?? [], [detail?.items]);
   const shipments = useMemo(() => detail?.shipments ?? [], [detail?.shipments]);
   const shippingConfirmed = detail?.shippingCostConfirmed === true;
@@ -464,6 +487,7 @@ export default function CustomerPackageDetailScreen() {
   const canApplyCustomerBalance = hasPermission(session, 'APPLY_CUSTOMER_BALANCE');
   const canManageInventory = hasPermission(session, 'MANAGE_INVENTORY');
   const canManageShipments = hasPermission(session, 'MANAGE_SHIPMENTS');
+  const markReadyBlockedReason = getMarkReadyBlockedReason(detail, canManagePackage, isWorking);
 
   const removeItemPreview = useMemo(() => {
     if (!detail || !removeItemCandidate) return null;
@@ -843,61 +867,62 @@ export default function CustomerPackageDetailScreen() {
   const handleMarkReady = async () => {
     if (!detail || !session) return;
 
-    if (!canManagePackage) {
+    const blockedReason = getMarkReadyBlockedReason(detail, canManagePackage, isWorking);
+    if (blockedReason) {
       setNotice({
-        title: 'Permiso requerido',
-        message: 'No tienes permiso para marcar listo para envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.',
+        title: 'No se puede liberar envio',
+        message: blockedReason,
         tone: 'warning',
       });
       return;
     }
 
-    if (!shippingConfirmed) {
+    setMarkReadyError(null);
+    setMarkReadyModalVisible(true);
+  };
+
+  const closeMarkReadyModal = () => {
+    if (isWorking) return;
+    setMarkReadyModalVisible(false);
+    setMarkReadyError(null);
+  };
+
+  const handleConfirmMarkReady = async () => {
+    if (!detail || !session) return;
+
+    const blockedReason = getMarkReadyBlockedReason(detail, canManagePackage, isWorking);
+    if (blockedReason) {
+      setMarkReadyError(blockedReason);
       setNotice({
-        title: 'Envio pendiente',
-        message: 'Antes de marcar listo para envio, captura el costo de paqueteria o marca el envio como sin costo.',
+        title: 'No se puede liberar envio',
+        message: blockedReason,
         tone: 'warning',
       });
       return;
     }
 
-    if (!canReady) {
+    try {
+      setIsWorking(true);
+      setMarkReadyError(null);
+      const updated = await markCustomerPackageReady(detail.id, session.userId);
+      setDetail(updated);
+      setMarkReadyModalVisible(false);
       setNotice({
-        title: 'Falta completar el paquete',
-        message: hasPending
-          ? 'Antes de marcar listo para envio, liquida el saldo pendiente del paquete.'
-          : 'Antes de marcar listo para envio, agrega al menos una prenda al paquete.',
-        tone: 'warning',
+        title: 'Paquete listo para envio',
+        message: 'Paquete marcado listo para envio.',
+        tone: 'success',
       });
-      return;
+    } catch (error: any) {
+      const message = error.message || 'No se pudo marcar el paquete como listo.';
+      setMarkReadyError(message);
+      setNotice({
+        title: 'No se pudo marcar listo',
+        message,
+        tone: 'danger',
+      });
+    } finally {
+      setIsWorking(false);
     }
-
-    Alert.alert('Marcar listo para envio', `Quieres marcar el paquete ${detail.folio} como listo para envio?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Marcar listo',
-        onPress: async () => {
-          try {
-            setIsWorking(true);
-            const updated = await markCustomerPackageReady(detail.id, session.userId);
-            setDetail(updated);
-            setNotice({
-              title: 'Paquete listo para envio',
-              message: 'Paquete marcado listo para envio.',
-              tone: 'success',
-            });
-          } catch (error: any) {
-            setNotice({
-              title: 'No se pudo marcar listo',
-              message: error.message || 'No se pudo marcar el paquete como listo.',
-              tone: 'danger',
-            });
-          } finally {
-            setIsWorking(false);
-          }
-        },
-      },
-    ]);
   };
 
   const handleCancel = async () => {
@@ -1005,16 +1030,8 @@ export default function CustomerPackageDetailScreen() {
           : {
               title: 'Marcar listo para envio',
               onPress: handleMarkReady,
-              disabled: !canReady || !canManagePackage || isWorking,
-              disabledReason: !canManagePackage
-                ? 'No tienes permiso para preparar paquetes. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
-                : !shippingConfirmed
-                  ? 'Antes de marcar listo para envio, captura el costo de paqueteria o marca envio sin costo.'
-                  : hasPending
-                  ? 'Liquida el saldo pendiente antes de liberar envio.'
-                  : itemCount <= 0
-                    ? 'Agrega al menos una prenda antes de liberar envio.'
-                    : 'Ya hay una accion en proceso.',
+              disabled: isWorking,
+              disabledReason: markReadyBlockedReason || 'Ya hay una accion en proceso.',
             };
 
   return (
@@ -1275,18 +1292,8 @@ export default function CustomerPackageDetailScreen() {
                 variant="secondary"
                 onPress={handleMarkReady}
                 loading={isWorking}
-                disabled={!canReady || !canManagePackage || isWorking}
-                disabledReason={
-                  !canManagePackage
-                    ? 'No tienes permiso para preparar paquetes. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
-                    : !shippingConfirmed
-                      ? 'Antes de marcar listo para envio, captura el costo de paqueteria o marca envio sin costo.'
-                    : hasPending
-                      ? 'Liquida el saldo pendiente antes de liberar envio.'
-                      : itemCount <= 0
-                        ? 'Agrega al menos una prenda antes de liberar envio.'
-                        : 'Ya hay una accion en proceso.'
-                }
+                disabled={isWorking}
+                disabledReason={markReadyBlockedReason || 'Ya hay una accion en proceso.'}
               />
               <AppButton
                 title="Cancelar paquete"
@@ -1505,6 +1512,69 @@ export default function CustomerPackageDetailScreen() {
             </AppText>
           }
         />
+      </AppBottomModal>
+
+      <AppBottomModal
+        visible={markReadyModalVisible}
+        title="Marcar listo para envio"
+        onClose={closeMarkReadyModal}
+        footer={
+          <View style={styles.modalActions}>
+            <AppButton
+              title="Cancelar"
+              variant="cancel"
+              onPress={closeMarkReadyModal}
+              disabled={isWorking}
+              disabledReason="Espera a que termine la operacion."
+            />
+            <AppButton
+              title="Marcar listo"
+              variant="operation"
+              onPress={handleConfirmMarkReady}
+              loading={isWorking}
+              disabled={isWorking}
+            />
+          </View>
+        }
+      >
+        {detail ? (
+          <View style={styles.removeConfirmContent}>
+            <AppCard variant="subtle">
+              <InfoRow label="Paquete" value={detail.folio} />
+              <InfoRow label="Estado actual" value={statusLabel(detail.status)} />
+              <InfoRow label="Prendas" value={String(detail.totalItems ?? 0)} />
+              <InfoRow label="Envio" value={shippingConfirmed ? money(detail.shippingCostAmount) : 'Pendiente'} />
+            </AppCard>
+
+            <AppResponsiveGrid phoneColumns={1} tabletColumns={2} desktopColumns={5} gap={8}>
+              <MetricCard label="Subtotal prendas" value={money(detail.itemSubtotalAmount)} />
+              <MetricCard label="Envio" value={shippingConfirmed ? money(detail.shippingCostAmount) : 'Pendiente'} tone={shippingConfirmed ? 'default' : 'warning'} />
+              <MetricCard label="Total" value={money(detail.totalAmount)} />
+              <MetricCard label="Abonado" value={money(detail.paidAmount)} tone={Number(detail.paidAmount ?? 0) > 0 ? 'success' : 'default'} />
+              <MetricCard label="Pendiente" value={money(detail.pendingAmount)} tone={Number(detail.pendingAmount ?? 0) > 0 ? 'danger' : 'success'} />
+            </AppResponsiveGrid>
+
+            <View style={[styles.shippingNotice, { borderColor: theme.colors.success, backgroundColor: theme.colors.surfaceAlt }]}>
+              <AppText variant="caption" bold color={theme.colors.success}>
+                Listo para liberar a envio
+              </AppText>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                El paquete tiene envio confirmado y saldo cubierto. Al confirmar cambiara a listo para envio.
+              </AppText>
+            </View>
+
+            {markReadyError ? (
+              <View style={[styles.shippingNotice, { borderColor: theme.colors.danger, backgroundColor: theme.colors.surfaceAlt }]}>
+                <AppText variant="caption" bold color={theme.colors.danger}>
+                  No se pudo marcar listo
+                </AppText>
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  {markReadyError}
+                </AppText>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
       </AppBottomModal>
 
       <AppBottomModal
