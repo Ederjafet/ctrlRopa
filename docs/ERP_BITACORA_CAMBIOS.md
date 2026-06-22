@@ -1,5 +1,31 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-22 - PACKAGE-DETAIL-UX-A detalle de paquete compacto
+
+Tipo: frontend, UX operativa, paquetes, pagos, envios, permisos, documentacion.
+
+Objetivo:
+
+- Compactar `/customer-package-detail` para entender rapido cliente, estado, saldos, prendas, pagos, envio y acciones.
+
+Cambios realizados:
+
+- La pantalla ahora usa cabecera compacta con folio, cliente y estados de paquete, pago y envio.
+- Se agrega fila de metricas arriba: total, abonado, saldo pendiente, saldo a favor, envio por cobrar y prendas.
+- Se agrega bloque `Siguiente paso` con accion principal contextual.
+- Prendas del paquete se muestran en filas compactas con precio, pagado, pendiente, origen, estado y acceso a detalle.
+- Pagos/abonos quedan en una seccion compacta con resumen financiero y CTA de registro.
+- Envio se concentra en panel lateral con estado, cobro, ultimo envio y acceso a detalle si aplica.
+- Acciones sensibles respetan permisos existentes y explican faltantes.
+- Se documenta la fase en `docs/PACKAGE_DETAIL_UX_A_COMPACTO.md`.
+
+Restricciones respetadas:
+
+- No se toco backend.
+- No se cambiaron reglas de negocio.
+- No se agrego `Actualizar` fuera de LIVE.
+- No se agregaron permisos nuevos.
+
 ## 2026-06-22 - RC-UX-PERM-A mensajes de permisos y confirmacion de prendas
 
 Tipo: release candidate, UX, permisos, inventario, frontend, documentacion.

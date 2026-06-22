@@ -5,9 +5,12 @@ import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
 import AppNoticeDropdown from '@/components/ui/AppNoticeDropdown';
 import AppOptionRow from '@/components/ui/AppOptionRow';
+import AppResponsiveGrid from '@/components/ui/AppResponsiveGrid';
 import ScreenPermissionHeaderAction from '@/components/ui/ScreenPermissionHeaderAction';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
+import { hasPermission } from '@/services/accessControl';
 import { getBalanceByPackageFolio, type BalanceSummary } from '@/services/balanceService';
 import { getPaymentMethods, type PaymentMethod } from '@/services/catalogService';
 import {
@@ -17,6 +20,7 @@ import {
   cancelCustomerPackage,
   CustomerPackageDetail,
   CustomerPackageItemLine,
+  CustomerPackageShipmentLine,
   getCustomerPackageDetail,
   getCustomerPackageDetailByFolio,
   isCustomerPackageOpen,
@@ -31,7 +35,7 @@ import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, View } from 'reac
 import QRCode from 'react-native-qrcode-svg';
 
 function money(value?: number | null) {
-  return `$${Number(value ?? 0).toFixed(2)}`;
+  return `$${Number(value ?? 0).toFixed(2)} MXN`;
 }
 
 function formatDate(value?: string | null) {
@@ -41,18 +45,20 @@ function formatDate(value?: string | null) {
   return date.toLocaleString();
 }
 
-function statusLabel(status?: string) {
-  if (status === 'OPEN') return 'Abierto';
+function statusLabel(status?: string | null) {
+  if (status === 'OPEN') return 'En preparacion';
   if (status === 'READY') return 'Listo para envio';
   if (status === 'SHIPPED') return 'Enviado';
   if (status === 'DELIVERED') return 'Entregado';
   if (status === 'CANCELLED') return 'Cancelado';
   if (status === 'ACTIVE') return 'Activo';
   if (status === 'SOLD') return 'Vendido';
+  if (status === 'AVAILABLE') return 'Disponible';
+  if (status === 'RESERVED') return 'Apartado';
   return status || 'Sin estado';
 }
 
-function paymentStatusLabel(status?: string) {
+function paymentStatusLabel(status?: string | null) {
   if (status === 'PAID') return 'Pagado';
   if (status === 'PARTIAL') return 'Parcial';
   if (status === 'PENDING') return 'Pendiente';
@@ -60,39 +66,235 @@ function paymentStatusLabel(status?: string) {
   return status || 'Sin estado';
 }
 
-function sourceTypeLabel(type?: string) {
+function sourceTypeLabel(type?: string | null) {
   if (type === 'SALE') return 'Venta';
   if (type === 'RESERVATION') return 'Apartado';
   return type || 'Movimiento';
 }
 
+function collectionStatusLabel(status?: string | null) {
+  if (status === 'COLLECTED') return 'Cobrado';
+  if (status === 'PENDING') return 'Pendiente';
+  if (status === 'DIFFERENCE') return 'Diferencia';
+  return status || 'Sin estado';
+}
+
+function compactDate(value?: string | null) {
+  if (!value) return 'Sin fecha';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString();
+}
+
+function getShipmentState(detail: CustomerPackageDetail, shipments: CustomerPackageShipmentLine[]) {
+  if (shipments.length > 0) {
+    const latest = shipments[0];
+    return `${statusLabel(latest.shipmentStatus)} / ${statusLabel(latest.packageShipmentStatus)}`;
+  }
+
+  if (detail.status === 'READY') return 'Listo, sin envio';
+  if (detail.status === 'SHIPPED') return 'Enviado';
+  if (detail.status === 'DELIVERED') return 'Entregado';
+  return 'Sin envio';
+}
+
+function getNextStep(
+  detail: CustomerPackageDetail,
+  hasPending: boolean,
+  canReady: boolean,
+  shipments: CustomerPackageShipmentLine[]
+) {
+  if (detail.status === 'CANCELLED') return 'Paquete cancelado. No requiere acciones operativas.';
+  if (detail.status === 'DELIVERED') return 'Paquete entregado. Conserva la consulta de pagos y envio.';
+  if (shipments.length > 0 && detail.status === 'SHIPPED') {
+    return 'Enviado. Da seguimiento desde el detalle del envio asociado.';
+  }
+  if (detail.status === 'READY') return 'Listo para envio. Registra o revisa el envio asociado.';
+  if (hasPending) return 'Falta registrar abono para liberar el envio.';
+  if ((detail.totalItems ?? 0) <= 0) return 'Agrega prendas antes de preparar el envio.';
+  if (canReady) return 'Paquete pagado. Puedes marcarlo listo para envio.';
+  return 'Revisa prendas, pagos y permisos antes de continuar.';
+}
+
 function PackageLabel({ detail }: { detail: CustomerPackageDetail }) {
   return (
     <View style={styles.labelBox}>
-      <QRCode value={detail.folio} size={130} backgroundColor="#ffffff" color="#000000" />
+      <QRCode value={detail.folio} size={104} backgroundColor="#ffffff" color="#000000" />
       <Text style={[styles.labelText, styles.labelFolio]}>{detail.folio}</Text>
       <Text style={styles.labelText}>{detail.customerName}</Text>
-      <Text style={styles.labelText}>Items: {detail.totalItems ?? 0}</Text>
+      <Text style={styles.labelText}>Prendas: {detail.totalItems ?? 0}</Text>
       <Text style={styles.labelText}>Estado: {statusLabel(detail.status)}</Text>
     </View>
   );
 }
 
-function ItemLine({ item }: { item: CustomerPackageItemLine }) {
+function StatusPill({
+  label,
+  tone = 'default',
+}: {
+  label: string;
+  tone?: 'default' | 'success' | 'warning' | 'danger' | 'info';
+}) {
   const { theme } = useAppTheme();
+  const color =
+    tone === 'success'
+      ? theme.colors.success
+      : tone === 'warning'
+        ? theme.colors.warning
+        : tone === 'danger'
+          ? theme.colors.danger
+          : tone === 'info'
+            ? theme.colors.accent
+            : theme.colors.mutedText;
 
   return (
-    <View style={[styles.itemRow, { borderBottomColor: theme.colors.border }]}> 
-      <AppText bold>{item.itemCode || `Item #${item.itemId}`}</AppText>
-      <AppText>Origen: {sourceTypeLabel(item.sourceType)}</AppText>
-      <AppText>Tipo: {item.productType || 'Sin tipo'}</AppText>
-      {item.brand ? <AppText>Marca: {item.brand}</AppText> : null}
-      {item.size ? <AppText>Talla: {item.size}</AppText> : null}
-      <AppText>Precio: {money(item.price)}</AppText>
-      <AppText>Pagado: {money(item.paidAmount)}</AppText>
-      <AppText>Pendiente: {money(item.pendingAmount)}</AppText>
-      <AppText>Estado origen: {statusLabel(item.sourceStatus)}</AppText>
-      <AppText color={theme.colors.mutedText}>Agregado: {formatDate(item.createdAt)}</AppText>
+    <View style={[styles.pill, { borderColor: color, backgroundColor: theme.colors.surfaceAlt }]}>
+      <AppText variant="caption" bold color={color}>
+        {label}
+      </AppText>
+    </View>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  helper,
+  tone = 'default',
+}: {
+  label: string;
+  value: string;
+  helper?: string;
+  tone?: 'default' | 'success' | 'warning' | 'danger' | 'info';
+}) {
+  const { theme } = useAppTheme();
+  const color =
+    tone === 'success'
+      ? theme.colors.success
+      : tone === 'warning'
+        ? theme.colors.warning
+        : tone === 'danger'
+          ? theme.colors.danger
+          : tone === 'info'
+            ? theme.colors.accent
+            : theme.colors.text;
+
+  return (
+    <View style={[styles.metricCard, { borderColor: theme.colors.borderSubtle, backgroundColor: theme.colors.surfaceAlt }]}>
+      <AppText variant="caption" color={theme.colors.mutedText}>
+        {label}
+      </AppText>
+      <AppText variant="subtitle" bold color={color} numberOfLines={1}>
+        {value}
+      </AppText>
+      {helper ? (
+        <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={2}>
+          {helper}
+        </AppText>
+      ) : null}
+    </View>
+  );
+}
+
+function InfoRow({
+  label,
+  value,
+  tone = 'default',
+}: {
+  label: string;
+  value: string;
+  tone?: 'default' | 'success' | 'warning' | 'danger';
+}) {
+  const { theme } = useAppTheme();
+  const color =
+    tone === 'success'
+      ? theme.colors.success
+      : tone === 'warning'
+        ? theme.colors.warning
+        : tone === 'danger'
+          ? theme.colors.danger
+          : theme.colors.text;
+
+  return (
+    <View style={styles.infoRow}>
+      <AppText variant="caption" color={theme.colors.mutedText}>
+        {label}
+      </AppText>
+      <AppText bold color={color} numberOfLines={1}>
+        {value}
+      </AppText>
+    </View>
+  );
+}
+
+function PackageItemLine({
+  item,
+  onOpenItem,
+}: {
+  item: CustomerPackageItemLine;
+  onOpenItem: (itemId: number) => void;
+}) {
+  const { theme } = useAppTheme();
+  const pending = Number(item.pendingAmount ?? 0);
+
+  return (
+    <View style={[styles.compactLine, { borderColor: theme.colors.borderSubtle, backgroundColor: theme.colors.surfaceAlt }]}>
+      <View style={styles.lineMain}>
+        <View style={styles.lineTitleBlock}>
+          <AppText bold numberOfLines={1}>
+            {item.itemCode || `Prenda #${item.itemId}`}
+          </AppText>
+          <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+            {item.productType || 'Sin tipo'} {item.size ? `- ${item.size}` : ''} {item.brand ? `- ${item.brand}` : ''}
+          </AppText>
+        </View>
+        <StatusPill label={statusLabel(item.sourceStatus || item.itemStatus)} tone={pending > 0 ? 'warning' : 'success'} />
+      </View>
+      <View style={styles.lineMetaGrid}>
+        <InfoRow label="Origen" value={sourceTypeLabel(item.sourceType)} />
+        <InfoRow label="Precio" value={money(item.price)} />
+        <InfoRow label="Pagado" value={money(item.paidAmount)} tone={Number(item.paidAmount ?? 0) > 0 ? 'success' : 'default'} />
+        <InfoRow label="Pendiente" value={money(item.pendingAmount)} tone={pending > 0 ? 'danger' : 'success'} />
+      </View>
+      <View style={styles.lineActions}>
+        <AppText variant="caption" color={theme.colors.mutedText}>
+          Agregado: {compactDate(item.createdAt)}
+        </AppText>
+        <AppButton
+          title="Ver prenda"
+          variant="secondary"
+          onPress={() => onOpenItem(item.itemId)}
+          style={styles.lineButton}
+        />
+      </View>
+    </View>
+  );
+}
+
+function ShipmentLine({ shipment }: { shipment: CustomerPackageShipmentLine }) {
+  const { theme } = useAppTheme();
+  const expected = Number(shipment.expectedCollectionAmount ?? 0);
+  const collected = Number(shipment.collectedAmount ?? 0);
+
+  return (
+    <View style={[styles.compactLine, { borderColor: theme.colors.borderSubtle, backgroundColor: theme.colors.surfaceAlt }]}>
+      <View style={styles.lineMain}>
+        <View style={styles.lineTitleBlock}>
+          <AppText bold numberOfLines={1}>
+            {shipment.shipmentFolio || `Envio #${shipment.shipmentId}`}
+          </AppText>
+          <AppText variant="caption" color={theme.colors.mutedText}>
+            Paquete: {statusLabel(shipment.packageShipmentStatus)}
+          </AppText>
+        </View>
+        <StatusPill label={statusLabel(shipment.shipmentStatus)} tone="info" />
+      </View>
+      <View style={styles.lineMetaGrid}>
+        <InfoRow label="Modo" value={shipment.paymentMode || 'Sin modo'} />
+        <InfoRow label="Por cobrar" value={money(expected)} tone={expected > 0 ? 'warning' : 'default'} />
+        <InfoRow label="Cobrado" value={money(collected)} tone={collected > 0 ? 'success' : 'default'} />
+        <InfoRow label="Cobranza" value={collectionStatusLabel(shipment.collectionStatus)} />
+      </View>
     </View>
   );
 }
@@ -101,6 +303,7 @@ export default function CustomerPackageDetailScreen() {
   const router = useRouter();
   const { id, folio } = useLocalSearchParams<{ id?: string; folio?: string }>();
   const { theme } = useAppTheme();
+  const { isDesktop } = useResponsiveLayout();
 
   const packageId = id ? Number(id) : null;
 
@@ -177,9 +380,18 @@ export default function CustomerPackageDetailScreen() {
   const canEdit = isCustomerPackageOpen(detail);
   const canReady = canMarkCustomerPackageReady(detail);
   const hasPending = Number(detail?.pendingAmount ?? 0) > 0;
+  const items = useMemo(() => detail?.items ?? [], [detail?.items]);
+  const shipments = useMemo(() => detail?.shipments ?? [], [detail?.shipments]);
+
+  const canManagePackage = hasPermission(session, 'CREATE_CLOSE_CUSTOMER_PACKAGE');
+  const canRegisterPayments = hasPermission(session, 'REGISTER_PAYMENTS');
+  const canApplyCustomerBalance = hasPermission(session, 'APPLY_CUSTOMER_BALANCE');
+  const canManageInventory = hasPermission(session, 'MANAGE_INVENTORY');
+  const canManageShipments = hasPermission(session, 'MANAGE_SHIPMENTS');
+
   const filteredBranchItems = useMemo(() => {
     const term = itemSearch.trim().toLowerCase();
-    const existingItemIds = new Set((detail?.items ?? []).map((item) => item.itemId));
+    const existingItemIds = new Set(items.map((item) => item.itemId));
 
     return branchItems
       .filter((item) => !existingItemIds.has(item.id))
@@ -191,14 +403,24 @@ export default function CustomerPackageDetailScreen() {
           .includes(term);
       })
       .slice(0, 50);
-  }, [branchItems, detail?.items, itemSearch]);
+  }, [branchItems, itemSearch, items]);
 
   const handleAddByCode = async () => {
     if (!detail) return;
+
+    if (!canManageInventory) {
+      setNotice({
+        title: 'Permiso requerido',
+        message: 'No tienes permiso para agregar prendas al paquete. Permiso requerido: MANAGE_INVENTORY.',
+        tone: 'warning',
+      });
+      return;
+    }
+
     const cleanCode = code.trim();
 
     if (!cleanCode) {
-      Alert.alert('Paquete', 'Captura el código del item.');
+      Alert.alert('Paquete', 'Captura el codigo del item.');
       return;
     }
 
@@ -210,7 +432,7 @@ export default function CustomerPackageDetailScreen() {
       setCodeModalVisible(false);
       setNotice({
         title: 'Prenda agregada',
-        message: 'La prenda se agregó correctamente al paquete.',
+        message: 'Prenda agregada al paquete.',
         tone: 'success',
       });
     } catch (error: any) {
@@ -226,6 +448,16 @@ export default function CustomerPackageDetailScreen() {
 
   const handleAddByQr = async () => {
     if (!detail) return;
+
+    if (!canManageInventory) {
+      setNotice({
+        title: 'Permiso requerido',
+        message: 'No tienes permiso para agregar prendas al paquete. Permiso requerido: MANAGE_INVENTORY.',
+        tone: 'warning',
+      });
+      return;
+    }
+
     const cleanQr = qrCode.trim();
 
     if (!cleanQr) {
@@ -241,7 +473,7 @@ export default function CustomerPackageDetailScreen() {
       setQrModalVisible(false);
       setNotice({
         title: 'Prenda agregada',
-        message: 'La prenda se agregó correctamente al paquete.',
+        message: 'Prenda agregada al paquete.',
         tone: 'success',
       });
     } catch (error: any) {
@@ -258,6 +490,15 @@ export default function CustomerPackageDetailScreen() {
   const handleAddSearchedItem = async (item: Item) => {
     if (!detail) return;
 
+    if (!canManageInventory) {
+      setNotice({
+        title: 'Permiso requerido',
+        message: 'No tienes permiso para agregar prendas al paquete. Permiso requerido: MANAGE_INVENTORY.',
+        tone: 'warning',
+      });
+      return;
+    }
+
     try {
       setIsWorking(true);
       const updated = await addCustomerPackageItemByCode(detail.folio, item.code);
@@ -266,7 +507,7 @@ export default function CustomerPackageDetailScreen() {
       setItemSearchModalVisible(false);
       setNotice({
         title: 'Prenda agregada',
-        message: `${item.code} se agregó correctamente al paquete.`,
+        message: `${item.code} se agrego correctamente al paquete.`,
         tone: 'success',
       });
     } catch (error: any) {
@@ -284,6 +525,15 @@ export default function CustomerPackageDetailScreen() {
 
   const openPaymentModal = () => {
     if (!detail) return;
+
+    if (!canRegisterPayments) {
+      setNotice({
+        title: 'Permiso requerido',
+        message: 'No tienes permiso para registrar abonos. Permiso requerido: REGISTER_PAYMENTS.',
+        tone: 'warning',
+      });
+      return;
+    }
 
     if (!hasPending) {
       setNotice({
@@ -311,6 +561,11 @@ export default function CustomerPackageDetailScreen() {
 
   const handleRegisterPackagePayment = async () => {
     if (!detail || !session) return;
+
+    if (!canRegisterPayments) {
+      Alert.alert('Permiso requerido', 'No tienes permiso para registrar abonos. Permiso requerido: REGISTER_PAYMENTS.');
+      return;
+    }
 
     const amount = Number(paymentAmount.replace(',', '.'));
 
@@ -344,13 +599,13 @@ export default function CustomerPackageDetailScreen() {
       setPaymentAmount('');
       setPaymentReference('');
       setNotice({
-        title: 'Abono registrado',
-        message: 'El pago se aplico al paquete. Si hubo sobrepago, quedo como saldo a favor del cliente.',
+        title: 'Pago registrado',
+        message: 'Pago registrado correctamente. Si hubo sobrepago, quedo como saldo a favor del cliente.',
         tone: 'success',
       });
       Alert.alert(
-        'Abono registrado',
-        'El pago se aplico al paquete. Si hubo sobrepago, quedo como saldo a favor del cliente.'
+        'Pago registrado',
+        'Pago registrado correctamente. Si hubo sobrepago, quedo como saldo a favor del cliente.'
       );
     } catch (error: any) {
       Alert.alert('No se pudo registrar', error.message || 'No se pudo registrar el abono del paquete.');
@@ -367,6 +622,15 @@ export default function CustomerPackageDetailScreen() {
   const handleMarkReady = async () => {
     if (!detail || !session) return;
 
+    if (!canManagePackage) {
+      setNotice({
+        title: 'Permiso requerido',
+        message: 'No tienes permiso para marcar listo para envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.',
+        tone: 'warning',
+      });
+      return;
+    }
+
     if (!canReady) {
       setNotice({
         title: 'Falta completar el paquete',
@@ -378,7 +642,7 @@ export default function CustomerPackageDetailScreen() {
       return;
     }
 
-    Alert.alert('Marcar listo para envio', `¿Quieres marcar el paquete ${detail.folio} como listo para envio?`, [
+    Alert.alert('Marcar listo para envio', `Quieres marcar el paquete ${detail.folio} como listo para envio?`, [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Marcar listo',
@@ -389,7 +653,7 @@ export default function CustomerPackageDetailScreen() {
             setDetail(updated);
             setNotice({
               title: 'Paquete listo para envio',
-              message: 'El paquete quedo listo para envio. Ya puede agregarse a Envios.',
+              message: 'Paquete marcado listo para envio.',
               tone: 'success',
             });
           } catch (error: any) {
@@ -409,8 +673,13 @@ export default function CustomerPackageDetailScreen() {
   const handleCancel = async () => {
     if (!detail || !session) return;
 
+    if (!canManagePackage) {
+      Alert.alert('Permiso requerido', 'No tienes permiso para cancelar paquetes. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.');
+      return;
+    }
+
     if (!cancelNotes.trim()) {
-      Alert.alert('Paquete', 'Captura el motivo de cancelación.');
+      Alert.alert('Paquete', 'Captura el motivo de cancelacion.');
       return;
     }
 
@@ -420,6 +689,11 @@ export default function CustomerPackageDetailScreen() {
       setDetail(updated);
       setCancelModalVisible(false);
       setCancelNotes('');
+      setNotice({
+        title: 'Paquete cancelado',
+        message: 'Paquete cancelado.',
+        tone: 'success',
+      });
     } catch (error: any) {
       Alert.alert('Paquete', error.message || 'No se pudo cancelar el paquete.');
     } finally {
@@ -431,7 +705,7 @@ export default function CustomerPackageDetailScreen() {
     return (
       <AppShellPage
         title="Detalle de paquete"
-        subtitle="Preparacion, etiqueta y prendas"
+        subtitle="Preparacion, pagos y envio"
         activeRoute="customer-packages"
       >
         <ActivityIndicator />
@@ -439,16 +713,70 @@ export default function CustomerPackageDetailScreen() {
     );
   }
 
-  const items = detail.items ?? [];
-  const shipments = detail.shipments ?? [];
+  const totalAmount = Number(detail.totalAmount ?? 0);
+  const paidAmount = Number(detail.paidAmount ?? 0);
+  const pendingAmount = Number(detail.pendingAmount ?? 0);
+  const customerBalance = Number(balanceSummary?.balance ?? 0);
+  const itemCount = Number(detail.totalItems ?? items.length);
+  const shipmentCollectAmount = shipments.reduce(
+    (sum, shipment) => sum + Number(shipment.expectedCollectionAmount ?? 0),
+    0
+  );
+  const shipmentCollectedAmount = shipments.reduce(
+    (sum, shipment) => sum + Number(shipment.collectedAmount ?? 0),
+    0
+  );
+  const latestShipment = shipments[0] ?? null;
+  const shipmentState = getShipmentState(detail, shipments);
+  const nextStep = getNextStep(detail, hasPending, canReady, shipments);
+  const isTerminalPackage = detail.status === 'CANCELLED' || detail.status === 'DELIVERED';
+  const primaryAction =
+    isTerminalPackage
+      ? {
+          title: 'Volver a paquetes',
+          onPress: () => router.replace(fallbackRoute as any),
+          disabled: false,
+          disabledReason: '',
+        }
+      : detail.status === 'READY' || detail.status === 'SHIPPED'
+      ? {
+          title: latestShipment ? 'Ver envio' : 'Ir a envios',
+          onPress: () =>
+            latestShipment
+              ? router.push(`/shipment-detail?id=${latestShipment.shipmentId}` as any)
+              : router.push('/shipments' as any),
+          disabled: !canManageShipments,
+          disabledReason: 'No tienes permiso para gestionar envios. Permiso requerido: MANAGE_SHIPMENTS.',
+        }
+        : hasPending
+          ? {
+              title: 'Registrar abono',
+              onPress: openPaymentModal,
+              disabled: !canRegisterPayments || isWorking,
+              disabledReason: !canRegisterPayments
+                ? 'No tienes permiso para registrar abonos. Permiso requerido: REGISTER_PAYMENTS.'
+                : 'Ya hay una accion en proceso.',
+            }
+          : {
+              title: 'Marcar listo para envio',
+              onPress: handleMarkReady,
+              disabled: !canReady || !canManagePackage || isWorking,
+              disabledReason: !canManagePackage
+                ? 'No tienes permiso para preparar paquetes. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
+                : hasPending
+                  ? 'Liquida el saldo pendiente antes de liberar envio.'
+                  : itemCount <= 0
+                    ? 'Agrega al menos una prenda antes de liberar envio.'
+                    : 'Ya hay una accion en proceso.',
+            };
 
   return (
     <AppShellPage
-      title={`Paquete ${detail.folio}`}
-      subtitle="Preparacion, etiqueta y prendas"
+      title="Detalle de paquete"
+      subtitle={`${detail.folio} - ${detail.customerName || 'Sin cliente'}`}
       activeRoute="customer-packages"
       rightContent={
-        <View style={styles.actionBarButtons}>
+        <View style={styles.headerActions}>
           <ScreenPermissionHeaderAction
             screenKey="customerPackageDetail"
             screenTitle="Detalle de paquete"
@@ -473,198 +801,301 @@ export default function CustomerPackageDetailScreen() {
         />
       ) : null}
 
-      <AppCard style={styles.actionBarCard}>
-        <View style={styles.actionBarHeader}>
-          <View style={styles.actionBarIdentity}>
+      <AppCard style={styles.heroCard}>
+        <View style={styles.heroHeader}>
+          <View style={styles.heroIdentity}>
             <AppText variant="caption" color={theme.colors.mutedText}>
-              Paquete {detail.folio} - Cliente
+              Paquete {detail.folio}
             </AppText>
-            <AppText variant="subtitle" bold numberOfLines={1}>
+            <AppText variant="title" bold numberOfLines={1}>
               {detail.customerName || 'Sin cliente'}
             </AppText>
             <AppText variant="caption" color={theme.colors.mutedText}>
-              Total {money(detail.totalAmount)} - Abonado {money(detail.paidAmount)} - Saldo {money(detail.pendingAmount)}
-            </AppText>
-            <AppText
-              variant="caption"
-              color={Number(balanceSummary?.balance ?? 0) > 0 ? theme.colors.success : theme.colors.mutedText}
-            >
-              Saldo a favor cliente: {money(balanceSummary?.balance)}
+              {detail.customerPhone || 'Sin telefono'} - {detail.branchName || detail.branchCode || 'Sin sucursal'} - {formatDate(detail.createdAt)}
             </AppText>
           </View>
-          <View style={styles.actionBarButtons}>
-            <AppButton
-              title="Registrar abono"
-              variant="operation"
-              onPress={openPaymentModal}
-              disabled={!hasPending || isWorking}
-              disabledReason={
-                !hasPending
-                  ? 'El paquete ya esta liquidado.'
-                  : 'Ya hay una accion en proceso.'
-              }
-              style={styles.compactActionButton}
-            />
-            <AppButton
-              title="Aplicar saldo a favor"
-              variant="neutral"
-              disabled
-              disabledReason="Pendiente: aplicar saldo a paquete requiere trazabilidad especifica paquete-saldo."
-              style={styles.compactActionButton}
-            />
+          <View style={styles.heroBadges}>
+            <StatusPill label={statusLabel(detail.status)} tone={detail.status === 'CANCELLED' ? 'danger' : 'info'} />
+            <StatusPill label={paymentStatusLabel(detail.paymentStatus)} tone={hasPending ? 'warning' : 'success'} />
+            <StatusPill label={shipmentState} tone={shipments.length > 0 ? 'info' : 'default'} />
           </View>
         </View>
-      </AppCard>
 
-      <AppCard>
-        <View style={styles.summaryRow}>
-          <AppText bold>Cliente</AppText>
-          <AppText>{detail.customerName || 'Sin cliente'}</AppText>
-        </View>
-        <View style={styles.summaryRow}>
-          <AppText bold>Teléfono</AppText>
-          <AppText>{detail.customerPhone || 'Sin teléfono'}</AppText>
-        </View>
-        <View style={styles.summaryRow}>
-          <AppText bold>Sucursal</AppText>
-          <AppText>{detail.branchName || detail.branchCode || 'Sin sucursal'}</AppText>
-        </View>
-        <View style={styles.summaryRow}>
-          <AppText bold>Estado</AppText>
-          <AppText bold>{statusLabel(detail.status)}</AppText>
-        </View>
-        <View style={styles.summaryRow}>
-          <AppText bold>Pago</AppText>
-          <AppText>{paymentStatusLabel(detail.paymentStatus)}</AppText>
-        </View>
-        <View style={styles.summaryRow}>
-          <AppText bold>Fecha</AppText>
-          <AppText>{formatDate(detail.createdAt)}</AppText>
-        </View>
-        {detail.notes ? <AppText>Notas: {detail.notes}</AppText> : null}
-      </AppCard>
+        <AppResponsiveGrid phoneColumns={2} tabletColumns={3} desktopColumns={6} gap={8} style={styles.metricsGrid}>
+          <MetricCard label="Total paquete" value={money(totalAmount)} />
+          <MetricCard label="Abonado" value={money(paidAmount)} tone={paidAmount > 0 ? 'success' : 'default'} />
+          <MetricCard
+            label="Saldo pendiente"
+            value={pendingAmount > 0 ? money(pendingAmount) : 'Pagado'}
+            tone={pendingAmount > 0 ? 'danger' : 'success'}
+          />
+          <MetricCard
+            label="Saldo a favor"
+            value={money(customerBalance)}
+            tone={customerBalance > 0 ? 'success' : 'default'}
+          />
+          <MetricCard
+            label="Envio por cobrar"
+            value={shipments.length > 0 ? money(shipmentCollectAmount) : 'Sin envio'}
+            helper={shipments.length > 0 ? `Cobrado ${money(shipmentCollectedAmount)}` : undefined}
+            tone={shipmentCollectAmount > shipmentCollectedAmount ? 'warning' : 'default'}
+          />
+          <MetricCard label="Prendas" value={String(itemCount)} helper={`${items.length} lineas`} />
+        </AppResponsiveGrid>
 
-      <AppCard>
-        <AppText variant="subtitle" bold>
-          Resumen
-        </AppText>
-        <View style={styles.summaryRow}>
-          <AppText>Prendas</AppText>
-          <AppText>{detail.totalItems ?? items.length}</AppText>
-        </View>
-        <View style={styles.summaryRow}>
-          <AppText>Total</AppText>
-          <AppText>{money(detail.totalAmount)}</AppText>
-        </View>
-        <View style={styles.summaryRow}>
-          <AppText>Pagado</AppText>
-          <AppText>{money(detail.paidAmount)}</AppText>
-        </View>
-        <View style={styles.summaryRow}>
-          <AppText bold>Pendiente</AppText>
-          <AppText bold color={hasPending ? theme.colors.danger : theme.colors.success}>
-            {money(detail.pendingAmount)}
-          </AppText>
-        </View>
-        <View style={styles.summaryRow}>
-          <AppText>Saldo a favor cliente</AppText>
-          <AppText bold color={Number(balanceSummary?.balance ?? 0) > 0 ? theme.colors.success : theme.colors.mutedText}>
-            {money(balanceSummary?.balance)}
-          </AppText>
-        </View>
-      </AppCard>
-
-      <AppCard>
-        <AppText variant="subtitle" bold>
-          Etiqueta del paquete
-        </AppText>
-        <PackageLabel detail={detail} />
-      </AppCard>
-
-      {canEdit ? (
-        <AppCard>
-          <AppText variant="subtitle" bold>
-            Agregar prendas
-          </AppText>
-          <AppText color={theme.colors.mutedText}>
-            Agrega prendas pagadas, apartadas o libres por búsqueda, código o QR. Si la prenda está libre, queda apartada para este cliente y bloqueada contra venta doble.
-          </AppText>
-
-          <View style={styles.actions}>
-            <AppButton title="Buscar prenda" onPress={() => setItemSearchModalVisible(true)} />
-            <AppButton title="Agregar por código" variant="secondary" onPress={() => setCodeModalVisible(true)} />
-            <AppButton title="Agregar por QR" variant="secondary" onPress={() => setQrModalVisible(true)} />
-            <AppButton
-              title="Alta rapida"
-              variant="neutral"
-              disabled
-              disabledReason="Disponible en siguiente fase: alta rapida directa desde paquete con cliente formal."
-            />
+        <View style={[styles.nextStepRow, { borderTopColor: theme.colors.borderSubtle }]}>
+          <View style={styles.nextStepText}>
+            <AppText variant="caption" color={theme.colors.mutedText} bold>
+              Siguiente paso
+            </AppText>
+            <AppText>{nextStep}</AppText>
           </View>
-        </AppCard>
-      ) : null}
-
-      <AppCard>
-        <AppText variant="subtitle" bold>
-          Prendas del paquete
-        </AppText>
-        {items.length === 0 ? (
-          <AppText color={theme.colors.mutedText}>Este paquete todavía no tiene prendas.</AppText>
-        ) : (
-          items.map((item) => <ItemLine key={item.id} item={item} />)
-        )}
+          <AppButton
+            title={primaryAction.title}
+            variant="operation"
+            onPress={primaryAction.onPress}
+            disabled={primaryAction.disabled}
+            disabledReason={primaryAction.disabledReason}
+            style={styles.primaryAction}
+          />
+        </View>
       </AppCard>
 
-      {shipments.length > 0 ? (
-        <AppCard>
-          <AppText variant="subtitle" bold>
-            Envíos asociados
-          </AppText>
-          {shipments.map((shipment) => (
-            <View
-              key={shipment.shipmentPackageId}
-              style={[styles.itemRow, { borderBottomColor: theme.colors.border }]}
-            >
-              <AppText bold>{shipment.shipmentFolio || `Envío #${shipment.shipmentId}`}</AppText>
-              <AppText>Estado envío: {statusLabel(shipment.shipmentStatus)}</AppText>
-              <AppText>Estado paquete: {statusLabel(shipment.packageShipmentStatus)}</AppText>
-              <AppText>Modo cobro: {shipment.paymentMode || 'Sin modo'}</AppText>
-              <AppText>Por cobrar: {money(shipment.expectedCollectionAmount)}</AppText>
-              <AppText>Cobrado: {money(shipment.collectedAmount)}</AppText>
+      <View style={[styles.contentGrid, !isDesktop ? styles.contentGridStacked : null]}>
+        <View style={styles.mainColumn}>
+          <AppCard>
+            <View style={styles.sectionHeader}>
+              <View>
+                <AppText variant="subtitle" bold>
+                  Prendas del paquete
+                </AppText>
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  {items.length} prendas incluidas
+                </AppText>
+              </View>
+              <View style={styles.sectionActions}>
+                <AppButton
+                  title="Buscar prenda"
+                  variant="secondary"
+                  onPress={() => setItemSearchModalVisible(true)}
+                  disabled={!canEdit || !canManageInventory || isWorking}
+                  disabledReason={
+                    !canManageInventory
+                      ? 'No tienes permiso para agregar prendas. Permiso requerido: MANAGE_INVENTORY.'
+                      : !canEdit
+                        ? 'Solo puedes agregar prendas a paquetes en preparacion.'
+                        : 'Ya hay una accion en proceso.'
+                  }
+                  style={styles.compactActionButton}
+                />
+                <AppButton
+                  title="Por codigo"
+                  variant="neutral"
+                  onPress={() => setCodeModalVisible(true)}
+                  disabled={!canEdit || !canManageInventory || isWorking}
+                  disabledReason={
+                    !canManageInventory
+                      ? 'No tienes permiso para agregar prendas. Permiso requerido: MANAGE_INVENTORY.'
+                      : !canEdit
+                        ? 'Solo puedes agregar prendas a paquetes en preparacion.'
+                        : 'Ya hay una accion en proceso.'
+                  }
+                  style={styles.compactActionButton}
+                />
+              </View>
             </View>
-          ))}
-        </AppCard>
-      ) : null}
 
-      {canEdit ? (
-        <View style={styles.bottomActions}>
-          <AppButton
-            title="Marcar listo para envio"
-            onPress={handleMarkReady}
-            loading={isWorking}
-            disabled={isWorking}
-          />
-          {hasPending ? (
-            <AppText variant="caption" color={theme.colors.danger}>
-              Para marcar listo para envio, el paquete no debe tener saldo pendiente.
-            </AppText>
-          ) : null}
-          <AppButton
-            title="Cancelar paquete"
-            variant="danger"
-            onPress={() => setCancelModalVisible(true)}
-            disabled={isWorking}
-          />
+            {items.length === 0 ? (
+              <View style={[styles.emptyState, { borderColor: theme.colors.borderSubtle }]}>
+                <AppText bold>Este paquete todavia no tiene prendas.</AppText>
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  Agrega una prenda disponible o vinculada al cliente para continuar.
+                </AppText>
+              </View>
+            ) : (
+              <View style={styles.lineList}>
+                {items.map((item) => (
+                  <PackageItemLine
+                    key={item.id}
+                    item={item}
+                    onOpenItem={(itemId) => router.push(`/items/${itemId}?returnTo=/customer-package-detail?id=${detail.id}` as any)}
+                  />
+                ))}
+              </View>
+            )}
+          </AppCard>
+
+          <AppCard>
+            <View style={styles.sectionHeader}>
+              <View>
+                <AppText variant="subtitle" bold>
+                  Pagos y abonos
+                </AppText>
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  Resumen financiero del paquete
+                </AppText>
+              </View>
+              <AppButton
+                title="Registrar abono"
+                variant="operation"
+                onPress={openPaymentModal}
+                disabled={!hasPending || !canRegisterPayments || isWorking}
+                disabledReason={
+                  !canRegisterPayments
+                    ? 'No tienes permiso para registrar abonos. Permiso requerido: REGISTER_PAYMENTS.'
+                    : !hasPending
+                      ? 'El paquete ya esta pagado.'
+                      : 'Ya hay una accion en proceso.'
+                }
+                style={styles.compactActionButton}
+              />
+            </View>
+
+            <AppResponsiveGrid phoneColumns={1} tabletColumns={2} desktopColumns={4} gap={8}>
+              <MetricCard label="Total" value={money(totalAmount)} />
+              <MetricCard label="Abonado" value={money(paidAmount)} tone={paidAmount > 0 ? 'success' : 'default'} />
+              <MetricCard label="Pendiente" value={money(pendingAmount)} tone={pendingAmount > 0 ? 'danger' : 'success'} />
+              <MetricCard label="Estado" value={paymentStatusLabel(detail.paymentStatus)} tone={pendingAmount > 0 ? 'warning' : 'success'} />
+            </AppResponsiveGrid>
+
+            <View style={[styles.emptyState, { borderColor: theme.colors.borderSubtle }]}>
+              <AppText bold>
+                {paidAmount > 0 ? 'Abonos aplicados al paquete' : 'Aun no hay pagos registrados para este paquete.'}
+              </AppText>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                El endpoint actual devuelve acumulados de pago por paquete. El historial detallado queda disponible como backlog read-only.
+              </AppText>
+            </View>
+          </AppCard>
         </View>
-      ) : null}
+
+        <View style={styles.sideColumn}>
+          <AppCard>
+            <AppText variant="subtitle" bold>
+              Acciones
+            </AppText>
+            <View style={styles.actionsList}>
+              <AppButton
+                title="Registrar abono"
+                onPress={openPaymentModal}
+                disabled={!hasPending || !canRegisterPayments || isWorking}
+                disabledReason={
+                  !canRegisterPayments
+                    ? 'No tienes permiso para registrar abonos. Permiso requerido: REGISTER_PAYMENTS.'
+                    : !hasPending
+                      ? 'El paquete ya esta pagado.'
+                      : 'Ya hay una accion en proceso.'
+                }
+              />
+              <AppButton
+                title="Aplicar saldo a favor"
+                variant="neutral"
+                disabled
+                disabledReason={
+                  !canApplyCustomerBalance
+                    ? 'No tienes permiso para aplicar saldo a favor. Permiso requerido: APPLY_CUSTOMER_BALANCE.'
+                    : 'Pendiente: aplicar saldo directo a paquete requiere trazabilidad especifica paquete-saldo.'
+                }
+              />
+              <AppButton
+                title="Agregar por QR"
+                variant="secondary"
+                onPress={() => setQrModalVisible(true)}
+                disabled={!canEdit || !canManageInventory || isWorking}
+                disabledReason={
+                  !canManageInventory
+                    ? 'No tienes permiso para agregar prendas. Permiso requerido: MANAGE_INVENTORY.'
+                    : !canEdit
+                      ? 'Solo puedes agregar prendas a paquetes en preparacion.'
+                      : 'Ya hay una accion en proceso.'
+                }
+              />
+              <AppButton
+                title="Marcar listo para envio"
+                variant="secondary"
+                onPress={handleMarkReady}
+                loading={isWorking}
+                disabled={!canReady || !canManagePackage || isWorking}
+                disabledReason={
+                  !canManagePackage
+                    ? 'No tienes permiso para preparar paquetes. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
+                    : hasPending
+                      ? 'Liquida el saldo pendiente antes de liberar envio.'
+                      : itemCount <= 0
+                        ? 'Agrega al menos una prenda antes de liberar envio.'
+                        : 'Ya hay una accion en proceso.'
+                }
+              />
+              <AppButton
+                title="Cancelar paquete"
+                variant="danger"
+                onPress={() => setCancelModalVisible(true)}
+                disabled={!canEdit || !canManagePackage || isWorking}
+                disabledReason={
+                  !canManagePackage
+                    ? 'No tienes permiso para cancelar paquetes. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
+                    : !canEdit
+                      ? 'Solo puedes cancelar paquetes en preparacion.'
+                      : 'Ya hay una accion en proceso.'
+                }
+              />
+            </View>
+          </AppCard>
+
+          <AppCard>
+            <AppText variant="subtitle" bold>
+              Envio
+            </AppText>
+            <InfoRow label="Estado" value={shipmentState} />
+            <InfoRow label="Por cobrar" value={shipments.length > 0 ? money(shipmentCollectAmount) : 'Sin envio'} />
+            <InfoRow label="Cobrado" value={shipments.length > 0 ? money(shipmentCollectedAmount) : 'Sin envio'} />
+            <InfoRow label="Ultimo envio" value={latestShipment?.shipmentFolio || 'Sin envio'} />
+            <View style={styles.sideAction}>
+              <AppButton
+                title={latestShipment ? 'Ver envio' : 'Ir a envios'}
+                variant="secondary"
+                onPress={() =>
+                  latestShipment
+                    ? router.push(`/shipment-detail?id=${latestShipment.shipmentId}` as any)
+                    : router.push('/shipments' as any)
+                }
+                disabled={!canManageShipments}
+                disabledReason="No tienes permiso para gestionar envios. Permiso requerido: MANAGE_SHIPMENTS."
+              />
+            </View>
+            {shipments.length > 0 ? (
+              <View style={styles.lineList}>
+                {shipments.map((shipment) => (
+                  <ShipmentLine key={shipment.shipmentPackageId} shipment={shipment} />
+                ))}
+              </View>
+            ) : (
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Este paquete todavia no tiene envio asociado.
+              </AppText>
+            )}
+          </AppCard>
+
+          <AppCard>
+            <AppText variant="subtitle" bold>
+              Cliente y etiqueta
+            </AppText>
+            <InfoRow label="Cliente" value={detail.customerName || 'Sin cliente'} />
+            <InfoRow label="Telefono" value={detail.customerPhone || 'Sin telefono'} />
+            <InfoRow label="Sucursal" value={detail.branchName || detail.branchCode || 'Sin sucursal'} />
+            {detail.notes ? <InfoRow label="Notas" value={detail.notes} /> : null}
+            <PackageLabel detail={detail} />
+          </AppCard>
+        </View>
+      </View>
 
       <AppBottomModal
         visible={codeModalVisible}
-        title="Agregar por código"
+        title="Agregar por codigo"
         onClose={() => setCodeModalVisible(false)}
       >
         <AppInput
-          label="Código de item"
+          label="Codigo de item"
           value={code}
           onChangeText={setCode}
           placeholder="Ej. IT-0001"
@@ -695,10 +1126,10 @@ export default function CustomerPackageDetailScreen() {
         scroll={false}
       >
         <AppInput
-          label="Búsqueda"
+          label="Busqueda"
           value={itemSearch}
           onChangeText={setItemSearch}
-          placeholder="Código, QR, tipo, marca o talla"
+          placeholder="Codigo, QR, tipo, marca o talla"
           autoCapitalize="characters"
         />
 
@@ -716,7 +1147,7 @@ export default function CustomerPackageDetailScreen() {
           )}
           ListEmptyComponent={
             <AppText color={theme.colors.mutedText}>
-              No hay prendas que coincidan con la búsqueda.
+              No hay prendas que coincidan con la busqueda.
             </AppText>
           }
         />
@@ -728,18 +1159,9 @@ export default function CustomerPackageDetailScreen() {
         onClose={closePaymentModal}
       >
         <AppCard variant="subtle">
-          <View style={styles.summaryRow}>
-            <AppText>Paquete</AppText>
-            <AppText bold>{detail.folio}</AppText>
-          </View>
-          <View style={styles.summaryRow}>
-            <AppText>Pendiente actual</AppText>
-            <AppText bold color={theme.colors.danger}>{money(detail.pendingAmount)}</AppText>
-          </View>
-          <View style={styles.summaryRow}>
-            <AppText>Saldo a favor</AppText>
-            <AppText>{money(balanceSummary?.balance)}</AppText>
-          </View>
+          <InfoRow label="Paquete" value={detail.folio} />
+          <InfoRow label="Pendiente actual" value={money(detail.pendingAmount)} tone={hasPending ? 'danger' : 'success'} />
+          <InfoRow label="Saldo a favor" value={money(balanceSummary?.balance)} tone={customerBalance > 0 ? 'success' : 'default'} />
         </AppCard>
 
         <AppInput
@@ -758,17 +1180,17 @@ export default function CustomerPackageDetailScreen() {
 
         <View style={styles.compactSelector}>
           <AppText variant="caption" color={theme.colors.mutedText} bold>
-            Método de pago
+            Metodo de pago
           </AppText>
           <AppButton
             title={
               paymentMethods.find((method) => method.id === selectedPaymentMethodId)?.name ||
-              'Seleccionar método'
+              'Seleccionar metodo'
             }
             variant="secondary"
             onPress={() => setPaymentMethodPickerVisible((current) => !current)}
             disabled={paymentMethods.length === 0 || isWorking}
-            disabledReason="No hay métodos de pago activos para esta sucursal."
+            disabledReason="No hay metodos de pago activos para esta sucursal."
           />
           {paymentMethodPickerVisible ? (
             <View style={styles.paymentMethodsList}>
@@ -779,7 +1201,7 @@ export default function CustomerPackageDetailScreen() {
                   <AppOptionRow
                     key={method.id}
                     title={`${selected ? '[x] ' : ''}${method.name}`}
-                    subtitle={method.code || 'Método activo'}
+                    subtitle={method.code || 'Metodo activo'}
                     onPress={() => {
                       setSelectedPaymentMethodId(method.id);
                       setPaymentMethodPickerVisible(false);
@@ -796,8 +1218,12 @@ export default function CustomerPackageDetailScreen() {
           variant="operation"
           onPress={handleRegisterPackagePayment}
           loading={isWorking}
-          disabled={isWorking || !selectedPaymentMethodId}
-          disabledReason="Selecciona metodo de pago y captura un monto valido."
+          disabled={isWorking || !selectedPaymentMethodId || !canRegisterPayments}
+          disabledReason={
+            !canRegisterPayments
+              ? 'No tienes permiso para registrar abonos. Permiso requerido: REGISTER_PAYMENTS.'
+              : 'Selecciona metodo de pago y captura un monto valido.'
+          }
         />
       </AppBottomModal>
 
@@ -810,15 +1236,16 @@ export default function CustomerPackageDetailScreen() {
           label="Motivo"
           value={cancelNotes}
           onChangeText={setCancelNotes}
-          placeholder="Motivo de cancelación"
+          placeholder="Motivo de cancelacion"
           multiline
         />
         <AppButton
-          title="Confirmar cancelación"
+          title="Confirmar cancelacion"
           variant="danger"
           onPress={handleCancel}
           loading={isWorking}
-          disabled={isWorking}
+          disabled={isWorking || !canManagePackage}
+          disabledReason="No tienes permiso para cancelar paquetes. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE."
         />
       </AppBottomModal>
     </AppShellPage>
@@ -826,41 +1253,102 @@ export default function CustomerPackageDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  actionBarButtons: {
+  headerActions: {
     alignItems: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
     justifyContent: 'flex-end',
   },
-  actionBarCard: {
+  heroCard: {
     marginBottom: 12,
   },
-  actionBarHeader: {
-    alignItems: 'center',
+  heroHeader: {
+    alignItems: 'flex-start',
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
     justifyContent: 'space-between',
   },
-  actionBarIdentity: {
+  heroIdentity: {
     flex: 1,
-    gap: 3,
-    minWidth: 220,
+    minWidth: 240,
   },
-  summaryRow: {
+  heroBadges: {
+    alignItems: 'flex-end',
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 8,
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'flex-end',
   },
-  actions: {
-    gap: 10,
+  metricsGrid: {
     marginTop: 12,
+  },
+  metricCard: {
+    borderWidth: 1,
+    gap: 2,
+    marginBottom: 8,
+    minHeight: 78,
+    padding: 10,
+  },
+  pill: {
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  nextStepRow: {
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'space-between',
+    marginTop: 12,
+    paddingTop: 12,
+  },
+  nextStepText: {
+    flex: 1,
+    minWidth: 240,
+  },
+  primaryAction: {
+    minWidth: 180,
+  },
+  contentGrid: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 14,
+  },
+  contentGridStacked: {
+    flexDirection: 'column',
+  },
+  mainColumn: {
+    flex: 2,
+    minWidth: 0,
+    width: '100%',
+  },
+  sideColumn: {
+    flex: 1,
+    minWidth: 300,
+    width: '100%',
+  },
+  sectionHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  sectionActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'flex-end',
   },
   compactActionButton: {
     minHeight: 32,
-    minWidth: 124,
+    minWidth: 116,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
@@ -868,12 +1356,56 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 12,
   },
-  bottomActions: {
-    gap: 10,
+  actionsList: {
+    gap: 8,
   },
-  itemRow: {
-    borderBottomWidth: 1,
-    paddingVertical: 12,
+  sideAction: {
+    marginBottom: 10,
+    marginTop: 8,
+  },
+  lineList: {
+    gap: 8,
+  },
+  compactLine: {
+    borderWidth: 1,
+    gap: 8,
+    padding: 10,
+  },
+  lineMain: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
+  lineTitleBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  lineMetaGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  lineActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'space-between',
+  },
+  lineButton: {
+    minWidth: 104,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  infoRow: {
+    flexGrow: 1,
+    minWidth: 116,
+  },
+  emptyState: {
+    borderWidth: 1,
+    gap: 4,
+    padding: 12,
   },
   modalList: {
     maxHeight: 420,
@@ -888,21 +1420,21 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     backgroundColor: '#ffffff',
     borderColor: '#dddddd',
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1,
-    padding: 20,
     marginTop: 12,
+    padding: 14,
   },
   labelText: {
     color: '#000000',
-    fontSize: 14,
+    fontSize: 12,
+    marginTop: 3,
     textAlign: 'center',
-    marginTop: 4,
   },
   labelFolio: {
-    marginTop: 12,
-    marginBottom: 6,
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
+    marginBottom: 4,
+    marginTop: 10,
   },
 });
