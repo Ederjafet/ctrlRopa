@@ -140,6 +140,8 @@ public class CustomerPackageDetailResponse {
         private Long reservationId;
         private String sourceType;
         private String sourceStatus;
+        private Boolean canRemove;
+        private String removeBlockedReason;
         private LocalDateTime createdAt;
 
         public ItemLine(Long id,
@@ -157,6 +159,8 @@ public class CustomerPackageDetailResponse {
                         Long reservationId,
                         String sourceType,
                         String sourceStatus,
+                        Boolean canRemove,
+                        String removeBlockedReason,
                         LocalDateTime createdAt) {
             this.id = id;
             this.itemId = itemId;
@@ -173,6 +177,8 @@ public class CustomerPackageDetailResponse {
             this.reservationId = reservationId;
             this.sourceType = sourceType;
             this.sourceStatus = sourceStatus;
+            this.canRemove = canRemove;
+            this.removeBlockedReason = removeBlockedReason;
             this.createdAt = createdAt;
         }
 
@@ -191,6 +197,8 @@ public class CustomerPackageDetailResponse {
         public Long getReservationId() { return reservationId; }
         public String getSourceType() { return sourceType; }
         public String getSourceStatus() { return sourceStatus; }
+        public Boolean getCanRemove() { return canRemove; }
+        public String getRemoveBlockedReason() { return removeBlockedReason; }
         public LocalDateTime getCreatedAt() { return createdAt; }
     }
 

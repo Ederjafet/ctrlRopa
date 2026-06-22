@@ -94,12 +94,14 @@ function getRemoveItemBlockedReason(
   canManagePackage: boolean,
   isWorking: boolean
 ) {
+  if (isWorking) return 'Ya hay una accion en proceso.';
+  if (item.canRemove === true) return '';
+  if (item.canRemove === false && item.removeBlockedReason) return item.removeBlockedReason;
   if (!canManagePackage) return 'No tienes permiso para quitar prendas del paquete.';
   if (!canEditPackage) return 'No puedes quitar prendas cuando el paquete ya esta listo para envio, enviado, cerrado o cancelado.';
   if (Number(item.paidAmount ?? 0) > 0) {
     return 'Esta prenda ya tiene abono aplicado. Para quitarla se requiere ajustar el pago o generar saldo a favor.';
   }
-  if (isWorking) return 'Ya hay una accion en proceso.';
   return '';
 }
 

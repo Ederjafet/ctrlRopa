@@ -1,5 +1,30 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-22 - PACKAGE-ITEM-REMOVE-B fix quitar linea sin abono con pagos/envio
+
+Tipo: backend, frontend, paquetes, pagos, envios, tests, documentacion.
+
+Objetivo:
+
+- Corregir el bloqueo de `Quitar` cuando una linea del paquete tiene `paidAmount = 0`, aunque el paquete tenga pagos aplicados a otras prendas y costo de envio confirmado.
+
+Cambios realizados:
+
+- `CustomerPackageDetailResponse.ItemLine` expone `canRemove` y `removeBlockedReason`.
+- `CustomerPackageService` calcula la removibilidad por linea usando permiso, estado editable y pago aplicado de esa linea.
+- El endpoint `DELETE /api/customer-packages/{packageId}/items/{packageItemId}` conserva la validacion backend por linea.
+- `/customer-package-detail` usa `canRemove/removeBlockedReason` del backend antes de aplicar su fallback local.
+- Se agrega regresion para paquete con dos lineas pagadas, una linea sin pago y envio confirmado.
+- Se documenta la fase en `docs/PACKAGE_ITEM_REMOVE_B_FIX_LINEA_SIN_ABONO.md` y se actualiza la documentacion de PACKAGE-ITEM-REMOVE-A.
+
+Restricciones respetadas:
+
+- No se uso el pago global del paquete para bloquear lineas sin abono.
+- No se permitio quitar lineas con pago aplicado.
+- No se elimino ni altero el costo de envio automaticamente.
+- No se tocaron pagos existentes.
+- No se reseteo base de datos.
+
 ## 2026-06-22 - PACKAGE-ITEM-REMOVE-A quitar prenda de paquete sin abono
 
 Tipo: backend, frontend, paquetes, pagos, permisos, documentacion.

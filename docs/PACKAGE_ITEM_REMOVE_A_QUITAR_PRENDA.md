@@ -119,6 +119,24 @@ Se agregaron pruebas unitarias para:
 - bloquear paquete listo para envio;
 - bloquear usuario sin permiso.
 
+## Correccion PACKAGE-ITEM-REMOVE-B
+
+Durante el smoke posterior se detecto que una linea con `Pagado $0.00` podia quedar bloqueada si el paquete tenia pagos aplicados a otras prendas y costo de envio confirmado.
+
+La regla queda aclarada:
+
+- La decision de quitar se calcula por linea, no por el abono global del paquete.
+- Una linea con `paidAmount = 0` se puede quitar aunque otras lineas tengan pago aplicado.
+- El costo de envio confirmado no bloquea la eliminacion de una linea sin abono.
+- El envio se conserva y el total se recalcula como `subtotal prendas + costo envio`.
+- El backend expone `canRemove` y `removeBlockedReason` por linea para que la UI no replique una regla distinta.
+
+Caso de regresion cubierto:
+
+- Antes: subtotal `$2,299.00`, envio `$190.00`, total `$2,489.00`, abonado `$699.00`, pendiente `$1,790.00`, 3 prendas.
+- Se quita linea de `$1,600.00` con pagado `$0.00`.
+- Despues: subtotal `$699.00`, envio `$190.00`, total `$889.00`, abonado `$699.00`, pendiente `$190.00`, 2 prendas.
+
 ## Backlog
 
 - Quitar prenda con abono aplicado generando saldo a favor.

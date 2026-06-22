@@ -20,6 +20,7 @@ import com.hpsqsoft.ctrlropa.reservation.ReservationStatus;
 import com.hpsqsoft.ctrlropa.sale.SaleRepository;
 import com.hpsqsoft.ctrlropa.security.access.AccessService;
 import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
+import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
 import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
@@ -328,6 +329,57 @@ class CustomerPackageServiceTests {
     }
 
     @Test
+    void removeItemWithoutPaidAmountIgnoresOtherPaidLinesAndKeepsShippingCost() {
+        Reservation paidReservationA = activeReservation(
+                1L,
+                6L,
+                "ITEM-1782091793236-0",
+                BigDecimal.valueOf(199).setScale(2)
+        );
+        Reservation paidReservationB = activeReservation(
+                2L,
+                7L,
+                "ITEM-1782146280743-0",
+                BigDecimal.valueOf(500).setScale(2)
+        );
+        Reservation unpaidReservation = activeReservation(
+                3L,
+                3L,
+                "ITEM-1782075838714-0",
+                BigDecimal.valueOf(1600).setScale(2)
+        );
+        CustomerPackage customerPackage = customerPackage(unpaidReservation);
+        customerPackage.setShippingCostConfirmed(true);
+        customerPackage.setShippingCostAmount(BigDecimal.valueOf(190).setScale(2));
+        CustomerPackageItem paidItemA = packageItem(customerPackage, paidReservationA, 1L);
+        CustomerPackageItem paidItemB = packageItem(customerPackage, paidReservationB, 2L);
+        CustomerPackageItem unpaidItem = packageItem(customerPackage, unpaidReservation, 3L);
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(accessService.can(99L, PermissionCode.CREATE_CLOSE_CUSTOMER_PACKAGE)).thenReturn(true);
+        when(repository.findById(501L)).thenReturn(Optional.of(customerPackage));
+        when(itemRepository.findById(3L)).thenReturn(Optional.of(unpaidItem));
+        stubFinancialSummary(1L, BigDecimal.valueOf(199).setScale(2), BigDecimal.valueOf(199).setScale(2));
+        stubFinancialSummary(2L, BigDecimal.valueOf(500).setScale(2), BigDecimal.valueOf(500).setScale(2));
+        stubFinancialSummary(3L, BigDecimal.valueOf(1600).setScale(2), BigDecimal.ZERO.setScale(2));
+        when(itemRepository.findByCustomerPackageIdOrderByCreatedAtAsc(501L))
+                .thenReturn(List.of(paidItemA, paidItemB));
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(501L))).thenReturn(List.of());
+        when(jdbcTemplate.queryForObject(anyString(), eq(BigDecimal.class), eq(501L)))
+                .thenReturn(BigDecimal.ZERO.setScale(2));
+
+        CustomerPackageDetailResponse response = service.removeItem(501L, 3L);
+
+        assertEquals(2, response.getTotalItems());
+        assertEquals(0, response.getItemSubtotalAmount().compareTo(BigDecimal.valueOf(699).setScale(2)));
+        assertEquals(0, response.getShippingCostAmount().compareTo(BigDecimal.valueOf(190).setScale(2)));
+        assertEquals(0, response.getTotalAmount().compareTo(BigDecimal.valueOf(889).setScale(2)));
+        assertEquals(0, response.getPaidAmount().compareTo(BigDecimal.valueOf(699).setScale(2)));
+        assertEquals(0, response.getPendingAmount().compareTo(BigDecimal.valueOf(190).setScale(2)));
+        verify(itemRepository).delete(unpaidItem);
+    }
+
+    @Test
     void removeItemWithPaidAmountIsRejected() {
         Reservation reservation = activeReservation(false);
         CustomerPackage customerPackage = customerPackage(reservation);
@@ -380,11 +432,15 @@ class CustomerPackageServiceTests {
     }
 
     private void stubFinancialSummary(Long reservationId, BigDecimal paidAmount) {
+        stubFinancialSummary(reservationId, BigDecimal.valueOf(300).setScale(2), paidAmount);
+    }
+
+    private void stubFinancialSummary(Long reservationId, BigDecimal price, BigDecimal paidAmount) {
         when(jdbcTemplate.queryForObject(anyString(), any(RowMapper.class), eq(reservationId))).thenAnswer(invocation -> {
             @SuppressWarnings("unchecked")
             RowMapper<Object> mapper = invocation.getArgument(1);
             ResultSet resultSet = mock(ResultSet.class);
-            when(resultSet.getBigDecimal("price")).thenReturn(BigDecimal.valueOf(300).setScale(2));
+            when(resultSet.getBigDecimal("price")).thenReturn(price);
             when(resultSet.getBigDecimal("paid_amount")).thenReturn(paidAmount);
             when(resultSet.getString("source_status")).thenReturn("ACTIVE");
             return mapper.mapRow(resultSet, 0);
@@ -412,6 +468,22 @@ class CustomerPackageServiceTests {
         return reservation;
     }
 
+    private Reservation activeReservation(Long reservationId, Long itemId, String itemCode, BigDecimal price) {
+        Branch branch = branch();
+        Customer customer = customer(branch);
+        Item item = item(branch, itemId, itemCode, price);
+
+        Reservation reservation = new Reservation();
+        ReflectionTestUtils.setField(reservation, "id", reservationId);
+        reservation.setBranch(branch);
+        reservation.setCustomer(customer);
+        reservation.setItem(item);
+        reservation.setPrice(price);
+        reservation.setStatus(ReservationStatus.ACTIVE);
+        ReflectionTestUtils.setField(reservation, "createdAt", LocalDateTime.now());
+        return reservation;
+    }
+
     private CustomerPackage customerPackage(Reservation reservation) {
         CustomerPackage customerPackage = new CustomerPackage();
         ReflectionTestUtils.setField(customerPackage, "id", 501L);
@@ -425,8 +497,12 @@ class CustomerPackageServiceTests {
     }
 
     private CustomerPackageItem packageItem(CustomerPackage customerPackage, Reservation reservation) {
+        return packageItem(customerPackage, reservation, 700L);
+    }
+
+    private CustomerPackageItem packageItem(CustomerPackage customerPackage, Reservation reservation, Long packageItemId) {
         CustomerPackageItem packageItem = new CustomerPackageItem();
-        ReflectionTestUtils.setField(packageItem, "id", 700L);
+        ReflectionTestUtils.setField(packageItem, "id", packageItemId);
         packageItem.setCustomerPackageId(customerPackage.getId());
         packageItem.setItem(reservation.getItem());
         packageItem.setReservationId(reservation.getId());
@@ -458,17 +534,21 @@ class CustomerPackageServiceTests {
     }
 
     private Item item(Branch branch) {
+        return item(branch, 8L, "IT-8", BigDecimal.valueOf(300).setScale(2));
+    }
+
+    private Item item(Branch branch, Long itemId, String itemCode, BigDecimal price) {
         ProductType productType = new ProductType();
         productType.setName("Blusa");
 
         Item item = new Item();
-        ReflectionTestUtils.setField(item, "id", 8L);
+        ReflectionTestUtils.setField(item, "id", itemId);
         item.setCompany(branch.getCompany());
         item.setBranch(branch);
-        item.setCode("IT-8");
-        item.setQrCode("QR-8");
+        item.setCode(itemCode);
+        item.setQrCode("QR-" + itemId);
         item.setProductType(productType);
-        item.setPrice(BigDecimal.valueOf(300).setScale(2));
+        item.setPrice(price);
         item.setStatus(ItemStatus.RESERVED);
         return item;
     }

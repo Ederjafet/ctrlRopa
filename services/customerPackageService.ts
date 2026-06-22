@@ -34,6 +34,8 @@ export type CustomerPackageItemLine = {
   reservationId?: number | null;
   sourceType?: 'SALE' | 'RESERVATION' | string;
   sourceStatus?: string;
+  canRemove?: boolean;
+  removeBlockedReason?: string | null;
   createdAt?: string;
 };
 

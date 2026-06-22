@@ -378,7 +378,7 @@ public class CustomerPackageService {
         accessService.assertCan(currentUser.getUserId(), PermissionCode.CREATE_CLOSE_CUSTOMER_PACKAGE);
         CustomerPackage customerPackage = findEntity(packageId);
 
-        if (customerPackage.getStatus() != CustomerPackageStatus.OPEN) {
+        if (!isEditableForItemRemoval(customerPackage.getStatus())) {
             throw new IllegalArgumentException("No puedes quitar prendas cuando el paquete ya esta listo para envio, enviado, cerrado o cancelado.");
         }
 
@@ -390,8 +390,8 @@ public class CustomerPackageService {
         }
 
         SourceFinancialData financialData = getSourceFinancialData(packageItem);
-        if (financialData.paidAmount().compareTo(BigDecimal.ZERO) > 0) {
-            throw new IllegalArgumentException("No se puede quitar esta prenda porque ya tiene abono aplicado.");
+        if (hasLinePayment(financialData)) {
+            throw new IllegalArgumentException("Esta prenda ya tiene abono aplicado. Para quitarla se requiere ajustar el pago o generar saldo a favor.");
         }
 
         itemRepository.delete(packageItem);
@@ -516,10 +516,14 @@ public class CustomerPackageService {
     }
 
     private CustomerPackageDetailResponse toDetail(CustomerPackage customerPackage) {
+        Long currentUserId = currentUser.getUserId();
+        boolean canRemoveItems = currentUserId != null
+                && accessService.can(currentUserId, PermissionCode.CREATE_CLOSE_CUSTOMER_PACKAGE);
+
         List<CustomerPackageDetailResponse.ItemLine> items = itemRepository
                 .findByCustomerPackageIdOrderByCreatedAtAsc(customerPackage.getId())
                 .stream()
-                .map(this::toItemLine)
+                .map(packageItem -> toItemLine(customerPackage, packageItem, canRemoveItems))
                 .toList();
 
         BigDecimal itemSubtotalAmount = items.stream()
@@ -745,7 +749,9 @@ public class CustomerPackageService {
         );
     }
 
-    private CustomerPackageDetailResponse.ItemLine toItemLine(CustomerPackageItem packageItem) {
+    private CustomerPackageDetailResponse.ItemLine toItemLine(CustomerPackage customerPackage,
+                                                              CustomerPackageItem packageItem,
+                                                              boolean canRemoveItems) {
         String sourceType = packageItem.getSaleId() != null ? "SALE" : "RESERVATION";
 
         SourceFinancialData financialData = getSourceFinancialData(packageItem);
@@ -756,6 +762,8 @@ public class CustomerPackageService {
         }
 
         Item item = packageItem.getItem();
+
+        String removeBlockedReason = getRemoveBlockedReason(customerPackage, financialData, canRemoveItems);
 
         return new CustomerPackageDetailResponse.ItemLine(
                 packageItem.getId(),
@@ -773,8 +781,36 @@ public class CustomerPackageService {
                 packageItem.getReservationId(),
                 sourceType,
                 financialData.sourceStatus(),
+                removeBlockedReason == null,
+                removeBlockedReason,
                 packageItem.getCreatedAt()
         );
+    }
+
+    private String getRemoveBlockedReason(CustomerPackage customerPackage,
+                                          SourceFinancialData financialData,
+                                          boolean canRemoveItems) {
+        if (!canRemoveItems) {
+            return "No tienes permiso para quitar prendas del paquete.";
+        }
+
+        if (!isEditableForItemRemoval(customerPackage.getStatus())) {
+            return "No puedes quitar prendas cuando el paquete ya esta listo para envio, enviado, cerrado o cancelado.";
+        }
+
+        if (hasLinePayment(financialData)) {
+            return "Esta prenda ya tiene abono aplicado. Para quitarla se requiere ajustar el pago o generar saldo a favor.";
+        }
+
+        return null;
+    }
+
+    private boolean isEditableForItemRemoval(CustomerPackageStatus status) {
+        return status == CustomerPackageStatus.OPEN;
+    }
+
+    private boolean hasLinePayment(SourceFinancialData financialData) {
+        return financialData.paidAmount().compareTo(BigDecimal.ZERO) > 0;
     }
 
     private SourceFinancialData getSourceFinancialData(CustomerPackageItem packageItem) {
