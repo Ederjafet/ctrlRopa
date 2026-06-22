@@ -65,8 +65,9 @@ public class CustomerPackageController {
 
     @DeleteMapping("/{id}/items/{packageItemId}")
     public CustomerPackageDetailResponse removeItem(@PathVariable Long id,
-                                                    @PathVariable Long packageItemId) {
-        return service.removeItem(id, packageItemId);
+                                                    @PathVariable Long packageItemId,
+                                                    @RequestParam(defaultValue = "false") boolean confirmCredit) {
+        return service.removeItem(id, packageItemId, confirmCredit);
     }
 
     @PostMapping("/folio/{folio}/items/item-code/{code}")

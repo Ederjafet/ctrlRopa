@@ -1,5 +1,6 @@
 package com.hpsqsoft.ctrlropa.customerpackage;
 
+import com.hpsqsoft.ctrlropa.balance.BalanceService;
 import com.hpsqsoft.ctrlropa.branch.Branch;
 import com.hpsqsoft.ctrlropa.branch.BranchRepository;
 import com.hpsqsoft.ctrlropa.catalog.SalesChannel;
@@ -54,6 +55,7 @@ public class CustomerPackageService {
     private final TenantAccessGuard tenantAccessGuard;
     private final AccessService accessService;
     private final CurrentUser currentUser;
+    private final BalanceService balanceService;
 
     public CustomerPackageService(CustomerPackageRepository repository,
                                   CustomerPackageItemRepository itemRepository,
@@ -68,7 +70,8 @@ public class CustomerPackageService {
                                   JdbcTemplate jdbcTemplate,
                                   TenantAccessGuard tenantAccessGuard,
                                   AccessService accessService,
-                                  CurrentUser currentUser) {
+                                  CurrentUser currentUser,
+                                  BalanceService balanceService) {
         this.repository = repository;
         this.itemRepository = itemRepository;
         this.customerRepository = customerRepository;
@@ -83,6 +86,7 @@ public class CustomerPackageService {
         this.tenantAccessGuard = tenantAccessGuard;
         this.accessService = accessService;
         this.currentUser = currentUser;
+        this.balanceService = balanceService;
     }
 
     public CustomerPackageResponse create(CreateCustomerPackageRequest request) {
@@ -376,8 +380,9 @@ public class CustomerPackageService {
         return findDetail(packageId);
     }
 
-    public CustomerPackageDetailResponse removeItem(Long packageId, Long packageItemId) {
-        accessService.assertCan(currentUser.getUserId(), PermissionCode.CREATE_CLOSE_CUSTOMER_PACKAGE);
+    public CustomerPackageDetailResponse removeItem(Long packageId, Long packageItemId, boolean confirmCredit) {
+        Long userId = currentUser.getUserId();
+        accessService.assertCan(userId, PermissionCode.CREATE_CLOSE_CUSTOMER_PACKAGE);
         CustomerPackage customerPackage = findEntity(packageId);
 
         if (!isEditableForItemRemoval(customerPackage.getStatus())) {
@@ -393,7 +398,17 @@ public class CustomerPackageService {
 
         SourceFinancialData financialData = getSourceFinancialData(packageItem);
         if (hasLinePayment(financialData)) {
-            throw new IllegalArgumentException("Esta prenda ya tiene abono aplicado. Para quitarla se requiere ajustar el pago o generar saldo a favor.");
+            if (!confirmCredit) {
+                throw new IllegalArgumentException("Esta prenda tiene abono aplicado. Si la quitas, " + formatMoney(financialData.paidAmount()) + " quedaran como saldo a favor del cliente.");
+            }
+            accessService.assertCan(userId, PermissionCode.APPLY_CUSTOMER_BALANCE);
+            balanceService.registerRefundStoreCredit(
+                    customerPackage.getCustomer().getId(),
+                    customerPackage.getBranch().getId(),
+                    normalizeMoney(financialData.paidAmount()),
+                    userId,
+                    buildPackageItemCreditNote(customerPackage, packageItem, financialData)
+            );
         }
 
         itemRepository.delete(packageItem);
@@ -521,11 +536,13 @@ public class CustomerPackageService {
         Long currentUserId = currentUser.getUserId();
         boolean canRemoveItems = currentUserId != null
                 && accessService.can(currentUserId, PermissionCode.CREATE_CLOSE_CUSTOMER_PACKAGE);
+        boolean canGenerateCustomerCredit = currentUserId != null
+                && accessService.can(currentUserId, PermissionCode.APPLY_CUSTOMER_BALANCE);
 
         List<CustomerPackageDetailResponse.ItemLine> items = itemRepository
                 .findByCustomerPackageIdOrderByCreatedAtAsc(customerPackage.getId())
                 .stream()
-                .map(packageItem -> toItemLine(customerPackage, packageItem, canRemoveItems))
+                .map(packageItem -> toItemLine(customerPackage, packageItem, canRemoveItems, canGenerateCustomerCredit))
                 .toList();
 
         BigDecimal itemSubtotalAmount = items.stream()
@@ -762,7 +779,8 @@ public class CustomerPackageService {
 
     private CustomerPackageDetailResponse.ItemLine toItemLine(CustomerPackage customerPackage,
                                                               CustomerPackageItem packageItem,
-                                                              boolean canRemoveItems) {
+                                                              boolean canRemoveItems,
+                                                              boolean canGenerateCustomerCredit) {
         String sourceType = packageItem.getSaleId() != null ? "SALE" : "RESERVATION";
 
         SourceFinancialData financialData = getSourceFinancialData(packageItem);
@@ -774,7 +792,13 @@ public class CustomerPackageService {
 
         Item item = packageItem.getItem();
 
-        String removeBlockedReason = getRemoveBlockedReason(customerPackage, financialData, canRemoveItems);
+        boolean requiresCreditConfirmation = hasLinePayment(financialData);
+        String removeBlockedReason = getRemoveBlockedReason(
+                customerPackage,
+                financialData,
+                canRemoveItems,
+                canGenerateCustomerCredit
+        );
 
         return new CustomerPackageDetailResponse.ItemLine(
                 packageItem.getId(),
@@ -792,6 +816,8 @@ public class CustomerPackageService {
                 packageItem.getReservationId(),
                 sourceType,
                 financialData.sourceStatus(),
+                requiresCreditConfirmation,
+                requiresCreditConfirmation ? normalizeMoney(financialData.paidAmount()) : BigDecimal.ZERO.setScale(2),
                 removeBlockedReason == null,
                 removeBlockedReason,
                 packageItem.getCreatedAt()
@@ -800,7 +826,8 @@ public class CustomerPackageService {
 
     private String getRemoveBlockedReason(CustomerPackage customerPackage,
                                           SourceFinancialData financialData,
-                                          boolean canRemoveItems) {
+                                          boolean canRemoveItems,
+                                          boolean canGenerateCustomerCredit) {
         if (!canRemoveItems) {
             return "No tienes permiso para quitar prendas del paquete.";
         }
@@ -809,8 +836,8 @@ public class CustomerPackageService {
             return "No puedes quitar prendas cuando el paquete ya esta listo para envio, enviado, cerrado o cancelado.";
         }
 
-        if (hasLinePayment(financialData)) {
-            return "Esta prenda ya tiene abono aplicado. Para quitarla se requiere ajustar el pago o generar saldo a favor.";
+        if (hasLinePayment(financialData) && !canGenerateCustomerCredit) {
+            return "No tienes permiso para quitar prendas con abono aplicado. Permiso requerido: APPLY_CUSTOMER_BALANCE.";
         }
 
         return null;
@@ -871,6 +898,15 @@ public class CustomerPackageService {
 
     private String formatMoney(BigDecimal value) {
         return "$" + normalizeMoney(value).toPlainString() + " MXN";
+    }
+
+    private String buildPackageItemCreditNote(CustomerPackage customerPackage,
+                                              CustomerPackageItem packageItem,
+                                              SourceFinancialData financialData) {
+        String itemCode = packageItem.getItem() != null ? packageItem.getItem().getCode() : "sin codigo";
+        return "Saldo a favor por quitar prenda " + itemCode
+                + " del paquete " + customerPackage.getFolio()
+                + ". Monto pagado transferido: " + formatMoney(financialData.paidAmount()) + ".";
     }
 
     private SourceFinancialData getSourceFinancialData(CustomerPackageItem packageItem) {

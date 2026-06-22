@@ -496,6 +496,7 @@ export default function CustomerPackageDetailScreen() {
     const nextPaid = Math.max(0, Number(detail.paidAmount ?? 0) - Number(removeItemCandidate.paidAmount ?? 0));
     const nextTotal = nextSubtotal + currentShippingCost;
     const nextPending = Math.max(0, nextTotal - nextPaid);
+    const credit = Number(removeItemCandidate.creditAmount ?? removeItemCandidate.paidAmount ?? 0);
 
     return {
       subtotal: nextSubtotal,
@@ -503,6 +504,7 @@ export default function CustomerPackageDetailScreen() {
       total: nextTotal,
       paid: nextPaid,
       pending: nextPending,
+      credit,
     };
   }, [currentShippingCost, detail, removeItemCandidate]);
 
@@ -680,13 +682,24 @@ export default function CustomerPackageDetailScreen() {
     try {
       setIsWorking(true);
       setRemoveItemError(null);
-      const updated = await removeCustomerPackageItem(detail.id, removeItemCandidate.id);
+      const createsCredit = Number(removeItemCandidate.creditAmount ?? removeItemCandidate.paidAmount ?? 0) > 0;
+      const updated = await removeCustomerPackageItem(detail.id, removeItemCandidate.id, {
+        confirmCredit: createsCredit,
+      });
       setDetail(updated);
       syncShippingForm(updated);
+      try {
+        const updatedBalance = await getBalanceByPackageFolio(updated.folio);
+        setBalanceSummary(updatedBalance);
+      } catch {
+        // El paquete ya fue actualizado; el saldo se refrescara al recargar si esta consulta falla.
+      }
       setRemoveItemCandidate(null);
       setNotice({
-        title: 'Prenda quitada',
-        message: 'Prenda quitada del paquete correctamente.',
+        title: createsCredit ? 'Saldo a favor generado' : 'Prenda quitada',
+        message: createsCredit
+          ? 'Prenda quitada. El abono quedo como saldo a favor del cliente.'
+          : 'Prenda quitada del paquete correctamente.',
         tone: 'success',
       });
     } catch (error: any) {
@@ -976,6 +989,8 @@ export default function CustomerPackageDetailScreen() {
   const paidAmount = Number(detail.paidAmount ?? 0);
   const pendingAmount = Number(detail.pendingAmount ?? 0);
   const customerBalance = Number(balanceSummary?.balance ?? 0);
+  const removeCreditAmount = Number(removeItemCandidate?.creditAmount ?? removeItemCandidate?.paidAmount ?? 0);
+  const removeCreatesCredit = removeCreditAmount > 0;
   const itemCount = Number(detail.totalItems ?? items.length);
   const shipmentCollectAmount = shipments.reduce(
     (sum, shipment) => sum + Number(shipment.expectedCollectionAmount ?? 0),
@@ -1579,7 +1594,7 @@ export default function CustomerPackageDetailScreen() {
 
       <AppBottomModal
         visible={Boolean(removeItemCandidate)}
-        title="Quitar prenda del paquete"
+        title={removeCreatesCredit ? 'Quitar prenda con abono aplicado' : 'Quitar prenda del paquete'}
         onClose={closeRemoveItemModal}
         footer={
           <View style={styles.modalActions}>
@@ -1591,7 +1606,7 @@ export default function CustomerPackageDetailScreen() {
               disabledReason="Espera a que termine la operacion."
             />
             <AppButton
-              title="Quitar prenda"
+              title={removeCreatesCredit ? 'Quitar y generar saldo a favor' : 'Quitar prenda'}
               variant="danger"
               onPress={handleConfirmRemovePackageItem}
               loading={isWorking}
@@ -1611,10 +1626,12 @@ export default function CustomerPackageDetailScreen() {
 
             <View style={[styles.shippingNotice, { borderColor: theme.colors.warning, backgroundColor: theme.colors.surfaceAlt }]}>
               <AppText variant="caption" bold color={theme.colors.warning}>
-                El total y saldo se recalcularan
+                {removeCreatesCredit ? 'Esta prenda tiene abono aplicado' : 'El total y saldo se recalcularan'}
               </AppText>
               <AppText variant="caption" color={theme.colors.mutedText}>
-                No se tocaran pagos ya registrados. Si venia de un apartado, permanecera fuera del paquete; si fue agregada desde inventario libre, conservara la reserva creada por el flujo actual.
+                {removeCreatesCredit
+                  ? 'Si continuas, la prenda saldra del paquete, el pago no se borrara y el monto pagado quedara como saldo a favor del cliente.'
+                  : 'No se tocaran pagos ya registrados. Si venia de un apartado, permanecera fuera del paquete; si fue agregada desde inventario libre, conservara la reserva creada por el flujo actual.'}
               </AppText>
             </View>
 
@@ -1625,6 +1642,9 @@ export default function CustomerPackageDetailScreen() {
                 <MetricCard label="Total despues" value={money(removeItemPreview.total)} />
                 <MetricCard label="Abonado" value={money(removeItemPreview.paid)} />
                 <MetricCard label="Pendiente" value={money(removeItemPreview.pending)} tone={removeItemPreview.pending > 0 ? 'danger' : 'success'} />
+                {removeCreatesCredit ? (
+                  <MetricCard label="Saldo a favor" value={money(removeItemPreview.credit)} tone="success" />
+                ) : null}
               </AppResponsiveGrid>
             ) : null}
 

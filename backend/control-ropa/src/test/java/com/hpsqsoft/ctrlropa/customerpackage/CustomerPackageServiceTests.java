@@ -1,5 +1,6 @@
 package com.hpsqsoft.ctrlropa.customerpackage;
 
+import com.hpsqsoft.ctrlropa.balance.BalanceService;
 import com.hpsqsoft.ctrlropa.branch.Branch;
 import com.hpsqsoft.ctrlropa.branch.BranchRepository;
 import com.hpsqsoft.ctrlropa.catalog.ProductType;
@@ -62,6 +63,7 @@ class CustomerPackageServiceTests {
     private final TenantAccessGuard tenantAccessGuard = mock(TenantAccessGuard.class);
     private final AccessService accessService = mock(AccessService.class);
     private final CurrentUser currentUser = mock(CurrentUser.class);
+    private final BalanceService balanceService = mock(BalanceService.class);
 
     private final CustomerPackageService service = new CustomerPackageService(
             repository,
@@ -77,7 +79,8 @@ class CustomerPackageServiceTests {
             jdbcTemplate,
             tenantAccessGuard,
             accessService,
-            currentUser
+            currentUser,
+            balanceService
     );
 
     @Test
@@ -427,7 +430,7 @@ class CustomerPackageServiceTests {
         when(itemRepository.findByCustomerPackageIdOrderByCreatedAtAsc(501L)).thenReturn(List.of());
         when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(501L))).thenReturn(List.of());
 
-        CustomerPackageDetailResponse response = service.removeItem(501L, 700L);
+        CustomerPackageDetailResponse response = service.removeItem(501L, 700L, false);
 
         assertEquals(0, response.getTotalItems());
         assertEquals(0, response.getTotalAmount().compareTo(BigDecimal.ZERO));
@@ -475,7 +478,7 @@ class CustomerPackageServiceTests {
         when(jdbcTemplate.queryForObject(anyString(), eq(BigDecimal.class), eq(501L)))
                 .thenReturn(BigDecimal.ZERO.setScale(2));
 
-        CustomerPackageDetailResponse response = service.removeItem(501L, 3L);
+        CustomerPackageDetailResponse response = service.removeItem(501L, 3L, false);
 
         assertEquals(2, response.getTotalItems());
         assertEquals(0, response.getItemSubtotalAmount().compareTo(BigDecimal.valueOf(699).setScale(2)));
@@ -497,7 +500,58 @@ class CustomerPackageServiceTests {
         when(itemRepository.findById(700L)).thenReturn(Optional.of(packageItem));
         stubFinancialSummary(BigDecimal.valueOf(50).setScale(2));
 
-        assertThrows(IllegalArgumentException.class, () -> service.removeItem(501L, 700L));
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.removeItem(501L, 700L, false)
+        );
+
+        assertTrue(exception.getMessage().contains("saldo a favor"));
+        verify(itemRepository, never()).delete(any(CustomerPackageItem.class));
+        verify(balanceService, never()).registerRefundStoreCredit(any(), any(), any(), any(), anyString());
+    }
+
+    @Test
+    void removeItemWithPaidAmountAndConfirmationCreatesCustomerCredit() {
+        Reservation reservation = activeReservation(false);
+        CustomerPackage customerPackage = customerPackage(reservation);
+        CustomerPackageItem packageItem = packageItem(customerPackage, reservation);
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(501L)).thenReturn(Optional.of(customerPackage));
+        when(itemRepository.findById(700L)).thenReturn(Optional.of(packageItem));
+        stubFinancialSummary(BigDecimal.valueOf(50).setScale(2));
+        when(itemRepository.findByCustomerPackageIdOrderByCreatedAtAsc(501L)).thenReturn(List.of());
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(501L))).thenReturn(List.of());
+
+        CustomerPackageDetailResponse response = service.removeItem(501L, 700L, true);
+
+        assertEquals(0, response.getTotalItems());
+        verify(balanceService).registerRefundStoreCredit(
+                eq(20L),
+                eq(6L),
+                eq(BigDecimal.valueOf(50).setScale(2)),
+                eq(99L),
+                anyString()
+        );
+        verify(itemRepository).delete(packageItem);
+    }
+
+    @Test
+    void removeItemWithPaidAmountRequiresCustomerBalancePermission() {
+        Reservation reservation = activeReservation(false);
+        CustomerPackage customerPackage = customerPackage(reservation);
+        CustomerPackageItem packageItem = packageItem(customerPackage, reservation);
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(501L)).thenReturn(Optional.of(customerPackage));
+        when(itemRepository.findById(700L)).thenReturn(Optional.of(packageItem));
+        stubFinancialSummary(BigDecimal.valueOf(50).setScale(2));
+        doThrow(new AccessDeniedException("missing balance permission"))
+                .when(accessService)
+                .assertCan(99L, PermissionCode.APPLY_CUSTOMER_BALANCE);
+
+        assertThrows(AccessDeniedException.class, () -> service.removeItem(501L, 700L, true));
+        verify(balanceService, never()).registerRefundStoreCredit(any(), any(), any(), any(), anyString());
         verify(itemRepository, never()).delete(any(CustomerPackageItem.class));
     }
 
@@ -509,7 +563,7 @@ class CustomerPackageServiceTests {
         when(currentUser.getUserId()).thenReturn(99L);
         when(repository.findById(501L)).thenReturn(Optional.of(customerPackage));
 
-        assertThrows(IllegalArgumentException.class, () -> service.removeItem(501L, 700L));
+        assertThrows(IllegalArgumentException.class, () -> service.removeItem(501L, 700L, false));
         verify(itemRepository, never()).findById(700L);
         verify(itemRepository, never()).delete(any(CustomerPackageItem.class));
     }
@@ -521,7 +575,7 @@ class CustomerPackageServiceTests {
                 .when(accessService)
                 .assertCan(any(), any());
 
-        assertThrows(AccessDeniedException.class, () -> service.removeItem(501L, 700L));
+        assertThrows(AccessDeniedException.class, () -> service.removeItem(501L, 700L, false));
         verify(repository, never()).findById(501L);
         verify(itemRepository, never()).delete(any(CustomerPackageItem.class));
     }

@@ -42,9 +42,10 @@ Ahora:
 La regla se mantiene por linea:
 
 - se permite quitar si `paidAmount = 0`, el paquete esta editable y el usuario tiene `CREATE_CLOSE_CUSTOMER_PACKAGE`;
+- desde PACKAGE-ITEM-REMOVE-D, si `paidAmount > 0`, se permite quitar solo con confirmacion explicita, `APPLY_CUSTOMER_BALANCE` y generacion de saldo a favor;
 - no se bloquea por pagos de otras prendas;
 - no se bloquea por costo de envio confirmado;
-- se bloquea si esa linea tiene abono aplicado, falta permiso o el paquete no esta editable.
+- se bloquea si falta permiso o el paquete no esta editable.
 
 ## Impacto en envio y pagos
 
@@ -55,6 +56,13 @@ Al quitar una linea sin abono:
 - no se cancela la reserva;
 - el detalle actualizado viene del backend;
 - el total y saldo se recalculan con envio incluido.
+
+Al quitar una linea con abono despues de PACKAGE-ITEM-REMOVE-D:
+
+- el pago historico no se borra;
+- se registra saldo a favor por el monto pagado de la linea;
+- se conserva el envio;
+- el detalle actualizado viene del backend.
 
 ## Smoke esperado
 

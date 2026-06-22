@@ -348,8 +348,15 @@ export const SCREEN_PERMISSIONS: Record<ScreenPermissionKey, ScreenPermissionDef
         key: 'removePackageItem',
         label: 'Quitar prenda del paquete',
         permissionCode: 'CREATE_CLOSE_CUSTOMER_PACKAGE',
-        allowedMessage: 'Puedes quitar prendas sin abono aplicado mientras el paquete esta en preparacion.',
+        allowedMessage: 'Puedes quitar prendas del paquete mientras esta en preparacion.',
         deniedMessage: 'No puedes quitar prendas del paquete.',
+      },
+      {
+        key: 'removePackageItemWithCredit',
+        label: 'Quitar prenda con abono y generar saldo a favor',
+        permissionCode: 'APPLY_CUSTOMER_BALANCE',
+        allowedMessage: 'Puedes confirmar que el abono de una prenda retirada quede como saldo a favor.',
+        deniedMessage: 'No puedes quitar prendas con abono aplicado ni generar saldo a favor.',
       },
       {
         key: 'registerPayment',

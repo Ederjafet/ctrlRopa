@@ -1,5 +1,33 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-22 - PACKAGE-ITEM-REMOVE-D quitar prenda con pago y saldo a favor
+
+Tipo: backend, frontend, paquetes, pagos, saldo a favor, permisos, tests, documentacion.
+
+Objetivo:
+
+- Permitir quitar una prenda del paquete aunque tenga abono aplicado, con confirmacion explicita y generacion de saldo a favor del cliente.
+
+Cambios realizados:
+
+- `DELETE /api/customer-packages/{packageId}/items/{packageItemId}` acepta `confirmCredit=true`.
+- Si la linea tiene pago y no hay confirmacion, backend bloquea con mensaje de saldo a favor.
+- Si la linea tiene pago y hay confirmacion, backend exige `APPLY_CUSTOMER_BALANCE` y registra `REFUND_STORE_CREDIT`.
+- No se borran pagos historicos ni asignaciones; solo se elimina la relacion de paquete.
+- `CustomerPackageDetailResponse.ItemLine` expone `requiresCreditConfirmation` y `creditAmount`.
+- `/customer-package-detail` muestra advertencia fuerte para lineas pagadas y cambia el CTA a `Quitar y generar saldo a favor`.
+- Despues de quitar, la UI refresca paquete y saldo a favor.
+- `Ver permisos` agrega la accion de quitar con abono y generar saldo a favor.
+- Se documenta la fase en `docs/PACKAGE_ITEM_REMOVE_D_CON_PAGO_SALDO_A_FAVOR.md`.
+
+Restricciones respetadas:
+
+- No se borraron pagos.
+- No se permitio quitar con pago sin advertencia.
+- No se permitio generar saldo sin permiso `APPLY_CUSTOMER_BALANCE`.
+- No se borro ni altero el envio.
+- No se reseteo base de datos.
+
 ## 2026-06-22 - PACKAGE-READY-A liberar paquete pagado para envio
 
 Tipo: backend, frontend, paquetes, pagos, envios, UX operativa, tests, documentacion.

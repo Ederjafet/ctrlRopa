@@ -24,11 +24,14 @@ Una prenda se puede quitar del paquete si:
 - el usuario tiene permiso `CREATE_CLOSE_CUSTOMER_PACKAGE`;
 - el paquete no esta listo para envio, enviado, entregado o cancelado.
 
+La regla inicial bloqueaba lineas con abono aplicado. Desde PACKAGE-ITEM-REMOVE-D, una linea con abono aplicado puede quitarse solo con advertencia, confirmacion explicita y generacion de saldo a favor del cliente.
+
 La accion queda bloqueada si:
 
-- la linea ya tiene abono aplicado;
 - el paquete no esta editable;
 - falta permiso;
+- la linea pagada no fue confirmada con `confirmCredit=true`;
+- la linea pagada intenta quitarse sin `APPLY_CUSTOMER_BALANCE`;
 - la linea ya no pertenece al paquete.
 
 ## Backend
@@ -57,7 +60,7 @@ La fase usa la regla mas segura:
 - No se libera inventario automaticamente.
 - No se toca ningun pago.
 
-El flujo para quitar prendas con abono aplicado queda fuera de alcance porque requiere ajuste de pago o generacion de saldo a favor.
+Desde PACKAGE-ITEM-REMOVE-D, el flujo para quitar prendas con abono aplicado queda dentro de alcance: el pago historico se conserva y el monto pagado de la linea se registra como `REFUND_STORE_CREDIT`.
 
 ## Frontend
 
@@ -87,9 +90,9 @@ Despues de quitar:
 
 ## Mensajes
 
-Pago aplicado:
+Pago aplicado sin confirmacion:
 
-`No se puede quitar esta prenda porque ya tiene abono aplicado.`
+`Esta prenda tiene abono aplicado. Si la quitas, $X.XX MXN quedaran como saldo a favor del cliente.`
 
 Estado no editable:
 
@@ -107,6 +110,8 @@ No encontrada:
 
 Se reutiliza `CREATE_CLOSE_CUSTOMER_PACKAGE`.
 
+Para quitar con abono aplicado se requiere ademas `APPLY_CUSTOMER_BALANCE`.
+
 Tambien se agrego la accion `Quitar prenda del paquete` al modal `Ver permisos` de `customerPackageDetail`.
 
 ## Tests
@@ -118,6 +123,8 @@ Se agregaron pruebas unitarias para:
 - bloquear linea con pago aplicado;
 - bloquear paquete listo para envio;
 - bloquear usuario sin permiso.
+
+Desde PACKAGE-ITEM-REMOVE-D, la prueba de linea con pago cambia a bloqueo sin confirmacion y se agrega exito con `confirmCredit=true`.
 
 ## Correccion PACKAGE-ITEM-REMOVE-B
 

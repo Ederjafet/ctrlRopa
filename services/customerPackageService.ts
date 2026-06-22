@@ -34,6 +34,8 @@ export type CustomerPackageItemLine = {
   reservationId?: number | null;
   sourceType?: 'SALE' | 'RESERVATION' | string;
   sourceStatus?: string;
+  requiresCreditConfirmation?: boolean;
+  creditAmount?: number;
   canRemove?: boolean;
   removeBlockedReason?: string | null;
   createdAt?: string;
@@ -196,9 +198,11 @@ export async function addCustomerPackageItemByQr(
 
 export async function removeCustomerPackageItem(
   packageId: number,
-  packageItemId: number
+  packageItemId: number,
+  options?: { confirmCredit?: boolean }
 ): Promise<CustomerPackageDetail> {
-  return apiRequest<CustomerPackageDetail>(`/api/customer-packages/${packageId}/items/${packageItemId}`, {
+  const query = options?.confirmCredit ? '?confirmCredit=true' : '';
+  return apiRequest<CustomerPackageDetail>(`/api/customer-packages/${packageId}/items/${packageItemId}${query}`, {
     method: 'DELETE',
   });
 }

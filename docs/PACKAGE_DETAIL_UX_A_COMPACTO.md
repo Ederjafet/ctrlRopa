@@ -57,11 +57,11 @@ La lista de prendas ahora usa filas compactas con:
 - pagado;
 - pendiente;
 - acceso a `Ver prenda`.
-- accion secundaria `Quitar` cuando la linea no tiene abono aplicado y el paquete sigue editable.
+- accion secundaria `Quitar` cuando el paquete sigue editable.
 
 Si el paquete no tiene prendas se muestra estado vacio con CTA contextual.
 
-Despues de PACKAGE-ITEM-REMOVE-A, `Quitar` pide confirmacion y actualiza el detalle completo del paquete. Si la linea tiene pago aplicado, el paquete ya no esta `OPEN` o falta permiso, la accion queda bloqueada con explicacion. Quitar una linea solo elimina la relacion con el paquete; la reserva se conserva fuera del paquete y no se liberan prendas automaticamente.
+Despues de PACKAGE-ITEM-REMOVE-A/C, `Quitar` pide confirmacion y actualiza el detalle completo del paquete. Desde PACKAGE-ITEM-REMOVE-D, si la linea tiene pago aplicado se muestra advertencia fuerte y se requiere `APPLY_CUSTOMER_BALANCE`; al confirmar, el monto pagado queda como saldo a favor del cliente. Quitar una linea solo elimina la relacion con el paquete; la reserva se conserva fuera del paquete y no se liberan prendas automaticamente.
 
 ## Pagos y abonos
 
