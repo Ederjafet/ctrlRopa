@@ -163,3 +163,9 @@ Tests agregados o ajustados:
 ## Decision
 
 GO funcional si las validaciones pasan con entorno DB configurado: el costo de envio queda claro, suma al total y bloquea la liberacion del paquete hasta confirmarse y liquidarse.
+
+## Actualizacion SHIPMENT-FLOW-A
+
+El costo de envio confirmado sigue viviendo en el paquete y se muestra en la bandeja `/shipments` para paquetes `READY` pendientes de preparar.
+
+La preparacion del envio real requiere seleccionar una direccion activa del cliente; no se selecciona automaticamente para evitar datos logisticos inventados.

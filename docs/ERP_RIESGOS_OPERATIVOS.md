@@ -293,6 +293,8 @@ Probabilidad:
 - FLOW-FAST-QA-B mejora `/payments` con datos reales disponibles, pero la consulta financiera global por sucursal requiere endpoint dedicado antes de prometer reporteria completa de pagos.
 - PERM-UX-E replica diagnostico de permisos en Operacion, pero no reemplaza enforcement backend; permisos amplios como `CREATE_CLOSE_CUSTOMER_PACKAGE` y `MANAGE_SHIPMENTS` siguen representando consulta y operacion hasta una fase de granularidad fina.
 - PERM-UX-E mantiene codigos tecnicos ocultos por bandera y perfil; QA debe validar roles reales con `EXPO_PUBLIC_ENABLE_PERMISSION_DIAGNOSTICS=false` antes de demo productiva.
+- SHIPMENT-FLOW-A muestra paquetes `READY` en la bandeja de envios sin crear direccion automatica; si el cliente no tiene direccion activa, logistica debe registrar una antes de preparar el envio real.
+- SHIPMENT-FLOW-A evita duplicados por shipment activo y validacion backend, pero un intento concurrente puede dejar un shipment vacio si otro usuario asocia primero el paquete; conviene agregar endpoint atomico `prepare-from-package` en una fase futura.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

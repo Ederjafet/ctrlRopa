@@ -3,11 +3,18 @@ import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
+import AppOptionRow from '@/components/ui/AppOptionRow';
 import ScreenPermissionHeaderAction from '@/components/ui/ScreenPermissionHeaderAction';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { hasRole } from '@/services/accessControl';
+import { CustomerAddress, getCustomerAddresses } from '@/services/customerAddressService';
 import {
+  CustomerPackageDetail,
+  getReadyCustomerPackagesForShipment,
+} from '@/services/customerPackageService';
+import {
+  addPackageToShipment,
   createShipment,
   getShipmentsByBranch,
   Shipment,
@@ -19,6 +26,10 @@ import { getSession, UserSession } from '@/services/sessionStorage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+
+function money(value?: number | null) {
+  return `$${Number(value ?? 0).toFixed(2)} MXN`;
+}
 
 function formatDate(value?: string | null) {
   if (!value) return 'Sin fecha';
@@ -37,11 +48,17 @@ export default function ShipmentsScreen() {
 
   const [session, setSession] = useState<UserSession | null>(null);
   const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [readyPackages, setReadyPackages] = useState<CustomerPackageDetail[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [isPreparingPackage, setIsPreparingPackage] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [prepareModalVisible, setPrepareModalVisible] = useState(false);
   const [actionsShipment, setActionsShipment] = useState<Shipment | null>(null);
+  const [selectedReadyPackage, setSelectedReadyPackage] = useState<CustomerPackageDetail | null>(null);
+  const [readyPackageAddresses, setReadyPackageAddresses] = useState<CustomerAddress[]>([]);
+  const [selectedReadyAddress, setSelectedReadyAddress] = useState<CustomerAddress | null>(null);
   const [deliveryType, setDeliveryType] = useState<ShipmentDeliveryType>('LOCAL');
   const [guideReference, setGuideReference] = useState('');
 
@@ -62,8 +79,12 @@ export default function ShipmentsScreen() {
       }
 
       setSession(currentSession);
-      const data = await getShipmentsByBranch(currentSession.branchId);
-      setShipments(data);
+      const [shipmentData, readyPackageData] = await Promise.all([
+        getShipmentsByBranch(currentSession.branchId),
+        getReadyCustomerPackagesForShipment(currentSession.branchId),
+      ]);
+      setShipments(shipmentData);
+      setReadyPackages(readyPackageData);
     } catch (error: any) {
       Alert.alert('Envíos', error.message || 'No se pudieron cargar los envíos.');
     } finally {
@@ -84,6 +105,18 @@ export default function ShipmentsScreen() {
       return text.includes(term);
     });
   }, [session, shipments, search]);
+
+  const filteredReadyPackages = useMemo(() => {
+    if (hasRole(session, 'COURIER')) return [];
+    const term = normalize(search);
+
+    if (!term) return readyPackages;
+
+    return readyPackages.filter((customerPackage) => {
+      const text = `${customerPackage.folio ?? ''} ${customerPackage.customerName ?? ''} ${customerPackage.status ?? ''} ${customerPackage.shippingCarrier ?? ''} ${customerPackage.trackingNumber ?? ''}`.toLowerCase();
+      return text.includes(term);
+    });
+  }, [session, readyPackages, search]);
 
   const handleCreate = async () => {
     if (!session) return;
@@ -110,6 +143,71 @@ export default function ShipmentsScreen() {
       Alert.alert('Envíos', error.message || 'No se pudo crear el envío.');
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const openPreparePackageModal = async (customerPackage: CustomerPackageDetail) => {
+    try {
+      setIsPreparingPackage(true);
+      setSelectedReadyPackage(customerPackage);
+      setSelectedReadyAddress(null);
+      setDeliveryType('LOCAL');
+      setGuideReference(customerPackage.trackingNumber?.trim() || '');
+
+      const addresses = await getCustomerAddresses(customerPackage.customerId);
+      const activeAddresses = addresses.filter((address) => address.status !== 'INACTIVE');
+      setReadyPackageAddresses(activeAddresses);
+      setSelectedReadyAddress(activeAddresses.find((address) => address.isDefault) ?? activeAddresses[0] ?? null);
+      setPrepareModalVisible(true);
+    } catch (error: any) {
+      Alert.alert('Envios', error.message || 'No se pudieron cargar las direcciones del cliente.');
+    } finally {
+      setIsPreparingPackage(false);
+    }
+  };
+
+  const handlePrepareReadyPackage = async () => {
+    if (!session || !selectedReadyPackage) return;
+
+    if (!selectedReadyAddress) {
+      Alert.alert('Envios', 'Selecciona una direccion activa para preparar el envio.');
+      return;
+    }
+
+    if (deliveryType === 'CARRIER' && !guideReference.trim()) {
+      Alert.alert('Envios', 'Captura la guia o referencia para envios por paqueteria.');
+      return;
+    }
+
+    try {
+      setIsPreparingPackage(true);
+      const created = await createShipment({
+        branchId: session.branchId,
+        deliveryType,
+        guideReference: guideReference.trim() || null,
+        createdByUserId: session.userId,
+      });
+
+      const detail = await addPackageToShipment(created.id, {
+        customerPackageId: selectedReadyPackage.id,
+        deliveryAddressId: selectedReadyAddress.id,
+        paymentMode: 'PREPAID',
+        expectedCodAmount: null,
+      });
+
+      setPrepareModalVisible(false);
+      setSelectedReadyPackage(null);
+      setReadyPackageAddresses([]);
+      setSelectedReadyAddress(null);
+      setGuideReference('');
+      setDeliveryType('LOCAL');
+      await loadData();
+      router.push(`/shipment-detail?id=${detail.id}` as any);
+    } catch (error: any) {
+      Alert.alert('Envios', error.message || 'No se pudo preparar el envio del paquete.');
+      await loadData();
+    } finally {
+      setIsPreparingPackage(false);
     }
   };
 
@@ -150,6 +248,19 @@ export default function ShipmentsScreen() {
             ]}
           >
             <AppText variant="caption" color={theme.colors.mutedText} bold>
+              Listos por preparar: {readyPackages.length}
+            </AppText>
+          </View>
+          <View
+            style={[
+              styles.kpiPill,
+              {
+                backgroundColor: theme.colors.surfaceAlt,
+                borderColor: theme.colors.border,
+              },
+            ]}
+          >
+            <AppText variant="caption" color={theme.colors.mutedText} bold>
               Envíos: {shipments.length}
             </AppText>
           </View>
@@ -172,19 +283,74 @@ export default function ShipmentsScreen() {
           label="Buscar"
           value={search}
           onChangeText={setSearch}
-          placeholder="Folio, estado, tipo o guía"
+          placeholder="Folio, cliente, estado, tipo o guia"
           autoCapitalize="none"
         />
 
         {isLoading ? <ActivityIndicator /> : null}
 
-        {!isLoading && filteredShipments.length === 0 ? (
+        {!isLoading && filteredShipments.length === 0 && filteredReadyPackages.length === 0 ? (
           <AppCard>
             <AppText color={theme.colors.mutedText}>
               No hay envíos pendientes. Los paquetes listos para enviar aparecerán aquí.
             </AppText>
           </AppCard>
         ) : null}
+
+        {filteredReadyPackages.map((customerPackage) => (
+          <View
+            key={`ready-${customerPackage.id}`}
+            style={[
+              styles.rowCard,
+              {
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.surface,
+              },
+            ]}
+          >
+            <View style={styles.shipmentIdentity}>
+              <AppText variant="caption" color={theme.colors.warning} numberOfLines={1}>
+                Pendiente de preparar envio
+              </AppText>
+              <AppText bold numberOfLines={1}>
+                {customerPackage.folio} · {customerPackage.customerName || `Cliente #${customerPackage.customerId}`}
+              </AppText>
+            </View>
+
+            <View style={styles.shipmentMeta}>
+              <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+                {customerPackage.totalItems ?? 0} prenda{customerPackage.totalItems === 1 ? '' : 's'} · Total {money(customerPackage.totalAmount)}
+              </AppText>
+              <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+                Envio: {customerPackage.shippingCostWaived ? 'Sin costo' : money(customerPackage.shippingCostAmount)}
+              </AppText>
+            </View>
+
+            <View style={styles.shipmentActions}>
+              <View style={styles.shipmentDateBlock}>
+                <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+                  Listo: {formatDate(customerPackage.closedAt || customerPackage.createdAt)}
+                </AppText>
+                <AppText variant="caption" color={theme.colors.success} numberOfLines={1}>
+                  Saldo cubierto
+                </AppText>
+              </View>
+              <AppButton
+                title="Preparar"
+                onPress={() => openPreparePackageModal(customerPackage)}
+                loading={isPreparingPackage && selectedReadyPackage?.id === customerPackage.id}
+                disabled={isPreparingPackage}
+                style={styles.compactButton}
+              />
+              <AppButton
+                title="Paquete"
+                variant="secondary"
+                onPress={() => router.push(`/customer-package-detail?id=${customerPackage.id}` as any)}
+                style={styles.compactButton}
+              />
+            </View>
+          </View>
+        ))}
 
         {filteredShipments.map((shipment) => (
           <View
@@ -297,6 +463,108 @@ export default function ShipmentsScreen() {
           loading={isCreating}
           disabled={isCreating}
         />
+      </AppBottomModal>
+
+      <AppBottomModal
+        visible={prepareModalVisible}
+        title={selectedReadyPackage ? `Preparar ${selectedReadyPackage.folio}` : 'Preparar envio'}
+        onClose={() => {
+          if (isPreparingPackage) return;
+          setPrepareModalVisible(false);
+          setSelectedReadyPackage(null);
+          setReadyPackageAddresses([]);
+          setSelectedReadyAddress(null);
+        }}
+        maxHeight="90%"
+      >
+        {selectedReadyPackage ? (
+          <View style={styles.modalActionsStack}>
+            <AppCard>
+              <AppText bold>{selectedReadyPackage.customerName || `Cliente #${selectedReadyPackage.customerId}`}</AppText>
+              <AppText color={theme.colors.mutedText}>
+                Total {money(selectedReadyPackage.totalAmount)} · Envio {selectedReadyPackage.shippingCostWaived ? 'sin costo' : money(selectedReadyPackage.shippingCostAmount)}
+              </AppText>
+            </AppCard>
+
+            <AppText bold>Direccion de entrega</AppText>
+            {readyPackageAddresses.length === 0 ? (
+              <AppCard>
+                <AppText color={theme.colors.warning}>
+                  Este cliente no tiene direcciones activas. Registra una direccion antes de preparar el envio.
+                </AppText>
+                <AppButton
+                  title="Ver cliente"
+                  variant="secondary"
+                  onPress={() => router.push(`/customers/${selectedReadyPackage.customerId}` as any)}
+                />
+              </AppCard>
+            ) : (
+              readyPackageAddresses.map((address) => (
+                <AppOptionRow
+                  key={address.id}
+                  title={`${address.label}${address.isDefault ? ' · Principal' : ''}`}
+                  subtitle={`${address.line1}, ${address.city}`}
+                  onPress={() => setSelectedReadyAddress(address)}
+                >
+                  {selectedReadyAddress?.id === address.id ? (
+                    <AppText variant="caption" color={theme.colors.success} bold>
+                      Seleccionada
+                    </AppText>
+                  ) : null}
+                </AppOptionRow>
+              ))
+            )}
+
+            <AppText bold>Tipo de entrega</AppText>
+            <View style={styles.typeRow}>
+              <Pressable
+                onPress={() => setDeliveryType('LOCAL')}
+                style={({ pressed }) => [
+                  styles.typeOption,
+                  {
+                    borderColor: deliveryType === 'LOCAL' ? theme.colors.accent : theme.colors.border,
+                    backgroundColor: deliveryType === 'LOCAL' ? theme.colors.optionPressedBackground : theme.colors.surface,
+                    borderRadius: theme.radius.md,
+                    opacity: pressed ? 0.75 : 1,
+                  },
+                ]}
+              >
+                <AppText bold>Local</AppText>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setDeliveryType('CARRIER')}
+                style={({ pressed }) => [
+                  styles.typeOption,
+                  {
+                    borderColor: deliveryType === 'CARRIER' ? theme.colors.accent : theme.colors.border,
+                    backgroundColor: deliveryType === 'CARRIER' ? theme.colors.optionPressedBackground : theme.colors.surface,
+                    borderRadius: theme.radius.md,
+                    opacity: pressed ? 0.75 : 1,
+                  },
+                ]}
+              >
+                <AppText bold>Paqueteria</AppText>
+              </Pressable>
+            </View>
+
+            <AppInput
+              label="Guia / referencia"
+              value={guideReference}
+              onChangeText={setGuideReference}
+              placeholder={deliveryType === 'CARRIER' ? 'Obligatoria para paqueteria' : 'Opcional'}
+              autoCapitalize="characters"
+            />
+
+            <AppButton
+              title={isPreparingPackage ? 'Preparando...' : 'Crear envio y abrir detalle'}
+              onPress={handlePrepareReadyPackage}
+              loading={isPreparingPackage}
+              disabled={isPreparingPackage || !selectedReadyAddress}
+              disabledReason={!selectedReadyAddress ? 'Selecciona una direccion activa.' : undefined}
+            />
+          </View>
+        ) : null}
       </AppBottomModal>
 
       <AppBottomModal

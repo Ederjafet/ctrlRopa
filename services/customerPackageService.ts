@@ -128,6 +128,12 @@ export async function getCustomerPackageDetailsByBranch(
   return apiRequest<CustomerPackageDetail[]>(`/api/customer-packages/branch/${branchId}/details`);
 }
 
+export async function getReadyCustomerPackagesForShipment(
+  branchId: number
+): Promise<CustomerPackageDetail[]> {
+  return apiRequest<CustomerPackageDetail[]>(`/api/customer-packages/branch/${branchId}/ready-for-shipment`);
+}
+
 export async function getCustomerPackageDetailsByCustomer(
   customerId: number
 ): Promise<CustomerPackageDetail[]> {

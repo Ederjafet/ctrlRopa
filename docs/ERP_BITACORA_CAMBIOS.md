@@ -4638,3 +4638,16 @@ Resultado:
 - LIVE, venta puerta, nuevo apartado, apartados, detalle de apartado, paquetes, detalle de paquete, envios, detalle de envio, autorizaciones LIVE y alta de prendas muestran `Ver permisos` en cabecera.
 - `/payments` usa el mismo boton reusable sin volver a mostrar tarjeta de permisos en el cuerpo.
 - `Actualizar` se mantiene solo en LIVE.
+
+## 2026-06-22 - SHIPMENT-FLOW-A paquetes listos visibles en Envios
+
+Tipo: integracion frontend/backend de paquete listo -> bandeja de envios, sin migracion.
+
+Resultado:
+
+- Se agrega endpoint `GET /api/customer-packages/branch/{branchId}/ready-for-shipment`.
+- La bandeja `/shipments` muestra envios reales y paquetes `READY` sin envio activo.
+- Los paquetes listos aparecen como `Pendiente de preparar envio`.
+- Desde la tarjeta se puede crear el envio real seleccionando direccion activa y tipo de entrega.
+- El flujo abre `/shipment-detail?id=...` despues de crear y asociar el paquete.
+- No se inventan direcciones ni se duplican paquetes con shipment activo.

@@ -98,3 +98,9 @@ Si la accion esta bloqueada, la pantalla muestra la razon en un aviso visible. S
 ## Decision
 
 GO si las validaciones finales pasan: paquete pagado y envio confirmado puede liberarse; si falta algo, la UI y backend muestran causa clara.
+
+## Actualizacion SHIPMENT-FLOW-A
+
+Al marcar un paquete como listo para envio, la pantalla `/shipments` lo muestra como `Pendiente de preparar envio` si todavia no tiene shipment activo.
+
+No se crea automaticamente el `shipment_package` en `markReady` porque el modelo actual exige una direccion de entrega obligatoria. La direccion se confirma desde `/shipments` al preparar el envio real.

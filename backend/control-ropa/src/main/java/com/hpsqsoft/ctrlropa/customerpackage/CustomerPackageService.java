@@ -215,6 +215,18 @@ public class CustomerPackageService {
     }
 
     @Transactional(readOnly = true)
+    public List<CustomerPackageDetailResponse> findReadyForShipmentByBranch(Long branchId) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.MANAGE_SHIPMENTS);
+        tenantAccessGuard.requireBranch(branchId, "La sucursal de paquetes listos para envio no pertenece al tenant activo");
+        return repository.findByBranchIdOrderByCreatedAtDesc(branchId)
+                .stream()
+                .filter(customerPackage -> customerPackage.getStatus() == CustomerPackageStatus.READY)
+                .map(this::toDetail)
+                .filter(this::isReadyForShipmentQueue)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public CustomerPackageDetailResponse findDetail(Long packageId) {
         CustomerPackage customerPackage = findEntity(packageId);
         return toDetail(customerPackage);
@@ -869,6 +881,27 @@ public class CustomerPackageService {
         }
 
         return null;
+    }
+
+    private boolean isReadyForShipmentQueue(CustomerPackageDetailResponse detail) {
+        if (detail.getTotalItems() == null || detail.getTotalItems() <= 0) {
+            return false;
+        }
+
+        if (!Boolean.TRUE.equals(detail.getShippingCostConfirmed())) {
+            return false;
+        }
+
+        if (normalizeMoney(detail.getPendingAmount()).compareTo(BigDecimal.ZERO) > 0) {
+            return false;
+        }
+
+        return detail.getShipments().stream().noneMatch(this::isActiveShipmentLine);
+    }
+
+    private boolean isActiveShipmentLine(CustomerPackageDetailResponse.ShipmentLine shipmentLine) {
+        return "OPEN".equals(shipmentLine.getShipmentStatus())
+                || "OUT_FOR_DELIVERY".equals(shipmentLine.getShipmentStatus());
     }
 
     private boolean isShippingConfirmedForReady(CustomerPackage customerPackage) {

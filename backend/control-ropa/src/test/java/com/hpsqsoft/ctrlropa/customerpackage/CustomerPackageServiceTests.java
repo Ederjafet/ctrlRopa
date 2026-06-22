@@ -418,6 +418,78 @@ class CustomerPackageServiceTests {
     }
 
     @Test
+    void findReadyForShipmentByBranchReturnsReadyPaidPackageWithoutActiveShipment() {
+        Reservation reservation = activeReservation(false);
+        CustomerPackage customerPackage = customerPackage(reservation);
+        customerPackage.setStatus(CustomerPackageStatus.READY);
+        customerPackage.setShippingCostConfirmed(true);
+        customerPackage.setShippingCostWaived(true);
+        customerPackage.setShippingCostAmount(BigDecimal.ZERO.setScale(2));
+        CustomerPackageItem packageItem = packageItem(customerPackage, reservation);
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findByBranchIdOrderByCreatedAtDesc(6L)).thenReturn(List.of(customerPackage));
+        when(itemRepository.findByCustomerPackageIdOrderByCreatedAtAsc(501L)).thenReturn(List.of(packageItem));
+        stubFinancialSummary(BigDecimal.valueOf(300).setScale(2));
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(501L))).thenReturn(List.of());
+
+        List<CustomerPackageDetailResponse> response = service.findReadyForShipmentByBranch(6L);
+
+        assertEquals(1, response.size());
+        assertEquals(501L, response.get(0).getId());
+        assertEquals(CustomerPackageStatus.READY.name(), response.get(0).getStatus());
+        assertEquals(0, response.get(0).getPendingAmount().compareTo(BigDecimal.ZERO));
+        verify(accessService).assertCan(99L, PermissionCode.MANAGE_SHIPMENTS);
+    }
+
+    @Test
+    void findReadyForShipmentByBranchExcludesPackageWithActiveShipment() {
+        Reservation reservation = activeReservation(false);
+        CustomerPackage customerPackage = customerPackage(reservation);
+        customerPackage.setStatus(CustomerPackageStatus.READY);
+        customerPackage.setShippingCostConfirmed(true);
+        customerPackage.setShippingCostWaived(true);
+        customerPackage.setShippingCostAmount(BigDecimal.ZERO.setScale(2));
+        CustomerPackageItem packageItem = packageItem(customerPackage, reservation);
+        CustomerPackageDetailResponse.ShipmentLine activeShipment = new CustomerPackageDetailResponse.ShipmentLine(
+                900L,
+                901L,
+                "SHP-901",
+                "OPEN",
+                "PENDING",
+                "PREPAID",
+                BigDecimal.ZERO.setScale(2),
+                BigDecimal.ZERO.setScale(2),
+                BigDecimal.ZERO.setScale(2),
+                null,
+                null,
+                null,
+                null
+        );
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findByBranchIdOrderByCreatedAtDesc(6L)).thenReturn(List.of(customerPackage));
+        when(itemRepository.findByCustomerPackageIdOrderByCreatedAtAsc(501L)).thenReturn(List.of(packageItem));
+        stubFinancialSummary(BigDecimal.valueOf(300).setScale(2));
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(501L))).thenReturn(List.of(activeShipment));
+
+        List<CustomerPackageDetailResponse> response = service.findReadyForShipmentByBranch(6L);
+
+        assertTrue(response.isEmpty());
+    }
+
+    @Test
+    void findReadyForShipmentByBranchRequiresShipmentPermission() {
+        when(currentUser.getUserId()).thenReturn(99L);
+        doThrow(new AccessDeniedException("missing shipments permission"))
+                .when(accessService)
+                .assertCan(99L, PermissionCode.MANAGE_SHIPMENTS);
+
+        assertThrows(AccessDeniedException.class, () -> service.findReadyForShipmentByBranch(6L));
+        verify(repository, never()).findByBranchIdOrderByCreatedAtDesc(6L);
+    }
+
+    @Test
     void removeItemWithoutPaidAmountDeletesPackageLineAndRecalculates() {
         Reservation reservation = activeReservation(false);
         CustomerPackage customerPackage = customerPackage(reservation);

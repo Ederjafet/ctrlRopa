@@ -922,7 +922,7 @@ export default function CustomerPackageDetailScreen() {
       setMarkReadyModalVisible(false);
       setNotice({
         title: 'Paquete listo para envio',
-        message: 'Paquete marcado listo para envio.',
+        message: 'Paquete marcado listo para envio. Ya aparece en la bandeja de Envios para prepararlo.',
         tone: 'success',
       });
     } catch (error: any) {
