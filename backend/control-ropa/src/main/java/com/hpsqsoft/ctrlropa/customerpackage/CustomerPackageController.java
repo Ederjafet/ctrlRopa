@@ -63,6 +63,12 @@ public class CustomerPackageController {
         return service.addItem(id, request);
     }
 
+    @DeleteMapping("/{id}/items/{packageItemId}")
+    public CustomerPackageDetailResponse removeItem(@PathVariable Long id,
+                                                    @PathVariable Long packageItemId) {
+        return service.removeItem(id, packageItemId);
+    }
+
     @PostMapping("/folio/{folio}/items/item-code/{code}")
     public CustomerPackageDetailResponse addItemByItemCode(@PathVariable String folio,
                                                            @PathVariable String code) {

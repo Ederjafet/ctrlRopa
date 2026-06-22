@@ -1,5 +1,33 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-22 - PACKAGE-ITEM-REMOVE-A quitar prenda de paquete sin abono
+
+Tipo: backend, frontend, paquetes, pagos, permisos, documentacion.
+
+Objetivo:
+
+- Permitir quitar del paquete una prenda agregada por error cuando esa linea no tiene abono aplicado y el paquete sigue editable.
+
+Cambios realizados:
+
+- Se agrega endpoint `DELETE /api/customer-packages/{packageId}/items/{packageItemId}`.
+- El backend valida permiso `CREATE_CLOSE_CUSTOMER_PACKAGE`, estado `OPEN`, pertenencia de la linea al paquete y `paidAmount = 0`.
+- La eliminacion borra solo la relacion de paquete; no cancela reservas, no libera inventario automaticamente y no toca pagos.
+- `/customer-package-detail` agrega accion secundaria `Quitar` por prenda, con confirmacion previa.
+- La UI bloquea la accion si la prenda tiene abono, si el paquete no esta editable o si falta permiso.
+- Al quitar, el detalle se actualiza con total, abonado, saldo y prendas recalculados desde la respuesta backend.
+- `Ver permisos` agrega la accion `Quitar prenda del paquete` en `customerPackageDetail`.
+- Se agregan tests unitarios de quitar linea sin pago, bloquear pago aplicado, bloquear estado no editable y bloquear permiso.
+- Se documenta la fase en `docs/PACKAGE_ITEM_REMOVE_A_QUITAR_PRENDA.md`.
+
+Restricciones respetadas:
+
+- No se permitio quitar prendas con pago aplicado sin flujo financiero controlado.
+- No se mezclaron pagos ni saldo a favor.
+- No se cambiaron reglas de envio.
+- No se agrego `Actualizar` fuera de LIVE.
+- No se reseteo base de datos.
+
 ## 2026-06-22 - PACKAGE-SHIPPING-A costo de envio en paquetes
 
 Tipo: backend, frontend, paquetes, pagos, envios, permisos, documentacion.

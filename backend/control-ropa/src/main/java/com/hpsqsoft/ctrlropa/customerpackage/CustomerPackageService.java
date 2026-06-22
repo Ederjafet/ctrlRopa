@@ -374,6 +374,30 @@ public class CustomerPackageService {
         return findDetail(packageId);
     }
 
+    public CustomerPackageDetailResponse removeItem(Long packageId, Long packageItemId) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.CREATE_CLOSE_CUSTOMER_PACKAGE);
+        CustomerPackage customerPackage = findEntity(packageId);
+
+        if (customerPackage.getStatus() != CustomerPackageStatus.OPEN) {
+            throw new IllegalArgumentException("No puedes quitar prendas cuando el paquete ya esta listo para envio, enviado, cerrado o cancelado.");
+        }
+
+        CustomerPackageItem packageItem = itemRepository.findById(packageItemId)
+                .orElseThrow(() -> new IllegalArgumentException("La prenda ya no pertenece a este paquete."));
+
+        if (!packageItem.getCustomerPackageId().equals(packageId)) {
+            throw new IllegalArgumentException("La prenda ya no pertenece a este paquete.");
+        }
+
+        SourceFinancialData financialData = getSourceFinancialData(packageItem);
+        if (financialData.paidAmount().compareTo(BigDecimal.ZERO) > 0) {
+            throw new IllegalArgumentException("No se puede quitar esta prenda porque ya tiene abono aplicado.");
+        }
+
+        itemRepository.delete(packageItem);
+        return findDetail(packageId);
+    }
+
     public CustomerPackageDetailResponse markReadyByFolio(String folio, CloseCustomerPackageRequest request) {
         CustomerPackage customerPackage = findEntityByFolio(folio);
         return markReady(customerPackage.getId(), request);

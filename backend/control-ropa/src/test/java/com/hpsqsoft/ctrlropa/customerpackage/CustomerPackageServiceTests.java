@@ -22,6 +22,7 @@ import com.hpsqsoft.ctrlropa.security.access.AccessService;
 import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
 import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -37,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -304,17 +306,86 @@ class CustomerPackageServiceTests {
         verify(repository, never()).save(any(CustomerPackage.class));
     }
 
+    @Test
+    void removeItemWithoutPaidAmountDeletesPackageLineAndRecalculates() {
+        Reservation reservation = activeReservation(false);
+        CustomerPackage customerPackage = customerPackage(reservation);
+        CustomerPackageItem packageItem = packageItem(customerPackage, reservation);
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(501L)).thenReturn(Optional.of(customerPackage));
+        when(itemRepository.findById(700L)).thenReturn(Optional.of(packageItem));
+        stubFinancialSummary(BigDecimal.ZERO.setScale(2));
+        when(itemRepository.findByCustomerPackageIdOrderByCreatedAtAsc(501L)).thenReturn(List.of());
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(501L))).thenReturn(List.of());
+
+        CustomerPackageDetailResponse response = service.removeItem(501L, 700L);
+
+        assertEquals(0, response.getTotalItems());
+        assertEquals(0, response.getTotalAmount().compareTo(BigDecimal.ZERO));
+        assertEquals(0, response.getPendingAmount().compareTo(BigDecimal.ZERO));
+        verify(itemRepository).delete(packageItem);
+    }
+
+    @Test
+    void removeItemWithPaidAmountIsRejected() {
+        Reservation reservation = activeReservation(false);
+        CustomerPackage customerPackage = customerPackage(reservation);
+        CustomerPackageItem packageItem = packageItem(customerPackage, reservation);
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(501L)).thenReturn(Optional.of(customerPackage));
+        when(itemRepository.findById(700L)).thenReturn(Optional.of(packageItem));
+        stubFinancialSummary(BigDecimal.valueOf(50).setScale(2));
+
+        assertThrows(IllegalArgumentException.class, () -> service.removeItem(501L, 700L));
+        verify(itemRepository, never()).delete(any(CustomerPackageItem.class));
+    }
+
+    @Test
+    void removeItemFromReadyPackageIsRejected() {
+        CustomerPackage customerPackage = customerPackage(activeReservation(false));
+        customerPackage.setStatus(CustomerPackageStatus.READY);
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(501L)).thenReturn(Optional.of(customerPackage));
+
+        assertThrows(IllegalArgumentException.class, () -> service.removeItem(501L, 700L));
+        verify(itemRepository, never()).findById(700L);
+        verify(itemRepository, never()).delete(any(CustomerPackageItem.class));
+    }
+
+    @Test
+    void removeItemWithoutPermissionIsRejected() {
+        when(currentUser.getUserId()).thenReturn(99L);
+        doThrow(new AccessDeniedException("missing"))
+                .when(accessService)
+                .assertCan(any(), any());
+
+        assertThrows(AccessDeniedException.class, () -> service.removeItem(501L, 700L));
+        verify(repository, never()).findById(501L);
+        verify(itemRepository, never()).delete(any(CustomerPackageItem.class));
+    }
+
     private void stubFinancialSummary() {
         stubFinancialSummary(10L);
     }
 
+    private void stubFinancialSummary(BigDecimal paidAmount) {
+        stubFinancialSummary(10L, paidAmount);
+    }
+
     private void stubFinancialSummary(Long reservationId) {
+        stubFinancialSummary(reservationId, BigDecimal.ZERO.setScale(2));
+    }
+
+    private void stubFinancialSummary(Long reservationId, BigDecimal paidAmount) {
         when(jdbcTemplate.queryForObject(anyString(), any(RowMapper.class), eq(reservationId))).thenAnswer(invocation -> {
             @SuppressWarnings("unchecked")
             RowMapper<Object> mapper = invocation.getArgument(1);
             ResultSet resultSet = mock(ResultSet.class);
             when(resultSet.getBigDecimal("price")).thenReturn(BigDecimal.valueOf(300).setScale(2));
-            when(resultSet.getBigDecimal("paid_amount")).thenReturn(BigDecimal.ZERO.setScale(2));
+            when(resultSet.getBigDecimal("paid_amount")).thenReturn(paidAmount);
             when(resultSet.getString("source_status")).thenReturn("ACTIVE");
             return mapper.mapRow(resultSet, 0);
         });
@@ -351,6 +422,16 @@ class CustomerPackageServiceTests {
         customerPackage.setCreatedByUserId(99L);
         ReflectionTestUtils.setField(customerPackage, "createdAt", LocalDateTime.now());
         return customerPackage;
+    }
+
+    private CustomerPackageItem packageItem(CustomerPackage customerPackage, Reservation reservation) {
+        CustomerPackageItem packageItem = new CustomerPackageItem();
+        ReflectionTestUtils.setField(packageItem, "id", 700L);
+        packageItem.setCustomerPackageId(customerPackage.getId());
+        packageItem.setItem(reservation.getItem());
+        packageItem.setReservationId(reservation.getId());
+        ReflectionTestUtils.setField(packageItem, "createdAt", LocalDateTime.now());
+        return packageItem;
     }
 
     private Branch branch() {

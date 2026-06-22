@@ -190,6 +190,15 @@ export async function addCustomerPackageItemByQr(
   );
 }
 
+export async function removeCustomerPackageItem(
+  packageId: number,
+  packageItemId: number
+): Promise<CustomerPackageDetail> {
+  return apiRequest<CustomerPackageDetail>(`/api/customer-packages/${packageId}/items/${packageItemId}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function markCustomerPackageReady(
   id: number,
   closedByUserId: number

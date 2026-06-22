@@ -345,6 +345,13 @@ export const SCREEN_PERMISSIONS: Record<ScreenPermissionKey, ScreenPermissionDef
         deniedMessage: 'No puedes agregar prendas libres.',
       },
       {
+        key: 'removePackageItem',
+        label: 'Quitar prenda del paquete',
+        permissionCode: 'CREATE_CLOSE_CUSTOMER_PACKAGE',
+        allowedMessage: 'Puedes quitar prendas sin abono aplicado mientras el paquete esta en preparacion.',
+        deniedMessage: 'No puedes quitar prendas del paquete.',
+      },
+      {
         key: 'registerPayment',
         label: 'Registrar abono',
         permissionCode: 'REGISTER_PAYMENTS',

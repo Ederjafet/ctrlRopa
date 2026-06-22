@@ -25,6 +25,7 @@ import {
   getCustomerPackageDetailByFolio,
   isCustomerPackageOpen,
   markCustomerPackageReady,
+  removeCustomerPackageItem,
   updateCustomerPackageShippingCost,
 } from '@/services/customerPackageService';
 import { getItemsByBranch, Item } from '@/services/itemService';
@@ -85,6 +86,21 @@ function compactDate(value?: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString();
+}
+
+function getRemoveItemBlockedReason(
+  item: CustomerPackageItemLine,
+  canEditPackage: boolean,
+  canManagePackage: boolean,
+  isWorking: boolean
+) {
+  if (!canManagePackage) return 'No tienes permiso para quitar prendas del paquete.';
+  if (!canEditPackage) return 'No puedes quitar prendas cuando el paquete ya esta listo para envio, enviado, cerrado o cancelado.';
+  if (Number(item.paidAmount ?? 0) > 0) {
+    return 'Esta prenda ya tiene abono aplicado. Para quitarla se requiere ajustar el pago o generar saldo a favor.';
+  }
+  if (isWorking) return 'Ya hay una accion en proceso.';
+  return '';
 }
 
 function getShipmentState(detail: CustomerPackageDetail, shipments: CustomerPackageShipmentLine[]) {
@@ -233,9 +249,13 @@ function InfoRow({
 function PackageItemLine({
   item,
   onOpenItem,
+  onRemoveItem,
+  removeBlockedReason,
 }: {
   item: CustomerPackageItemLine;
   onOpenItem: (itemId: number) => void;
+  onRemoveItem: (item: CustomerPackageItemLine) => void;
+  removeBlockedReason: string;
 }) {
   const { theme } = useAppTheme();
   const pending = Number(item.pendingAmount ?? 0);
@@ -267,6 +287,14 @@ function PackageItemLine({
           title="Ver prenda"
           variant="secondary"
           onPress={() => onOpenItem(item.itemId)}
+          style={styles.lineButton}
+        />
+        <AppButton
+          title="Quitar"
+          variant="neutral"
+          onPress={() => onRemoveItem(item)}
+          disabled={Boolean(removeBlockedReason)}
+          disabledReason={removeBlockedReason || 'No se puede quitar esta prenda del paquete.'}
           style={styles.lineButton}
         />
       </View>
@@ -552,6 +580,53 @@ export default function CustomerPackageDetailScreen() {
     } finally {
       setIsWorking(false);
     }
+  };
+
+  const handleRemovePackageItem = (item: CustomerPackageItemLine) => {
+    if (!detail) return;
+
+    const blockedReason = getRemoveItemBlockedReason(item, canEdit, canManagePackage, isWorking);
+    if (blockedReason) {
+      setNotice({
+        title: 'No se puede quitar',
+        message: blockedReason,
+        tone: 'warning',
+      });
+      return;
+    }
+
+    Alert.alert(
+      'Quitar prenda del paquete',
+      `Vas a quitar esta prenda del paquete:\n\n${item.itemCode || `Prenda #${item.itemId}`}\nPrecio: ${money(item.price)}\nPagado aplicado: ${money(item.paidAmount)}\n\nEl total del paquete y el saldo pendiente se recalcularan.\n\nSi venia de un apartado, permanecera como apartado fuera del paquete. Si fue agregada desde inventario libre, conservara la reserva creada por el flujo actual.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Quitar prenda',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsWorking(true);
+              const updated = await removeCustomerPackageItem(detail.id, item.id);
+              setDetail(updated);
+              syncShippingForm(updated);
+              setNotice({
+                title: 'Prenda quitada',
+                message: 'Prenda quitada del paquete correctamente.',
+                tone: 'success',
+              });
+            } catch (error: any) {
+              setNotice({
+                title: 'No se pudo quitar',
+                message: error.message || 'No se pudo quitar la prenda. Intenta de nuevo.',
+                tone: 'danger',
+              });
+            } finally {
+              setIsWorking(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const openPaymentModal = () => {
@@ -1047,6 +1122,8 @@ export default function CustomerPackageDetailScreen() {
                     key={item.id}
                     item={item}
                     onOpenItem={(itemId) => router.push(`/items/${itemId}?returnTo=/customer-package-detail?id=${detail.id}` as any)}
+                    onRemoveItem={handleRemovePackageItem}
+                    removeBlockedReason={getRemoveItemBlockedReason(item, canEdit, canManagePackage, isWorking)}
                   />
                 ))}
               </View>
