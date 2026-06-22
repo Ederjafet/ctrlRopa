@@ -1,5 +1,28 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-21 - RC-VENDEDOR-A bootstrap de catalogos para vendedor
+
+Tipo: release candidate, vendedor, catalogos, permisos, tenant isolation, backend, tests, documentacion.
+
+Objetivo:
+
+- Corregir el 500 en `GET /api/catalogs/bootstrap?branchId=5` al entrar con cuenta vendedor.
+
+Cambios realizados:
+
+- `CatalogBootstrapService` deja de usar `assertCan(MANAGE_USERS)` para decidir si incluye roles/permisos administrativos.
+- El permiso opcional `MANAGE_USERS` ahora se evalua con `accessService.can(...)`, sin lanzar excepcion esperada para vendedor.
+- El bootstrap valida `branchId` con `TenantAccessGuard` y limita sucursales, ubicaciones y cajas a la sucursal efectiva.
+- Se agregan pruebas unitarias para vendedor sin `MANAGE_USERS`, admin con `MANAGE_USERS` y branch fuera de tenant.
+- Se documenta la causa raiz en `docs/RC_VENDEDOR_A_CATALOG_BOOTSTRAP.md`.
+
+Restricciones respetadas:
+
+- No se amplio el rol vendedor.
+- No se reseteo base de datos.
+- No se toco frontend ni produccion.
+- No se convirtieron permisos esperados en 500.
+
 ## 2026-06-21 - BATCH-UX-A detalle de lote claro
 
 Tipo: inventario, lotes, proveedores, permisos, UX, frontend, documentacion.

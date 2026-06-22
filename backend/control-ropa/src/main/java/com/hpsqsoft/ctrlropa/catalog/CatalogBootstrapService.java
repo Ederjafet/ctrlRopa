@@ -3,6 +3,8 @@ package com.hpsqsoft.ctrlropa.catalog;
 import com.hpsqsoft.ctrlropa.security.access.AccessService;
 import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
 import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
+import com.hpsqsoft.ctrlropa.tenant.CurrentTenantContext;
+import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,20 +23,30 @@ public class CatalogBootstrapService {
     private final JdbcTemplate jdbcTemplate;
     private final AccessService accessService;
     private final CurrentUser currentUser;
+    private final TenantAccessGuard tenantAccessGuard;
 
     public CatalogBootstrapService(JdbcTemplate jdbcTemplate,
                                    AccessService accessService,
-                                   CurrentUser currentUser) {
+                                   CurrentUser currentUser,
+                                   TenantAccessGuard tenantAccessGuard) {
         this.jdbcTemplate = jdbcTemplate;
         this.accessService = accessService;
         this.currentUser = currentUser;
+        this.tenantAccessGuard = tenantAccessGuard;
     }
 
     public CatalogBootstrapResponse getBootstrap(Long branchId) {
+        CurrentTenantContext tenant = branchId == null
+                ? tenantAccessGuard.requireCurrentTenant()
+                : tenantAccessGuard.requireBranch(
+                        branchId,
+                        "La sucursal solicitada no pertenece a la sesion activa"
+                );
+        Long effectiveBranchId = branchId == null ? tenant.getBranchId() : branchId;
         boolean canManageUsers = canManageUsers();
 
         return new CatalogBootstrapResponse(
-                findActiveSimpleCatalog("branches", "name"),
+                findBranches(tenant.getCompanyId(), effectiveBranchId),
                 findActiveSimpleCatalog("sales_channels", "code"),
                 findActiveSimpleCatalog("payment_methods", "code"),
                 canManageUsers ? findSimpleCatalog("roles", "code") : new ArrayList<>(),
@@ -42,9 +54,39 @@ public class CatalogBootstrapService {
                 findActiveSimpleCatalog("product_types", "name"),
                 findActiveSimpleCatalog("brands", "name"),
                 findActiveSimpleCatalog("sizes", "sort_order, name"),
-                findStorageLocations(branchId),
-                findBoxes(branchId)
+                findStorageLocations(effectiveBranchId),
+                findBoxes(effectiveBranchId)
         );
+    }
+
+    private List<CatalogBootstrapResponse.SimpleCatalog> findBranches(Long companyId, Long branchId) {
+        try {
+            return jdbcTemplate.query(
+                    """
+                    SELECT id, code, name
+                    FROM branches
+                    WHERE status = 'ACTIVE'
+                      AND company_id = ?
+                      AND id = ?
+                    ORDER BY name
+                    """,
+                    (rs, rowNum) -> new CatalogBootstrapResponse.SimpleCatalog(
+                            rs.getLong("id"),
+                            rs.getString("code"),
+                            rs.getString("name")
+                    ),
+                    companyId,
+                    branchId
+            );
+        } catch (Exception ex) {
+            log.warn(
+                    "No se pudieron cargar sucursales para bootstrap. companyId={}, branchId={}",
+                    companyId,
+                    branchId,
+                    ex
+            );
+            return new ArrayList<>();
+        }
     }
 
     private List<CatalogBootstrapResponse.SimpleCatalog> findActiveSimpleCatalog(String tableName, String orderBy) {
@@ -160,11 +202,6 @@ public class CatalogBootstrapService {
     }
 
     private boolean canManageUsers() {
-        try {
-            accessService.assertCan(currentUser.getUserId(), PermissionCode.MANAGE_USERS);
-            return true;
-        } catch (Exception ex) {
-            return false;
-        }
+        return accessService.can(currentUser.getUserId(), PermissionCode.MANAGE_USERS);
     }
 }
