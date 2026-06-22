@@ -12,6 +12,7 @@ import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
+import { hasPermission } from '@/services/accessControl';
 import { getActionableApiError } from '@/services/apiError';
 import {
   Batch,
@@ -130,6 +131,7 @@ export default function ItemsCreateScreen() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [canManageInventory, setCanManageInventory] = useState(false);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [validationDialog, setValidationDialog] =
     useState<ValidationDialogState | null>(null);
@@ -149,6 +151,7 @@ export default function ItemsCreateScreen() {
   const loadCatalogs = async () => {
     const session = await getSession();
     if (!session) return;
+    setCanManageInventory(hasPermission(session, 'MANAGE_INVENTORY'));
 
     try {
       const [bootstrapResult, batchResult] = await Promise.allSettled([
@@ -355,6 +358,14 @@ export default function ItemsCreateScreen() {
     const session = await getSession();
     if (!session) return;
 
+    if (!hasPermission(session, 'MANAGE_INVENTORY')) {
+      Alert.alert(
+        'Permiso requerido',
+        'No tienes permiso para crear prendas. Permiso requerido: MANAGE_INVENTORY.'
+      );
+      return;
+    }
+
     try {
       setIsSaving(true);
       setSuccessMessage('');
@@ -448,6 +459,17 @@ export default function ItemsCreateScreen() {
           <AppCard variant="info">
             <AppText variant="caption" color={theme.colors.textSecondary}>
               {t('itemsCreate.liveReturnHelp')}
+            </AppText>
+          </AppCard>
+        ) : null}
+
+        {!canManageInventory ? (
+          <AppCard variant="warning">
+            <AppText variant="subtitle" bold>
+              Accion bloqueada
+            </AppText>
+            <AppText variant="caption" color={theme.colors.textSecondary}>
+              No tienes permiso para crear prendas. Permiso requerido: MANAGE_INVENTORY.
             </AppText>
           </AppCard>
         ) : null}
@@ -578,6 +600,8 @@ export default function ItemsCreateScreen() {
             title={t('operationalScreens.itemsCreate.generateItems')}
             onPress={handleCreate}
             loading={isSaving}
+            disabled={!canManageInventory}
+            disabledReason="No tienes permiso para crear prendas. Permiso requerido: MANAGE_INVENTORY."
             style={isPhone ? styles.mobilePrimaryAction : styles.desktopPrimaryAction}
           />
         </View>

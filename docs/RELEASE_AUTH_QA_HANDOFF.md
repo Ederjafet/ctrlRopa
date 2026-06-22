@@ -30,6 +30,7 @@ Este release entrega el bloque AUTH con:
 - Permisos efectivos por rol y permisos directos.
 - Enforcement P0 inicial y hardening progresivo.
 - Permiso dedicado `VIEW_SECURITY_AUDIT`.
+- Nota SEC-RBAC-AUDIT-A: `POST/PUT/PATCH /api/items/**` exige `MANAGE_INVENTORY`; el vendedor con solo `VIEW_INVENTORY` ya no puede ejecutar alta rapida de prenda aunque llegue por URL/API directa.
 
 ### Sesion unica
 

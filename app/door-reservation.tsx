@@ -9,6 +9,7 @@ import ScreenPermissionHeaderAction from '@/components/ui/ScreenPermissionHeader
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 
+import { hasPermission } from '@/services/accessControl';
 import { getActionableApiError } from '@/services/apiError';
 import { getPaymentMethods, PaymentMethod } from '@/services/catalogService';
 import { Customer, getCustomersByBranch } from '@/services/customerService';
@@ -83,6 +84,7 @@ export default function DoorReservationScreen() {
   const [isItemModalVisible, setIsItemModalVisible] = useState(false);
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
   const [isScannerVisible, setIsScannerVisible] = useState(false);
+  const [canManageInventory, setCanManageInventory] = useState(false);
   const [validationIssue, setValidationIssue] =
     useState<ReservationValidationIssue>(null);
 
@@ -157,6 +159,7 @@ export default function DoorReservationScreen() {
   const loadData = async () => {
     const session = await getSession();
     if (!session) return;
+    setCanManageInventory(hasPermission(session, 'MANAGE_INVENTORY'));
 
     try {
       setIsLoading(true);
@@ -672,6 +675,8 @@ export default function DoorReservationScreen() {
             <AppButton
               title={t('operationalScreens.doorReservation.quickItem')}
               variant="secondary"
+              disabled={!canManageInventory}
+              disabledReason="No tienes permiso para crear prenda rapida. Permiso requerido: MANAGE_INVENTORY."
               onPress={() => {
                 persistDraft();
                 const returnPath = selectedCustomer

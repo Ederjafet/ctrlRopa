@@ -12,6 +12,8 @@ import com.hpsqsoft.ctrlropa.catalog.Size;
 import com.hpsqsoft.ctrlropa.catalog.SizeRepository;
 import com.hpsqsoft.ctrlropa.inventory.StorageLocation;
 import com.hpsqsoft.ctrlropa.inventory.StorageLocationRepository;
+import com.hpsqsoft.ctrlropa.security.access.AccessService;
+import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
 import com.hpsqsoft.ctrlropa.tenant.CurrentTenantContext;
 import com.hpsqsoft.ctrlropa.tenant.TenantResolver;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -47,6 +49,7 @@ public class ItemService {
     private final BrandRepository brandRepository;
     private final SizeRepository sizeRepository;
     private final StorageLocationRepository storageLocationRepository;
+    private final AccessService accessService;
     private final TenantResolver tenantResolver;
     
     private final SaleRepository saleRepository;
@@ -63,6 +66,7 @@ public class ItemService {
                        BrandRepository brandRepository,
                        SizeRepository sizeRepository,
                        StorageLocationRepository storageLocationRepository,
+                       AccessService accessService,
                        SaleRepository saleRepository,
                        ReservationRepository reservationRepository,
                        CustomerPackageItemRepository customerPackageItemRepository,
@@ -77,6 +81,7 @@ public class ItemService {
         this.brandRepository = brandRepository;
         this.sizeRepository = sizeRepository;
         this.storageLocationRepository = storageLocationRepository;
+        this.accessService = accessService;
         
         this.saleRepository = saleRepository;
         this.reservationRepository = reservationRepository;
@@ -90,6 +95,7 @@ public class ItemService {
     @Transactional(readOnly = true)
     public List<ItemResponse> findByBranch(Long branchId) {
         CurrentTenantContext tenant = resolveAndValidateBranch(branchId);
+        accessService.assertCan(tenant.getUserId(), PermissionCode.VIEW_INVENTORY);
         return repository.findByCompanyIdAndBranchIdOrderByCreatedAtDesc(tenant.getCompanyId(), branchId)
                 .stream()
                 .map(this::toResponse)
@@ -98,14 +104,18 @@ public class ItemService {
 
     @Transactional(readOnly = true)
     public ItemResponse findById(Long id) {
-        Item item = findEntityById(id, currentCompanyId());
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        accessService.assertCan(tenant.getUserId(), PermissionCode.VIEW_INVENTORY);
+        Item item = findEntityById(id, tenant.getCompanyId());
         assertItemBelongsToCurrentTenant(item);
         return toResponse(item);
     }
 
     @Transactional(readOnly = true)
     public ItemResponse findByCode(String code) {
-        Item entity = repository.findByCompanyIdAndCode(currentCompanyId(), code)
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        accessService.assertCan(tenant.getUserId(), PermissionCode.VIEW_INVENTORY);
+        Item entity = repository.findByCompanyIdAndCode(tenant.getCompanyId(), code)
                 .orElseThrow(() -> new IllegalArgumentException("Item no encontrado con código: " + code));
         assertItemBelongsToCurrentTenant(entity);
         return toResponse(entity);
@@ -113,7 +123,9 @@ public class ItemService {
     
     @Transactional(readOnly = true)
     public ItemLookupResponse lookupByCode(String code) {
-        Item item = repository.findByCompanyIdAndCode(currentCompanyId(), code)
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        accessService.assertCan(tenant.getUserId(), PermissionCode.VIEW_INVENTORY);
+        Item item = repository.findByCompanyIdAndCode(tenant.getCompanyId(), code)
                 .orElseThrow(() -> new IllegalArgumentException("Item no encontrado con código: " + code));
 
         assertItemBelongsToCurrentTenant(item);
@@ -122,7 +134,9 @@ public class ItemService {
 
     @Transactional(readOnly = true)
     public ItemLookupResponse lookupByQrCode(String qrCode) {
-        Item item = repository.findByCompanyIdAndQrCode(currentCompanyId(), qrCode)
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        accessService.assertCan(tenant.getUserId(), PermissionCode.VIEW_INVENTORY);
+        Item item = repository.findByCompanyIdAndQrCode(tenant.getCompanyId(), qrCode)
                 .orElseThrow(() -> new IllegalArgumentException("Item no encontrado con QR: " + qrCode));
 
         assertItemBelongsToCurrentTenant(item);
@@ -234,6 +248,7 @@ public class ItemService {
 
     public ItemResponse create(CreateItemRequest request) {
         CurrentTenantContext tenant = resolveAndValidateBranch(request.getBranchId());
+        accessService.assertCan(tenant.getUserId(), PermissionCode.MANAGE_INVENTORY);
         if (repository.existsByCompanyIdAndCode(tenant.getCompanyId(), request.getCode())) {
             throw new IllegalArgumentException("Ya existe un item con código: " + request.getCode());
         }
@@ -296,7 +311,9 @@ public class ItemService {
     }
 
     public ItemResponse update(Long id, UpdateItemRequest request) {
-        Long companyId = currentCompanyId();
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        Long companyId = tenant.getCompanyId();
+        accessService.assertCan(tenant.getUserId(), PermissionCode.MANAGE_INVENTORY);
         Item existing = findEntityById(id, companyId);
         assertItemBelongsToCurrentTenant(existing);
 
@@ -351,7 +368,9 @@ public class ItemService {
     }
 
     public ItemResponse changeLocation(Long id, Long storageLocationId) {
-        Long companyId = currentCompanyId();
+        CurrentTenantContext tenant = tenantResolver.resolveCurrent();
+        Long companyId = tenant.getCompanyId();
+        accessService.assertCan(tenant.getUserId(), PermissionCode.MANAGE_INVENTORY);
         Item existing = findEntityById(id, companyId);
         assertItemBelongsToCurrentTenant(existing);
 
@@ -375,10 +394,6 @@ public class ItemService {
         } catch (DataIntegrityViolationException ex) {
             throw new IllegalArgumentException("No se pudo guardar el item por datos duplicados");
         }
-    }
-
-    private Long currentCompanyId() {
-        return tenantResolver.resolveCurrent().getCompanyId();
     }
 
     private CurrentTenantContext resolveAndValidateBranch(Long branchId) {

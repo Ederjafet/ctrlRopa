@@ -1,5 +1,29 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-21 - SEC-RBAC-AUDIT-A permisos por rol, pantalla y endpoint
+
+Tipo: seguridad, RBAC, permisos, inventario, vendedor, backend, frontend, tests, documentacion.
+
+Objetivo:
+
+- Corregir la inconsistencia donde `Nuevo apartado` marcaba `Crear prenda rapida` como bloqueado para vendedor, pero la alta rapida podia crear una prenda.
+
+Cambios realizados:
+
+- `ItemService` ahora exige `VIEW_INVENTORY` para lectura de prendas y `MANAGE_INVENTORY` para crear, editar o cambiar ubicacion.
+- `POST /api/items`, `PUT /api/items/{id}` y `PATCH /api/items/{id}/location/{storageLocationId}` ya no dependen solo del frontend.
+- `/door-reservation` deshabilita `Alta rapida de prenda` si falta `MANAGE_INVENTORY` y muestra el permiso requerido.
+- `/items-create` muestra aviso de accion bloqueada y evita submit si falta `MANAGE_INVENTORY`.
+- Se agregan pruebas unitarias para garantizar que crear prenda exige `MANAGE_INVENTORY`.
+- Se documenta la matriz real y el smoke por rol en `docs/SEC_RBAC_AUDIT_A_*.md`.
+
+Restricciones respetadas:
+
+- No se ampliaron permisos del vendedor.
+- No se creo migracion ni permiso nuevo.
+- No se reseteo base de datos.
+- No se toco produccion.
+
 ## 2026-06-21 - RC-VENDEDOR-A bootstrap de catalogos para vendedor
 
 Tipo: release candidate, vendedor, catalogos, permisos, tenant isolation, backend, tests, documentacion.

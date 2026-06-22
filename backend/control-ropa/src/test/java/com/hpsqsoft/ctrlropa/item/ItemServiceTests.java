@@ -14,6 +14,8 @@ import com.hpsqsoft.ctrlropa.customerpackage.CustomerPackageRepository;
 import com.hpsqsoft.ctrlropa.inventory.StorageLocationRepository;
 import com.hpsqsoft.ctrlropa.reservation.ReservationRepository;
 import com.hpsqsoft.ctrlropa.sale.SaleRepository;
+import com.hpsqsoft.ctrlropa.security.access.AccessService;
+import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
 import com.hpsqsoft.ctrlropa.shipment.ShipmentPackageRepository;
 import com.hpsqsoft.ctrlropa.shipment.ShipmentRepository;
 import com.hpsqsoft.ctrlropa.tenant.CurrentTenantContext;
@@ -39,6 +41,7 @@ class ItemServiceTests {
     private final BrandRepository brandRepository = mock(BrandRepository.class);
     private final SizeRepository sizeRepository = mock(SizeRepository.class);
     private final StorageLocationRepository storageLocationRepository = mock(StorageLocationRepository.class);
+    private final AccessService accessService = mock(AccessService.class);
     private final SaleRepository saleRepository = mock(SaleRepository.class);
     private final ReservationRepository reservationRepository = mock(ReservationRepository.class);
     private final CustomerPackageItemRepository customerPackageItemRepository = mock(CustomerPackageItemRepository.class);
@@ -55,6 +58,7 @@ class ItemServiceTests {
             brandRepository,
             sizeRepository,
             storageLocationRepository,
+            accessService,
             saleRepository,
             reservationRepository,
             customerPackageItemRepository,
@@ -71,6 +75,7 @@ class ItemServiceTests {
         service.findByBranch(10L);
 
         verify(tenantResolver).assertBranchBelongsToCompany(10L, 1L);
+        verify(accessService).assertCan(99L, PermissionCode.VIEW_INVENTORY);
         verify(repository).findByCompanyIdAndBranchIdOrderByCreatedAtDesc(1L, 10L);
     }
 
@@ -97,6 +102,26 @@ class ItemServiceTests {
         assertEquals("ITEM-QA-001", response.getCode());
         assertEquals(99L, response.getCreatedByUserId());
         verify(tenantResolver).assertBranchBelongsToCompany(10L, 1L);
+        verify(accessService).assertCan(99L, PermissionCode.MANAGE_INVENTORY);
+    }
+
+    @Test
+    void createRequiresManageInventoryPermission() {
+        ItemService.CreateItemRequest request = new ItemService.CreateItemRequest();
+        request.setCode("ITEM-QA-001");
+        request.setQrCode("QR-QA-001");
+        request.setBranchId(10L);
+        request.setProductTypeId(20L);
+
+        when(tenantResolver.resolveCurrent()).thenReturn(tenant());
+        doThrow(new AccessDeniedException("Permiso requerido: MANAGE_INVENTORY"))
+                .when(accessService)
+                .assertCan(99L, PermissionCode.MANAGE_INVENTORY);
+
+        assertThrows(AccessDeniedException.class, () -> service.create(request));
+
+        verify(tenantResolver).assertBranchBelongsToCompany(10L, 1L);
+        verify(accessService).assertCan(99L, PermissionCode.MANAGE_INVENTORY);
     }
 
     @Test
@@ -106,6 +131,7 @@ class ItemServiceTests {
         when(repository.findByCompanyIdAndCode(1L, "ITEM-QA-001")).thenReturn(Optional.of(item));
 
         assertEquals("ITEM-QA-001", service.findByCode("ITEM-QA-001").getCode());
+        verify(accessService).assertCan(99L, PermissionCode.VIEW_INVENTORY);
     }
 
     @Test
