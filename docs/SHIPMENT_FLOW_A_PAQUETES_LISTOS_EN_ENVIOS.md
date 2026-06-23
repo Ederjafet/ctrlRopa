@@ -8,6 +8,8 @@ Fecha: 2026-06-22
 
 > Actualizacion SHIPMENT-DETAIL-UX-A: el detalle de envio quedo como vista operativa con destino, guia, paquete, prendas, timeline y regreso contextual hacia `/shipments`.
 
+> Actualizacion SHIPMENTS-INTEGRITY-A: la preparacion de un envio exige paquete asociado desde la creacion (`customerPackageId`). El servicio crea el shipment y agrega el paquete en una misma operacion, evitando shipments operativos con `0 paquetes`.
+
 ## Problema
 
 El paquete podia marcarse como listo para envio desde `/customer-package-detail`, pero no aparecia en `/shipments`.
@@ -21,7 +23,7 @@ Se eligio una bandeja mixta:
 - envios reales existentes;
 - paquetes `READY` sin envio activo, mostrados como `Pendiente de preparar envio`.
 
-No se crea automaticamente `shipment_package` al marcar listo porque la tabla requiere `delivery_address_id` obligatorio. Crear un envio automaticamente sin direccion implicaria inventar datos o elegir direccion sin confirmacion operativa.
+No se crea automaticamente `shipment_package` al marcar listo porque la tabla requiere datos logisticos confirmados. El shipment se prepara desde `/shipments` usando el paquete listo y su snapshot de direccion/envio. Desde SHIPMENTS-INTEGRITY-A esa preparacion ya no se hace en dos pasos visibles: el backend exige `customerPackageId` y agrega el paquete al crear el shipment.
 
 ## Backend
 

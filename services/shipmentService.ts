@@ -35,6 +35,31 @@ export type Shipment = {
   cancelledAt?: string | null;
   cancelledByUserId?: number | null;
   packageCount?: number | null;
+  primaryPackageId?: number | null;
+  primaryPackageFolio?: string | null;
+  primaryPackageStatus?: string | null;
+  packageItemCount?: number | null;
+  customerId?: number | null;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  packageDeliveryType?: string | null;
+  recipientName?: string | null;
+  recipientPhone?: string | null;
+  destinationSummary?: string | null;
+  destinationCity?: string | null;
+  destinationState?: string | null;
+  destinationPostalCode?: string | null;
+  shippingCarrier?: string | null;
+  packageTrackingNumber?: string | null;
+  shippingCostAmount?: number | null;
+  packageTotalAmount?: number | null;
+  paymentMode?: ShipmentPackagePaymentMode | string | null;
+  requiresAttention?: boolean;
+  attentionReason?: string | null;
+  nextStep?: string | null;
+  canDispatch?: boolean;
+  canConfirmReceived?: boolean;
+  blockedReason?: string | null;
 };
 
 export type ShipmentPackageLine = {
@@ -73,6 +98,10 @@ export type ShipmentDetail = Shipment & {
 
 export type CreateShipmentRequest = {
   branchId: number;
+  customerPackageId: number;
+  deliveryAddressId?: number | null;
+  paymentMode?: ShipmentPackagePaymentMode;
+  expectedCodAmount?: number | null;
   deliveryType: ShipmentDeliveryType;
   guideReference?: string | null;
   createdByUserId: number;

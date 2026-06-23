@@ -419,10 +419,10 @@ export const SCREEN_PERMISSIONS: Record<ScreenPermissionKey, ScreenPermissionDef
       },
       {
         key: 'createShipment',
-        label: 'Crear envio manual',
+        label: 'Crear envio desde paquete',
         permissionCode: 'MANAGE_SHIPMENTS',
-        allowedMessage: 'Puedes crear envios manuales cuando la operacion lo requiera.',
-        deniedMessage: 'No puedes crear envios.',
+        allowedMessage: 'Puedes preparar envios a partir de paquetes listos.',
+        deniedMessage: 'No puedes preparar envios.',
       },
       {
         key: 'prepareReadyPackage',
@@ -472,13 +472,6 @@ export const SCREEN_PERMISSIONS: Record<ScreenPermissionKey, ScreenPermissionDef
         permissionCode: 'MANAGE_SHIPMENTS',
         allowedMessage: 'Puedes consultar datos y paquetes del envio.',
         deniedMessage: 'No puedes consultar el detalle del envio.',
-      },
-      {
-        key: 'addPackage',
-        label: 'Agregar paquete',
-        permissionCode: 'MANAGE_SHIPMENTS',
-        allowedMessage: 'Puedes agregar paquetes elegibles al envio.',
-        deniedMessage: 'No puedes agregar paquetes al envio.',
       },
         {
           key: 'dispatchShipment',

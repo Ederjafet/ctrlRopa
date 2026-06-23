@@ -3,6 +3,7 @@
 Fecha: 2026-06-22
 
 > Actualizacion SHIPMENT-TIMELINE-A: `Cancelado` deja de mostrarse como paso pendiente de la linea de tiempo. La accion de cancelar permanece en acciones cuando aplica; la timeline solo muestra el evento cancelado cuando el shipment esta `CANCELLED`.
+> Actualizacion SHIPMENTS-INTEGRITY-A: `Agregar paquete` deja de ser accion visible en `shipment-detail`. Si un shipment ya existe sin paquete, se trata como incidencia y no permite `Marcar enviado` ni `Confirmar recibido`.
 
 ## Problema detectado
 

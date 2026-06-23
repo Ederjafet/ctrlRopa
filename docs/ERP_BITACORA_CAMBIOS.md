@@ -1,5 +1,30 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-22 - SHIPMENTS-INTEGRITY-A cliente y paquete obligatorio en envios
+
+Tipo: frontend, backend, envios, paquetes, integridad operativa, tests, documentacion.
+
+Objetivo:
+
+- Enriquecer `/shipments` con datos de cliente/paquete/destino y evitar envios operativos sin paquete asociado.
+
+Cambios realizados:
+
+- `POST /api/shipments` ahora requiere `customerPackageId` y asocia el paquete en la misma operacion de servicio.
+- `ShipmentResponse` incluye cliente, telefono, paquete principal, prendas, destino, costo, total, siguiente paso y razones de atencion.
+- `/shipments` muestra cliente, telefono, paquete, destino, costo, total y guia efectiva para envios reales.
+- Los envios con `0 paquetes` se marcan como incidencia `Sin paquete asociado` y caen en `Con atencion`.
+- `/shipment-detail` oculta acciones operativas para envios huerfanos y deja solo cancelacion controlada si aplica.
+- Se removio la accion de envio manual y el flujo visible de agregar paquete desde detalle.
+- Se agregaron tests de `ShipmentService` para creacion con paquete, bloqueo sin paquete, DTO enriquecido y acciones bloqueadas en huerfanos.
+- Se documenta la fase en `docs/SHIPMENTS_INTEGRITY_A_CLIENTE_PAQUETE_OBLIGATORIO.md`.
+
+Restricciones respetadas:
+
+- No se borran envios huerfanos existentes.
+- No se duplican envios ni se toca pagos, saldos o costo de envio.
+- Backend mantiene tenant/branch isolation y permisos reales.
+
 ## 2026-06-22 - RESERVATIONS-SHIPPED-A ocultar apartados enviados de activos
 
 Tipo: frontend, backend, apartados, paquetes, envios, tests, documentacion.

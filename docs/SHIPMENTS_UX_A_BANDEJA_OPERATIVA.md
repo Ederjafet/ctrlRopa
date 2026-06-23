@@ -6,6 +6,7 @@ Fecha: 2026-06-22
 > Actualizacion SHIPMENT-BUTTONS-A: las acciones criticas del detalle de envio usan modal propio, no alertas nativas, y `Marcar enviado` usa la guia del shipment o del paquete relacionado.
 > Actualizacion SHIPMENT-RECEIVED-A: al confirmar recepcion desde `/shipment-detail`, el shipment queda `DELIVERED` y al volver a `/shipments` se mueve al filtro Entregados, dejando de aparecer como enviado/en ruta.
 > Actualizacion RESERVATIONS-SHIPPED-A: los apartados asociados a paquetes enviados, entregados o cancelados dejan de aparecer en `/reservations` como activos y quedan consultables desde historial.
+> Actualizacion SHIPMENTS-INTEGRITY-A: los envios reales se enriquecen con cliente, telefono, paquete, destino, costo y siguiente paso. Ya no existe creacion operativa de shipment sin paquete; los huerfanos existentes se muestran como `Con atencion`.
 
 ## Problema
 
@@ -22,7 +23,7 @@ No se agrego backend. La pantalla organiza ambas fuentes como una sola bandeja o
 
 ## Cambios de UI
 
-- Cabecera compacta con `Ver permisos` y accion secundaria `Envio manual`.
+- Cabecera compacta con `Ver permisos`.
 - Resumen superior: listos para envio, pendientes de guia, en preparacion, enviados, entregados y con atencion.
 - Filtros: todos, listos, pendientes de guia, en preparacion, enviados, entregados, con atencion e historial.
 - Busqueda por cliente, paquete, guia, paqueteria, telefono o folio.
@@ -43,7 +44,7 @@ Las acciones que no se pueden ejecutar quedan bloqueadas con `disabledReason`; n
 `/shipments` usa `MANAGE_SHIPMENTS` para:
 
 - ver bandeja;
-- crear envio manual;
+- crear/preparar envio desde paquete listo;
 - preparar paquete listo;
 - registrar guia;
 - marcar enviado;
@@ -57,11 +58,13 @@ Las acciones que no se pueden ejecutar quedan bloqueadas con `disabledReason`; n
 
 La pantalla no crea envios automaticamente al listar. Cuando prepara un paquete listo, reutiliza el flujo existente:
 
-1. crea `Shipment`;
-2. agrega el paquete al envio;
+1. crea `Shipment` con `customerPackageId` obligatorio;
+2. asocia el paquete en la misma operacion de servicio;
 3. abre `shipment-detail`.
 
 La lista de paquetes listos excluye paquetes con envio activo y el backend conserva la validacion de asignacion activa, por lo que no se duplican paquetes en envios.
+
+Los shipments existentes sin paquetes no se eliminan. Se muestran como incidencia `Sin paquete asociado`, no pueden despacharse ni confirmarse recibidos y solo se pueden cancelar si el estado/permisos lo permiten.
 
 ## Fuera de alcance
 

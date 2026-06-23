@@ -2,22 +2,16 @@ import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
-import AppOptionRow from '@/components/ui/AppOptionRow';
 import AppShellPage from '@/components/layout/AppShellPage';
 import ScreenPermissionHeaderAction from '@/components/ui/ScreenPermissionHeaderAction';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { hasPermission } from '@/services/accessControl';
-import { Customer, getCustomersByBranch } from '@/services/customerService';
-import { CustomerAddress, getCustomerAddresses } from '@/services/customerAddressService';
 import {
-  CustomerPackage,
   CustomerPackageDetail,
   getCustomerPackageDetail,
-  getCustomerPackagesByCustomer,
 } from '@/services/customerPackageService';
 import {
-  addPackageToShipment,
   cancelShipment,
   confirmShipmentReceived,
   collectionStatusLabel,
@@ -28,7 +22,6 @@ import {
   resolveShipmentPackage,
   ShipmentDetail,
   ShipmentPackageLine,
-  ShipmentPackagePaymentMode,
   ShipmentPackageStatus,
   shipmentDeliveryTypeLabel,
   shipmentPackageStatusLabel,
@@ -37,7 +30,7 @@ import {
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 type NoticeTone = 'success' | 'warning' | 'danger' | 'info';
 type NoticeState = {
@@ -63,18 +56,6 @@ function formatDate(value?: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString();
-}
-
-function normalize(value?: string | null) {
-  return (value ?? '').toLowerCase().trim();
-}
-
-function isActiveCustomer(customer: Customer) {
-  return customer.status !== 'INACTIVE' && !customer.isGeneric;
-}
-
-function isActiveAddress(address: CustomerAddress) {
-  return address.status !== 'INACTIVE';
 }
 
 function packageDeliveryTypeLabel(type?: string | null) {
@@ -272,20 +253,9 @@ export default function ShipmentDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
 
-  const [addModalVisible, setAddModalVisible] = useState(false);
   const [resolveModalVisible, setResolveModalVisible] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const [selectedLine, setSelectedLine] = useState<ShipmentPackageLine | null>(null);
-
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [customerSearch, setCustomerSearch] = useState('');
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [packages, setPackages] = useState<CustomerPackage[]>([]);
-  const [selectedPackage, setSelectedPackage] = useState<CustomerPackage | null>(null);
-  const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
-  const [selectedAddress, setSelectedAddress] = useState<CustomerAddress | null>(null);
-  const [paymentMode, setPaymentMode] = useState<ShipmentPackagePaymentMode>('PREPAID');
-  const [expectedCodAmount, setExpectedCodAmount] = useState('');
 
   const [resolutionStatus, setResolutionStatus] = useState<ShipmentPackageStatus>('DELIVERED');
   const [collectedAmount, setCollectedAmount] = useState('');
@@ -342,7 +312,6 @@ export default function ShipmentDetailScreen() {
   const canViewPackages = hasPermission(session, 'CREATE_CLOSE_CUSTOMER_PACKAGE');
   const effectiveGuide = useMemo(() => getEffectiveGuide(detail, packageDetails), [detail, packageDetails]);
   const hasGuide = Boolean(effectiveGuide);
-  const canEdit = detail?.status === 'OPEN';
   const canResolve = detail?.status === 'OUT_FOR_DELIVERY';
   const canCancel = detail?.status === 'OPEN';
   const canReopen = detail?.status === 'CANCELLED' || detail?.status === 'CLOSED_WITH_INCIDENTS';
@@ -355,25 +324,6 @@ export default function ShipmentDetailScreen() {
     return total + (customerPackage?.items?.length ?? 0);
   }, 0) ?? 0;
   const customerName = primaryLine?.customerName || primaryPackage?.customerName || 'Cliente no indicado';
-
-  const filteredCustomers = useMemo(() => {
-    const term = normalize(customerSearch);
-    const active = customers.filter(isActiveCustomer);
-    if (!term) return active.slice(0, 25);
-    return active
-      .filter((customer) => `${customer.name ?? ''} ${customer.phone ?? ''}`.toLowerCase().includes(term))
-      .slice(0, 25);
-  }, [customers, customerSearch]);
-
-  const readyPackages = useMemo(
-    () => packages.filter((customerPackage) => customerPackage.status === 'READY'),
-    [packages]
-  );
-
-  const activeAddresses = useMemo(
-    () => addresses.filter(isActiveAddress),
-    [addresses]
-  );
 
   const dispatchBlockedReason = useMemo(() => {
     if (!detail) return 'No se ha cargado el envio.';
@@ -424,18 +374,6 @@ export default function ShipmentDetailScreen() {
     return null;
   }, [canManageShipments, detail, isWorking]);
 
-  const addPackageBlockedReason = isWorking
-    ? 'Espera a que termine la accion actual.'
-    : !canManageShipments
-      ? 'No tienes permiso para agregar paquetes. Permiso requerido: MANAGE_SHIPMENTS.'
-      : !selectedPackage && !selectedAddress
-        ? 'Selecciona un paquete listo y una direccion activa.'
-        : !selectedPackage
-          ? 'Selecciona un paquete listo.'
-          : !selectedAddress
-            ? 'Selecciona una direccion activa.'
-            : undefined;
-
   const nextStep = useMemo(() => {
     if (!detail) {
       return {
@@ -457,8 +395,8 @@ export default function ShipmentDetailScreen() {
       if (detail.packages.length === 0) {
         return {
           tone: 'warning' as NoticeTone,
-          title: 'Agregar paquete',
-          message: 'Agrega un paquete listo para envio antes de marcarlo como enviado.',
+          title: 'Envio sin paquete asociado',
+          message: 'Este envio no puede operarse hasta corregirse o cancelarse. No se puede marcar enviado ni recibido.',
         };
       }
 
@@ -509,110 +447,6 @@ export default function ShipmentDetailScreen() {
       message: 'Revisa el estado y las acciones disponibles.',
     };
   }, [canManageShipments, detail, hasGuide, receiveBlockedReason]);
-
-  const resetAddModal = () => {
-    setCustomerSearch('');
-    setSelectedCustomer(null);
-    setPackages([]);
-    setSelectedPackage(null);
-    setAddresses([]);
-    setSelectedAddress(null);
-    setPaymentMode('PREPAID');
-    setExpectedCodAmount('');
-  };
-
-  const openAddModal = async () => {
-    if (!session) return;
-
-    try {
-      setIsWorking(true);
-      const customerData = await getCustomersByBranch(session.branchId);
-      setCustomers(customerData);
-      resetAddModal();
-      setAddModalVisible(true);
-    } catch (error: any) {
-      setNotice({
-        tone: 'danger',
-        title: 'No se pudieron cargar los clientes.',
-        message: error.message,
-      });
-    } finally {
-      setIsWorking(false);
-    }
-  };
-
-  const selectCustomer = async (customer: Customer) => {
-    try {
-      setIsWorking(true);
-      setSelectedCustomer(customer);
-      setSelectedPackage(null);
-      setSelectedAddress(null);
-
-      const [packageData, addressData] = await Promise.all([
-        getCustomerPackagesByCustomer(customer.id),
-        getCustomerAddresses(customer.id),
-      ]);
-
-      setPackages(packageData);
-      setAddresses(addressData);
-    } catch (error: any) {
-      setNotice({
-        tone: 'danger',
-        title: 'No se pudieron cargar paquetes o direcciones.',
-        message: error.message,
-      });
-    } finally {
-      setIsWorking(false);
-    }
-  };
-
-  const handleAddPackage = async () => {
-    if (!detail || !selectedPackage || !selectedAddress) {
-      setNotice({
-        tone: 'warning',
-        title: 'Seleccion incompleta',
-        message: 'Selecciona paquete y direccion antes de agregar.',
-      });
-      return;
-    }
-
-    const expected = Number(expectedCodAmount);
-    if (paymentMode === 'COD' && (!expectedCodAmount.trim() || Number.isNaN(expected) || expected <= 0)) {
-      setNotice({
-        tone: 'warning',
-        title: 'Monto contra entrega requerido',
-        message: 'Captura un monto esperado mayor a 0.',
-      });
-      return;
-    }
-
-    try {
-      setIsWorking(true);
-      const updated = await addPackageToShipment(detail.id, {
-        customerPackageId: selectedPackage.id,
-        deliveryAddressId: selectedAddress.id,
-        paymentMode,
-        expectedCodAmount: paymentMode === 'COD' ? expected : null,
-      });
-
-      await updateDetail(updated);
-      setAddModalVisible(false);
-      resetAddModal();
-      setNotice({
-        tone: 'success',
-        title: 'Paquete agregado al envio.',
-        message: 'La vista se actualizo con el paquete relacionado.',
-      });
-    } catch (error: any) {
-      setNotice({
-        tone: 'danger',
-        title: 'No se pudo agregar el paquete.',
-        message: error.message,
-      });
-    } finally {
-      setIsWorking(false);
-    }
-  };
 
   const openConfirmation = (action: ConfirmAction, blockedReason?: string | null) => {
     if (!detail || !session) return;
@@ -1200,6 +1034,35 @@ export default function ShipmentDetailScreen() {
     if (!detail) return null;
     const isOutForDelivery = detail.status === 'OUT_FOR_DELIVERY';
 
+    if (packageCount === 0) {
+      return (
+        <AppCard>
+          <AppText variant="subtitle" bold>
+            Acciones
+          </AppText>
+          <View style={styles.actionStack}>
+            <AppCard variant="warning">
+              <AppText bold>Envio sin paquete asociado</AppText>
+              <AppText color={theme.colors.mutedText}>
+                No puede marcarse enviado ni recibido. Cancela este envio invalido si ya no corresponde a un paquete real.
+              </AppText>
+            </AppCard>
+
+            {canCancel ? (
+              <AppButton
+                title="Cancelar envio invalido"
+                variant="danger"
+                onPress={handleCancel}
+                loading={isWorking}
+                disabled={Boolean(cancelBlockedReason)}
+                disabledReason={cancelBlockedReason || undefined}
+              />
+            ) : null}
+          </View>
+        </AppCard>
+      );
+    }
+
     return (
       <AppCard>
         <AppText variant="subtitle" bold>
@@ -1223,17 +1086,6 @@ export default function ShipmentDetailScreen() {
               loading={isWorking}
               disabled={Boolean(receiveBlockedReason)}
               disabledReason={receiveBlockedReason || undefined}
-            />
-          ) : null}
-
-          {canEdit && packageCount === 0 ? (
-            <AppButton
-              title="Agregar paquete"
-              variant="secondary"
-              onPress={openAddModal}
-              loading={isWorking}
-              disabled={!canManageShipments || isWorking}
-              disabledReason="No tienes permiso para agregar paquetes. Permiso requerido: MANAGE_SHIPMENTS."
             />
           ) : null}
 
@@ -1426,121 +1278,6 @@ export default function ShipmentDetailScreen() {
       </AppShellPage>
 
       <AppBottomModal
-        visible={addModalVisible}
-        title="Agregar paquete al envio"
-        onClose={() => setAddModalVisible(false)}
-        maxHeight="90%"
-      >
-        <AppText bold>Cliente</AppText>
-        {selectedCustomer ? (
-          <AppCard>
-            <AppText bold>{selectedCustomer.name}</AppText>
-            <AppText color={theme.colors.mutedText}>{selectedCustomer.phone || 'Sin telefono'}</AppText>
-            <AppButton title="Cambiar cliente" variant="secondary" onPress={() => setSelectedCustomer(null)} />
-          </AppCard>
-        ) : (
-          <>
-            <AppInput placeholder="Buscar cliente" value={customerSearch} onChangeText={setCustomerSearch} />
-            {filteredCustomers.map((customer) => (
-              <AppOptionRow
-                key={customer.id}
-                title={customer.name}
-                subtitle={customer.phone || 'Sin telefono'}
-                onPress={() => selectCustomer(customer)}
-              />
-            ))}
-          </>
-        )}
-
-        {selectedCustomer ? (
-          <>
-            <AppText bold style={styles.modalSectionTitle}>Paquete listo</AppText>
-            {readyPackages.length === 0 ? (
-              <AppText color={theme.colors.mutedText}>Este cliente no tiene paquetes READY.</AppText>
-            ) : (
-              readyPackages.map((customerPackage) => (
-                <AppOptionRow
-                  key={customerPackage.id}
-                  title={customerPackage.folio}
-                  subtitle={`Estado: ${customerPackage.status}`}
-                  onPress={() => setSelectedPackage(customerPackage)}
-                >
-                  {selectedPackage?.id === customerPackage.id ? <AppText bold>Seleccionado</AppText> : null}
-                </AppOptionRow>
-              ))
-            )}
-
-            <AppText bold style={styles.modalSectionTitle}>Direccion</AppText>
-            {activeAddresses.length === 0 ? (
-              <AppText color={theme.colors.mutedText}>Este cliente no tiene direcciones activas.</AppText>
-            ) : (
-              activeAddresses.map((address) => (
-                <AppOptionRow
-                  key={address.id}
-                  title={address.label}
-                  subtitle={`${address.line1}${address.city ? ` - ${address.city}` : ''}`}
-                  onPress={() => setSelectedAddress(address)}
-                >
-                  {selectedAddress?.id === address.id ? <AppText bold>Seleccionada</AppText> : null}
-                </AppOptionRow>
-              ))
-            )}
-
-            <AppText bold style={styles.modalSectionTitle}>Modo de cobro</AppText>
-            <View style={styles.typeRow}>
-              <Pressable
-                onPress={() => setPaymentMode('PREPAID')}
-                style={({ pressed }) => [
-                  styles.typeOption,
-                  {
-                    borderColor: paymentMode === 'PREPAID' ? theme.colors.accent : theme.colors.border,
-                    backgroundColor: paymentMode === 'PREPAID' ? theme.colors.optionPressedBackground : theme.colors.surface,
-                    borderRadius: theme.radius.md,
-                    opacity: pressed ? 0.75 : 1,
-                  },
-                ]}
-              >
-                <AppText bold>Pagado</AppText>
-              </Pressable>
-
-              <Pressable
-                onPress={() => setPaymentMode('COD')}
-                style={({ pressed }) => [
-                  styles.typeOption,
-                  {
-                    borderColor: paymentMode === 'COD' ? theme.colors.accent : theme.colors.border,
-                    backgroundColor: paymentMode === 'COD' ? theme.colors.optionPressedBackground : theme.colors.surface,
-                    borderRadius: theme.radius.md,
-                    opacity: pressed ? 0.75 : 1,
-                  },
-                ]}
-              >
-                <AppText bold>Contra entrega</AppText>
-              </Pressable>
-            </View>
-
-            {paymentMode === 'COD' ? (
-              <AppInput
-                label="Monto esperado COD"
-                value={expectedCodAmount}
-                onChangeText={setExpectedCodAmount}
-                keyboardType="numeric"
-                placeholder="0.00"
-              />
-            ) : null}
-
-            <AppButton
-              title={isWorking ? 'Agregando...' : 'Agregar paquete'}
-              onPress={handleAddPackage}
-              loading={isWorking}
-              disabled={Boolean(addPackageBlockedReason)}
-              disabledReason={addPackageBlockedReason}
-            />
-          </>
-        ) : null}
-      </AppBottomModal>
-
-      <AppBottomModal
         visible={resolveModalVisible}
         title={resolutionStatus === 'DELIVERED' ? 'Confirmar recibido' : 'Resolver entrega'}
         onClose={() => setResolveModalVisible(false)}
@@ -1731,9 +1468,6 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 14,
   },
-  modalSectionTitle: {
-    marginTop: 14,
-  },
   packageActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1785,17 +1519,5 @@ const styles = StyleSheet.create({
   timelineRow: {
     flexDirection: 'row',
     gap: 10,
-  },
-  typeOption: {
-    alignItems: 'center',
-    borderWidth: 1,
-    flex: 1,
-    padding: 12,
-  },
-  typeRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 12,
-    marginTop: 8,
   },
 });

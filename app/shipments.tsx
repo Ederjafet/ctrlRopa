@@ -12,7 +12,6 @@ import {
   getReadyCustomerPackagesForShipment,
 } from '@/services/customerPackageService';
 import {
-  addPackageToShipment,
   createShipment,
   getShipmentsByBranch,
   Shipment,
@@ -149,11 +148,20 @@ function getReadyPackageAttentionReason(customerPackage: CustomerPackageDetail) 
 }
 
 function getShipmentAttentionReason(shipment: Shipment) {
-  if ((shipment.packageCount ?? 0) === 0) {
-    return 'Sin paquetes asignados';
+  if (shipment.requiresAttention && shipment.attentionReason) {
+    return shipment.attentionReason;
   }
 
-  if (shipment.status === 'OPEN' && shipment.deliveryType === 'CARRIER' && !shipment.guideReference?.trim()) {
+  if ((shipment.packageCount ?? 0) === 0) {
+    return 'Sin paquete asociado';
+  }
+
+  if (
+    shipment.status === 'OPEN' &&
+    shipment.deliveryType === 'CARRIER' &&
+    !shipment.guideReference?.trim() &&
+    !shipment.packageTrackingNumber?.trim()
+  ) {
     return 'Falta guia';
   }
 
@@ -166,7 +174,7 @@ function getShipmentAttentionReason(shipment: Shipment) {
 
 function getShipmentFilterGroup(shipment: Shipment, attentionReason: string | null): ShipmentFilter {
   if (attentionReason === 'Falta guia') return 'pendingGuide';
-  if (attentionReason === 'Sin paquetes asignados') return 'attention';
+  if (attentionReason === 'Sin paquete asociado') return 'attention';
   if (shipment.status === 'OPEN') return 'preparing';
   if (shipment.status === 'OUT_FOR_DELIVERY') return 'shipped';
   if (shipment.status === 'DELIVERED') return 'delivered';
@@ -190,9 +198,7 @@ export default function ShipmentsScreen() {
   const [activeFilter, setActiveFilter] = useState<ShipmentFilter>('all');
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [isCreating, setIsCreating] = useState(false);
   const [isPreparingPackage, setIsPreparingPackage] = useState(false);
-  const [createModalVisible, setCreateModalVisible] = useState(false);
   const [prepareModalVisible, setPrepareModalVisible] = useState(false);
   const [actionsShipment, setActionsShipment] = useState<Shipment | null>(null);
   const [selectedReadyPackage, setSelectedReadyPackage] = useState<CustomerPackageDetail | null>(null);
@@ -278,7 +284,20 @@ export default function ShipmentsScreen() {
           shipmentDeliveryTypeLabel(shipment.deliveryType),
           shipmentStatusLabel(shipment.status),
           shipment.guideReference,
+          shipment.packageTrackingNumber,
           shipment.packageCount,
+          shipment.primaryPackageFolio,
+          shipment.primaryPackageStatus,
+          shipment.customerName,
+          shipment.customerPhone,
+          shipment.recipientName,
+          shipment.recipientPhone,
+          shipment.destinationSummary,
+          shipment.destinationCity,
+          shipment.destinationState,
+          shipment.destinationPostalCode,
+          shipment.shippingCarrier,
+          shipment.packageDeliveryType ? packageDeliveryTypeLabel(shipment.packageDeliveryType) : null,
         ].join(' ')
       );
 
@@ -331,34 +350,6 @@ export default function ShipmentsScreen() {
     };
   }, [readyPackages, visibleShipments]);
 
-  const handleCreate = async () => {
-    if (!session) return;
-
-    if (deliveryType === 'CARRIER' && !guideReference.trim()) {
-      Alert.alert('Envios', 'Captura la guia o referencia para envios por paqueteria.');
-      return;
-    }
-
-    try {
-      setIsCreating(true);
-      const created = await createShipment({
-        branchId: session.branchId,
-        deliveryType,
-        guideReference: guideReference.trim() || null,
-        createdByUserId: session.userId,
-      });
-
-      setCreateModalVisible(false);
-      setGuideReference('');
-      setDeliveryType('LOCAL');
-      router.push(`/shipment-detail?id=${created.id}&returnTo=${encodeURIComponent('/shipments')}` as any);
-    } catch (error: any) {
-      Alert.alert('Envios', error.message || 'No se pudo crear el envio.');
-    } finally {
-      setIsCreating(false);
-    }
-  };
-
   const openPreparePackageModal = (customerPackage: CustomerPackageDetail) => {
     setSelectedReadyPackage(customerPackage);
     setDeliveryType(customerPackage.deliveryType === 'PARCEL_SERVICE' ? 'CARRIER' : 'LOCAL');
@@ -378,16 +369,13 @@ export default function ShipmentsScreen() {
       setIsPreparingPackage(true);
       const created = await createShipment({
         branchId: session.branchId,
-        deliveryType,
-        guideReference: guideReference.trim() || null,
-        createdByUserId: session.userId,
-      });
-
-      const detail = await addPackageToShipment(created.id, {
         customerPackageId: selectedReadyPackage.id,
         deliveryAddressId: selectedReadyPackage.sourceCustomerAddressId ?? null,
         paymentMode: 'PREPAID',
         expectedCodAmount: null,
+        deliveryType,
+        guideReference: guideReference.trim() || null,
+        createdByUserId: session.userId,
       });
 
       setPrepareModalVisible(false);
@@ -395,7 +383,7 @@ export default function ShipmentsScreen() {
       setGuideReference('');
       setDeliveryType('LOCAL');
       await loadData();
-      router.push(`/shipment-detail?id=${detail.id}&returnTo=${encodeURIComponent('/shipments')}` as any);
+      router.push(`/shipment-detail?id=${created.id}&returnTo=${encodeURIComponent('/shipments')}` as any);
     } catch (error: any) {
       Alert.alert('Envios', error.message || 'No se pudo preparar el envio del paquete.');
       await loadData();
@@ -419,14 +407,6 @@ export default function ShipmentsScreen() {
         screenTitle="Envios"
         session={session}
         buttonStyle={styles.headerButton}
-      />
-      <AppButton
-        title="Envio manual"
-        variant="secondary"
-        onPress={() => setCreateModalVisible(true)}
-        disabled={!canManageShipments}
-        disabledReason="No tienes permiso para crear envios. Permiso requerido: MANAGE_SHIPMENTS."
-        style={styles.headerButton}
       />
     </View>
   );
@@ -613,8 +593,12 @@ export default function ShipmentsScreen() {
     const isOpen = shipment.status === 'OPEN';
     const isShipped = shipment.status === 'OUT_FOR_DELIVERY';
     const isDelivered = shipment.status === 'DELIVERED';
-    const primaryTitle = isOpen
-      ? shipment.deliveryType === 'CARRIER' && !shipment.guideReference?.trim()
+    const isOrphan = (shipment.packageCount ?? 0) === 0;
+    const effectiveGuide = shipment.guideReference || shipment.packageTrackingNumber;
+    const primaryTitle = isOrphan
+      ? 'Revisar incidencia'
+      : isOpen
+      ? shipment.deliveryType === 'CARRIER' && !effectiveGuide?.trim()
         ? 'Registrar guia'
         : 'Preparar envio'
       : isShipped
@@ -680,7 +664,7 @@ export default function ShipmentsScreen() {
                 Guia
               </AppText>
               <AppText bold numberOfLines={1}>
-                {shipment.guideReference || 'Pendiente'}
+                {effectiveGuide || 'Pendiente'}
               </AppText>
             </View>
             <View style={styles.metaCell}>
@@ -691,11 +675,74 @@ export default function ShipmentsScreen() {
             </View>
           </View>
 
+          <View style={styles.metaGrid}>
+            <View style={styles.metaCell}>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Cliente
+              </AppText>
+              <AppText bold numberOfLines={1}>
+                {shipment.customerName || 'No indicado'}
+              </AppText>
+            </View>
+            <View style={styles.metaCell}>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Telefono
+              </AppText>
+              <AppText bold numberOfLines={1}>
+                {shipment.customerPhone || 'Sin telefono'}
+              </AppText>
+            </View>
+            <View style={styles.metaCell}>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Paquete
+              </AppText>
+              <AppText bold numberOfLines={1}>
+                {shipment.primaryPackageFolio || 'Sin paquete'}
+              </AppText>
+            </View>
+            <View style={styles.metaCell}>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Prendas
+              </AppText>
+              <AppText bold>{shipment.packageItemCount ?? 0}</AppText>
+            </View>
+            <View style={styles.metaCell}>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Costo envio
+              </AppText>
+              <AppText bold numberOfLines={1}>
+                {shipment.shippingCostAmount != null ? money(shipment.shippingCostAmount) : 'No aplica'}
+              </AppText>
+            </View>
+            <View style={styles.metaCell}>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Total paquete
+              </AppText>
+              <AppText bold numberOfLines={1}>
+                {shipment.packageTotalAmount != null ? money(shipment.packageTotalAmount) : 'Sin total'}
+              </AppText>
+            </View>
+          </View>
+
+          <View style={[styles.addressBlock, { backgroundColor: theme.colors.surfaceAlt }]}>
+            <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+              Recibe: {shipment.recipientName || shipment.customerName || 'No indicado'} - {shipment.recipientPhone || shipment.customerPhone || 'Sin telefono'}
+            </AppText>
+            <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={2}>
+              {shipment.destinationSummary || (isOrphan ? 'Este envio no tiene paquete asociado.' : 'Sin destino registrado')}
+            </AppText>
+            <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+              Paqueteria: {shipment.shippingCarrier || shipmentDeliveryTypeLabel(shipment.deliveryType)} - Estado paquete: {packageStatusLabel(shipment.primaryPackageStatus)}
+            </AppText>
+          </View>
+
           <View style={styles.nextStepRow}>
             <AppText variant="caption" color={item.attentionReason ? theme.colors.warning : theme.colors.mutedText} bold>
               {item.attentionReason
                 ? `Atencion: ${item.attentionReason}`
-                : isOpen
+                : shipment.nextStep
+                  ? `Siguiente paso: ${shipment.nextStep}`
+                  : isOpen
                   ? 'Siguiente paso: revisar paquetes y despachar desde el detalle.'
                   : isShipped
                     ? 'Siguiente paso: confirmar recibido desde el detalle.'
@@ -722,6 +769,16 @@ export default function ShipmentsScreen() {
             disabledReason="No tienes permiso para ver envios. Permiso requerido: MANAGE_SHIPMENTS."
             style={styles.actionButton}
           />
+          {shipment.primaryPackageId ? (
+            <AppButton
+              title="Ver paquete"
+              variant="secondary"
+              onPress={() => openPackageDetail(shipment.primaryPackageId as number)}
+              disabled={!canViewPackages}
+              disabledReason="No tienes permiso para ver paquetes. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE."
+              style={styles.actionButton}
+            />
+          ) : null}
           <AppButton
             title="Mas"
             variant="secondary"
@@ -786,61 +843,6 @@ export default function ShipmentsScreen() {
           </View>
         ) : null}
       </AppShellPage>
-
-      <AppBottomModal
-        visible={createModalVisible}
-        title="Nuevo envio manual"
-        onClose={() => setCreateModalVisible(false)}
-      >
-        <AppText bold>Tipo de entrega</AppText>
-        <View style={styles.typeRow}>
-          <Pressable
-            onPress={() => setDeliveryType('LOCAL')}
-            style={({ pressed }) => [
-              styles.typeOption,
-              {
-                borderColor: deliveryType === 'LOCAL' ? theme.colors.accent : theme.colors.border,
-                backgroundColor: deliveryType === 'LOCAL' ? theme.colors.optionPressedBackground : theme.colors.surface,
-                borderRadius: theme.radius.md,
-                opacity: pressed ? 0.75 : 1,
-              },
-            ]}
-          >
-            <AppText bold>Local</AppText>
-          </Pressable>
-
-          <Pressable
-            onPress={() => setDeliveryType('CARRIER')}
-            style={({ pressed }) => [
-              styles.typeOption,
-              {
-                borderColor: deliveryType === 'CARRIER' ? theme.colors.accent : theme.colors.border,
-                backgroundColor: deliveryType === 'CARRIER' ? theme.colors.optionPressedBackground : theme.colors.surface,
-                borderRadius: theme.radius.md,
-                opacity: pressed ? 0.75 : 1,
-              },
-            ]}
-          >
-            <AppText bold>Paqueteria</AppText>
-          </Pressable>
-        </View>
-
-        <AppInput
-          label="Guia / referencia"
-          value={guideReference}
-          onChangeText={setGuideReference}
-          placeholder={deliveryType === 'CARRIER' ? 'Obligatoria para paqueteria' : 'Opcional'}
-          autoCapitalize="characters"
-        />
-
-        <AppButton
-          title={isCreating ? 'Creando...' : 'Crear envio'}
-          onPress={handleCreate}
-          loading={isCreating}
-          disabled={isCreating || !canManageShipments}
-          disabledReason="No tienes permiso para crear envios. Permiso requerido: MANAGE_SHIPMENTS."
-        />
-      </AppBottomModal>
 
       <AppBottomModal
         visible={prepareModalVisible}
@@ -935,6 +937,14 @@ export default function ShipmentsScreen() {
       >
         {actionsShipment ? (
           <View style={styles.modalActionsStack}>
+            {(actionsShipment.packageCount ?? 0) === 0 ? (
+              <AppCard variant="warning">
+                <AppText bold>Sin paquete asociado</AppText>
+                <AppText color={theme.colors.mutedText}>
+                  Este envio no puede operarse como normal. Abre el detalle para revisar o cancelar.
+                </AppText>
+              </AppCard>
+            ) : null}
             <AppButton
               title="Abrir detalle"
               variant="secondary"
@@ -944,28 +954,32 @@ export default function ShipmentsScreen() {
                 openShipmentDetail(id);
               }}
             />
-            <AppButton
-              title="Registrar guia / paqueteria"
-              variant="operation"
-              onPress={() => {
-                const id = actionsShipment.id;
-                setActionsShipment(null);
-                openShipmentDetail(id);
-              }}
-              disabled={!canManageShipments}
-              disabledReason="No tienes permiso para actualizar envios. Permiso requerido: MANAGE_SHIPMENTS."
-            />
-            <AppButton
-              title="Marcar enviado / confirmar recibido"
-              variant="neutral"
-              onPress={() => {
-                const id = actionsShipment.id;
-                setActionsShipment(null);
-                openShipmentDetail(id);
-              }}
-              disabled={!canManageShipments}
-              disabledReason="Disponible desde el detalle del envio con permiso MANAGE_SHIPMENTS."
-            />
+            {(actionsShipment.packageCount ?? 0) > 0 ? (
+              <>
+                <AppButton
+                  title="Registrar guia / paqueteria"
+                  variant="operation"
+                  onPress={() => {
+                    const id = actionsShipment.id;
+                    setActionsShipment(null);
+                    openShipmentDetail(id);
+                  }}
+                  disabled={!canManageShipments}
+                  disabledReason="No tienes permiso para actualizar envios. Permiso requerido: MANAGE_SHIPMENTS."
+                />
+                <AppButton
+                  title="Marcar enviado / confirmar recibido"
+                  variant="neutral"
+                  onPress={() => {
+                    const id = actionsShipment.id;
+                    setActionsShipment(null);
+                    openShipmentDetail(id);
+                  }}
+                  disabled={!canManageShipments}
+                  disabledReason="Disponible desde el detalle del envio con permiso MANAGE_SHIPMENTS."
+                />
+              </>
+            ) : null}
           </View>
         ) : null}
       </AppBottomModal>

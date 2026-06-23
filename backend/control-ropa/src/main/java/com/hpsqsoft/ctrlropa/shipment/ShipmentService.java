@@ -71,6 +71,10 @@ public class ShipmentService {
 
     public ShipmentResponse create(CreateShipmentRequest request) {
         assertCanManageShipments();
+        if (request.getCustomerPackageId() == null) {
+            throw new IllegalArgumentException("No se puede crear un envio sin paquete asociado.");
+        }
+
         Branch branch = branchRepository.findById(request.getBranchId())
                 .orElseThrow(() -> new IllegalArgumentException("Sucursal no encontrada"));
         tenantAccessGuard.requireBranch(branch.getId(), "La sucursal del envio no pertenece al tenant activo");
@@ -88,7 +92,16 @@ public class ShipmentService {
         shipment.setStatus(ShipmentStatus.OPEN);
         shipment.setCreatedByUserId(request.getCreatedByUserId());
 
-        return toResponse(repository.save(shipment));
+        Shipment savedShipment = repository.save(shipment);
+
+        AddShipmentPackageRequest addRequest = new AddShipmentPackageRequest();
+        addRequest.setCustomerPackageId(request.getCustomerPackageId());
+        addRequest.setDeliveryAddressId(request.getDeliveryAddressId());
+        addRequest.setPaymentMode(request.getPaymentMode() != null ? request.getPaymentMode() : ShipmentPackagePaymentMode.PREPAID);
+        addRequest.setExpectedCodAmount(request.getExpectedCodAmount());
+        addPackageToShipment(savedShipment, addRequest);
+
+        return toResponse(savedShipment);
     }
 
     @Transactional(readOnly = true)
@@ -140,6 +153,12 @@ public class ShipmentService {
         assertCanManageShipments();
         Shipment shipment = findShipment(shipmentId);
 
+        addPackageToShipment(shipment, request);
+
+        return findDetail(shipmentId);
+    }
+
+    private void addPackageToShipment(Shipment shipment, AddShipmentPackageRequest request) {
         if (shipment.getStatus() != ShipmentStatus.OPEN) {
             throw new IllegalArgumentException("Solo shipments OPEN pueden modificarse");
         }
@@ -199,8 +218,6 @@ public class ShipmentService {
         shipmentPackage.setReturnedAt(null);
 
         shipmentPackageRepository.save(shipmentPackage);
-
-        return findDetail(shipmentId);
     }
     
     public ShipmentDetailResponse addPackageByFolio(String shipmentFolio,
@@ -705,6 +722,34 @@ public class ShipmentService {
     }
 
     private ShipmentResponse toResponse(Shipment shipment) {
+        List<ShipmentPackage> packages = shipmentPackageRepository.findByShipmentIdOrderByIdAsc(shipment.getId());
+        ShipmentPackage primaryPackageLine = packages.isEmpty() ? null : packages.get(0);
+        CustomerPackage primaryPackage = null;
+        Integer packageItemCount = null;
+        BigDecimal packageTotalAmount = null;
+
+        if (primaryPackageLine != null) {
+            primaryPackage = customerPackageRepository.findById(primaryPackageLine.getCustomerPackageId())
+                    .orElse(null);
+            if (primaryPackage != null) {
+                List<CustomerPackageItem> packageItems = customerPackageItemRepository
+                        .findByCustomerPackageIdOrderByCreatedAtAsc(primaryPackage.getId());
+                packageItemCount = packageItems.size();
+                packageTotalAmount = packageItems.stream()
+                        .map(item -> item.getItem().getPrice() == null ? BigDecimal.ZERO : item.getItem().getPrice())
+                        .reduce(BigDecimal.ZERO, BigDecimal::add)
+                        .add(resolvePackageShippingAmount(primaryPackage));
+            }
+        }
+
+        String effectiveGuide = cleanNullable(shipment.getGuideReference());
+        if (effectiveGuide == null && primaryPackage != null) {
+            effectiveGuide = cleanNullable(primaryPackage.getTrackingNumber());
+        }
+
+        String attentionReason = resolveAttentionReason(shipment, packages, effectiveGuide);
+        String blockedReason = resolveBlockedReason(shipment, packages, effectiveGuide);
+
         return new ShipmentResponse(
                 shipment.getId(),
                 shipment.getFolio(),
@@ -719,8 +764,102 @@ public class ShipmentService {
                 shipment.getDispatchedByUserId(),
                 shipment.getCancelledAt(),
                 shipment.getCancelledByUserId(),
-                shipmentPackageRepository.countByShipmentId(shipment.getId())
+                (long) packages.size(),
+                primaryPackage != null ? primaryPackage.getId() : null,
+                primaryPackage != null ? primaryPackage.getFolio() : null,
+                primaryPackage != null ? primaryPackage.getStatus().name() : null,
+                packageItemCount,
+                primaryPackage != null ? primaryPackage.getCustomer().getId() : null,
+                primaryPackage != null ? primaryPackage.getCustomer().getName() : null,
+                primaryPackage != null ? primaryPackage.getCustomer().getPhone() : null,
+                primaryPackage != null && primaryPackage.getDeliveryType() != null ? primaryPackage.getDeliveryType().name() : null,
+                primaryPackage != null ? primaryPackage.getShipToName() : null,
+                primaryPackage != null ? primaryPackage.getShipToPhone() : null,
+                primaryPackage != null ? resolveDeliveryAddressText(primaryPackage, null) : null,
+                primaryPackage != null ? primaryPackage.getShipToCity() : null,
+                primaryPackage != null ? primaryPackage.getShipToState() : null,
+                primaryPackage != null ? primaryPackage.getShipToPostalCode() : null,
+                primaryPackage != null ? primaryPackage.getShippingCarrier() : null,
+                primaryPackage != null ? primaryPackage.getTrackingNumber() : null,
+                primaryPackage != null && primaryPackage.isShippingCostConfirmed() ? primaryPackage.getShippingCostAmount() : null,
+                packageTotalAmount,
+                primaryPackageLine != null ? primaryPackageLine.getPaymentMode().name() : null,
+                attentionReason != null,
+                attentionReason,
+                resolveNextStep(shipment, packages, attentionReason),
+                shipment.getStatus() == ShipmentStatus.OPEN && blockedReason == null,
+                shipment.getStatus() == ShipmentStatus.OUT_FOR_DELIVERY && !packages.isEmpty(),
+                blockedReason
         );
+    }
+
+    private BigDecimal resolvePackageShippingAmount(CustomerPackage customerPackage) {
+        if (!customerPackage.isShippingCostConfirmed()
+                || customerPackage.isShippingCostWaived()
+                || customerPackage.isShippingCollect()
+                || customerPackage.isCustomerProvidedLabel()) {
+            return BigDecimal.ZERO;
+        }
+
+        return customerPackage.getShippingCostAmount() == null
+                ? BigDecimal.ZERO
+                : customerPackage.getShippingCostAmount();
+    }
+
+    private String resolveAttentionReason(Shipment shipment, List<ShipmentPackage> packages, String effectiveGuide) {
+        if (packages.isEmpty()) {
+            return "Sin paquete asociado";
+        }
+
+        if (shipment.getStatus() == ShipmentStatus.OPEN
+                && shipment.getDeliveryType() == ShipmentDeliveryType.CARRIER
+                && effectiveGuide == null) {
+            return "Falta guia";
+        }
+
+        return null;
+    }
+
+    private String resolveBlockedReason(Shipment shipment, List<ShipmentPackage> packages, String effectiveGuide) {
+        if (packages.isEmpty()) {
+            return "Este envio no tiene paquete asociado. No puede operarse hasta corregirse o cancelarse.";
+        }
+
+        if (shipment.getStatus() == ShipmentStatus.OPEN
+                && shipment.getDeliveryType() == ShipmentDeliveryType.CARRIER
+                && effectiveGuide == null) {
+            return "Captura la guia o referencia antes de marcar como enviado.";
+        }
+
+        return null;
+    }
+
+    private String resolveNextStep(Shipment shipment, List<ShipmentPackage> packages, String attentionReason) {
+        if (attentionReason != null) {
+            return attentionReason;
+        }
+
+        if (shipment.getStatus() == ShipmentStatus.OPEN) {
+            return "Marcar enviado";
+        }
+
+        if (shipment.getStatus() == ShipmentStatus.OUT_FOR_DELIVERY) {
+            return "Confirmar recibido";
+        }
+
+        if (shipment.getStatus() == ShipmentStatus.DELIVERED) {
+            return "Entregado";
+        }
+
+        if (shipment.getStatus() == ShipmentStatus.CANCELLED) {
+            return "Cancelado";
+        }
+
+        if (shipment.getStatus() == ShipmentStatus.CLOSED_WITH_INCIDENTS) {
+            return "Revisar incidencias";
+        }
+
+        return packages.isEmpty() ? "Revisar incidencia" : "Revisar detalle";
     }
 
     private String cleanNullable(String value) {
