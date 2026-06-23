@@ -29,6 +29,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class ShipmentServiceTests {
@@ -117,6 +118,70 @@ class ShipmentServiceTests {
         assertThrows(AccessDeniedException.class, () -> service.dispatch(2L, request));
 
         verify(repository, never()).findById(2L);
+    }
+
+    @Test
+    void confirmReceivedUpdatesShipmentAndPackageWithoutTouchingPayments() {
+        Shipment shipment = carrierShipment("478521678");
+        shipment.setStatus(ShipmentStatus.OUT_FOR_DELIVERY);
+        ShipmentPackage shipmentPackage = shipmentPackage();
+        CustomerPackage customerPackage = readyCustomerPackage("478521678");
+        customerPackage.setStatus(CustomerPackageStatus.SHIPPED);
+        ConfirmShipmentReceivedRequest request = new ConfirmShipmentReceivedRequest();
+        request.setDeliveryConfirmedByUserId(77L);
+        request.setNotes("Cliente confirmo recibido por WhatsApp");
+
+        when(currentUser.getUserId()).thenReturn(77L);
+        when(repository.findById(2L)).thenReturn(Optional.of(shipment));
+        when(shipmentPackageRepository.findByShipmentIdOrderByIdAsc(2L)).thenReturn(List.of(shipmentPackage));
+        when(customerPackageRepository.findById(4L)).thenReturn(Optional.of(customerPackage));
+        when(repository.save(shipment)).thenReturn(shipment);
+        when(customerPackageRepository.save(customerPackage)).thenReturn(customerPackage);
+        when(shipmentPackageRepository.save(shipmentPackage)).thenReturn(shipmentPackage);
+
+        ShipmentDetailResponse response = service.confirmReceived(2L, request);
+
+        verify(accessService, atLeastOnce()).assertCan(77L, PermissionCode.MANAGE_SHIPMENTS);
+        assertEquals(ShipmentStatus.DELIVERED.name(), response.getStatus());
+        assertEquals(ShipmentPackageStatus.DELIVERED, shipmentPackage.getStatus());
+        assertEquals(CustomerPackageStatus.DELIVERED, customerPackage.getStatus());
+        assertEquals("Cliente confirmo recibido por WhatsApp", shipmentPackage.getCollectionNotes());
+        assertNotNull(shipmentPackage.getDeliveredAt());
+        verifyNoInteractions(paymentService);
+    }
+
+    @Test
+    void confirmReceivedBlocksShipmentThatWasNotDispatched() {
+        Shipment shipment = carrierShipment("478521678");
+        ConfirmShipmentReceivedRequest request = new ConfirmShipmentReceivedRequest();
+        request.setDeliveryConfirmedByUserId(77L);
+
+        when(currentUser.getUserId()).thenReturn(77L);
+        when(repository.findById(2L)).thenReturn(Optional.of(shipment));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.confirmReceived(2L, request));
+
+        assertEquals("El envio debe estar marcado como enviado antes de confirmar recibido.", ex.getMessage());
+        verify(shipmentPackageRepository, never()).findByShipmentIdOrderByIdAsc(2L);
+    }
+
+    @Test
+    void confirmReceivedBlocksCodPackagesToAvoidImplicitPayments() {
+        Shipment shipment = carrierShipment("478521678");
+        shipment.setStatus(ShipmentStatus.OUT_FOR_DELIVERY);
+        ShipmentPackage shipmentPackage = shipmentPackage();
+        shipmentPackage.setPaymentMode(ShipmentPackagePaymentMode.COD);
+        ConfirmShipmentReceivedRequest request = new ConfirmShipmentReceivedRequest();
+        request.setDeliveryConfirmedByUserId(77L);
+
+        when(currentUser.getUserId()).thenReturn(77L);
+        when(repository.findById(2L)).thenReturn(Optional.of(shipment));
+        when(shipmentPackageRepository.findByShipmentIdOrderByIdAsc(2L)).thenReturn(List.of(shipmentPackage));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.confirmReceived(2L, request));
+
+        assertEquals("Este envio tiene cobro contra entrega. Resuelve la entrega capturando el monto cobrado.", ex.getMessage());
+        verifyNoInteractions(paymentService);
     }
 
     private Shipment carrierShipment(String guideReference) {

@@ -42,7 +42,7 @@ No se agregaron migraciones ni integraciones externas.
 - `Agregar paquete`: oculto cuando no aplica porque el envio ya contiene paquete.
 - `Ver paquete`: navega a `/customer-package-detail` con regreso al shipment detail.
 - `Cancelar envio`: confirmacion y feedback si aplica al estado.
-- `Confirmar recibido`: conserva modal operativo de resolucion de paquete.
+- `Confirmar recibido`: en SHIPMENT-RECEIVED-A pasa a flujo principal con endpoint `confirm-received`, modal propio, nota opcional y actualizacion de timeline.
 - `Guardar guia`: no hay boton activo en esta pantalla; la guia se define al preparar el envio o se hereda del paquete.
 
 ## Permisos

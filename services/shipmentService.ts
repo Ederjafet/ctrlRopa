@@ -92,6 +92,12 @@ export type ResolveShipmentPackageRequest = {
   deliveryConfirmedByUserId: number;
 };
 
+export type ConfirmShipmentReceivedRequest = {
+  receivedAt?: string | null;
+  notes?: string | null;
+  deliveryConfirmedByUserId: number;
+};
+
 export async function getShipmentsByBranch(branchId: number): Promise<Shipment[]> {
   return apiRequest<Shipment[]>(`/api/shipments/branch/${branchId}`);
 }
@@ -143,6 +149,16 @@ export async function resolveShipmentPackage(
       body: payload,
     }
   );
+}
+
+export async function confirmShipmentReceived(
+  shipmentId: number,
+  payload: ConfirmShipmentReceivedRequest
+): Promise<ShipmentDetail> {
+  return apiRequest<ShipmentDetail>(`/api/shipments/${shipmentId}/confirm-received`, {
+    method: 'PATCH',
+    body: payload,
+  });
 }
 
 export async function cancelShipment(

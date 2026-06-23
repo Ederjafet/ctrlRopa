@@ -489,10 +489,17 @@ export const SCREEN_PERMISSIONS: Record<ScreenPermissionKey, ScreenPermissionDef
         },
         {
           key: 'confirmDelivery',
-          label: 'Confirmar entrega',
+          label: 'Confirmar recibido',
           permissionCode: 'MANAGE_SHIPMENTS',
-          allowedMessage: 'Puedes confirmar resultados de entrega.',
-          deniedMessage: 'No puedes confirmar entregas.',
+          allowedMessage: 'Puedes confirmar que el cliente recibio el envio.',
+          deniedMessage: 'No puedes confirmar recibido.',
+        },
+        {
+          key: 'closeRelatedPackage',
+          label: 'Cerrar paquete relacionado',
+          permissionCode: 'CREATE_CLOSE_CUSTOMER_PACKAGE',
+          allowedMessage: 'Puedes completar el cierre operativo desde el paquete relacionado.',
+          deniedMessage: 'No puedes cerrar paquetes relacionados.',
         },
         {
           key: 'cancelOrReopenShipment',

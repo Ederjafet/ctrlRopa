@@ -3,6 +3,7 @@
 Fecha: 2026-06-22
 
 > Actualizacion SHIPMENT-BUTTONS-A: las acciones criticas del detalle ya no usan `Alert.alert` como confirmacion. `Marcar enviado`, `Cancelar envio` y `Reabrir envio` usan modal propio, loading y aviso visible. El despacho toma la guia del shipment o del paquete relacionado si el shipment aun no la tiene.
+> Actualizacion SHIPMENT-RECEIVED-A: cuando el envio esta `OUT_FOR_DELIVERY`, `Confirmar recibido` abre modal real con nota opcional, llama `PATCH /api/shipments/{id}/confirm-received`, actualiza timeline y mueve shipment/paquete a `DELIVERED` sin tocar pagos ni costo de envio.
 
 ## Problema
 

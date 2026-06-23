@@ -19,6 +19,7 @@ import {
 import {
   addPackageToShipment,
   cancelShipment,
+  confirmShipmentReceived,
   collectionStatusLabel,
   dispatchShipment,
   getShipmentDetail,
@@ -45,7 +46,7 @@ type NoticeState = {
   message?: string;
 } | null;
 
-type ConfirmAction = 'dispatch' | 'cancel' | 'reopen';
+type ConfirmAction = 'dispatch' | 'receive' | 'cancel' | 'reopen';
 
 function money(value?: number | null) {
   return `$${Number(value ?? 0).toFixed(2)} MXN`;
@@ -216,6 +217,7 @@ export default function ShipmentDetailScreen() {
   const [resolutionStatus, setResolutionStatus] = useState<ShipmentPackageStatus>('DELIVERED');
   const [collectedAmount, setCollectedAmount] = useState('');
   const [collectionNotes, setCollectionNotes] = useState('');
+  const [receivedNotes, setReceivedNotes] = useState('');
 
   const updateDetail = useCallback(async (shipmentDetail: ShipmentDetail) => {
     setDetail(shipmentDetail);
@@ -310,6 +312,22 @@ export default function ShipmentDetailScreen() {
     return null;
   }, [canManageShipments, detail, hasGuide, isWorking]);
 
+  const receiveBlockedReason = useMemo(() => {
+    if (!detail) return 'No se ha cargado el envio.';
+    if (!canManageShipments) return 'No tienes permiso para confirmar recibido. Permiso requerido: MANAGE_SHIPMENTS.';
+    if (isWorking) return 'Espera a que termine la accion actual.';
+    if (detail.status === 'DELIVERED') return 'Este envio ya fue confirmado como recibido.';
+    if (detail.status === 'CANCELLED') return 'No puedes confirmar recibido en un envio cancelado.';
+    if (detail.status === 'CLOSED_WITH_INCIDENTS') return 'No puedes confirmar recibido en un envio cerrado con incidencias.';
+    if (detail.status !== 'OUT_FOR_DELIVERY') return 'El envio debe estar marcado como enviado antes de confirmar recibido.';
+    if (detail.packages.length === 0) return 'El envio no tiene paquete relacionado.';
+    if (!pendingLine) return 'Este envio ya no tiene paquetes pendientes por recibir.';
+    if (detail.packages.some((line) => line.status === 'PENDING' && line.paymentMode === 'COD')) {
+      return 'Este envio tiene cobro contra entrega. Resuelve la entrega capturando el monto cobrado.';
+    }
+    return null;
+  }, [canManageShipments, detail, isWorking, pendingLine]);
+
   const cancelBlockedReason = useMemo(() => {
     if (!detail) return 'No se ha cargado el envio.';
     if (!canManageShipments) return 'No tienes permiso para cancelar envios. Permiso requerido: MANAGE_SHIPMENTS.';
@@ -390,9 +408,9 @@ export default function ShipmentDetailScreen() {
       return {
         tone: 'info' as NoticeTone,
         title: 'Confirmar recibido',
-        message: pendingLine
-          ? 'Registra si cada paquete fue entregado, no entregado o devuelto.'
-          : 'Todas las lineas fueron resueltas. Revisa el resultado de entrega.',
+        message: receiveBlockedReason
+          ? receiveBlockedReason
+          : 'Confirma la recepcion cuando el cliente haya recibido el paquete.',
       };
     }
 
@@ -417,7 +435,7 @@ export default function ShipmentDetailScreen() {
       title: shipmentStatusLabel(detail.status),
       message: 'Revisa el estado y las acciones disponibles.',
     };
-  }, [canManageShipments, detail, hasGuide, pendingLine]);
+  }, [canManageShipments, detail, hasGuide, receiveBlockedReason]);
 
   const resetAddModal = () => {
     setCustomerSearch('');
@@ -542,6 +560,11 @@ export default function ShipmentDetailScreen() {
     openConfirmation('dispatch', dispatchBlockedReason);
   };
 
+  const handleReceive = () => {
+    setReceivedNotes('');
+    openConfirmation('receive', receiveBlockedReason);
+  };
+
   const handleCancel = () => {
     openConfirmation('cancel', cancelBlockedReason);
   };
@@ -553,6 +576,7 @@ export default function ShipmentDetailScreen() {
   const closeConfirmation = () => {
     if (!isWorking) {
       setConfirmAction(null);
+      setReceivedNotes('');
     }
   };
 
@@ -562,6 +586,8 @@ export default function ShipmentDetailScreen() {
     const blockedReason =
       confirmAction === 'dispatch'
         ? dispatchBlockedReason
+        : confirmAction === 'receive'
+          ? receiveBlockedReason
         : confirmAction === 'cancel'
           ? cancelBlockedReason
           : reopenBlockedReason;
@@ -581,12 +607,18 @@ export default function ShipmentDetailScreen() {
       const updated =
         confirmAction === 'dispatch'
           ? await dispatchShipment(detail.id, session.userId)
+          : confirmAction === 'receive'
+            ? await confirmShipmentReceived(detail.id, {
+                deliveryConfirmedByUserId: session.userId,
+                notes: receivedNotes.trim() || null,
+              })
           : confirmAction === 'cancel'
             ? await cancelShipment(detail.id, session.userId)
             : await reopenShipment(detail.id, session.userId);
 
       await updateDetail(updated);
       setConfirmAction(null);
+      setReceivedNotes('');
       setNotice(
         confirmAction === 'dispatch'
           ? {
@@ -594,6 +626,12 @@ export default function ShipmentDetailScreen() {
               title: 'Envio marcado como enviado.',
               message: 'La linea de tiempo se actualizo. Ahora puedes confirmar recibido cuando se complete la entrega.',
             }
+          : confirmAction === 'receive'
+            ? {
+                tone: 'success',
+                title: 'Recepcion confirmada correctamente.',
+                message: 'El envio y el paquete relacionado quedaron como entregados. El cierre operativo del paquete queda separado.',
+              }
           : confirmAction === 'cancel'
             ? {
                 tone: 'success',
@@ -612,6 +650,8 @@ export default function ShipmentDetailScreen() {
         title:
           confirmAction === 'dispatch'
             ? 'No se pudo marcar enviado.'
+            : confirmAction === 'receive'
+              ? 'No se pudo confirmar recibido.'
             : confirmAction === 'cancel'
               ? 'No se pudo cancelar el envio.'
               : 'No se pudo reabrir el envio.',
@@ -1078,7 +1118,7 @@ export default function ShipmentDetailScreen() {
 
   const renderActions = () => {
     if (!detail) return null;
-    const canConfirm = Boolean(pendingLine) && detail.status === 'OUT_FOR_DELIVERY';
+    const isOutForDelivery = detail.status === 'OUT_FOR_DELIVERY';
 
     return (
       <AppCard>
@@ -1096,13 +1136,13 @@ export default function ShipmentDetailScreen() {
             />
           ) : null}
 
-          {canConfirm && pendingLine ? (
+          {isOutForDelivery ? (
             <AppButton
               title="Confirmar recibido"
-              onPress={() => openResolveModal(pendingLine, 'DELIVERED')}
+              onPress={handleReceive}
               loading={isWorking}
-              disabled={!canManageShipments || isWorking}
-              disabledReason="No tienes permiso para confirmar entrega. Permiso requerido: MANAGE_SHIPMENTS."
+              disabled={Boolean(receiveBlockedReason)}
+              disabledReason={receiveBlockedReason || undefined}
             />
           ) : null}
 
@@ -1158,6 +1198,17 @@ export default function ShipmentDetailScreen() {
               </AppText>
             </View>
           ) : null}
+
+          {isOutForDelivery && receiveBlockedReason ? (
+            <View style={[styles.inlineNotice, { borderColor: theme.colors.warning, backgroundColor: theme.colors.surfaceAlt }]}>
+              <AppText variant="caption" bold color={theme.colors.warning}>
+                Confirmar recibido bloqueado
+              </AppText>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                {receiveBlockedReason}
+              </AppText>
+            </View>
+          ) : null}
         </View>
       </AppCard>
     );
@@ -1173,6 +1224,17 @@ export default function ShipmentDetailScreen() {
         warning: 'Esta accion registrara la fecha de envio y actualizara el paquete relacionado.',
         confirmTitle: 'Marcar enviado',
         loadingTitle: 'Marcando...',
+        variant: 'primary' as const,
+      };
+    }
+
+    if (confirmAction === 'receive') {
+      return {
+        title: 'Confirmar recibido',
+        body: 'Confirma esta accion solo cuando el cliente haya recibido el paquete.',
+        warning: 'Se registrara la fecha de recepcion y el paquete relacionado quedara como entregado. Pagos, saldo y costo de envio no cambian.',
+        confirmTitle: 'Confirmar recibido',
+        loadingTitle: 'Confirmando...',
         variant: 'primary' as const,
       };
     }
@@ -1469,6 +1531,15 @@ export default function ShipmentDetailScreen() {
             {renderMetric('Paqueteria', shipmentDeliveryTypeLabel(detail.deliveryType), 'info')}
             {renderMetric('Guia', effectiveGuide || 'Pendiente', effectiveGuide ? 'success' : 'warning')}
           </View>
+          {confirmAction === 'receive' ? (
+            <AppInput
+              label="Nota de recepcion"
+              value={receivedNotes}
+              onChangeText={setReceivedNotes}
+              placeholder="Ej. Cliente confirmo recibido por WhatsApp"
+              multiline
+            />
+          ) : null}
           <View style={[styles.inlineNotice, { borderColor: theme.colors.warning, backgroundColor: theme.colors.surfaceAlt }]}>
             <AppText variant="caption" bold color={theme.colors.warning}>
               Confirmacion requerida

@@ -349,6 +349,73 @@ public class ShipmentService {
 		return resolvePackage(shipment.getId(), shipmentPackageId, request);
 	}
 
+    public ShipmentDetailResponse confirmReceived(Long shipmentId, ConfirmShipmentReceivedRequest request) {
+        assertCanManageShipments();
+        Shipment shipment = findShipment(shipmentId);
+
+        if (shipment.getStatus() == ShipmentStatus.DELIVERED) {
+            throw new IllegalArgumentException("Este envio ya fue confirmado como recibido.");
+        }
+
+        if (shipment.getStatus() == ShipmentStatus.CANCELLED) {
+            throw new IllegalArgumentException("No puedes confirmar un envio cancelado.");
+        }
+
+        if (shipment.getStatus() == ShipmentStatus.CLOSED_WITH_INCIDENTS) {
+            throw new IllegalArgumentException("No puedes confirmar recibido en un envio cerrado con incidencias.");
+        }
+
+        if (shipment.getStatus() != ShipmentStatus.OUT_FOR_DELIVERY) {
+            throw new IllegalArgumentException("El envio debe estar marcado como enviado antes de confirmar recibido.");
+        }
+
+        List<ShipmentPackage> packages = shipmentPackageRepository.findByShipmentIdOrderByIdAsc(shipmentId);
+        if (packages.isEmpty()) {
+            throw new IllegalArgumentException("El envio no tiene paquetes relacionados.");
+        }
+
+        List<ShipmentPackage> pendingPackages = packages.stream()
+                .filter(sp -> sp.getStatus() == ShipmentPackageStatus.PENDING)
+                .toList();
+
+        if (pendingPackages.isEmpty()) {
+            throw new IllegalArgumentException("Este envio ya no tiene paquetes pendientes por recibir.");
+        }
+
+        boolean hasCodPackage = pendingPackages.stream()
+                .anyMatch(sp -> sp.getPaymentMode() == ShipmentPackagePaymentMode.COD);
+        if (hasCodPackage) {
+            throw new IllegalArgumentException("Este envio tiene cobro contra entrega. Resuelve la entrega capturando el monto cobrado.");
+        }
+
+        LocalDateTime receivedAt = request.getReceivedAt() != null
+                ? request.getReceivedAt()
+                : LocalDateTime.now();
+        String notes = cleanNullable(request.getNotes());
+
+        for (ShipmentPackage shipmentPackage : pendingPackages) {
+            CustomerPackage customerPackage = customerPackageRepository.findById(shipmentPackage.getCustomerPackageId())
+                    .orElseThrow(() -> new IllegalArgumentException("Paquete no encontrado"));
+
+            shipmentPackage.setStatus(ShipmentPackageStatus.DELIVERED);
+            shipmentPackage.setCollectedAmount(BigDecimal.ZERO);
+            shipmentPackage.setCollectionDifference(BigDecimal.ZERO);
+            shipmentPackage.setCollectionStatus(CollectionStatus.BALANCED);
+            shipmentPackage.setCollectionNotes(notes);
+            shipmentPackage.setDeliveryConfirmedByUserId(request.getDeliveryConfirmedByUserId());
+            shipmentPackage.setDeliveredAt(receivedAt);
+
+            customerPackage.setStatus(CustomerPackageStatus.DELIVERED);
+
+            shipmentPackageRepository.save(shipmentPackage);
+            customerPackageRepository.save(customerPackage);
+        }
+
+        refreshShipmentStatus(shipment);
+
+        return findDetail(shipmentId);
+    }
+
     public ShipmentDetailResponse cancel(Long shipmentId, CancelShipmentRequest request) {
         assertCanManageShipments();
         Shipment shipment = findShipment(shipmentId);

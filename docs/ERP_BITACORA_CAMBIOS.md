@@ -1,5 +1,27 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-22 - SHIPMENT-RECEIVED-A confirmar recibido y cierre operativo
+
+Tipo: frontend, backend, envios, paquetes, permisos, tests, documentacion.
+
+Objetivo:
+
+- Completar el flujo posterior a `Marcar enviado`, permitiendo confirmar recepcion desde `/shipment-detail`.
+
+Cambios realizados:
+
+- Se agrega `PATCH /api/shipments/{id}/confirm-received`.
+- `Confirmar recibido` usa `AppBottomModal`, nota opcional, loading y feedback visible.
+- Al confirmar recibido, las lineas pendientes no-COD pasan a `DELIVERED`, el paquete relacionado pasa a `DELIVERED` y el shipment se refresca a `DELIVERED`.
+- Se bloquea el flujo global para paquetes COD para evitar registrar pagos implicitos.
+- Se actualiza `Ver permisos` para reflejar confirmar recibido y cierre operativo de paquete relacionado.
+- Se agregan tests de `ShipmentService` para recepcion correcta y bloqueos operativos.
+
+Restricciones respetadas:
+
+- No se tocaron pagos, saldo, costo de envio, prendas ni integraciones externas.
+- No hay cierre automatico de paquete; el paquete queda entregado y el cierre operativo permanece separado.
+
 ## 2026-06-22 - SHIPMENT-BUTTONS-A acciones de detalle de envio
 
 Tipo: frontend, backend, envios, permisos, tests, documentacion.

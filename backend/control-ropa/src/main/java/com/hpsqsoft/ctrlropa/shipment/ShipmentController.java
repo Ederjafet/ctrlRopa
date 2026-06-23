@@ -67,6 +67,12 @@ public class ShipmentController {
         return service.resolvePackage(shipmentId, shipmentPackageId, request);
     }
 
+    @PatchMapping("/{id}/confirm-received")
+    public ShipmentDetailResponse confirmReceived(@PathVariable Long id,
+                                                  @Valid @RequestBody ConfirmShipmentReceivedRequest request) {
+        return service.confirmReceived(id, request);
+    }
+
     @PatchMapping("/folio/{shipmentFolio}/packages/{shipmentPackageId}/resolve")
     public ShipmentDetailResponse resolvePackageByFolio(@PathVariable String shipmentFolio,
                                                         @PathVariable Long shipmentPackageId,

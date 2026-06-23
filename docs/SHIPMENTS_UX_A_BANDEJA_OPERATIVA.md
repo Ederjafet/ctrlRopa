@@ -4,6 +4,7 @@ Fecha: 2026-06-22
 
 > Actualizacion SHIPMENT-DETAIL-UX-A: al abrir un envio desde la bandeja, `/shipment-detail` ahora presenta estado, siguiente paso, destino, guia, paquete, prendas, timeline y acciones contextuales. El regreso con `returnTo=/shipments` vuelve directamente a la bandeja.
 > Actualizacion SHIPMENT-BUTTONS-A: las acciones criticas del detalle de envio usan modal propio, no alertas nativas, y `Marcar enviado` usa la guia del shipment o del paquete relacionado.
+> Actualizacion SHIPMENT-RECEIVED-A: al confirmar recepcion desde `/shipment-detail`, el shipment queda `DELIVERED` y al volver a `/shipments` se mueve al filtro Entregados, dejando de aparecer como enviado/en ruta.
 
 ## Problema
 
