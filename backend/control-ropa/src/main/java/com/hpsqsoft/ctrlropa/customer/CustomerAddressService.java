@@ -1,6 +1,9 @@
 package com.hpsqsoft.ctrlropa.customer;
 
 import com.hpsqsoft.ctrlropa.common.Status;
+import com.hpsqsoft.ctrlropa.security.access.AccessService;
+import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
+import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
 import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -15,17 +18,24 @@ public class CustomerAddressService {
     private final CustomerAddressRepository repository;
     private final CustomerRepository customerRepository;
     private final TenantAccessGuard tenantAccessGuard;
+    private final AccessService accessService;
+    private final CurrentUser currentUser;
 
     public CustomerAddressService(CustomerAddressRepository repository,
                                   CustomerRepository customerRepository,
-                                  TenantAccessGuard tenantAccessGuard) {
+                                  TenantAccessGuard tenantAccessGuard,
+                                  AccessService accessService,
+                                  CurrentUser currentUser) {
         this.repository = repository;
         this.customerRepository = customerRepository;
         this.tenantAccessGuard = tenantAccessGuard;
+        this.accessService = accessService;
+        this.currentUser = currentUser;
     }
 
     @Transactional(readOnly = true)
     public List<CustomerAddressResponse> findByCustomer(Long customerId) {
+        assertCan(PermissionCode.VIEW_CUSTOMERS);
         findCustomerInActiveTenant(customerId);
         return repository.findByCustomerIdOrderByIsDefaultDescLabelAsc(customerId)
                 .stream()
@@ -34,6 +44,7 @@ public class CustomerAddressService {
     }
 
     public CustomerAddressResponse create(Long customerId, CustomerAddress entity) {
+        assertCan(PermissionCode.EDIT_CUSTOMER);
         Customer customer = findCustomerInActiveTenant(customerId);
 
         if (repository.existsByCustomerIdAndLabel(customerId, entity.getLabel())) {
@@ -52,6 +63,7 @@ public class CustomerAddressService {
     }
 
     public CustomerAddressResponse update(Long id, CustomerAddress request) {
+        assertCan(PermissionCode.EDIT_CUSTOMER);
         CustomerAddress existing = findAddressInActiveTenant(id);
 
         if (!existing.getLabel().equals(request.getLabel())
@@ -78,6 +90,7 @@ public class CustomerAddressService {
     }
 
     public CustomerAddressResponse deactivate(Long id) {
+        assertCan(PermissionCode.EDIT_CUSTOMER);
         CustomerAddress existing = findAddressInActiveTenant(id);
 
         existing.setStatus(Status.INACTIVE);
@@ -101,6 +114,10 @@ public class CustomerAddressService {
         } catch (DataIntegrityViolationException ex) {
             throw new IllegalArgumentException("No se pudo guardar la dirección por datos duplicados");
         }
+    }
+
+    private void assertCan(String permissionCode) {
+        accessService.assertCan(currentUser.getUserId(), permissionCode);
     }
 
     private Customer findCustomerInActiveTenant(Long customerId) {

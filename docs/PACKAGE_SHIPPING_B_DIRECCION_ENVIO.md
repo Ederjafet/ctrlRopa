@@ -81,6 +81,8 @@ Actualizacion `PACKAGE-SHIPPING-C`: el detalle de paquete organiza direccion/env
 
 Actualizacion `PACKAGE-SHIPPING-D`: los datos logisticos se pueden completar tambien cuando el paquete ya esta `READY`, siempre que aun no este enviado/cerrado/cancelado. Esto permite corregir paquetes con costo/guia heredados pero sin tipo o fuente de direccion.
 
+Actualizacion `CUSTOMER-UX-A`: la ficha de cliente muestra y administra direcciones guardadas como base para paquetes. El snapshot historico sigue viviendo en el paquete; cambiar la direccion del cliente no modifica paquetes ya preparados.
+
 ## Fuera de alcance
 
 - cotizacion automatica;

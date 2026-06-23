@@ -4739,3 +4739,15 @@ Resultado:
 - `Guardar direccion y envio` deja de quedar deshabilitado sin explicacion en paquetes listos sin envio.
 - Se conservan datos parciales heredados como costo, paqueteria y guia al completar el tipo de entrega.
 - Backend acepta `PATCH /api/customer-packages/{id}/shipping` para paquetes listos sin enviar y sigue bloqueando estados no editables.
+
+## 2026-06-22 - CUSTOMER-UX-A cliente 360, pedidos y direcciones
+
+Tipo: rediseno frontend/UX de cliente, pedidos y direcciones con hardening backend de permisos en direcciones.
+
+Resultado:
+
+- `/customers/[id]` queda como ficha Cliente 360 con resumen, contacto, direcciones, paquetes, apartados, pagos/saldo y acciones rapidas.
+- `/customer-orders` muestra paquetes reales, pedidos operativos, resumen, busqueda, filtros y navegacion a paquete/envio con `returnTo`.
+- `/customer-addresses-create` y edicion de direccion respetan `returnTo`, validan campos, permiten principal y muestran feedback claro.
+- `/customers/4s` ya no intenta cargar backend con ID roto; muestra cliente no valido.
+- Backend valida `VIEW_CUSTOMERS`/`EDIT_CUSTOMER` en endpoints de direcciones de cliente.

@@ -301,6 +301,7 @@ Probabilidad:
 - SHIPMENTS-UX-A conserva el flujo no atomico de crear shipment y luego asociar paquete; la proteccion anti-duplicados depende de los filtros y validaciones existentes.
 - PACKAGE-SHIPPING-C corrige estados visuales parciales en frontend; paquetes heredados con costo/guia pero sin tipo de entrega requieren guardar nuevamente direccion/envio para quedar completos.
 - PACKAGE-SHIPPING-D permite completar logistica en paquetes `READY`; QA debe validar que no se use para modificar envios ya enviados/cerrados y que los roles sin permiso sigan recibiendo bloqueo claro.
+- CUSTOMER-UX-A mantiene `customer_addresses` como domicilio base sin destinatario/telefono persistido; si el negocio requiere multiples receptores guardados, se debe ampliar el modelo antes de prometerlo como agenda completa de envios.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

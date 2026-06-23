@@ -76,6 +76,10 @@ Se corrigio el bloqueo que dejaba la seccion sin poder guardarse en paquetes `RE
 
 Los selectores de tipo de entrega y direccion muestran razon cuando estan bloqueados, y los datos parciales heredados como costo, paqueteria o guia se conservan al completar el tipo de entrega.
 
+## Actualizacion CUSTOMER-UX-A
+
+Las direcciones del cliente se volvieron mas operables desde `/customers/[id]` y `/customer-addresses-create`. La regla se mantiene: las direcciones guardadas sirven como base, pero el envio usa snapshot del paquete para conservar el historico exacto.
+
 ## Validaciones
 
 - `npx tsc --noEmit`: OK.

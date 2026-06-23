@@ -22,6 +22,9 @@ export type ScreenPermissionKey =
   | 'liveAuthorizations'
   | 'itemsCreate'
   | 'itemDetail'
+  | 'customerDetail'
+  | 'customerOrders'
+  | 'customerAddressesCreate'
   | 'customersCreate'
   | 'suppliers'
   | 'batchForm'
@@ -623,6 +626,125 @@ export const SCREEN_PERMISSIONS: Record<ScreenPermissionKey, ScreenPermissionDef
         permissionCode: 'DO_DOOR_RESERVATION',
         allowedMessage: 'Puedes revisar apartados relacionados con la prenda.',
         deniedMessage: 'No puedes consultar apartados relacionados.',
+      },
+    ],
+  },
+  customerDetail: {
+    key: 'customerDetail',
+    title: 'Cliente',
+    requiredToView: ['VIEW_CUSTOMERS'],
+    actions: [
+      {
+        key: 'viewCustomer',
+        label: 'Ver cliente',
+        permissionCode: 'VIEW_CUSTOMERS',
+        allowedMessage: 'Puedes consultar datos, direcciones y actividad del cliente.',
+        deniedMessage: 'No puedes consultar clientes.',
+      },
+      {
+        key: 'editCustomer',
+        label: 'Editar cliente',
+        permissionCode: 'EDIT_CUSTOMER',
+        allowedMessage: 'Puedes corregir datos y administrar direcciones del cliente.',
+        deniedMessage: 'No puedes editar clientes ni direcciones.',
+      },
+      {
+        key: 'viewOrders',
+        label: 'Ver pedidos y paquetes',
+        permissionCode: 'CREATE_CLOSE_CUSTOMER_PACKAGE',
+        allowedMessage: 'Puedes revisar paquetes y pedidos relacionados con el cliente.',
+        deniedMessage: 'No puedes consultar paquetes del cliente.',
+      },
+      {
+        key: 'createReservation',
+        label: 'Crear apartado',
+        permissionCode: 'DO_DOOR_RESERVATION',
+        allowedMessage: 'Puedes iniciar un apartado para este cliente.',
+        deniedMessage: 'No puedes crear apartados.',
+      },
+      {
+        key: 'viewPayments',
+        label: 'Ver pagos y saldo',
+        permissionCode: 'VIEW_PAYMENTS',
+        allowedMessage: 'Puedes consultar pagos y saldo visible del cliente.',
+        deniedMessage: 'No puedes consultar pagos del cliente.',
+      },
+    ],
+  },
+  customerOrders: {
+    key: 'customerOrders',
+    title: 'Pedidos del cliente',
+    requiredToView: ['VIEW_CUSTOMERS'],
+    actions: [
+      {
+        key: 'viewCustomerOrders',
+        label: 'Ver actividad del cliente',
+        permissionCode: 'VIEW_CUSTOMERS',
+        allowedMessage: 'Puedes consultar el historial operativo del cliente.',
+        deniedMessage: 'No puedes consultar actividad de clientes.',
+      },
+      {
+        key: 'viewPackages',
+        label: 'Ver paquetes',
+        permissionCode: 'CREATE_CLOSE_CUSTOMER_PACKAGE',
+        allowedMessage: 'Puedes abrir paquetes y revisar saldos operativos.',
+        deniedMessage: 'No puedes consultar paquetes del cliente.',
+      },
+      {
+        key: 'viewPayments',
+        label: 'Ver pagos',
+        permissionCode: 'VIEW_PAYMENTS',
+        allowedMessage: 'Puedes revisar saldos y pagos relacionados.',
+        deniedMessage: 'No puedes consultar pagos.',
+      },
+      {
+        key: 'registerPayment',
+        label: 'Registrar pago',
+        permissionCode: 'REGISTER_PAYMENTS',
+        allowedMessage: 'Puedes registrar pagos desde los flujos relacionados.',
+        deniedMessage: 'No puedes registrar pagos.',
+      },
+      {
+        key: 'manageShipments',
+        label: 'Ver envio',
+        permissionCode: 'MANAGE_SHIPMENTS',
+        allowedMessage: 'Puedes continuar el seguimiento logistico desde envios.',
+        deniedMessage: 'No puedes gestionar envios.',
+      },
+    ],
+  },
+  customerAddressesCreate: {
+    key: 'customerAddressesCreate',
+    title: 'Direccion del cliente',
+    requiredToView: ['VIEW_CUSTOMERS'],
+    actions: [
+      {
+        key: 'viewAddresses',
+        label: 'Ver direcciones',
+        permissionCode: 'VIEW_CUSTOMERS',
+        allowedMessage: 'Puedes consultar direcciones guardadas del cliente.',
+        deniedMessage: 'No puedes consultar direcciones del cliente.',
+      },
+      {
+        key: 'createAddress',
+        label: 'Crear direccion',
+        permissionCode: 'EDIT_CUSTOMER',
+        allowedMessage: 'Puedes crear direcciones para el cliente.',
+        deniedMessage: 'No puedes crear direcciones.',
+      },
+      {
+        key: 'editAddress',
+        label: 'Editar direccion',
+        permissionCode: 'EDIT_CUSTOMER',
+        allowedMessage: 'Puedes modificar direcciones existentes.',
+        deniedMessage: 'No puedes modificar direcciones.',
+      },
+      {
+        key: 'makePrimaryAddress',
+        label: 'Marcar principal',
+        permissionCode: 'EDIT_CUSTOMER',
+        allowedMessage: 'Puedes elegir la direccion principal del cliente.',
+        deniedMessage: 'No puedes cambiar la direccion principal.',
       },
     ],
   },
