@@ -6,6 +6,8 @@ Fecha: 2026-06-22
 
 > Actualizacion SHIPMENTS-UX-A: `/shipments` se organiza como bandeja operativa mixta con resumen, filtros, busqueda, tarjetas por siguiente paso y acciones contextuales. El modelo sigue siendo envios reales + paquetes `READY` sin envio activo.
 
+> Actualizacion SHIPMENT-DETAIL-UX-A: el detalle de envio quedo como vista operativa con destino, guia, paquete, prendas, timeline y regreso contextual hacia `/shipments`.
+
 ## Problema
 
 El paquete podia marcarse como listo para envio desde `/customer-package-detail`, pero no aparecia en `/shipments`.

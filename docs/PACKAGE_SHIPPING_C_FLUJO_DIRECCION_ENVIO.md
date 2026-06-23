@@ -2,6 +2,8 @@
 
 Fecha: 2026-06-22
 
+> Actualizacion SHIPMENT-DETAIL-UX-A: `/shipment-detail` muestra la direccion snapshot y la modalidad de entrega proveniente del paquete para que logistica no dependa de la direccion actual del cliente.
+
 ## Problema
 
 La seccion `Direccion y envio` en `/customer-package-detail` mezclaba resumen, botones e inputs. En paquetes con datos parciales podia mostrar estados contradictorios, por ejemplo tipo sin definir con direccion/costo como confirmados.

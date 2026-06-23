@@ -1,5 +1,30 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-22 - SHIPMENT-DETAIL-UX-A detalle operativo de envio
+
+Tipo: frontend, UX operativa, envios, paquetes, documentacion.
+
+Objetivo:
+
+- Convertir `/shipment-detail` en una vista clara para logistica, con destino, guia, paquete, prendas, timeline, siguiente paso y acciones contextuales.
+
+Cambios realizados:
+
+- Se rediseña `app/shipment-detail.tsx` con cabecera compacta y regreso contextual usando `returnTo`.
+- El detalle carga tambien `GET /api/customer-packages/{packageId}` por cada linea para mostrar prendas incluidas y totales de paquete sin tocar backend.
+- Se agrega bloque de estado/siguiente paso y metricas de paquetes, prendas, guia y fecha de creacion.
+- Se agregan secciones de destino, paqueteria/guia, paquete relacionado, prendas, timeline y acciones.
+- `Marcar enviado` queda bloqueado con razon clara si falta guia en envios por paqueteria, si no hay paquetes, si falta permiso o si el estado no aplica.
+- `Ver permisos` de `shipmentDetail` se alinea con las acciones reales de la pantalla.
+- Los resultados de acciones quedan visibles en un aviso de pantalla, no solo en `Alert.alert`.
+- Se documenta la fase en `docs/SHIPMENT_DETAIL_UX_A_DETALLE_OPERATIVO.md`.
+
+Restricciones respetadas:
+
+- No se integro tracking real, mapas, paqueterias ni facturacion.
+- No se tocaron reglas de pagos, paquetes, costo de envio ni saldo a favor.
+- No se agregaron permisos ni migraciones.
+
 ## 2026-06-22 - PACKAGE-SHIPPING-B direccion de envio por paquete
 
 Tipo: backend, frontend, paquetes, envios, direcciones, migracion, tests, documentacion.

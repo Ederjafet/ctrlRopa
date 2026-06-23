@@ -2,6 +2,8 @@
 
 Fecha: 2026-06-22
 
+> Actualizacion SHIPMENT-DETAIL-UX-A: al abrir un envio desde la bandeja, `/shipment-detail` ahora presenta estado, siguiente paso, destino, guia, paquete, prendas, timeline y acciones contextuales. El regreso con `returnTo=/shipments` vuelve directamente a la bandeja.
+
 ## Problema
 
 `/shipments` mostraba paquetes listos y envios reales como una lista simple. La pantalla no dejaba distinguir rapidamente que estaba listo para preparar, que envio necesitaba guia, que estaba en ruta o que ya estaba entregado.
