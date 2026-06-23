@@ -79,6 +79,8 @@ Actualizacion `SHIPMENTS-UX-A`: la bandeja muestra el resumen de direccion y des
 
 Actualizacion `PACKAGE-SHIPPING-C`: el detalle de paquete organiza direccion/envio por pasos y ya no muestra direccion o costo como envio completo si falta `delivery_type`.
 
+Actualizacion `PACKAGE-SHIPPING-D`: los datos logisticos se pueden completar tambien cuando el paquete ya esta `READY`, siempre que aun no este enviado/cerrado/cancelado. Esto permite corregir paquetes con costo/guia heredados pero sin tipo o fuente de direccion.
+
 ## Fuera de alcance
 
 - cotizacion automatica;

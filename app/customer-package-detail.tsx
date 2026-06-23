@@ -507,20 +507,27 @@ function SelectableCard({
   subtitle,
   selected,
   disabled,
+  disabledReason,
   onPress,
 }: {
   title: string;
   subtitle: string;
   selected: boolean;
   disabled?: boolean;
+  disabledReason?: string;
   onPress: () => void;
 }) {
   const { theme } = useAppTheme();
 
   return (
     <Pressable
-      onPress={onPress}
-      disabled={disabled}
+      onPress={() => {
+        if (disabled) {
+          Alert.alert('Accion no disponible', disabledReason || 'Revisa los datos requeridos antes de continuar.');
+          return;
+        }
+        onPress();
+      }}
       style={({ pressed }) => [
         styles.selectableCard,
         {
@@ -765,6 +772,7 @@ export default function CustomerPackageDetailScreen() {
   }, [detail?.customerId]);
 
   const canEdit = isCustomerPackageOpen(detail);
+  const canEditShipping = detail?.status === 'OPEN' || detail?.status === 'READY';
   const canReady = canMarkCustomerPackageReady(detail);
   const hasPending = Number(Number(detail?.pendingAmount ?? 0).toFixed(2)) > 0;
   const items = useMemo(() => detail?.items ?? [], [detail?.items]);
@@ -1221,10 +1229,10 @@ export default function CustomerPackageDetailScreen() {
       return;
     }
 
-    if (!canEdit) {
+    if (!canEditShipping) {
       setNotice({
-        title: 'Paquete cerrado',
-        message: 'Solo paquetes en preparacion pueden modificar datos de envio.',
+        title: 'Paquete no editable para envio',
+        message: 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio.',
         tone: 'warning',
       });
       return;
@@ -1469,6 +1477,8 @@ export default function CustomerPackageDetailScreen() {
   const shipmentState = getShipmentState(detail, shipments);
   const nextStep = getNextStep(detail, hasPending, canReady, shippingConfirmed, addressConfirmed || !deliveryRequiresAddress(detail.deliveryType), shipments);
   const isTerminalPackage = detail.status === 'CANCELLED' || detail.status === 'DELIVERED';
+  const shippingReadyForOperations =
+    shippingReadiness.typeReady && shippingReadiness.addressReady && shippingReadiness.costReady;
   const primaryAction =
     isTerminalPackage
       ? {
@@ -1477,6 +1487,17 @@ export default function CustomerPackageDetailScreen() {
           disabled: false,
           disabledReason: '',
         }
+      : detail.status === 'READY' && !latestShipment && !shippingReadyForOperations
+        ? {
+            title: 'Completar direccion y envio',
+            onPress: handleSaveShipping,
+            disabled: !canEditShipping || !canManagePackage || isWorking || isSavingShipping,
+            disabledReason: !canManagePackage
+              ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
+              : !canEditShipping
+                ? 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio.'
+                : shippingReadiness.nextStep,
+          }
       : detail.status === 'READY' || detail.status === 'SHIPPED'
       ? {
           title: latestShipment ? 'Ver envio' : 'Ir a envios',
@@ -1491,11 +1512,11 @@ export default function CustomerPackageDetailScreen() {
           ? {
               title: 'Definir envio',
               onPress: handleSaveShipping,
-              disabled: !canEdit || !canManagePackage || isWorking || isSavingShipping,
+              disabled: !canEditShipping || !canManagePackage || isWorking || isSavingShipping,
               disabledReason: !canManagePackage
                 ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
-                : !canEdit
-                  ? 'Solo paquetes en preparacion pueden modificar datos de envio.'
+                : !canEditShipping
+                  ? 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio.'
                   : 'Captura costo de paqueteria o marca envio sin costo.',
             }
         : hasPending
@@ -1772,7 +1793,7 @@ export default function CustomerPackageDetailScreen() {
                 variant="secondary"
                 onPress={handleMarkReady}
                 loading={isWorking}
-                disabled={isWorking}
+                disabled={Boolean(markReadyBlockedReason) || isWorking}
                 disabledReason={markReadyBlockedReason || 'Ya hay una accion en proceso.'}
               />
               <AppButton
@@ -1851,7 +1872,14 @@ export default function CustomerPackageDetailScreen() {
                       subtitle={option.description}
                       selected={deliveryType === option.type}
                       onPress={() => handleSelectDeliveryType(option.type)}
-                      disabled={!canEdit || !canManagePackage || isWorking}
+                      disabled={!canEditShipping || !canManagePackage || isWorking}
+                      disabledReason={
+                        !canManagePackage
+                          ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
+                          : !canEditShipping
+                            ? 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio.'
+                            : 'Ya hay una accion en proceso.'
+                      }
                     />
                   ))}
                 </View>
@@ -1894,7 +1922,16 @@ export default function CustomerPackageDetailScreen() {
                         setAddressSource('CUSTOMER_PRIMARY_ADDRESS');
                         setSourceCustomerAddressId(primaryAddress?.id ?? null);
                       }}
-                      disabled={!primaryAddress || !canEdit || !canManagePackage || isWorking}
+                      disabled={!primaryAddress || !canEditShipping || !canManagePackage || isWorking}
+                      disabledReason={
+                        !primaryAddress
+                          ? 'El cliente no tiene direccion principal activa.'
+                          : !canManagePackage
+                            ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
+                            : !canEditShipping
+                              ? 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio.'
+                              : 'Ya hay una accion en proceso.'
+                      }
                     />
                     <SelectableCard
                       title="Direccion guardada"
@@ -1904,7 +1941,16 @@ export default function CustomerPackageDetailScreen() {
                         setAddressSource('CUSTOMER_SAVED_ADDRESS');
                         setSourceCustomerAddressId(selectedSavedAddress?.id ?? primaryAddress?.id ?? customerAddresses[0]?.id ?? null);
                       }}
-                      disabled={customerAddresses.length === 0 || !canEdit || !canManagePackage || isWorking}
+                      disabled={customerAddresses.length === 0 || !canEditShipping || !canManagePackage || isWorking}
+                      disabledReason={
+                        customerAddresses.length === 0
+                          ? 'No hay direcciones guardadas activas.'
+                          : !canManagePackage
+                            ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
+                            : !canEditShipping
+                              ? 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio.'
+                              : 'Ya hay una accion en proceso.'
+                      }
                     />
                     <SelectableCard
                       title="Otra direccion"
@@ -1914,7 +1960,14 @@ export default function CustomerPackageDetailScreen() {
                         setAddressSource('CUSTOM_PACKAGE_ADDRESS');
                         setSourceCustomerAddressId(null);
                       }}
-                      disabled={!canEdit || !canManagePackage || isWorking}
+                      disabled={!canEditShipping || !canManagePackage || isWorking}
+                      disabledReason={
+                        !canManagePackage
+                          ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
+                          : !canEditShipping
+                            ? 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio.'
+                            : 'Ya hay una accion en proceso.'
+                      }
                     />
                   </View>
 
@@ -1933,41 +1986,57 @@ export default function CustomerPackageDetailScreen() {
 
                   {addressSource === 'CUSTOM_PACKAGE_ADDRESS' || addressSource === 'LOCAL_DELIVERY' ? (
                     <View style={styles.addressFields}>
-                      <AppInput label="Recibe" value={shipToName} onChangeText={setShipToName} editable={canEdit && canManagePackage && !isWorking} />
-                      <AppInput label="Telefono" value={shipToPhone} onChangeText={setShipToPhone} editable={canEdit && canManagePackage && !isWorking} />
-                      <AppInput label="Calle y numero" value={shipToLine1} onChangeText={setShipToLine1} editable={canEdit && canManagePackage && !isWorking} />
-                      <AppInput label="Interior / referencias cortas" value={shipToLine2} onChangeText={setShipToLine2} editable={canEdit && canManagePackage && !isWorking} />
+                      <AppInput label="Recibe" value={shipToName} onChangeText={setShipToName} editable={canEditShipping && canManagePackage && !isWorking} />
+                      <AppInput label="Telefono" value={shipToPhone} onChangeText={setShipToPhone} editable={canEditShipping && canManagePackage && !isWorking} />
+                      <AppInput label="Calle y numero" value={shipToLine1} onChangeText={setShipToLine1} editable={canEditShipping && canManagePackage && !isWorking} />
+                      <AppInput label="Interior / referencias cortas" value={shipToLine2} onChangeText={setShipToLine2} editable={canEditShipping && canManagePackage && !isWorking} />
                       <View style={styles.inlineFields}>
                         <View style={styles.inlineField}>
-                          <AppInput label="Ciudad" value={shipToCity} onChangeText={setShipToCity} editable={canEdit && canManagePackage && !isWorking} />
+                          <AppInput label="Ciudad" value={shipToCity} onChangeText={setShipToCity} editable={canEditShipping && canManagePackage && !isWorking} />
                         </View>
                         <View style={styles.inlineField}>
-                          <AppInput label="Estado" value={shipToState} onChangeText={setShipToState} editable={canEdit && canManagePackage && !isWorking} />
+                          <AppInput label="Estado" value={shipToState} onChangeText={setShipToState} editable={canEditShipping && canManagePackage && !isWorking} />
                         </View>
                         <View style={styles.inlineField}>
-                          <AppInput label="CP" value={shipToPostalCode} onChangeText={setShipToPostalCode} editable={canEdit && canManagePackage && !isWorking} />
+                          <AppInput label="CP" value={shipToPostalCode} onChangeText={setShipToPostalCode} editable={canEditShipping && canManagePackage && !isWorking} />
                         </View>
                       </View>
-                      <AppInput label="Pais" value={shipToCountry} onChangeText={setShipToCountry} editable={canEdit && canManagePackage && !isWorking} />
-                      <AppInput label="Referencias" value={shipToReferences} onChangeText={setShipToReferences} multiline editable={canEdit && canManagePackage && !isWorking} />
+                      <AppInput label="Pais" value={shipToCountry} onChangeText={setShipToCountry} editable={canEditShipping && canManagePackage && !isWorking} />
+                      <AppInput label="Referencias" value={shipToReferences} onChangeText={setShipToReferences} multiline editable={canEditShipping && canManagePackage && !isWorking} />
                       <View style={styles.selectorRow}>
                         <AppButton
                           title={`${saveAddressToCustomer ? '[x]' : '[ ]'} Guardar en cliente`}
                           variant={saveAddressToCustomer ? 'operation' : 'neutral'}
                           onPress={() => setSaveAddressToCustomer((current) => !current)}
-                          disabled={!canEdit || !canManagePackage || isWorking}
+                          disabled={!canEditShipping || !canManagePackage || isWorking}
+                          disabledReason={
+                            !canManagePackage
+                              ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
+                              : !canEditShipping
+                                ? 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio.'
+                                : 'Ya hay una accion en proceso.'
+                          }
                           style={styles.compactActionButton}
                         />
                         <AppButton
                           title={`${makePrimaryAddress ? '[x]' : '[ ]'} Hacer principal`}
                           variant={makePrimaryAddress ? 'operation' : 'neutral'}
                           onPress={() => setMakePrimaryAddress((current) => !current)}
-                          disabled={!saveAddressToCustomer || !canEdit || !canManagePackage || isWorking}
+                          disabled={!saveAddressToCustomer || !canEditShipping || !canManagePackage || isWorking}
+                          disabledReason={
+                            !saveAddressToCustomer
+                              ? 'Primero marca Guardar en cliente.'
+                              : !canManagePackage
+                                ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
+                                : !canEditShipping
+                                  ? 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio.'
+                                  : 'Ya hay una accion en proceso.'
+                          }
                           style={styles.compactActionButton}
                         />
                       </View>
                       {saveAddressToCustomer ? (
-                        <AppInput label="Etiqueta para cliente" value={addressLabel} onChangeText={setAddressLabel} placeholder="Ej. Trabajo, Mama, Casa" editable={canEdit && canManagePackage && !isWorking} />
+                        <AppInput label="Etiqueta para cliente" value={addressLabel} onChangeText={setAddressLabel} placeholder="Ej. Trabajo, Mama, Casa" editable={canEditShipping && canManagePackage && !isWorking} />
                       ) : null}
                     </View>
                   ) : null}
@@ -2043,14 +2112,14 @@ export default function CustomerPackageDetailScreen() {
                     return next;
                   });
                 }}
-                disabled={!costEditable || !canEdit || !canManagePackage || isWorking}
+                disabled={!costEditable || !canEditShipping || !canManagePackage || isWorking}
                 disabledReason={
                   !costEditable
                     ? 'Esta modalidad no suma costo al paquete.'
                     : !canManagePackage
                     ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
-                    : !canEdit
-                      ? 'Solo paquetes en preparacion pueden modificar datos de envio.'
+                    : !canEditShipping
+                      ? 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio.'
                       : 'Ya hay una accion en proceso.'
                 }
               />
@@ -2060,21 +2129,21 @@ export default function CustomerPackageDetailScreen() {
                 onChangeText={setShippingCostInput}
                 placeholder="0.00"
                 keyboardType="decimal-pad"
-                editable={costEditable && !shippingCostWaived && canEdit && canManagePackage && !isWorking}
+                editable={costEditable && !shippingCostWaived && canEditShipping && canManagePackage && !isWorking}
               />
               <AppInput
                 label="Paqueteria"
                 value={shippingCarrier}
                 onChangeText={setShippingCarrier}
                 placeholder={deliveryType === 'LOCAL_DELIVERY' ? 'Ej. Entrega local' : 'Ej. Estafeta'}
-                editable={canEdit && canManagePackage && !isWorking}
+                editable={canEditShipping && canManagePackage && !isWorking}
               />
               <AppInput
                 label="Guia / referencia"
                 value={trackingNumber}
                 onChangeText={setTrackingNumber}
                 placeholder={deliveryType === 'CUSTOMER_PROVIDED_LABEL' ? 'Guia del cliente' : 'Pendiente'}
-                editable={canEdit && canManagePackage && !isWorking}
+                editable={canEditShipping && canManagePackage && !isWorking}
               />
               <AppInput
                 label="Notas"
@@ -2082,7 +2151,7 @@ export default function CustomerPackageDetailScreen() {
                 onChangeText={setShippingNotes}
                 placeholder="Cliente paga envio, entrega local, etc."
                 multiline
-                editable={canEdit && canManagePackage && !isWorking}
+                editable={canEditShipping && canManagePackage && !isWorking}
               />
                 </View>
               )}
@@ -2102,12 +2171,12 @@ export default function CustomerPackageDetailScreen() {
                 variant="operation"
                 onPress={handleSaveShipping}
                 loading={isSavingShipping}
-                disabled={!canEdit || !canManagePackage || isWorking}
+                disabled={!canEditShipping || !canManagePackage || isWorking}
                 disabledReason={
                   !canManagePackage
                     ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
-                    : !canEdit
-                      ? 'Solo paquetes en preparacion pueden modificar datos de envio.'
+                    : !canEditShipping
+                      ? 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio.'
                       : 'Ya hay una accion en proceso.'
                 }
               />

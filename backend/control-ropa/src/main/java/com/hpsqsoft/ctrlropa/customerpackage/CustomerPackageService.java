@@ -371,8 +371,8 @@ public class CustomerPackageService {
         }
         CustomerPackage customerPackage = findEntity(packageId);
 
-        if (customerPackage.getStatus() != CustomerPackageStatus.OPEN) {
-            throw new IllegalArgumentException("Solo paquetes en preparacion pueden modificar datos de envio");
+        if (!isEditableForShipping(customerPackage.getStatus())) {
+            throw new IllegalArgumentException("Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio");
         }
 
         boolean waived = Boolean.TRUE.equals(request.getShippingCostWaived());
@@ -415,8 +415,8 @@ public class CustomerPackageService {
 
         CustomerPackage customerPackage = findEntity(packageId);
 
-        if (customerPackage.getStatus() != CustomerPackageStatus.OPEN) {
-            throw new IllegalArgumentException("Solo paquetes en preparacion pueden modificar datos de envio");
+        if (!isEditableForShipping(customerPackage.getStatus())) {
+            throw new IllegalArgumentException("Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio");
         }
 
         CustomerPackageDeliveryType deliveryType = request.getDeliveryType();
@@ -1251,6 +1251,10 @@ public class CustomerPackageService {
 
     private boolean isEditableForItemRemoval(CustomerPackageStatus status) {
         return status == CustomerPackageStatus.OPEN;
+    }
+
+    private boolean isEditableForShipping(CustomerPackageStatus status) {
+        return status == CustomerPackageStatus.OPEN || status == CustomerPackageStatus.READY;
     }
 
     private boolean hasLinePayment(SourceFinancialData financialData) {

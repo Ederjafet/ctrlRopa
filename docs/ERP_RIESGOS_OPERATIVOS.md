@@ -300,6 +300,7 @@ Probabilidad:
 - SHIPMENTS-UX-A mejora la bandeja sin backend nuevo; los envios reales en lista siguen mostrando datos resumidos hasta abrir `shipment-detail` para ver paquetes/direccion completa.
 - SHIPMENTS-UX-A conserva el flujo no atomico de crear shipment y luego asociar paquete; la proteccion anti-duplicados depende de los filtros y validaciones existentes.
 - PACKAGE-SHIPPING-C corrige estados visuales parciales en frontend; paquetes heredados con costo/guia pero sin tipo de entrega requieren guardar nuevamente direccion/envio para quedar completos.
+- PACKAGE-SHIPPING-D permite completar logistica en paquetes `READY`; QA debe validar que no se use para modificar envios ya enviados/cerrados y que los roles sin permiso sigan recibiendo bloqueo claro.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

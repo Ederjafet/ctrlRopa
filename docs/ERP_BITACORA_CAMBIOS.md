@@ -4727,3 +4727,15 @@ Resultado:
 - Paquetes con datos parciales muestran aviso y ya no aparecen como confirmados si falta tipo de entrega.
 - `Marcar listo para envio` prioriza razones claras: tipo, direccion, costo/modalidad y saldo.
 - El formulario conserva el endpoint existente `PATCH /shipping` y no cambia reglas de pago.
+
+## 2026-06-22 - PACKAGE-SHIPPING-D direccion y envio funcional en paquete listo
+
+Tipo: correccion frontend/backend de edicion logistica en detalle de paquete, sin migracion.
+
+Resultado:
+
+- `Direccion y envio` puede completarse en paquetes `OPEN` y `READY` mientras no esten enviados/cerrados/cancelados.
+- Los chips de tipo de entrega y direccion muestran seleccion y razon cuando estan bloqueados.
+- `Guardar direccion y envio` deja de quedar deshabilitado sin explicacion en paquetes listos sin envio.
+- Se conservan datos parciales heredados como costo, paqueteria y guia al completar el tipo de entrega.
+- Backend acepta `PATCH /api/customer-packages/{id}/shipping` para paquetes listos sin enviar y sigue bloqueando estados no editables.

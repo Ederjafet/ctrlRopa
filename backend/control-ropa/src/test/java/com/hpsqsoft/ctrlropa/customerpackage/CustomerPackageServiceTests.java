@@ -381,6 +381,57 @@ class CustomerPackageServiceTests {
     }
 
     @Test
+    void updateShippingAllowsReadyPackageBeforeShipment() {
+        CustomerPackage customerPackage = customerPackage(activeReservation(false));
+        customerPackage.setStatus(CustomerPackageStatus.READY);
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(501L)).thenReturn(Optional.of(customerPackage));
+        when(repository.save(any(CustomerPackage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(itemRepository.findByCustomerPackageIdOrderByCreatedAtAsc(501L)).thenReturn(List.of());
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(501L))).thenReturn(List.of());
+        when(jdbcTemplate.queryForObject(anyString(), eq(BigDecimal.class), eq(501L)))
+                .thenReturn(BigDecimal.ZERO);
+
+        UpdateCustomerPackageShippingRequest request = customShippingRequest();
+        request.setDeliveryType(CustomerPackageDeliveryType.LOCAL_DELIVERY);
+        request.setShippingCostAmount(BigDecimal.valueOf(190).setScale(2));
+        request.setShippingCarrier("Local");
+        request.setTrackingNumber("478521678");
+
+        CustomerPackageDetailResponse response = service.updateShipping(501L, request);
+
+        assertEquals(CustomerPackageStatus.READY.name(), response.getStatus());
+        assertEquals("LOCAL_DELIVERY", response.getDeliveryType());
+        assertEquals("CUSTOM_PACKAGE_ADDRESS", response.getShippingAddressSource());
+        assertEquals(true, response.getShippingAddressConfirmed());
+        assertEquals(BigDecimal.valueOf(190).setScale(2), response.getShippingCostAmount());
+        assertEquals("Local", response.getShippingCarrier());
+        assertEquals("478521678", response.getTrackingNumber());
+        verify(repository).save(customerPackage);
+    }
+
+    @Test
+    void updateShippingRejectsShippedPackage() {
+        CustomerPackage customerPackage = customerPackage(activeReservation(false));
+        customerPackage.setStatus(CustomerPackageStatus.SHIPPED);
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(501L)).thenReturn(Optional.of(customerPackage));
+
+        UpdateCustomerPackageShippingRequest request = customShippingRequest();
+        request.setShippingCostAmount(BigDecimal.valueOf(190).setScale(2));
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.updateShipping(501L, request)
+        );
+
+        assertTrue(exception.getMessage().contains("preparacion o listos sin enviar"));
+        verify(repository, never()).save(any(CustomerPackage.class));
+    }
+
+    @Test
     void markReadyWithoutShippingConfirmedIsRejected() {
         CustomerPackage customerPackage = customerPackage(activeReservation(false));
 

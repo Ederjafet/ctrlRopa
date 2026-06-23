@@ -70,6 +70,12 @@ El bloqueo ahora prioriza razones accionables:
 
 No se tocaron backend, migraciones ni reglas de pago. El endpoint existente `PATCH /api/customer-packages/{packageId}/shipping` se conserva.
 
+## Actualizacion PACKAGE-SHIPPING-D
+
+Se corrigio el bloqueo que dejaba la seccion sin poder guardarse en paquetes `READY`. La edicion logistica ahora se permite en paquetes `OPEN` y `READY` mientras no esten enviados, entregados, cerrados o cancelados.
+
+Los selectores de tipo de entrega y direccion muestran razon cuando estan bloqueados, y los datos parciales heredados como costo, paqueteria o guia se conservan al completar el tipo de entrega.
+
 ## Validaciones
 
 - `npx tsc --noEmit`: OK.
