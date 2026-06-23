@@ -4677,3 +4677,16 @@ Resultado:
 - Desde la tarjeta se puede crear el envio real seleccionando direccion activa y tipo de entrega.
 - El flujo abre `/shipment-detail?id=...` despues de crear y asociar el paquete.
 - No se inventan direcciones ni se duplican paquetes con shipment activo.
+
+## 2026-06-22 - SHIPMENTS-UX-A bandeja operativa de Envios
+
+Tipo: rediseño frontend/UX de `/shipments`, sin backend ni migraciones.
+
+Resultado:
+
+- `/shipments` queda como bandeja mixta de paquetes listos y envios reales.
+- Se agregan resumen superior, filtros por estado, busqueda operativa y cards compactas.
+- Paquetes listos muestran cliente, telefono, tipo de entrega, direccion, total, envio y siguiente paso.
+- Envios reales muestran estado, tipo, guia, paquetes, dias en estado y accion contextual.
+- `Ver permisos` ahora enumera preparar paquete listo, registrar guia, marcar enviado y confirmar recibido.
+- Las acciones bloqueadas muestran razon; no se agregan integraciones reales de paqueteria.

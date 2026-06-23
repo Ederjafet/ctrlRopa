@@ -75,6 +75,8 @@ Se conserva `/shipping-cost` por compatibilidad, pero la UI nueva usa `/shipping
 
 `/shipments` usa el snapshot del paquete para preparar envios. Si existe `source_customer_address_id`, se envia como referencia; si es direccion temporal o recoleccion, el shipment se crea sin `delivery_address_id` y muestra el snapshot.
 
+Actualizacion `SHIPMENTS-UX-A`: la bandeja muestra el resumen de direccion y destinatario en las tarjetas de paquetes listos, ademas de estado de guia/costo y siguiente paso operativo.
+
 ## Fuera de alcance
 
 - cotizacion automatica;
