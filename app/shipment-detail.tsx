@@ -36,7 +36,7 @@ import {
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 type NoticeTone = 'success' | 'warning' | 'danger' | 'info';
 type NoticeState = {
@@ -44,6 +44,8 @@ type NoticeState = {
   title: string;
   message?: string;
 } | null;
+
+type ConfirmAction = 'dispatch' | 'cancel' | 'reopen';
 
 function money(value?: number | null) {
   return `$${Number(value ?? 0).toFixed(2)} MXN`;
@@ -137,6 +139,19 @@ function requiresGuide(detail: ShipmentDetail) {
   return detail.deliveryType === 'CARRIER';
 }
 
+function getEffectiveGuide(detail: ShipmentDetail | null, packageDetails: Record<number, CustomerPackageDetail>) {
+  if (!detail) return '';
+  const shipmentGuide = detail.guideReference?.trim();
+  if (shipmentGuide) return shipmentGuide;
+
+  for (const line of detail.packages) {
+    const packageGuide = packageDetails[line.customerPackageId]?.trackingNumber?.trim();
+    if (packageGuide) return packageGuide;
+  }
+
+  return '';
+}
+
 function getDeliveredAt(detail: ShipmentDetail) {
   const dates = detail.packages
     .map((line) => line.deliveredAt)
@@ -185,6 +200,7 @@ export default function ShipmentDetailScreen() {
 
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [resolveModalVisible, setResolveModalVisible] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const [selectedLine, setSelectedLine] = useState<ShipmentPackageLine | null>(null);
 
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -249,7 +265,8 @@ export default function ShipmentDetailScreen() {
 
   const canManageShipments = hasPermission(session, 'MANAGE_SHIPMENTS');
   const canViewPackages = hasPermission(session, 'CREATE_CLOSE_CUSTOMER_PACKAGE');
-  const hasGuide = Boolean(detail?.guideReference?.trim());
+  const effectiveGuide = useMemo(() => getEffectiveGuide(detail, packageDetails), [detail, packageDetails]);
+  const hasGuide = Boolean(effectiveGuide);
   const canEdit = detail?.status === 'OPEN';
   const canResolve = detail?.status === 'OUT_FOR_DELIVERY';
   const canCancel = detail?.status === 'OPEN';
@@ -292,6 +309,29 @@ export default function ShipmentDetailScreen() {
     if (requiresGuide(detail) && !hasGuide) return 'Captura la guia o referencia antes de marcar como enviado.';
     return null;
   }, [canManageShipments, detail, hasGuide, isWorking]);
+
+  const cancelBlockedReason = useMemo(() => {
+    if (!detail) return 'No se ha cargado el envio.';
+    if (!canManageShipments) return 'No tienes permiso para cancelar envios. Permiso requerido: MANAGE_SHIPMENTS.';
+    if (isWorking) return 'Espera a que termine la accion actual.';
+    if (detail.status === 'CANCELLED') return 'Este envio ya esta cancelado.';
+    if (detail.status === 'OUT_FOR_DELIVERY') return 'No puedes cancelar un envio que ya fue marcado como enviado.';
+    if (detail.status === 'DELIVERED' || detail.status === 'CLOSED_WITH_INCIDENTS') {
+      return 'No puedes cancelar un envio finalizado.';
+    }
+    if (detail.status !== 'OPEN') return 'Este envio no puede cancelarse en su estado actual.';
+    return null;
+  }, [canManageShipments, detail, isWorking]);
+
+  const reopenBlockedReason = useMemo(() => {
+    if (!detail) return 'No se ha cargado el envio.';
+    if (!canManageShipments) return 'No tienes permiso para reabrir envios. Permiso requerido: MANAGE_SHIPMENTS.';
+    if (isWorking) return 'Espera a que termine la accion actual.';
+    if (detail.status !== 'CANCELLED' && detail.status !== 'CLOSED_WITH_INCIDENTS') {
+      return 'Solo puedes reabrir envios cancelados o cerrados con incidencias.';
+    }
+    return null;
+  }, [canManageShipments, detail, isWorking]);
 
   const addPackageBlockedReason = isWorking
     ? 'Espera a que termine la accion actual.'
@@ -483,107 +523,103 @@ export default function ShipmentDetailScreen() {
     }
   };
 
-  const handleDispatch = () => {
+  const openConfirmation = (action: ConfirmAction, blockedReason?: string | null) => {
     if (!detail || !session) return;
 
-    if (dispatchBlockedReason) {
+    if (blockedReason) {
       setNotice({
         tone: 'warning',
-        title: 'No se puede marcar enviado',
-        message: dispatchBlockedReason,
+        title: 'Accion no disponible',
+        message: blockedReason,
       });
       return;
     }
 
-    Alert.alert('Marcar enviado', `Quieres marcar el envio ${detail.folio} como enviado?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Marcar enviado',
-        onPress: async () => {
-          try {
-            setIsWorking(true);
-            const updated = await dispatchShipment(detail.id, session.userId);
-            await updateDetail(updated);
-            setNotice({
-              tone: 'success',
-              title: 'Envio marcado como enviado.',
-              message: 'Ahora puedes confirmar recibido cuando se complete la entrega.',
-            });
-          } catch (error: any) {
-            setNotice({
-              tone: 'danger',
-              title: 'No se pudo marcar enviado.',
-              message: error.message,
-            });
-          } finally {
-            setIsWorking(false);
-          }
-        },
-      },
-    ]);
+    setConfirmAction(action);
+  };
+
+  const handleDispatch = () => {
+    openConfirmation('dispatch', dispatchBlockedReason);
   };
 
   const handleCancel = () => {
-    if (!detail || !session) return;
-
-    Alert.alert('Cancelar envio', `Quieres cancelar el envio ${detail.folio}?`, [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Cancelar envio',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            setIsWorking(true);
-            const updated = await cancelShipment(detail.id, session.userId);
-            await updateDetail(updated);
-            setNotice({
-              tone: 'success',
-              title: 'Envio cancelado.',
-              message: 'El estado se actualizo correctamente.',
-            });
-          } catch (error: any) {
-            setNotice({
-              tone: 'danger',
-              title: 'No se pudo cancelar el envio.',
-              message: error.message,
-            });
-          } finally {
-            setIsWorking(false);
-          }
-        },
-      },
-    ]);
+    openConfirmation('cancel', cancelBlockedReason);
   };
 
   const handleReopen = () => {
-    if (!detail || !session) return;
+    openConfirmation('reopen', reopenBlockedReason);
+  };
 
-    Alert.alert('Reabrir envio', `Quieres reabrir el envio ${detail.folio}?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Reabrir',
-        onPress: async () => {
-          try {
-            setIsWorking(true);
-            const updated = await reopenShipment(detail.id, session.userId);
-            await updateDetail(updated);
-            setNotice({
+  const closeConfirmation = () => {
+    if (!isWorking) {
+      setConfirmAction(null);
+    }
+  };
+
+  const handleConfirmAction = async () => {
+    if (!detail || !session || !confirmAction) return;
+
+    const blockedReason =
+      confirmAction === 'dispatch'
+        ? dispatchBlockedReason
+        : confirmAction === 'cancel'
+          ? cancelBlockedReason
+          : reopenBlockedReason;
+
+    if (blockedReason) {
+      setNotice({
+        tone: 'warning',
+        title: 'Accion no disponible',
+        message: blockedReason,
+      });
+      setConfirmAction(null);
+      return;
+    }
+
+    try {
+      setIsWorking(true);
+      const updated =
+        confirmAction === 'dispatch'
+          ? await dispatchShipment(detail.id, session.userId)
+          : confirmAction === 'cancel'
+            ? await cancelShipment(detail.id, session.userId)
+            : await reopenShipment(detail.id, session.userId);
+
+      await updateDetail(updated);
+      setConfirmAction(null);
+      setNotice(
+        confirmAction === 'dispatch'
+          ? {
               tone: 'success',
-              title: 'Envio reabierto.',
-              message: 'Ya puedes continuar el flujo operativo.',
-            });
-          } catch (error: any) {
-            setNotice({
-              tone: 'danger',
-              title: 'No se pudo reabrir el envio.',
-              message: error.message,
-            });
-          } finally {
-            setIsWorking(false);
-          }
-        },
-      },
-    ]);
+              title: 'Envio marcado como enviado.',
+              message: 'La linea de tiempo se actualizo. Ahora puedes confirmar recibido cuando se complete la entrega.',
+            }
+          : confirmAction === 'cancel'
+            ? {
+                tone: 'success',
+                title: 'Envio cancelado.',
+                message: 'El estado se actualizo correctamente.',
+              }
+            : {
+                tone: 'success',
+                title: 'Envio reabierto.',
+                message: 'Ya puedes continuar el flujo operativo.',
+              }
+      );
+    } catch (error: any) {
+      setNotice({
+        tone: 'danger',
+        title:
+          confirmAction === 'dispatch'
+            ? 'No se pudo marcar enviado.'
+            : confirmAction === 'cancel'
+              ? 'No se pudo cancelar el envio.'
+              : 'No se pudo reabrir el envio.',
+        message: error.message || 'Intenta de nuevo.',
+      });
+    } finally {
+      setIsWorking(false);
+    }
   };
 
   const openResolveModal = (line: ShipmentPackageLine, status: ShipmentPackageStatus) => {
@@ -730,7 +766,7 @@ export default function ShipmentDetailScreen() {
         <View style={styles.metricGrid}>
           {renderMetric('Paquetes', String(packageCount), packageCount > 0 ? 'success' : 'warning')}
           {renderMetric('Prendas', String(itemCount), itemCount > 0 ? 'success' : 'warning')}
-          {renderMetric('Guia', detail.guideReference || 'Pendiente', requiresGuide(detail) && !hasGuide ? 'warning' : 'success')}
+          {renderMetric('Guia', effectiveGuide || 'Pendiente', requiresGuide(detail) && !hasGuide ? 'warning' : 'success')}
           {renderMetric('Creado', formatDate(detail.createdAt), 'info')}
         </View>
       </AppCard>
@@ -807,7 +843,7 @@ export default function ShipmentDetailScreen() {
     if (!detail) return null;
     const firstLine = detail.packages[0];
     const firstPackage = firstLine ? packageDetails[firstLine.customerPackageId] : null;
-    const guide = detail.guideReference || firstPackage?.trackingNumber;
+    const guide = effectiveGuide;
     const carrier = firstPackage?.shippingCarrier || (detail.deliveryType === 'LOCAL' ? 'Local' : null);
 
     return (
@@ -822,7 +858,7 @@ export default function ShipmentDetailScreen() {
           {renderMetric('Cobro', firstLine ? paymentModeLabel(firstLine.paymentMode) : 'Sin paquete', 'info')}
         </View>
 
-        {requiresGuide(detail) && !detail.guideReference?.trim() ? (
+        {requiresGuide(detail) && !effectiveGuide ? (
           <View style={[styles.inlineNotice, { borderColor: theme.colors.warning, backgroundColor: theme.colors.surfaceAlt }]}>
             <AppText variant="caption" bold color={theme.colors.warning}>
               Captura la guia antes de marcar enviado.
@@ -905,7 +941,7 @@ export default function ShipmentDetailScreen() {
         {line.status !== 'PENDING' ? (
           <View style={[styles.inlineNotice, { borderColor: theme.colors.borderSubtle, backgroundColor: theme.colors.surface }]}>
             <AppText variant="caption" color={theme.colors.mutedText}>
-              Cobrado: {money(line.collectedAmount)} · Diferencia: {money(line.collectionDifference)} · Resultado: {collectionStatusLabel(line.collectionStatus)}
+              Cobrado: {money(line.collectedAmount)} - Diferencia: {money(line.collectionDifference)} - Resultado: {collectionStatusLabel(line.collectionStatus)}
             </AppText>
             {line.collectionNotes ? (
               <AppText variant="caption" color={theme.colors.mutedText}>
@@ -982,7 +1018,7 @@ export default function ShipmentDetailScreen() {
                     {item.itemCode || item.itemQrCode || `Prenda #${item.itemId}`}
                   </AppText>
                   <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
-                    {[item.productType, item.size, item.brand].filter(Boolean).join(' · ') || item.packageFolio}
+                    {[item.productType, item.size, item.brand].filter(Boolean).join(' - ') || item.packageFolio}
                   </AppText>
                 </View>
                 <View style={styles.itemAmount}>
@@ -1004,7 +1040,7 @@ export default function ShipmentDetailScreen() {
     const deliveredAt = getDeliveredAt(detail);
     const steps = [
       { label: 'Envio creado', value: formatDate(detail.createdAt), done: Boolean(detail.createdAt) },
-      { label: 'Guia registrada', value: detail.guideReference || 'Pendiente', done: hasGuide },
+      { label: 'Guia registrada', value: effectiveGuide || 'Pendiente', done: hasGuide },
       { label: 'Marcado enviado', value: formatDate(detail.dispatchedAt), done: Boolean(detail.dispatchedAt) },
       { label: 'Recibido / resuelto', value: formatDate(deliveredAt), done: Boolean(deliveredAt) || detail.status === 'DELIVERED' },
       { label: 'Cancelado', value: formatDate(detail.cancelledAt), done: Boolean(detail.cancelledAt) },
@@ -1070,7 +1106,7 @@ export default function ShipmentDetailScreen() {
             />
           ) : null}
 
-          {canEdit ? (
+          {canEdit && packageCount === 0 ? (
             <AppButton
               title="Agregar paquete"
               variant="secondary"
@@ -1097,8 +1133,8 @@ export default function ShipmentDetailScreen() {
               variant="danger"
               onPress={handleCancel}
               loading={isWorking}
-              disabled={!canManageShipments || isWorking}
-              disabledReason="No tienes permiso para cancelar envios. Permiso requerido: MANAGE_SHIPMENTS."
+              disabled={Boolean(cancelBlockedReason)}
+              disabledReason={cancelBlockedReason || undefined}
             />
           ) : null}
 
@@ -1107,14 +1143,60 @@ export default function ShipmentDetailScreen() {
               title="Reabrir envio"
               onPress={handleReopen}
               loading={isWorking}
-              disabled={!canManageShipments || isWorking}
-              disabledReason="No tienes permiso para reabrir envios. Permiso requerido: MANAGE_SHIPMENTS."
+              disabled={Boolean(reopenBlockedReason)}
+              disabledReason={reopenBlockedReason || undefined}
             />
+          ) : null}
+
+          {detail.status === 'OPEN' && dispatchBlockedReason ? (
+            <View style={[styles.inlineNotice, { borderColor: theme.colors.warning, backgroundColor: theme.colors.surfaceAlt }]}>
+              <AppText variant="caption" bold color={theme.colors.warning}>
+                Marcar enviado bloqueado
+              </AppText>
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                {dispatchBlockedReason}
+              </AppText>
+            </View>
           ) : null}
         </View>
       </AppCard>
     );
   };
+
+  const confirmationCopy = (() => {
+    if (!detail || !confirmAction) return null;
+
+    if (confirmAction === 'dispatch') {
+      return {
+        title: 'Marcar envio como enviado',
+        body: 'Vas a registrar la salida de este envio y moverlo al estado En ruta.',
+        warning: 'Esta accion registrara la fecha de envio y actualizara el paquete relacionado.',
+        confirmTitle: 'Marcar enviado',
+        loadingTitle: 'Marcando...',
+        variant: 'primary' as const,
+      };
+    }
+
+    if (confirmAction === 'cancel') {
+      return {
+        title: 'Cancelar envio',
+        body: 'Vas a cancelar este envio antes de que salga a ruta.',
+        warning: 'El envio dejara de estar disponible para despacho. Reabrelo solo si necesitas continuar el flujo.',
+        confirmTitle: 'Cancelar envio',
+        loadingTitle: 'Cancelando...',
+        variant: 'danger' as const,
+      };
+    }
+
+    return {
+      title: 'Reabrir envio',
+      body: 'Vas a reabrir este envio para continuar su operacion.',
+      warning: 'El envio volvera a estado abierto cuando backend lo permita.',
+      confirmTitle: 'Reabrir envio',
+      loadingTitle: 'Reabriendo...',
+      variant: 'primary' as const,
+    };
+  })();
 
   if (isLoading) {
     return (
@@ -1163,7 +1245,7 @@ export default function ShipmentDetailScreen() {
     <>
       <AppShellPage
         title="Detalle de envio"
-        subtitle={`${detail.folio} · ${primaryLine?.customerPackageFolio || primaryPackage?.folio || 'Sin paquete'} · ${customerName}`}
+        subtitle={`${detail.folio} - ${primaryLine?.customerPackageFolio || primaryPackage?.folio || 'Sin paquete'} - ${customerName}`}
         activeRoute="shipments"
         session={session}
         compactHeader
@@ -1254,7 +1336,7 @@ export default function ShipmentDetailScreen() {
                 <AppOptionRow
                   key={address.id}
                   title={address.label}
-                  subtitle={`${address.line1}${address.city ? ` · ${address.city}` : ''}`}
+                  subtitle={`${address.line1}${address.city ? ` - ${address.city}` : ''}`}
                   onPress={() => setSelectedAddress(address)}
                 >
                   {selectedAddress?.id === address.id ? <AppText bold>Seleccionada</AppText> : null}
@@ -1322,7 +1404,7 @@ export default function ShipmentDetailScreen() {
         onClose={() => setResolveModalVisible(false)}
       >
         <AppText bold>
-          {selectedLine?.customerPackageFolio || 'Paquete'} · {shipmentPackageStatusLabel(resolutionStatus)}
+          {selectedLine?.customerPackageFolio || 'Paquete'} - {shipmentPackageStatusLabel(resolutionStatus)}
         </AppText>
         <AppText color={theme.colors.mutedText}>
           Registra el resultado de entrega. Los importes COD se comparan contra el monto esperado.
@@ -1352,12 +1434,66 @@ export default function ShipmentDetailScreen() {
           disabledReason="Espera a que termine la operacion."
         />
       </AppBottomModal>
+
+      <AppBottomModal
+        visible={Boolean(confirmAction)}
+        title={confirmationCopy?.title || 'Confirmar accion'}
+        onClose={closeConfirmation}
+        footer={
+          <View style={styles.confirmFooter}>
+            <AppButton
+              title="Cancelar"
+              variant="cancel"
+              onPress={closeConfirmation}
+              disabled={isWorking}
+              disabledReason="Espera a que termine la operacion."
+              style={styles.confirmButton}
+            />
+            <AppButton
+              title={isWorking ? confirmationCopy?.loadingTitle || 'Procesando...' : confirmationCopy?.confirmTitle || 'Confirmar'}
+              variant={confirmationCopy?.variant || 'primary'}
+              onPress={handleConfirmAction}
+              loading={isWorking}
+              disabled={isWorking}
+              disabledReason="Espera a que termine la operacion."
+              style={styles.confirmButton}
+            />
+          </View>
+        }
+      >
+        <View style={styles.compactStack}>
+          <AppText>{confirmationCopy?.body}</AppText>
+          <View style={styles.detailGrid}>
+            {renderMetric('Cliente', customerName, 'info')}
+            {renderMetric('Paquete', primaryLine?.customerPackageFolio || primaryPackage?.folio || 'Sin paquete', primaryLine ? 'success' : 'warning')}
+            {renderMetric('Paqueteria', shipmentDeliveryTypeLabel(detail.deliveryType), 'info')}
+            {renderMetric('Guia', effectiveGuide || 'Pendiente', effectiveGuide ? 'success' : 'warning')}
+          </View>
+          <View style={[styles.inlineNotice, { borderColor: theme.colors.warning, backgroundColor: theme.colors.surfaceAlt }]}>
+            <AppText variant="caption" bold color={theme.colors.warning}>
+              Confirmacion requerida
+            </AppText>
+            <AppText variant="caption" color={theme.colors.mutedText}>
+              {confirmationCopy?.warning}
+            </AppText>
+          </View>
+        </View>
+      </AppBottomModal>
     </>
   );
 }
 
 const styles = StyleSheet.create({
   actionStack: {
+    gap: 10,
+  },
+  confirmButton: {
+    flex: 1,
+    minWidth: 150,
+  },
+  confirmFooter: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
   },
   compactStack: {

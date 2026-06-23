@@ -14,6 +14,9 @@ import com.hpsqsoft.ctrlropa.incident.IncidentService;
 import com.hpsqsoft.ctrlropa.payment.PaymentService;
 import com.hpsqsoft.ctrlropa.sale.Sale;
 import com.hpsqsoft.ctrlropa.sale.SaleRepository;
+import com.hpsqsoft.ctrlropa.security.access.AccessService;
+import com.hpsqsoft.ctrlropa.security.access.CurrentUser;
+import com.hpsqsoft.ctrlropa.security.access.PermissionCode;
 import com.hpsqsoft.ctrlropa.tenant.TenantAccessGuard;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +40,8 @@ public class ShipmentService {
     private final IncidentService incidentService;
     private final SaleRepository saleRepository;
     private final TenantAccessGuard tenantAccessGuard;
+    private final AccessService accessService;
+    private final CurrentUser currentUser;
 
     public ShipmentService(ShipmentRepository repository,
                            ShipmentPackageRepository shipmentPackageRepository,
@@ -47,7 +52,9 @@ public class ShipmentService {
                            PaymentService paymentService,
                            IncidentService incidentService,
                            SaleRepository saleRepository,
-                           TenantAccessGuard tenantAccessGuard) {
+                           TenantAccessGuard tenantAccessGuard,
+                           AccessService accessService,
+                           CurrentUser currentUser) {
         this.repository = repository;
         this.shipmentPackageRepository = shipmentPackageRepository;
         this.customerPackageRepository = customerPackageRepository;
@@ -58,9 +65,12 @@ public class ShipmentService {
         this.incidentService = incidentService;
         this.saleRepository = saleRepository;
         this.tenantAccessGuard = tenantAccessGuard;
+        this.accessService = accessService;
+        this.currentUser = currentUser;
     }
 
     public ShipmentResponse create(CreateShipmentRequest request) {
+        assertCanManageShipments();
         Branch branch = branchRepository.findById(request.getBranchId())
                 .orElseThrow(() -> new IllegalArgumentException("Sucursal no encontrada"));
         tenantAccessGuard.requireBranch(branch.getId(), "La sucursal del envio no pertenece al tenant activo");
@@ -83,6 +93,7 @@ public class ShipmentService {
 
     @Transactional(readOnly = true)
     public ShipmentDetailResponse findDetail(Long shipmentId) {
+        assertCanManageShipments();
         Shipment shipment = findShipment(shipmentId);
 
         List<ShipmentDetailResponse.PackageLine> packages = shipmentPackageRepository
@@ -117,6 +128,7 @@ public class ShipmentService {
 
     @Transactional(readOnly = true)
     public List<ShipmentResponse> findByBranch(Long branchId) {
+        assertCanManageShipments();
         tenantAccessGuard.requireBranch(branchId, "La sucursal de envios no pertenece al tenant activo");
         return repository.findByBranchIdOrderByCreatedAtDesc(branchId)
                 .stream()
@@ -125,6 +137,7 @@ public class ShipmentService {
     }
 
     public ShipmentDetailResponse addPackage(Long shipmentId, AddShipmentPackageRequest request) {
+        assertCanManageShipments();
         Shipment shipment = findShipment(shipmentId);
 
         if (shipment.getStatus() != ShipmentStatus.OPEN) {
@@ -208,6 +221,7 @@ public class ShipmentService {
 	}
 
     public ShipmentDetailResponse dispatch(Long shipmentId, DispatchShipmentRequest request) {
+        assertCanManageShipments();
         Shipment shipment = findShipment(shipmentId);
 
         if (shipment.getStatus() != ShipmentStatus.OPEN) {
@@ -220,6 +234,8 @@ public class ShipmentService {
             throw new IllegalArgumentException("No se puede despachar un shipment vacío");
         }
 
+        String resolvedGuide = cleanNullable(shipment.getGuideReference());
+
         for (ShipmentPackage sp : packages) {
             CustomerPackage cp = customerPackageRepository.findById(sp.getCustomerPackageId())
                     .orElseThrow(() -> new IllegalArgumentException("Paquete no encontrado"));
@@ -227,8 +243,17 @@ public class ShipmentService {
             if (cp.getStatus() != CustomerPackageStatus.READY) {
                 throw new IllegalArgumentException("Todos los paquetes deben estar en READY para despachar");
             }
+
+            if (shipment.getDeliveryType() == ShipmentDeliveryType.CARRIER && resolvedGuide == null) {
+                resolvedGuide = cleanNullable(cp.getTrackingNumber());
+            }
         }
 
+        if (shipment.getDeliveryType() == ShipmentDeliveryType.CARRIER && resolvedGuide == null) {
+            throw new IllegalArgumentException("Captura la guia o referencia antes de marcar como enviado.");
+        }
+
+        shipment.setGuideReference(resolvedGuide);
         shipment.setStatus(ShipmentStatus.OUT_FOR_DELIVERY);
         shipment.setDispatchedAt(LocalDateTime.now());
         shipment.setDispatchedByUserId(request.getDispatchedByUserId());
@@ -252,6 +277,7 @@ public class ShipmentService {
     public ShipmentDetailResponse resolvePackage(Long shipmentId,
                                                  Long shipmentPackageId,
                                                  ResolveShipmentPackageRequest request) {
+        assertCanManageShipments();
         Shipment shipment = findShipment(shipmentId);
 
         if (shipment.getStatus() != ShipmentStatus.OUT_FOR_DELIVERY) {
@@ -324,6 +350,7 @@ public class ShipmentService {
 	}
 
     public ShipmentDetailResponse cancel(Long shipmentId, CancelShipmentRequest request) {
+        assertCanManageShipments();
         Shipment shipment = findShipment(shipmentId);
 
         if (shipment.getStatus() == ShipmentStatus.CANCELLED) {
@@ -353,6 +380,7 @@ public class ShipmentService {
     }
 
     public ShipmentDetailResponse reopen(Long shipmentId, ReopenShipmentRequest request) {
+        assertCanManageShipments();
         Shipment shipment = findShipment(shipmentId);
 
         if (shipment.getStatus() == ShipmentStatus.OPEN) {
@@ -635,6 +663,10 @@ public class ShipmentService {
 
         String cleaned = value.trim();
         return cleaned.isBlank() ? null : cleaned;
+    }
+
+    private void assertCanManageShipments() {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.MANAGE_SHIPMENTS);
     }
 
     private boolean deliveryTypeRequiresAddress(CustomerPackageDeliveryType deliveryType) {

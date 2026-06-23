@@ -2,6 +2,8 @@
 
 Fecha: 2026-06-22
 
+> Actualizacion SHIPMENT-BUTTONS-A: las acciones criticas del detalle ya no usan `Alert.alert` como confirmacion. `Marcar enviado`, `Cancelar envio` y `Reabrir envio` usan modal propio, loading y aviso visible. El despacho toma la guia del shipment o del paquete relacionado si el shipment aun no la tiene.
+
 ## Problema
 
 `/shipment-detail` cargaba el envio y sus paquetes, pero la pantalla se sentia aislada: mostraba datos en bloques simples, no explicaba el siguiente paso, no destacaba destino/guia/costo y no exponia prendas del paquete. Tambien dependia de alertas nativas para feedback y no guiaba bien el regreso a `/shipments`.
@@ -24,7 +26,7 @@ Para mostrar prendas sin tocar backend, la pantalla carga el detalle de cada paq
 
 - `GET /api/customer-packages/{packageId}`
 
-El backend no expone en esta fase un endpoint para editar guia de un shipment ya creado. La guia se define al crear/preparar el envio desde `/shipments`.
+El backend no expone en esta fase un endpoint para editar guia de un shipment ya creado. La guia se define al crear/preparar el envio desde `/shipments` o se hereda desde la guia del paquete al despachar.
 
 ## Cambios visuales
 
@@ -52,6 +54,7 @@ El backend no expone en esta fase un endpoint para editar guia de un shipment ya
 - Si una accion esta bloqueada, `AppButton` muestra `disabledReason`.
 - Los exitos y errores quedan visibles como aviso en pantalla.
 - `Confirmar recibido` usa el flujo existente de resolver linea de paquete.
+- `Marcar enviado`, `Cancelar envio` y `Reabrir envio` usan `AppBottomModal` para no depender de alertas nativas en web.
 
 ## Permisos
 

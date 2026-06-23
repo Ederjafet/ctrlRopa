@@ -1,5 +1,29 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-22 - SHIPMENT-BUTTONS-A acciones de detalle de envio
+
+Tipo: frontend, backend, envios, permisos, tests, documentacion.
+
+Objetivo:
+
+- Corregir botones sin accion visible en `/shipment-detail`, especialmente `Marcar enviado`.
+
+Cambios realizados:
+
+- `Marcar enviado`, `Cancelar envio` y `Reabrir envio` dejan de depender de `Alert.alert` y usan confirmacion propia con `AppBottomModal`.
+- El detalle usa guia efectiva: primero `shipment.guideReference` y luego la guia del paquete relacionado si el shipment no la tiene.
+- Backend `ShipmentService` valida `MANAGE_SHIPMENTS` para operaciones de envio.
+- El despacho por paqueteria puede tomar la guia del paquete y bloquea con mensaje claro si no existe ninguna guia.
+- `Agregar paquete` se oculta cuando el envio ya tiene paquete asociado.
+- Se agregan tests de `ShipmentService` para despacho con guia heredada, bloqueo sin guia y bloqueo por permiso.
+- Se documenta la fase en `docs/SHIPMENT_BUTTONS_A_ACCIONES_DETALLE_ENVIO.md`.
+
+Restricciones respetadas:
+
+- No se agregaron migraciones, tracking real, mapas ni integracion con paqueterias.
+- No se tocaron pagos ni saldo a favor.
+- Se conserva tenant/branch isolation.
+
 ## 2026-06-22 - SHIPMENT-DETAIL-UX-A detalle operativo de envio
 
 Tipo: frontend, UX operativa, envios, paquetes, documentacion.
