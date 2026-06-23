@@ -171,3 +171,7 @@ GO funcional si las validaciones pasan con entorno DB configurado: el costo de e
 El costo de envio confirmado sigue viviendo en el paquete y se muestra en la bandeja `/shipments` para paquetes `READY` pendientes de preparar.
 
 La preparacion del envio real requiere seleccionar una direccion activa del cliente; no se selecciona automaticamente para evitar datos logisticos inventados.
+
+## Actualizacion PACKAGE-SHIPPING-C
+
+El costo de envio puede estar capturado en paquetes heredados, pero la UI ya no lo presenta como flujo completo si falta tipo de entrega o direccion requerida. El usuario debe guardar `Direccion y envio` para confirmar el flujo completo antes de liberar el paquete.

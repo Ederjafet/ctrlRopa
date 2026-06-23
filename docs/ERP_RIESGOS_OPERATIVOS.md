@@ -298,6 +298,7 @@ Probabilidad:
 - SHIPMENT-FLOW-A evita duplicados por shipment activo y validacion backend, pero un intento concurrente puede dejar un shipment vacio si otro usuario asocia primero el paquete; conviene agregar endpoint atomico `prepare-from-package` en una fase futura.
 - SHIPMENTS-UX-A mejora la bandeja sin backend nuevo; los envios reales en lista siguen mostrando datos resumidos hasta abrir `shipment-detail` para ver paquetes/direccion completa.
 - SHIPMENTS-UX-A conserva el flujo no atomico de crear shipment y luego asociar paquete; la proteccion anti-duplicados depende de los filtros y validaciones existentes.
+- PACKAGE-SHIPPING-C corrige estados visuales parciales en frontend; paquetes heredados con costo/guia pero sin tipo de entrega requieren guardar nuevamente direccion/envio para quedar completos.
 - Pagos/ventas sin regresion automatizada suficiente.
 - Auditoria de negocio todavia parcial.
 - Artefactos no rastreados antes de release.

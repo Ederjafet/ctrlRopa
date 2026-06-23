@@ -104,3 +104,7 @@ GO si las validaciones finales pasan: paquete pagado y envio confirmado puede li
 Al marcar un paquete como listo para envio, la pantalla `/shipments` lo muestra como `Pendiente de preparar envio` si todavia no tiene shipment activo.
 
 No se crea automaticamente el `shipment_package` en `markReady` porque el modelo actual exige una direccion de entrega obligatoria. La direccion se confirma desde `/shipments` al preparar el envio real.
+
+## Actualizacion PACKAGE-SHIPPING-C
+
+La UI de detalle de paquete prioriza mensajes de bloqueo antes de liberar envio: tipo de entrega, direccion requerida, costo/modalidad confirmada y saldo. Esto evita que datos parciales de envio parezcan listos solo por tener costo o guia capturados.

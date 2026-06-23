@@ -35,8 +35,8 @@ import { getItemsByBranch, Item } from '@/services/itemService';
 import { createPaymentByPackageFolio } from '@/services/paymentService';
 import { getSession, UserSession } from '@/services/sessionStorage';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, View } from 'react-native';
+import { ReactNode, useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 function money(value?: number | null) {
@@ -109,8 +109,40 @@ function deliveryRequiresAddress(type?: string | null) {
 }
 
 function deliveryUsesPackageCost(type?: string | null) {
-  return type !== 'STORE_PICKUP' && type !== 'CUSTOMER_PROVIDED_LABEL' && type !== 'COLLECT_SHIPPING';
+  return Boolean(type) && type !== 'STORE_PICKUP' && type !== 'CUSTOMER_PROVIDED_LABEL' && type !== 'COLLECT_SHIPPING';
 }
+
+const DELIVERY_TYPE_OPTIONS: {
+  type: CustomerPackageDeliveryType;
+  title: string;
+  description: string;
+}[] = [
+  {
+    type: 'PARCEL_SERVICE',
+    title: 'Paqueteria',
+    description: 'Requiere direccion y costo de envio o por cobrar.',
+  },
+  {
+    type: 'LOCAL_DELIVERY',
+    title: 'Entrega local',
+    description: 'Requiere direccion y costo o envio sin costo.',
+  },
+  {
+    type: 'STORE_PICKUP',
+    title: 'Recoleccion',
+    description: 'No requiere direccion y confirma costo cero.',
+  },
+  {
+    type: 'CUSTOMER_PROVIDED_LABEL',
+    title: 'Cliente envia guia',
+    description: 'No suma costo al paquete; captura guia o nota.',
+  },
+  {
+    type: 'COLLECT_SHIPPING',
+    title: 'Por cobrar',
+    description: 'Requiere direccion; el cliente paga al recibir.',
+  },
+];
 
 function formatPackageAddress(detail?: CustomerPackageDetail | null) {
   const parts = [
@@ -122,6 +154,111 @@ function formatPackageAddress(detail?: CustomerPackageDetail | null) {
     detail?.shipToCountry,
   ].filter(Boolean);
   return parts.length > 0 ? parts.join(', ') : 'Sin direccion';
+}
+
+function hasPackageAddressSnapshot(detail?: CustomerPackageDetail | null) {
+  return Boolean(
+    detail?.shipToName ||
+      detail?.shipToPhone ||
+      detail?.shipToLine1 ||
+      detail?.shipToCity ||
+      detail?.shipToState ||
+      detail?.shipToPostalCode
+  );
+}
+
+function getShippingCostText(detail?: CustomerPackageDetail | null) {
+  if (!detail?.shippingCostConfirmed) {
+    return detail?.shippingCostAmount != null ? `Capturado: ${money(detail.shippingCostAmount)}` : 'Pendiente';
+  }
+
+  if (detail.shippingCollect) return 'Por cobrar';
+  if (detail.customerProvidedLabel) return 'Guia del cliente';
+  if (detail.shippingCostWaived) return 'Sin costo';
+  return money(detail.shippingCostAmount);
+}
+
+function getShippingReadiness(detail: CustomerPackageDetail | null, hasPending: boolean) {
+  if (!detail) {
+    return {
+      label: 'Incompleto',
+      tone: 'warning' as const,
+      nextStep: 'Carga el paquete para revisar direccion y envio.',
+      typeReady: false,
+      addressReady: false,
+      costReady: false,
+      paymentReady: false,
+    };
+  }
+
+  const typeReady = Boolean(detail.deliveryType);
+  const addressRequired = deliveryRequiresAddress(detail.deliveryType);
+  const addressReady =
+    typeReady &&
+    (!addressRequired ||
+      (detail.shippingAddressConfirmed === true &&
+        Boolean(detail.shippingAddressSource) &&
+        hasPackageAddressSnapshot(detail)));
+  const costReady = typeReady && detail.shippingCostConfirmed === true;
+  const paymentReady = !hasPending;
+
+  if (!typeReady) {
+    return {
+      label: 'Incompleto',
+      tone: 'warning' as const,
+      nextStep: 'Selecciona el tipo de entrega.',
+      typeReady,
+      addressReady: false,
+      costReady: false,
+      paymentReady,
+    };
+  }
+
+  if (!addressReady) {
+    return {
+      label: 'Direccion pendiente',
+      tone: 'warning' as const,
+      nextStep: 'Captura o selecciona la direccion de envio.',
+      typeReady,
+      addressReady,
+      costReady,
+      paymentReady,
+    };
+  }
+
+  if (!costReady) {
+    return {
+      label: 'Costo pendiente',
+      tone: 'warning' as const,
+      nextStep: 'Confirma costo de envio, envio sin costo, por cobrar o guia del cliente.',
+      typeReady,
+      addressReady,
+      costReady,
+      paymentReady,
+    };
+  }
+
+  if (!paymentReady) {
+    return {
+      label: 'Listo para cobrar',
+      tone: 'info' as const,
+      nextStep: `Falta cubrir saldo pendiente de ${money(detail.pendingAmount)}.`,
+      typeReady,
+      addressReady,
+      costReady,
+      paymentReady,
+    };
+  }
+
+  return {
+    label: 'Listo para envio',
+    tone: 'success' as const,
+    nextStep: 'Direccion, costo y pago estan completos. Puedes marcar listo para envio.',
+    typeReady,
+    addressReady,
+    costReady,
+    paymentReady,
+  };
 }
 
 function compactDate(value?: string | null) {
@@ -165,13 +302,14 @@ function getMarkReadyBlockedReason(
 ) {
   if (isWorking) return 'Ya hay una accion en proceso.';
   if (!detail) return 'No se pudo cargar el paquete.';
-  if (detail.canMarkReadyForShipment === true) return '';
-  if (detail.markReadyForShipmentBlockedReason) return detail.markReadyForShipmentBlockedReason;
   if (!canManagePackage) return 'No tienes permiso para marcar listo para envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.';
   if (detail.status !== 'OPEN') return `El paquete no puede prepararse para envio en su estado actual: ${statusLabel(detail.status)}.`;
   if (Number(detail.totalItems ?? 0) <= 0) return 'Agrega al menos una prenda antes de liberar envio.';
   if (!detail.deliveryType) return 'Selecciona el tipo de entrega antes de marcar listo para envio.';
-  if (deliveryRequiresAddress(detail.deliveryType) && detail.shippingAddressConfirmed !== true) {
+  if (
+    deliveryRequiresAddress(detail.deliveryType) &&
+    (detail.shippingAddressConfirmed !== true || !detail.shippingAddressSource || !hasPackageAddressSnapshot(detail))
+  ) {
     return 'Captura o selecciona la direccion de envio antes de marcar listo para envio.';
   }
   if (detail.shippingCostConfirmed !== true) {
@@ -180,6 +318,8 @@ function getMarkReadyBlockedReason(
   if (Number(Number(detail.pendingAmount ?? 0).toFixed(2)) > 0) {
     return `No puedes marcar listo para envio porque el paquete tiene saldo pendiente de ${money(detail.pendingAmount)}.`;
   }
+  if (detail.canMarkReadyForShipment === true) return '';
+  if (detail.markReadyForShipmentBlockedReason) return detail.markReadyForShipmentBlockedReason;
   return '';
 }
 
@@ -329,6 +469,77 @@ function InfoRow({
   );
 }
 
+function ShippingStep({
+  number,
+  title,
+  status,
+  tone = 'default',
+  children,
+}: {
+  number: number;
+  title: string;
+  status: string;
+  tone?: 'default' | 'success' | 'warning' | 'danger' | 'info';
+  children: ReactNode;
+}) {
+  const { theme } = useAppTheme();
+
+  return (
+    <View style={[styles.shippingStep, { borderColor: theme.colors.borderSubtle, backgroundColor: theme.colors.surfaceAlt }]}>
+      <View style={styles.shippingStepHeader}>
+        <View style={[styles.stepNumber, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+          <AppText variant="caption" bold>
+            {number}
+          </AppText>
+        </View>
+        <View style={styles.stepTitleBlock}>
+          <AppText bold>{title}</AppText>
+        </View>
+        <StatusPill label={status} tone={tone} />
+      </View>
+      <View style={styles.shippingStepBody}>{children}</View>
+    </View>
+  );
+}
+
+function SelectableCard({
+  title,
+  subtitle,
+  selected,
+  disabled,
+  onPress,
+}: {
+  title: string;
+  subtitle: string;
+  selected: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  const { theme } = useAppTheme();
+
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [
+        styles.selectableCard,
+        {
+          borderColor: selected ? theme.colors.accent : theme.colors.border,
+          backgroundColor: selected ? theme.colors.optionPressedBackground : theme.colors.surface,
+          opacity: disabled ? 0.5 : pressed ? 0.78 : 1,
+        },
+      ]}
+    >
+      <AppText bold color={selected ? theme.colors.accent : theme.colors.text}>
+        {title}
+      </AppText>
+      <AppText variant="caption" color={theme.colors.mutedText}>
+        {subtitle}
+      </AppText>
+    </Pressable>
+  );
+}
+
 function PackageItemLine({
   item,
   onOpenItem,
@@ -445,7 +656,7 @@ export default function CustomerPackageDetailScreen() {
   const [paymentReference, setPaymentReference] = useState('');
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<number | null>(null);
   const [customerAddresses, setCustomerAddresses] = useState<CustomerAddress[]>([]);
-  const [deliveryType, setDeliveryType] = useState<CustomerPackageDeliveryType>('PARCEL_SERVICE');
+  const [deliveryType, setDeliveryType] = useState<CustomerPackageDeliveryType | null>(null);
   const [addressSource, setAddressSource] = useState<CustomerPackageAddressSource>('CUSTOM_PACKAGE_ADDRESS');
   const [sourceCustomerAddressId, setSourceCustomerAddressId] = useState<number | null>(null);
   const [addressLabel, setAddressLabel] = useState('');
@@ -478,8 +689,8 @@ export default function CustomerPackageDetailScreen() {
 
   const syncShippingForm = useCallback((packageDetail: CustomerPackageDetail) => {
     const confirmed = packageDetail.shippingCostConfirmed === true;
-    const nextDeliveryType = packageDetail.deliveryType ?? 'PARCEL_SERVICE';
-    const nextAddressSource = packageDetail.shippingAddressSource ?? (deliveryRequiresAddress(nextDeliveryType) ? 'CUSTOM_PACKAGE_ADDRESS' : 'PICKUP_NO_ADDRESS');
+    const nextDeliveryType = packageDetail.deliveryType ?? null;
+    const nextAddressSource = packageDetail.shippingAddressSource ?? (nextDeliveryType && deliveryRequiresAddress(nextDeliveryType) ? 'CUSTOM_PACKAGE_ADDRESS' : 'PICKUP_NO_ADDRESS');
     setDeliveryType(nextDeliveryType);
     setAddressSource(nextAddressSource);
     setSourceCustomerAddressId(packageDetail.sourceCustomerAddressId ?? null);
@@ -577,6 +788,62 @@ export default function CustomerPackageDetailScreen() {
   const selectedSavedAddress = sourceCustomerAddressId
     ? customerAddresses.find((address) => address.id === sourceCustomerAddressId) ?? null
     : null;
+  const shippingReadiness = getShippingReadiness(detail, hasPending);
+  const savedRequiresAddress = deliveryRequiresAddress(detail?.deliveryType);
+  const savedAddressText =
+    !detail?.deliveryType
+      ? 'Pendiente'
+      : savedRequiresAddress
+        ? shippingReadiness.addressReady
+          ? 'Confirmada'
+          : 'Pendiente'
+        : 'No aplica';
+  const savedAddressSourceText =
+    !detail?.deliveryType
+      ? 'Pendiente'
+      : savedRequiresAddress
+        ? detail.shippingAddressSource
+          ? addressSourceLabel(detail.shippingAddressSource)
+          : 'Pendiente'
+        : addressSourceLabel(detail.shippingAddressSource);
+  const hasLegacyPartialShipping = Boolean(
+    detail &&
+      !detail.deliveryType &&
+      (detail.shippingCostConfirmed ||
+        detail.shippingAddressConfirmed ||
+        detail.shippingCarrier ||
+        detail.trackingNumber ||
+        detail.shippingCostAmount != null)
+  );
+  const savedFormAddressSource =
+    detail?.shippingAddressSource ?? (detail?.deliveryType && deliveryRequiresAddress(detail.deliveryType) ? 'CUSTOM_PACKAGE_ADDRESS' : 'PICKUP_NO_ADDRESS');
+  const typeDraftChanged = Boolean(detail && deliveryType !== (detail.deliveryType ?? null));
+  const addressDraftChanged = Boolean(
+    detail &&
+      (addressSource !== savedFormAddressSource ||
+        sourceCustomerAddressId !== (detail.sourceCustomerAddressId ?? null) ||
+        shipToName !== (detail.shipToName ?? detail.customerName ?? '') ||
+        shipToPhone !== (detail.shipToPhone ?? detail.customerPhone ?? '') ||
+        shipToLine1 !== (detail.shipToLine1 ?? '') ||
+        shipToLine2 !== (detail.shipToLine2 ?? '') ||
+        shipToCity !== (detail.shipToCity ?? '') ||
+        shipToState !== (detail.shipToState ?? '') ||
+        shipToPostalCode !== (detail.shipToPostalCode ?? '') ||
+        shipToCountry !== (detail.shipToCountry ?? 'Mexico') ||
+        shipToReferences !== (detail.shipToReferences ?? ''))
+  );
+  const costDraftChanged = Boolean(
+    detail &&
+      (shippingCostWaived !== (detail.shippingCostWaived === true) ||
+        shippingCostInput !== (detail.shippingCostConfirmed === true && detail.shippingCostAmount != null ? Number(detail.shippingCostAmount).toFixed(2) : '') ||
+        shippingCarrier !== (detail.shippingCarrier ?? '') ||
+        trackingNumber !== (detail.trackingNumber ?? '') ||
+        shippingNotes !== (detail.shippingNotes ?? ''))
+  );
+  const hasShippingDraftChanges = Boolean(
+    detail &&
+      (typeDraftChanged || addressDraftChanged || costDraftChanged)
+  );
 
   const canManagePackage = hasPermission(session, 'CREATE_CLOSE_CUSTOMER_PACKAGE');
   const canRegisterPayments = hasPermission(session, 'REGISTER_PAYMENTS');
@@ -584,6 +851,41 @@ export default function CustomerPackageDetailScreen() {
   const canManageInventory = hasPermission(session, 'MANAGE_INVENTORY');
   const canManageShipments = hasPermission(session, 'MANAGE_SHIPMENTS');
   const markReadyBlockedReason = getMarkReadyBlockedReason(detail, canManagePackage, isWorking);
+
+  const handleSelectDeliveryType = (type: CustomerPackageDeliveryType) => {
+    setDeliveryType(type);
+
+    if (type === 'STORE_PICKUP') {
+      setAddressSource('PICKUP_NO_ADDRESS');
+      setSourceCustomerAddressId(null);
+      setShippingCostWaived(true);
+      setShippingCostInput('0.00');
+      return;
+    }
+
+    if (type === 'CUSTOMER_PROVIDED_LABEL') {
+      setAddressSource('CUSTOMER_PROVIDED_LABEL');
+      setSourceCustomerAddressId(null);
+      setShippingCostWaived(true);
+      setShippingCostInput('0.00');
+      return;
+    }
+
+    if (type === 'COLLECT_SHIPPING') {
+      setShippingCostWaived(true);
+      setShippingCostInput('0.00');
+      setAddressSource(primaryAddress ? 'CUSTOMER_PRIMARY_ADDRESS' : 'CUSTOM_PACKAGE_ADDRESS');
+      setSourceCustomerAddressId(primaryAddress?.id ?? null);
+      return;
+    }
+
+    setAddressSource(primaryAddress ? 'CUSTOMER_PRIMARY_ADDRESS' : 'CUSTOM_PACKAGE_ADDRESS');
+    setSourceCustomerAddressId(primaryAddress?.id ?? null);
+    if (detail?.deliveryType !== type && (detail?.shippingCollect || detail?.customerProvidedLabel)) {
+      setShippingCostWaived(false);
+      setShippingCostInput('');
+    }
+  };
 
   const removeItemPreview = useMemo(() => {
     if (!detail || !removeItemCandidate) return null;
@@ -928,6 +1230,15 @@ export default function CustomerPackageDetailScreen() {
       return;
     }
 
+    if (!deliveryType) {
+      setNotice({
+        title: 'Tipo de entrega requerido',
+        message: 'Selecciona el tipo de entrega antes de guardar direccion y envio.',
+        tone: 'warning',
+      });
+      return;
+    }
+
     const effectiveCostWaived =
       shippingCostWaived ||
       deliveryType === 'STORE_PICKUP' ||
@@ -1259,8 +1570,8 @@ export default function CustomerPackageDetailScreen() {
           <MetricCard
             label="Costo envio"
             value={shippingConfirmed ? money(currentShippingCost) : 'Pendiente'}
-            helper={shippingConfirmed ? shippingStatusText : 'Define antes de liberar'}
-            tone={!shippingConfirmed ? 'warning' : currentShippingWaived ? 'success' : 'info'}
+            helper={!detail.deliveryType && shippingConfirmed ? 'Completa tipo de entrega' : shippingConfirmed ? shippingStatusText : 'Define antes de liberar'}
+            tone={!shippingConfirmed || !detail.deliveryType ? 'warning' : currentShippingWaived ? 'success' : 'info'}
           />
           <MetricCard
             label="Total paquete"
@@ -1396,7 +1707,7 @@ export default function CustomerPackageDetailScreen() {
               <MetricCard
                 label="Envio"
                 value={shippingConfirmed ? money(currentShippingCost) : 'Pendiente'}
-                tone={!shippingConfirmed ? 'warning' : currentShippingWaived ? 'success' : 'info'}
+                tone={!shippingConfirmed || !detail.deliveryType ? 'warning' : currentShippingWaived ? 'success' : 'info'}
               />
               <MetricCard label="Total" value={money(totalAmount)} helper={!shippingConfirmed ? 'Parcial sin envio' : undefined} />
               <MetricCard label="Abonado" value={money(paidAmount)} tone={paidAmount > 0 ? 'success' : 'default'} />
@@ -1484,108 +1795,126 @@ export default function CustomerPackageDetailScreen() {
             <AppText variant="subtitle" bold>
               Direccion y envio
             </AppText>
+            <View style={[styles.shippingHero, { borderColor: theme.colors.borderSubtle, backgroundColor: theme.colors.surfaceAlt }]}>
+              <View style={styles.shippingHeroMain}>
+                <StatusPill label={shippingReadiness.label} tone={shippingReadiness.tone} />
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  Proximo paso: {shippingReadiness.nextStep}
+                </AppText>
+              </View>
+              {hasShippingDraftChanges ? <StatusPill label="Cambios pendientes de guardar" tone="warning" /> : null}
+            </View>
+
             <View style={styles.shippingSummary}>
-              <InfoRow label="Tipo" value={deliveryTypeLabel(detail.deliveryType)} tone={!detail.deliveryType ? 'warning' : 'success'} />
-              <InfoRow
-                label="Direccion"
-                value={addressConfirmed || !deliveryRequiresAddress(detail.deliveryType) ? 'Confirmada' : 'Pendiente'}
-                tone={addressConfirmed || !deliveryRequiresAddress(detail.deliveryType) ? 'success' : 'warning'}
-              />
-              <InfoRow label="Fuente" value={addressSourceLabel(detail.shippingAddressSource)} />
-              <InfoRow
-                label="Costo"
-                value={shippingConfirmed ? money(currentShippingCost) : 'Pendiente'}
-                tone={!shippingConfirmed ? 'warning' : 'success'}
-              />
-              <InfoRow label="Confirmacion" value={shippingStatusText} tone={!shippingConfirmed ? 'warning' : 'success'} />
+              <InfoRow label="Tipo guardado" value={detail.deliveryType ? deliveryTypeLabel(detail.deliveryType) : 'Pendiente'} tone={!detail.deliveryType ? 'warning' : 'success'} />
+              <InfoRow label="Direccion" value={savedAddressText} tone={shippingReadiness.addressReady ? 'success' : detail.deliveryType ? 'warning' : 'default'} />
+              <InfoRow label="Fuente" value={savedAddressSourceText} tone={savedAddressSourceText === 'Pendiente' ? 'warning' : 'default'} />
+              <InfoRow label="Costo" value={getShippingCostText(detail)} tone={shippingReadiness.costReady ? 'success' : 'warning'} />
               <InfoRow label="Paqueteria" value={detail.shippingCarrier || 'Sin definir'} />
               <InfoRow label="Guia" value={detail.trackingNumber || 'Pendiente'} />
             </View>
 
-            {!shippingConfirmed ? (
+            {hasLegacyPartialShipping ? (
               <View style={[styles.shippingNotice, { borderColor: theme.colors.warning, backgroundColor: theme.colors.surfaceAlt }]}>
                 <AppText variant="caption" bold color={theme.colors.warning}>
-                  Direccion o envio pendiente
+                  Datos parciales heredados
                 </AppText>
                 <AppText variant="caption" color={theme.colors.mutedText}>
-                  Antes de marcar listo para envio, selecciona tipo de entrega, confirma direccion si aplica y define costo o modalidad sin costo/por cobrar.
+                  Este paquete tiene costo, guia o direccion capturados, pero aun falta guardar el tipo de entrega para considerarlo completo.
+                </AppText>
+              </View>
+            ) : null}
+
+            {markReadyBlockedReason ? (
+              <View style={[styles.shippingNotice, { borderColor: theme.colors.warning, backgroundColor: theme.colors.surfaceAlt }]}>
+                <AppText variant="caption" bold color={theme.colors.warning}>
+                  Falta para liberar envio
+                </AppText>
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  {markReadyBlockedReason}
                 </AppText>
               </View>
             ) : null}
 
             <View style={styles.shippingForm}>
-              <View style={styles.compactSelector}>
-                <AppText variant="caption" color={theme.colors.mutedText} bold>
-                  Tipo de entrega
-                </AppText>
-                <View style={styles.selectorRow}>
-                  {(['PARCEL_SERVICE', 'LOCAL_DELIVERY', 'STORE_PICKUP', 'CUSTOMER_PROVIDED_LABEL', 'COLLECT_SHIPPING'] as CustomerPackageDeliveryType[]).map((type) => (
-                    <AppButton
-                      key={type}
-                      title={deliveryTypeLabel(type)}
-                      variant={deliveryType === type ? 'operation' : 'neutral'}
-                      onPress={() => {
-                        setDeliveryType(type);
-                        if (type === 'STORE_PICKUP') {
-                          setAddressSource('PICKUP_NO_ADDRESS');
-                          setShippingCostWaived(true);
-                          setShippingCostInput('0.00');
-                        } else if (type === 'CUSTOMER_PROVIDED_LABEL') {
-                          setAddressSource('CUSTOMER_PROVIDED_LABEL');
-                          setShippingCostWaived(true);
-                          setShippingCostInput('0.00');
-                        } else if (type === 'COLLECT_SHIPPING') {
-                          setShippingCostWaived(true);
-                          setShippingCostInput('0.00');
-                          setAddressSource(primaryAddress ? 'CUSTOMER_PRIMARY_ADDRESS' : 'CUSTOM_PACKAGE_ADDRESS');
-                        } else {
-                          setAddressSource(primaryAddress ? 'CUSTOMER_PRIMARY_ADDRESS' : 'CUSTOM_PACKAGE_ADDRESS');
-                        }
-                      }}
-                      style={styles.compactActionButton}
+              <ShippingStep
+                number={1}
+                title="Tipo de entrega"
+                status={!deliveryType ? 'Pendiente' : typeDraftChanged ? 'Pendiente de guardar' : 'Guardado'}
+                tone={!deliveryType ? 'default' : typeDraftChanged ? 'warning' : 'success'}
+              >
+                <View style={styles.optionGrid}>
+                  {DELIVERY_TYPE_OPTIONS.map((option) => (
+                    <SelectableCard
+                      key={option.type}
+                      title={option.title}
+                      subtitle={option.description}
+                      selected={deliveryType === option.type}
+                      onPress={() => handleSelectDeliveryType(option.type)}
                       disabled={!canEdit || !canManagePackage || isWorking}
                     />
                   ))}
                 </View>
-              </View>
+              </ShippingStep>
 
-              {requiresAddress ? (
+              <ShippingStep
+                number={2}
+                title="Direccion o recoleccion"
+                status={
+                  !deliveryType
+                    ? 'En espera'
+                    : !requiresAddress
+                      ? 'No aplica'
+                      : shippingReadiness.addressReady && !addressDraftChanged
+                        ? 'Confirmada'
+                        : addressSource
+                          ? 'Pendiente de guardar'
+                          : 'Pendiente'
+                }
+                tone={
+                  !deliveryType
+                    ? 'default'
+                    : !requiresAddress || (shippingReadiness.addressReady && !addressDraftChanged)
+                      ? 'success'
+                      : 'warning'
+                }
+              >
+              {!deliveryType ? (
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  Primero selecciona el tipo de entrega.
+                </AppText>
+              ) : requiresAddress ? (
                 <View style={styles.compactSelector}>
-                  <AppText variant="caption" color={theme.colors.mutedText} bold>
-                    Direccion
-                  </AppText>
-                  <View style={styles.selectorRow}>
-                    <AppButton
-                      title="Principal"
-                      variant={addressSource === 'CUSTOMER_PRIMARY_ADDRESS' ? 'operation' : 'neutral'}
+                  <View style={styles.optionGrid}>
+                    <SelectableCard
+                      title="Direccion principal"
+                      subtitle={primaryAddress ? `${primaryAddress.line1}, ${primaryAddress.city || 'Sin ciudad'}` : 'El cliente no tiene direccion principal activa.'}
+                      selected={addressSource === 'CUSTOMER_PRIMARY_ADDRESS'}
                       onPress={() => {
                         setAddressSource('CUSTOMER_PRIMARY_ADDRESS');
                         setSourceCustomerAddressId(primaryAddress?.id ?? null);
                       }}
                       disabled={!primaryAddress || !canEdit || !canManagePackage || isWorking}
-                      disabledReason={!primaryAddress ? 'El cliente no tiene direccion principal activa.' : undefined}
-                      style={styles.compactActionButton}
                     />
-                    <AppButton
-                      title="Guardada"
-                      variant={addressSource === 'CUSTOMER_SAVED_ADDRESS' ? 'operation' : 'neutral'}
+                    <SelectableCard
+                      title="Direccion guardada"
+                      subtitle={customerAddresses.length > 0 ? 'Elige una direccion existente del cliente.' : 'No hay direcciones guardadas activas.'}
+                      selected={addressSource === 'CUSTOMER_SAVED_ADDRESS'}
                       onPress={() => {
                         setAddressSource('CUSTOMER_SAVED_ADDRESS');
                         setSourceCustomerAddressId(selectedSavedAddress?.id ?? primaryAddress?.id ?? customerAddresses[0]?.id ?? null);
                       }}
                       disabled={customerAddresses.length === 0 || !canEdit || !canManagePackage || isWorking}
-                      disabledReason={customerAddresses.length === 0 ? 'El cliente no tiene direcciones guardadas.' : undefined}
-                      style={styles.compactActionButton}
                     />
-                    <AppButton
+                    <SelectableCard
                       title="Otra direccion"
-                      variant={addressSource === 'CUSTOM_PACKAGE_ADDRESS' ? 'operation' : 'neutral'}
+                      subtitle="Captura una direccion solo para este paquete."
+                      selected={addressSource === 'CUSTOM_PACKAGE_ADDRESS'}
                       onPress={() => {
                         setAddressSource('CUSTOM_PACKAGE_ADDRESS');
                         setSourceCustomerAddressId(null);
                       }}
                       disabled={!canEdit || !canManagePackage || isWorking}
-                      style={styles.compactActionButton}
                     />
                   </View>
 
@@ -1659,8 +1988,9 @@ export default function CustomerPackageDetailScreen() {
                   </AppText>
                 </View>
               )}
+              </ShippingStep>
 
-              {detail.shippingAddressConfirmed ? (
+              {detail.deliveryType && detail.shippingAddressConfirmed && hasPackageAddressSnapshot(detail) ? (
                 <View style={[styles.shippingNotice, { borderColor: theme.colors.success, backgroundColor: theme.colors.surfaceAlt }]}>
                   <AppText variant="caption" bold color={theme.colors.success}>
                     Snapshot confirmado
@@ -1671,6 +2001,36 @@ export default function CustomerPackageDetailScreen() {
                 </View>
               ) : null}
 
+              <ShippingStep
+                number={3}
+                title="Costo, guia y paqueteria"
+                status={
+                  !deliveryType
+                    ? 'En espera'
+                    : shippingReadiness.costReady && !costDraftChanged
+                      ? 'Confirmado'
+                      : shippingCostWaived || !costEditable
+                        ? 'Sin costo / no suma'
+                        : shippingCostInput
+                          ? 'Pendiente de guardar'
+                          : 'Pendiente'
+                }
+                tone={
+                  !deliveryType
+                    ? 'default'
+                    : shippingReadiness.costReady && !costDraftChanged
+                      ? 'success'
+                      : shippingCostWaived || !costEditable || shippingCostInput
+                        ? 'warning'
+                        : 'warning'
+                }
+              >
+              {!deliveryType ? (
+                <AppText variant="caption" color={theme.colors.mutedText}>
+                  Primero selecciona el tipo de entrega.
+                </AppText>
+              ) : (
+                <View style={styles.addressFields}>
               <AppButton
                 title={`${shippingCostWaived ? '[x]' : '[ ]'} Envio sin costo`}
                 variant={shippingCostWaived ? 'operation' : 'neutral'}
@@ -1695,7 +2055,7 @@ export default function CustomerPackageDetailScreen() {
                 }
               />
               <AppInput
-                label="Costo de envio"
+                label={deliveryType === 'COLLECT_SHIPPING' ? 'Costo para el paquete' : 'Costo de envio'}
                 value={!costEditable || shippingCostWaived ? '0.00' : shippingCostInput}
                 onChangeText={setShippingCostInput}
                 placeholder="0.00"
@@ -1706,14 +2066,14 @@ export default function CustomerPackageDetailScreen() {
                 label="Paqueteria"
                 value={shippingCarrier}
                 onChangeText={setShippingCarrier}
-                placeholder="Ej. Estafeta"
+                placeholder={deliveryType === 'LOCAL_DELIVERY' ? 'Ej. Entrega local' : 'Ej. Estafeta'}
                 editable={canEdit && canManagePackage && !isWorking}
               />
               <AppInput
                 label="Guia / referencia"
                 value={trackingNumber}
                 onChangeText={setTrackingNumber}
-                placeholder="Pendiente"
+                placeholder={deliveryType === 'CUSTOMER_PROVIDED_LABEL' ? 'Guia del cliente' : 'Pendiente'}
                 editable={canEdit && canManagePackage && !isWorking}
               />
               <AppInput
@@ -1724,8 +2084,21 @@ export default function CustomerPackageDetailScreen() {
                 multiline
                 editable={canEdit && canManagePackage && !isWorking}
               />
+                </View>
+              )}
+              </ShippingStep>
+
+              <ShippingStep
+                number={4}
+                title="Guardar y confirmar"
+                status={hasShippingDraftChanges ? 'Cambios pendientes' : shippingReadiness.label}
+                tone={hasShippingDraftChanges ? 'warning' : shippingReadiness.tone}
+              >
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Guardar crea o actualiza el snapshot historico de direccion del paquete y recalcula total/saldo cuando el costo aplica.
+              </AppText>
               <AppButton
-                title="Guardar datos de envio"
+                title="Guardar direccion y envio"
                 variant="operation"
                 onPress={handleSaveShipping}
                 loading={isSavingShipping}
@@ -1738,6 +2111,7 @@ export default function CustomerPackageDetailScreen() {
                       : 'Ya hay una accion en proceso.'
                 }
               />
+              </ShippingStep>
             </View>
 
             <View style={[styles.shippingLogistics, { borderTopColor: theme.colors.borderSubtle }]}>
@@ -2201,6 +2575,20 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
+  optionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  selectableCard: {
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    gap: 4,
+    minHeight: 84,
+    minWidth: 148,
+    padding: 10,
+  },
   addressList: {
     gap: 8,
   },
@@ -2230,6 +2618,22 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginTop: 8,
   },
+  shippingHero: {
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
+    marginTop: 8,
+    padding: 10,
+  },
+  shippingHeroMain: {
+    flex: 1,
+    gap: 6,
+    minWidth: 220,
+  },
   shippingNotice: {
     borderWidth: 1,
     gap: 4,
@@ -2237,7 +2641,34 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   shippingForm: {
-    gap: 2,
+    gap: 10,
+  },
+  shippingStep: {
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 10,
+    padding: 10,
+  },
+  shippingStepHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  shippingStepBody: {
+    gap: 8,
+  },
+  stepNumber: {
+    alignItems: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 28,
+    justifyContent: 'center',
+    width: 28,
+  },
+  stepTitleBlock: {
+    flex: 1,
+    minWidth: 140,
   },
   shippingLogistics: {
     borderTopWidth: StyleSheet.hairlineWidth,

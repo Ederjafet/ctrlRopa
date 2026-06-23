@@ -4690,3 +4690,15 @@ Resultado:
 - Envios reales muestran estado, tipo, guia, paquetes, dias en estado y accion contextual.
 - `Ver permisos` ahora enumera preparar paquete listo, registrar guia, marcar enviado y confirmar recibido.
 - Las acciones bloqueadas muestran razon; no se agregan integraciones reales de paqueteria.
+
+## 2026-06-22 - PACKAGE-SHIPPING-C flujo claro de direccion y envio
+
+Tipo: rediseno frontend/UX de la seccion `Direccion y envio` en detalle de paquete, sin backend ni migraciones.
+
+Resultado:
+
+- `Direccion y envio` se reorganiza en cuatro pasos: tipo, direccion/recoleccion, costo/guia/paqueteria y guardar.
+- Se agrega estado compuesto: incompleto, direccion pendiente, costo pendiente, listo para cobrar y listo para envio.
+- Paquetes con datos parciales muestran aviso y ya no aparecen como confirmados si falta tipo de entrega.
+- `Marcar listo para envio` prioriza razones claras: tipo, direccion, costo/modalidad y saldo.
+- El formulario conserva el endpoint existente `PATCH /shipping` y no cambia reglas de pago.

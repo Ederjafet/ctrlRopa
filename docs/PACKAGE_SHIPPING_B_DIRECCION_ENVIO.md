@@ -77,6 +77,8 @@ Se conserva `/shipping-cost` por compatibilidad, pero la UI nueva usa `/shipping
 
 Actualizacion `SHIPMENTS-UX-A`: la bandeja muestra el resumen de direccion y destinatario en las tarjetas de paquetes listos, ademas de estado de guia/costo y siguiente paso operativo.
 
+Actualizacion `PACKAGE-SHIPPING-C`: el detalle de paquete organiza direccion/envio por pasos y ya no muestra direccion o costo como envio completo si falta `delivery_type`.
+
 ## Fuera de alcance
 
 - cotizacion automatica;
