@@ -12,6 +12,8 @@ export type LiveReservationOperationalStatus =
   | 'OPERATIONAL_SOLD'
   | 'CANCELLED';
 
+export type ReservationScope = 'active' | 'history' | 'all';
+
 export type CreateReservationRequest = {
   itemId: number;
   customerId?: number | null;
@@ -49,6 +51,16 @@ export type Reservation = {
   liveOperationalStatusUpdatedAt?: string | null;
   liveOperationalStatusUpdatedByUserId?: number | null;
   liveOperationalStatusReason?: string | null;
+  customerPackageId?: number | null;
+  customerPackageFolio?: string | null;
+  customerPackageStatus?: string | null;
+  shipmentId?: number | null;
+  shipmentFolio?: string | null;
+  shipmentStatus?: string | null;
+  operationalStatus?: string | null;
+  operationalStatusLabel?: string | null;
+  activeReservation?: boolean;
+  historicalReservation?: boolean;
   boxId?: number | null;
   boxCode?: string | null;
   createdAt?: string;
@@ -82,9 +94,10 @@ function createReservationIdempotencyKey(): string {
 }
 
 export async function getReservationsByBranch(
-  branchId: number
+  branchId: number,
+  scope: ReservationScope = 'active'
 ): Promise<Reservation[]> {
-  return apiRequest<Reservation[]>(`/api/reservations/branch/${branchId}`);
+  return apiRequest<Reservation[]>(`/api/reservations/branch/${branchId}?scope=${scope}`);
 }
 
 export async function getReservationsWithoutBox(

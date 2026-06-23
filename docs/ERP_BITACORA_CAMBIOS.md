@@ -1,5 +1,28 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-22 - RESERVATIONS-SHIPPED-A ocultar apartados enviados de activos
+
+Tipo: frontend, backend, apartados, paquetes, envios, tests, documentacion.
+
+Objetivo:
+
+- Evitar que apartados ya enviados o entregados sigan apareciendo en la bandeja activa de `/reservations`.
+
+Cambios realizados:
+
+- `GET /api/reservations/branch/{branchId}` acepta `scope=active|history|all`, con `active` como default.
+- El DTO de reserva expone paquete, shipment y estado operativo derivado.
+- `/reservations` usa la vista default `Activos` y agrega filtros para `Listas para envio`, `Enviadas / historial` y `Todos`.
+- Las reservas historicas conservan consulta de detalle/paquete/envio, pero no muestran acciones operativas de apartado vivo.
+- Se agregan tests de `ReservationService` para activos, historial y all.
+- Se documenta la fase en `docs/RESERVATIONS_SHIPPED_A_OCULTAR_ENVIADOS.md`.
+
+Restricciones respetadas:
+
+- No se borran apartados, pagos, paquetes ni envios.
+- No se cambia el estado fisico de la prenda; la regla se deriva de paquete/envio.
+- `READY` queda como activo porque todavia no fue enviado.
+
 ## 2026-06-22 - SHIPMENT-TIMELINE-A timeline contextual de envios
 
 Tipo: frontend, UX operativa, envios, documentacion.

@@ -76,6 +76,9 @@ type ReservationPackageLink = {
   id: number;
   folio: string;
   status?: string;
+  shipmentId?: number | null;
+  shipmentFolio?: string | null;
+  shipmentStatus?: string | null;
 };
 
 type ReservationPackageMap = Record<number, ReservationPackageLink>;
@@ -126,6 +129,16 @@ function isActiveReservation(reservation: Reservation) {
   return reservation.status === 'ACTIVE';
 }
 
+function isOperationallyActiveReservation(reservation: Reservation) {
+  if (typeof reservation.activeReservation === 'boolean') return reservation.activeReservation;
+  return isActiveReservation(reservation);
+}
+
+function isHistoricalReservation(reservation: Reservation) {
+  if (typeof reservation.historicalReservation === 'boolean') return reservation.historicalReservation;
+  return !isOperationallyActiveReservation(reservation);
+}
+
 function hasFormalCustomer(reservation: Reservation) {
   return Boolean(reservation.customerId);
 }
@@ -139,7 +152,47 @@ function isSelectableCustomer(customer: Customer) {
 }
 
 function isActivePackageStatus(status?: string | null) {
-  return status === 'OPEN' || status === 'READY' || status === 'SHIPPED';
+  return status === 'OPEN' || status === 'READY';
+}
+
+function isReadyToShipReservation(reservation: Reservation, packageLink?: ReservationPackageLink) {
+  return (
+    isOperationallyActiveReservation(reservation) &&
+    (reservation.operationalStatus === 'READY_TO_SHIP' ||
+      reservation.customerPackageStatus === 'READY' ||
+      packageLink?.status === 'READY')
+  );
+}
+
+function getPackageLinkFromReservation(reservation: Reservation): ReservationPackageLink | undefined {
+  if (!reservation.customerPackageId) return undefined;
+
+  return {
+    id: reservation.customerPackageId,
+    folio: reservation.customerPackageFolio || `Paquete #${reservation.customerPackageId}`,
+    status: reservation.customerPackageStatus || undefined,
+    shipmentId: reservation.shipmentId,
+    shipmentFolio: reservation.shipmentFolio,
+    shipmentStatus: reservation.shipmentStatus,
+  };
+}
+
+function buildReservationPackageMap(reservations: Reservation[]) {
+  return reservations.reduce<ReservationPackageMap>((acc, reservation) => {
+    const packageLink = getPackageLinkFromReservation(reservation);
+    if (packageLink) {
+      acc[reservation.id] = packageLink;
+    }
+    return acc;
+  }, {});
+}
+
+function getOperationalLabel(reservation: Reservation, packageLink?: ReservationPackageLink) {
+  if (reservation.operationalStatusLabel) return reservation.operationalStatusLabel;
+  if (!isActiveReservation(reservation)) return 'Historico';
+  if (packageLink?.status === 'READY') return 'Listo para envio';
+  if (packageLink?.status === 'OPEN') return 'En paquete';
+  return 'Activo';
 }
 
 function getPartyInfo(reservation: Reservation) {
@@ -195,7 +248,10 @@ function getPrimaryAction(
   packageLink?: ReservationPackageLink,
   hasOpenPackage = false
 ): { kind: PrimaryActionKind; title: string } {
-  if (!isActiveReservation(reservation)) return { kind: 'detail', title: 'Ver detalle' };
+  if (!isOperationallyActiveReservation(reservation) && packageLink) {
+    return { kind: 'viewPackage', title: 'Ver paquete' };
+  }
+  if (!isOperationallyActiveReservation(reservation)) return { kind: 'detail', title: 'Ver detalle' };
   if (packageLink) return { kind: 'viewPackage', title: 'Ver paquete' };
   if (!reservation.customerId) return { kind: 'linkCustomer', title: 'Vincular cliente' };
 
@@ -218,8 +274,8 @@ function getPackageDisabledReason(
     return 'Tu usuario no tiene permiso para crear paquetes.';
   }
 
-  if (!isActiveReservation(reservation)) {
-    return 'Solo se pueden preparar paquetes desde apartados activos.';
+  if (!isOperationallyActiveReservation(reservation)) {
+    return 'Este apartado ya no esta activo; revisalo en historial.';
   }
 
   if (!reservation.customerId) {
@@ -234,7 +290,7 @@ function getPackageDisabledReason(
 }
 
 function getAssignBoxDisabledReason(reservation: Reservation) {
-  if (!isActiveReservation(reservation)) {
+  if (!isOperationallyActiveReservation(reservation)) {
     return 'Solo se pueden asignar cajas a apartados activos.';
   }
 
@@ -254,7 +310,7 @@ export default function ReservationsScreen() {
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<ReservationFilter>('ALL');
+  const [filter, setFilter] = useState<ReservationFilter>('ACTIVE');
   const [visibleLimit, setVisibleLimit] = useState(RESERVATION_PAGE_SIZE);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -305,14 +361,12 @@ export default function ReservationsScreen() {
       {
         key: 'READY_TO_SHIP',
         label: 'Listas para envio',
-        enabled: false,
-        disabledReason: 'Pendiente de liberacion segura con saldo pagado.',
+        enabled: true,
       },
       {
         key: 'SHIPPED',
-        label: 'Enviadas',
-        enabled: false,
-        disabledReason: 'Pendiente de trazabilidad de envio desde paquetes.',
+        label: 'Enviadas / historial',
+        enabled: true,
       },
     ],
     []
@@ -396,16 +450,17 @@ export default function ReservationsScreen() {
         }
 
         const [reservationData, boxData, customerData] = await Promise.all([
-          getReservationsByBranch(currentSession.branchId),
+          getReservationsByBranch(currentSession.branchId, 'all'),
           getActiveBoxesByBranch(currentSession.branchId),
           getCustomersByBranch(currentSession.branchId),
         ]);
 
-        const active = reservationData.filter(isActiveReservation);
+        const active = reservationData.filter(isOperationallyActiveReservation);
         const { packageMap, openCustomerIds } = await loadReservationPackageMap(active);
+        const packageMapFromReservations = buildReservationPackageMap(reservationData);
 
-        setReservations(active);
-        setReservationPackageMap(packageMap);
+        setReservations(reservationData);
+        setReservationPackageMap({ ...packageMapFromReservations, ...packageMap });
         setOpenPackageCustomerIds(openCustomerIds);
         setBoxes(boxData);
         setCustomers(customerData.filter(isSelectableCustomer));
@@ -428,17 +483,29 @@ export default function ReservationsScreen() {
 
   const filtered = useMemo(() => {
     const query = search.toLowerCase().trim();
+    const activeReservations = reservations.filter(isOperationallyActiveReservation);
+    const historicalReservations = reservations.filter(isHistoricalReservation);
     const data =
-      filter === 'WITHOUT_BOX'
-        ? reservations.filter((reservation) => !reservation.boxId)
+      filter === 'ALL'
+        ? reservations
+        : filter === 'ACTIVE'
+          ? activeReservations
+        : filter === 'WITHOUT_BOX'
+          ? activeReservations.filter((reservation) => !reservation.boxId)
         : filter === 'WITH_BOX'
-          ? reservations.filter((reservation) => Boolean(reservation.boxId))
-          : filter === 'INTERESTED'
-            ? reservations.filter(hasInterestedAlias)
+          ? activeReservations.filter((reservation) => Boolean(reservation.boxId))
+        : filter === 'INTERESTED'
+            ? activeReservations.filter(hasInterestedAlias)
           : filter === 'CUSTOMERS'
-            ? reservations.filter(hasFormalCustomer)
+            ? activeReservations.filter(hasFormalCustomer)
           : filter === 'IN_PACKAGE'
-            ? reservations.filter((reservation) => Boolean(reservationPackageMap[reservation.id]))
+            ? activeReservations.filter((reservation) => Boolean(reservationPackageMap[reservation.id]))
+          : filter === 'READY_TO_SHIP'
+            ? activeReservations.filter((reservation) =>
+                isReadyToShipReservation(reservation, reservationPackageMap[reservation.id])
+              )
+          : filter === 'SHIPPED'
+            ? historicalReservations
           : reservations;
 
     if (!query) return data;
@@ -462,12 +529,16 @@ export default function ReservationsScreen() {
   }, [filter, reservationPackageMap, reservations, search]);
 
   const metrics = useMemo(() => {
-    const active = reservations.filter(isActiveReservation);
+    const active = reservations.filter(isOperationallyActiveReservation);
+    const history = reservations.filter(isHistoricalReservation);
     const withoutBox = active.filter((reservation) => !reservation.boxId);
     const withBox = active.filter((reservation) => Boolean(reservation.boxId));
     const interested = active.filter(hasInterestedAlias);
     const customers = active.filter(hasFormalCustomer);
     const inPackage = active.filter((reservation) => Boolean(reservationPackageMap[reservation.id]));
+    const ready = active.filter((reservation) =>
+      isReadyToShipReservation(reservation, reservationPackageMap[reservation.id])
+    );
 
     return {
       active: active.length,
@@ -476,6 +547,8 @@ export default function ReservationsScreen() {
       withoutBox: withoutBox.length,
       withBox: withBox.length,
       inPackage: inPackage.length,
+      ready: ready.length,
+      history: history.length,
     };
   }, [reservationPackageMap, reservations]);
 
@@ -485,6 +558,15 @@ export default function ReservationsScreen() {
   );
   const visibleCount = Math.min(visibleLimit, filtered.length);
   const canLoadMore = visibleCount < filtered.length;
+  const currentFilterMessage = useMemo(() => {
+    if (filter === 'SHIPPED') {
+      return 'Mostrando apartados enviados, entregados, cancelados o cerrados. Se conservan para consulta historica.';
+    }
+    if (filter === 'ALL') {
+      return 'Mostrando apartados activos e historicos. Usa Activas para la bandeja operativa diaria.';
+    }
+    return 'Mostrando apartados pendientes de operacion. Los apartados enviados o entregados se consultan en Historial.';
+  }, [filter]);
   const filteredLinkCustomers = useMemo(() => {
     const query = linkCustomerSearch.toLowerCase().trim();
     const data = query
@@ -605,7 +687,16 @@ export default function ReservationsScreen() {
   const openPackageDetail = (packageLink: ReservationPackageLink) => {
     router.push({
       pathname: '/customer-package-detail',
-      params: { id: String(packageLink.id) },
+      params: { id: String(packageLink.id), returnTo: returnTo || '/reservations' },
+    } as any);
+  };
+
+  const openShipmentDetail = (packageLink: ReservationPackageLink) => {
+    if (!packageLink.shipmentId) return;
+
+    router.push({
+      pathname: '/shipment-detail',
+      params: { id: String(packageLink.shipmentId), returnTo: returnTo || '/reservations' },
     } as any);
   };
 
@@ -791,7 +882,7 @@ export default function ReservationsScreen() {
 
     const reservationCandidates = reservations
       .filter((candidate) => {
-        if (!isActiveReservation(candidate)) return false;
+        if (!isOperationallyActiveReservation(candidate)) return false;
         if (!candidate.customerId || candidate.customerId !== reservation.customerId) return false;
         if (!candidate.itemId) return false;
         return !packagedReservationIds.has(candidate.id);
@@ -1093,18 +1184,22 @@ export default function ReservationsScreen() {
     const party = getPartyInfo(item);
     const packageLink = reservationPackageMap[item.id];
     const hasOpenPackage = item.customerId ? openPackageCustomerIds.has(item.customerId) : false;
+    const operationalLabel = getOperationalLabel(item, packageLink);
+    const isHistorical = isHistoricalReservation(item);
     const channelLabel =
       item.liveId
         ? getLiveLabel(item)
         : getSalesChannelLabel(item.salesChannelCode, item.salesChannelName) || 'Canal no capturado';
     const boxLabel = item.boxCode || 'Sin caja';
     const followUpLabel = packageLink
-      ? `En paquete ${packageLink.folio}`
+      ? `${operationalLabel}: ${packageLink.folio}`
       : party.needsCustomer
       ? 'Pendiente: vincular cliente'
       : item.boxCode
         ? `En caja: ${boxLabel}`
-        : 'Caja: Sin caja';
+        : isHistorical
+          ? operationalLabel
+          : 'Caja: Sin caja';
     const itemLabel = item.itemCode || `ID ${item.itemId}`;
     const branchLabel = session?.branchName || 'Sucursal no capturada';
     const itemMetaLine = `${itemLabel} - ${branchLabel}`;
@@ -1186,6 +1281,8 @@ export default function ReservationsScreen() {
             <InfoPill label="Live / canal" value={channelLabel} />
             <InfoPill label="Prenda" value={itemLabel} />
             {packageLink ? <InfoPill label="Paquete" value={packageLink.folio} /> : null}
+            <InfoPill label="Estado operativo" value={operationalLabel} tone={isHistorical ? 'warning' : 'neutral'} />
+            {packageLink?.shipmentFolio ? <InfoPill label="Envio" value={packageLink.shipmentFolio} /> : null}
             <InfoPill
               label="Pagos"
               value="Abono y saldo se revisan en detalle para evitar llamadas N+1."
@@ -1210,6 +1307,7 @@ export default function ReservationsScreen() {
     const assignBoxDisabledReason = getAssignBoxDisabledReason(item);
     const isCreatingPackage = workingReservationId === item.id && workingAction === 'createPackage';
     const needsCustomerFollowUp = hasInterestedAlias(item);
+    const isOperationalActive = isOperationallyActiveReservation(item);
 
     return (
       <AppBottomModal
@@ -1242,7 +1340,25 @@ export default function ReservationsScreen() {
               }}
             />
           ) : null}
-          {needsCustomerFollowUp ? (
+          {packageLink?.shipmentId ? (
+            <AppButton
+              title={`Ver envio ${packageLink.shipmentFolio || `#${packageLink.shipmentId}`}`}
+              variant="secondary"
+              onPress={() => {
+                setActionsReservation(null);
+                openShipmentDetail(packageLink);
+              }}
+            />
+          ) : null}
+          {!isOperationalActive ? (
+            <AppCard variant="subtle">
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Este apartado esta en historial. Se conserva para consulta, pero ya no permite acciones operativas de
+                bandeja activa.
+              </AppText>
+            </AppCard>
+          ) : null}
+          {isOperationalActive && needsCustomerFollowUp ? (
             <>
               <AppButton
                 title="Vincular alias a cliente existente"
@@ -1266,72 +1382,76 @@ export default function ReservationsScreen() {
               />
             </>
           ) : null}
-          <AppButton
-            title={item.boxId ? 'Cambiar caja' : 'Asignar caja'}
-            variant={item.boxId ? 'neutral' : 'operation'}
-            onPress={() =>
-              item.boxId ? closeActionsAndRun(openReservationDetail) : closeActionsAndRun(openBoxModal)
-            }
-            disabled={Boolean(assignBoxDisabledReason)}
-            disabledReason={assignBoxDisabledReason || undefined}
-          />
-          {!packageLink ? (
-            <AppButton
-              title={packageActionTitle}
-              variant="operation"
-              onPress={() => closeActionsAndRun(openPackageModal)}
-              loading={isCreatingPackage}
-              disabled={Boolean(packageDisabledReason) || Boolean(workingReservationId)}
-              disabledReason={packageDisabledReason || 'Ya hay una accion en proceso.'}
-            />
+          {isOperationalActive ? (
+            <>
+              <AppButton
+                title={item.boxId ? 'Cambiar caja' : 'Asignar caja'}
+                variant={item.boxId ? 'neutral' : 'operation'}
+                onPress={() =>
+                  item.boxId ? closeActionsAndRun(openReservationDetail) : closeActionsAndRun(openBoxModal)
+                }
+                disabled={Boolean(assignBoxDisabledReason)}
+                disabledReason={assignBoxDisabledReason || undefined}
+              />
+              {!packageLink ? (
+                <AppButton
+                  title={packageActionTitle}
+                  variant="operation"
+                  onPress={() => closeActionsAndRun(openPackageModal)}
+                  loading={isCreatingPackage}
+                  disabled={Boolean(packageDisabledReason) || Boolean(workingReservationId)}
+                  disabledReason={packageDisabledReason || 'Ya hay una accion en proceso.'}
+                />
+              ) : null}
+              <AppButton
+                title="Ver pagos"
+                variant="secondary"
+                onPress={() => closeActionsAndRun(openReservationDetail)}
+                disabled={!canViewPayments}
+                disabledReason="Tu usuario no tiene permiso para ver pagos."
+              />
+              <AppButton
+                title="Registrar abono"
+                variant="secondary"
+                onPress={() => closeActionsAndRun(openPaymentFlow)}
+                disabled={!canRegisterPayments || !isOperationalActive}
+                disabledReason={
+                  !canRegisterPayments
+                    ? 'Tu usuario no tiene permiso para registrar pagos.'
+                    : 'Solo se puede abonar sobre apartados activos.'
+                }
+              />
+              <AppButton
+                title="Venta inmediata LIVE"
+                variant="neutral"
+                disabled
+                disabledReason="Usar solo si la venta se cierra directamente desde LIVE, sin continuar flujo de paquete/envio."
+              />
+              <AppButton
+                title="Liberar envio"
+                variant="neutral"
+                disabled
+                disabledReason="Pendiente: requiere resumen de paquete pagado y validacion backend de saldo completo."
+              />
+              <AppButton
+                title="Marcar enviado"
+                variant="neutral"
+                disabled
+                disabledReason="Pendiente: requiere paquete liberado y datos de envio."
+              />
+              <AppButton
+                title="Cancelar apartado"
+                variant="danger"
+                onPress={() => closeActionsAndRun(openReservationDetail)}
+                disabled={!canCancelReservation || !isOperationalActive}
+                disabledReason={
+                  !canCancelReservation
+                    ? 'Tu usuario no tiene permiso para cancelar apartados.'
+                    : 'Solo se puede cancelar desde apartados activos.'
+                }
+              />
+            </>
           ) : null}
-          <AppButton
-            title="Ver pagos"
-            variant="secondary"
-            onPress={() => closeActionsAndRun(openReservationDetail)}
-            disabled={!canViewPayments}
-            disabledReason="Tu usuario no tiene permiso para ver pagos."
-          />
-          <AppButton
-            title="Registrar abono"
-            variant="secondary"
-            onPress={() => closeActionsAndRun(openPaymentFlow)}
-            disabled={!canRegisterPayments || !isActiveReservation(item)}
-            disabledReason={
-              !canRegisterPayments
-                ? 'Tu usuario no tiene permiso para registrar pagos.'
-                : 'Solo se puede abonar sobre apartados activos.'
-            }
-          />
-          <AppButton
-            title="Venta inmediata LIVE"
-            variant="neutral"
-            disabled
-            disabledReason="Usar solo si la venta se cierra directamente desde LIVE, sin continuar flujo de paquete/envio."
-          />
-          <AppButton
-            title="Liberar envio"
-            variant="neutral"
-            disabled
-            disabledReason="Pendiente: requiere resumen de paquete pagado y validacion backend de saldo completo."
-          />
-          <AppButton
-            title="Marcar enviado"
-            variant="neutral"
-            disabled
-            disabledReason="Pendiente: requiere paquete liberado y datos de envio."
-          />
-          <AppButton
-            title="Cancelar apartado"
-            variant="danger"
-            onPress={() => closeActionsAndRun(openReservationDetail)}
-            disabled={!canCancelReservation || !isActiveReservation(item)}
-            disabledReason={
-              !canCancelReservation
-                ? 'Tu usuario no tiene permiso para cancelar apartados.'
-                : 'Solo se puede cancelar desde apartados activos.'
-            }
-          />
         </View>
       </AppBottomModal>
     );
@@ -1396,6 +1516,8 @@ export default function ReservationsScreen() {
         {renderCompactMetric('Sin caja', metrics.withoutBox)}
         {renderCompactMetric('Con caja', metrics.withBox)}
         {renderCompactMetric('En paquete', metrics.inPackage)}
+        {renderCompactMetric('Listas', metrics.ready)}
+        {renderCompactMetric('Historial', metrics.history)}
       </View>
 
       <View style={styles.filterRow}>
@@ -1417,6 +1539,12 @@ export default function ReservationsScreen() {
         value={search}
         onChangeText={handleSearchChange}
       />
+
+      <AppCard variant={filter === 'SHIPPED' ? 'warning' : 'subtle'} style={styles.scopeNotice}>
+        <AppText variant="caption" color={theme.colors.mutedText}>
+          {currentFilterMessage}
+        </AppText>
+      </AppCard>
 
       {errorMessage ? (
         <AppCard variant="danger">
@@ -1458,7 +1586,11 @@ export default function ReservationsScreen() {
         ListEmptyComponent={
           <EmptyState
             title={
-              filter === 'WITHOUT_BOX'
+              filter === 'SHIPPED'
+                ? 'No hay apartados en historial'
+                : filter === 'READY_TO_SHIP'
+                  ? 'No hay apartados listos para envio'
+                : filter === 'WITHOUT_BOX'
                 ? 'No hay apartados activos sin caja'
                 : filter === 'WITH_BOX'
                   ? 'No hay apartados activos con caja'
@@ -1466,9 +1598,15 @@ export default function ReservationsScreen() {
                     ? 'No hay apartados con interesado'
                     : filter === 'CUSTOMERS'
                       ? 'No hay apartados con cliente formal'
+                  : filter === 'ALL'
+                    ? 'No hay apartados'
                   : 'No hay apartados activos'
             }
-            message="Cuando existan reservas para este filtro, apareceran aqui."
+            message={
+              filter === 'SHIPPED'
+                ? 'Cuando un paquete se marque enviado, entregado, cancelado o cerrado, sus apartados apareceran aqui.'
+                : 'Cuando existan reservas para este filtro, apareceran aqui.'
+            }
           />
         }
       />
@@ -1997,6 +2135,9 @@ const styles = StyleSheet.create({
     minWidth: 118,
     paddingHorizontal: 10,
     paddingVertical: 6,
+  },
+  scopeNotice: {
+    marginBottom: 10,
   },
   reservationIdentity: {
     flex: 1,

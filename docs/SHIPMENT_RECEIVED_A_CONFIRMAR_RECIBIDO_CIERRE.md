@@ -1,6 +1,7 @@
 # SHIPMENT-RECEIVED-A Confirmar recibido y cierre operativo
 
 > Actualizacion SHIPMENT-TIMELINE-A: al confirmar recibido, la linea de tiempo muestra `Recibido` como paso completado y ya no conserva `Cancelado` como pendiente en envios no cancelados.
+> Actualizacion RESERVATIONS-SHIPPED-A: cuando un envio pasa a `OUT_FOR_DELIVERY` o `DELIVERED`, los apartados de sus paquetes salen de la bandeja activa y se consultan desde historial.
 
 ## Problema detectado
 

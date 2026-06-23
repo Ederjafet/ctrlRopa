@@ -30,6 +30,16 @@ public class ReservationResponse {
     private LocalDateTime liveOperationalStatusUpdatedAt;
     private Long liveOperationalStatusUpdatedByUserId;
     private String liveOperationalStatusReason;
+    private Long customerPackageId;
+    private String customerPackageFolio;
+    private String customerPackageStatus;
+    private Long shipmentId;
+    private String shipmentFolio;
+    private String shipmentStatus;
+    private String operationalStatus;
+    private String operationalStatusLabel;
+    private boolean activeReservation;
+    private boolean historicalReservation;
     private LocalDateTime createdAt;
     private LocalDateTime cancelledAt;
     private String cancelReason;
@@ -63,6 +73,16 @@ public class ReservationResponse {
                                LocalDateTime liveOperationalStatusUpdatedAt,
                                Long liveOperationalStatusUpdatedByUserId,
                                String liveOperationalStatusReason,
+                               Long customerPackageId,
+                               String customerPackageFolio,
+                               String customerPackageStatus,
+                               Long shipmentId,
+                               String shipmentFolio,
+                               String shipmentStatus,
+                               String operationalStatus,
+                               String operationalStatusLabel,
+                               boolean activeReservation,
+                               boolean historicalReservation,
                                LocalDateTime createdAt,
                                LocalDateTime cancelledAt,
                                String cancelReason,
@@ -92,6 +112,16 @@ public class ReservationResponse {
         this.liveOperationalStatusUpdatedAt = liveOperationalStatusUpdatedAt;
         this.liveOperationalStatusUpdatedByUserId = liveOperationalStatusUpdatedByUserId;
         this.liveOperationalStatusReason = liveOperationalStatusReason;
+        this.customerPackageId = customerPackageId;
+        this.customerPackageFolio = customerPackageFolio;
+        this.customerPackageStatus = customerPackageStatus;
+        this.shipmentId = shipmentId;
+        this.shipmentFolio = shipmentFolio;
+        this.shipmentStatus = shipmentStatus;
+        this.operationalStatus = operationalStatus;
+        this.operationalStatusLabel = operationalStatusLabel;
+        this.activeReservation = activeReservation;
+        this.historicalReservation = historicalReservation;
         this.createdAt = createdAt;
         this.cancelledAt = cancelledAt;
         this.cancelReason = cancelReason;
@@ -123,6 +153,16 @@ public class ReservationResponse {
     public LocalDateTime getLiveOperationalStatusUpdatedAt() { return liveOperationalStatusUpdatedAt; }
     public Long getLiveOperationalStatusUpdatedByUserId() { return liveOperationalStatusUpdatedByUserId; }
     public String getLiveOperationalStatusReason() { return liveOperationalStatusReason; }
+    public Long getCustomerPackageId() { return customerPackageId; }
+    public String getCustomerPackageFolio() { return customerPackageFolio; }
+    public String getCustomerPackageStatus() { return customerPackageStatus; }
+    public Long getShipmentId() { return shipmentId; }
+    public String getShipmentFolio() { return shipmentFolio; }
+    public String getShipmentStatus() { return shipmentStatus; }
+    public String getOperationalStatus() { return operationalStatus; }
+    public String getOperationalStatusLabel() { return operationalStatusLabel; }
+    public boolean isActiveReservation() { return activeReservation; }
+    public boolean isHistoricalReservation() { return historicalReservation; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getCancelledAt() { return cancelledAt; }
     public String getCancelReason() { return cancelReason; }

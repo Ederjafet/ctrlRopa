@@ -17,8 +17,9 @@ public class ReservationController {
     }
 
     @GetMapping("/branch/{branchId}")
-    public List<ReservationResponse> findByBranch(@PathVariable Long branchId) {
-        return service.findByBranch(branchId);
+    public List<ReservationResponse> findByBranch(@PathVariable Long branchId,
+                                                  @RequestParam(defaultValue = "active") String scope) {
+        return service.findByBranch(branchId, scope);
     }
 
     @GetMapping("/branch/{branchId}/without-box")

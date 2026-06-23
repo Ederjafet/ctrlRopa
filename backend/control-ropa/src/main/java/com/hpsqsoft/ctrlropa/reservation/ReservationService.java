@@ -42,6 +42,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @Transactional
@@ -109,10 +110,17 @@ public class ReservationService {
 
     @Transactional(readOnly = true)
     public List<ReservationResponse> findByBranch(Long branchId) {
+        return findByBranch(branchId, "active");
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReservationResponse> findByBranch(Long branchId, String scope) {
         tenantAccessGuard.requireBranch(branchId, "La sucursal de reservas no pertenece al tenant activo");
+        ReservationScope reservationScope = ReservationScope.from(scope);
         return repository.findByBranchIdOrderByCreatedAtDesc(branchId)
                 .stream()
                 .map(this::toResponse)
+                .filter(response -> reservationScope.includes(response.isActiveReservation()))
                 .toList();
     }
 
@@ -1109,6 +1117,9 @@ public class ReservationService {
     }
 
     private ReservationResponse toResponse(Reservation entity) {
+        ReservationPackageSnapshot packageSnapshot = findReservationPackageSnapshot(entity.getId());
+        ReservationOperationalState operationalState = resolveOperationalState(entity, packageSnapshot);
+
         return new ReservationResponse(
                 entity.getId(),
                 entity.getItem().getId(),
@@ -1135,11 +1146,103 @@ public class ReservationService {
                 entity.getLiveOperationalStatusUpdatedAt(),
                 entity.getLiveOperationalStatusUpdatedByUserId(),
                 entity.getLiveOperationalStatusReason(),
+                packageSnapshot.customerPackageId(),
+                packageSnapshot.customerPackageFolio(),
+                packageSnapshot.customerPackageStatus(),
+                packageSnapshot.shipmentId(),
+                packageSnapshot.shipmentFolio(),
+                packageSnapshot.shipmentStatus(),
+                operationalState.status(),
+                operationalState.label(),
+                operationalState.active(),
+                !operationalState.active(),
                 entity.getCreatedAt(),
                 entity.getCancelledAt(),
                 entity.getCancelReason(),
                 entity.getCancelledByUserId()
         );
+    }
+
+    private ReservationPackageSnapshot findReservationPackageSnapshot(Long reservationId) {
+        List<ReservationPackageSnapshot> packageSnapshots = jdbcTemplate.query(
+                """
+                SELECT cp.id AS customer_package_id,
+                       cp.folio AS customer_package_folio,
+                       cp.status AS customer_package_status,
+                       sh.id AS shipment_id,
+                       sh.folio AS shipment_folio,
+                       sh.status AS shipment_status
+                FROM customer_package_items cpi
+                JOIN customer_packages cp ON cp.id = cpi.customer_package_id
+                LEFT JOIN shipment_packages sp ON sp.customer_package_id = cp.id
+                LEFT JOIN shipments sh ON sh.id = sp.shipment_id
+                WHERE cpi.reservation_id = ?
+                ORDER BY
+                  CASE WHEN sh.id IS NULL THEN 1 ELSE 0 END,
+                  COALESCE(sh.created_at, cp.created_at) DESC,
+                  cp.id DESC
+                LIMIT 1
+                """,
+                (rs, rowNum) -> new ReservationPackageSnapshot(
+                        rs.getLong("customer_package_id"),
+                        rs.getString("customer_package_folio"),
+                        rs.getString("customer_package_status"),
+                        rs.getObject("shipment_id") != null ? rs.getLong("shipment_id") : null,
+                        rs.getString("shipment_folio"),
+                        rs.getString("shipment_status")
+                ),
+                reservationId
+        );
+
+        return packageSnapshots == null || packageSnapshots.isEmpty()
+                ? ReservationPackageSnapshot.empty()
+                : packageSnapshots.get(0);
+    }
+
+    private ReservationOperationalState resolveOperationalState(Reservation reservation,
+                                                               ReservationPackageSnapshot packageSnapshot) {
+        if (reservation.getStatus() == ReservationStatus.CANCELLED) {
+            return new ReservationOperationalState("CANCELLED", "Cancelado", false);
+        }
+        if (reservation.getStatus() == ReservationStatus.CONVERTED_TO_SALE) {
+            return new ReservationOperationalState("CONVERTED_TO_SALE", "Convertido a venta", false);
+        }
+        if (reservation.getStatus() != ReservationStatus.ACTIVE) {
+            return new ReservationOperationalState(reservation.getStatus().name(), "Historico", false);
+        }
+
+        String shipmentStatus = packageSnapshot.shipmentStatus();
+        if ("DELIVERED".equals(shipmentStatus)) {
+            return new ReservationOperationalState("DELIVERED", "Entregado", false);
+        }
+        if ("OUT_FOR_DELIVERY".equals(shipmentStatus)) {
+            return new ReservationOperationalState("SHIPPED", "Enviado", false);
+        }
+        if ("CLOSED_WITH_INCIDENTS".equals(shipmentStatus)) {
+            return new ReservationOperationalState("CLOSED_WITH_INCIDENTS", "Cerrado con incidencias", false);
+        }
+        if ("CANCELLED".equals(shipmentStatus)) {
+            return new ReservationOperationalState("CANCELLED", "Envio cancelado", false);
+        }
+
+        String packageStatus = packageSnapshot.customerPackageStatus();
+        if ("DELIVERED".equals(packageStatus)) {
+            return new ReservationOperationalState("DELIVERED", "Paquete entregado", false);
+        }
+        if ("SHIPPED".equals(packageStatus)) {
+            return new ReservationOperationalState("SHIPPED", "Paquete enviado", false);
+        }
+        if ("CANCELLED".equals(packageStatus)) {
+            return new ReservationOperationalState("CANCELLED", "Paquete cancelado", false);
+        }
+        if ("READY".equals(packageStatus)) {
+            return new ReservationOperationalState("READY_TO_SHIP", "Listo para envio", true);
+        }
+        if ("OPEN".equals(packageStatus)) {
+            return new ReservationOperationalState("IN_PACKAGE", "En paquete", true);
+        }
+
+        return new ReservationOperationalState("ACTIVE", "Activo", true);
     }
 
     private String findUserName(Long userId) {
@@ -1154,6 +1257,52 @@ public class ReservationService {
         );
 
         return names.isEmpty() ? null : names.get(0);
+    }
+
+    private enum ReservationScope {
+        ACTIVE,
+        HISTORY,
+        ALL;
+
+        static ReservationScope from(String value) {
+            if (value == null || value.isBlank()) {
+                return ACTIVE;
+            }
+
+            return switch (value.trim().toLowerCase(Locale.ROOT)) {
+                case "history", "historical", "historial" -> HISTORY;
+                case "all", "todos" -> ALL;
+                default -> ACTIVE;
+            };
+        }
+
+        boolean includes(boolean active) {
+            return switch (this) {
+                case ACTIVE -> active;
+                case HISTORY -> !active;
+                case ALL -> true;
+            };
+        }
+    }
+
+    private record ReservationPackageSnapshot(
+            Long customerPackageId,
+            String customerPackageFolio,
+            String customerPackageStatus,
+            Long shipmentId,
+            String shipmentFolio,
+            String shipmentStatus
+    ) {
+        static ReservationPackageSnapshot empty() {
+            return new ReservationPackageSnapshot(null, null, null, null, null, null);
+        }
+    }
+
+    private record ReservationOperationalState(
+            String status,
+            String label,
+            boolean active
+    ) {
     }
 
     public static class CreateReservationRequest {

@@ -40,6 +40,7 @@ import org.mockito.ArgumentMatchers;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.sql.ResultSet;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
@@ -96,6 +97,84 @@ class ReservationServiceTests {
             paymentAllocationRepository,
             paymentRepository
     );
+
+    @Test
+    void findByBranchDefaultActiveExcludesShippedAndDeliveredReservations() {
+        Branch branch = branch();
+        Customer customer = customer(branch);
+        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
+        Reservation withoutPackage = reservation(10L, item(ItemStatus.RESERVED, branch), customer, branch, channel);
+        Reservation openPackage = reservation(11L, item(ItemStatus.RESERVED, branch), customer, branch, channel);
+        Reservation readyPackage = reservation(12L, item(ItemStatus.RESERVED, branch), customer, branch, channel);
+        Reservation shippedPackage = reservation(13L, item(ItemStatus.RESERVED, branch), customer, branch, channel);
+        Reservation deliveredShipment = reservation(14L, item(ItemStatus.RESERVED, branch), customer, branch, channel);
+
+        when(repository.findByBranchIdOrderByCreatedAtDesc(6L))
+                .thenReturn(List.of(withoutPackage, openPackage, readyPackage, shippedPackage, deliveredShipment));
+        when(customerOrderService.findOrderIdByReservationId(ArgumentMatchers.anyLong())).thenReturn(null);
+        stubSellerName();
+        stubNoPackage(10L);
+        stubPackageSnapshot(11L, 101L, "PKG-OPEN", "OPEN", null, null, null);
+        stubPackageSnapshot(12L, 102L, "PKG-READY", "READY", null, null, null);
+        stubPackageSnapshot(13L, 103L, "PKG-SHIPPED", "SHIPPED", 203L, "SHP-203", "OUT_FOR_DELIVERY");
+        stubPackageSnapshot(14L, 104L, "PKG-DELIVERED", "DELIVERED", 204L, "SHP-204", "DELIVERED");
+
+        List<ReservationResponse> response = service.findByBranch(6L);
+
+        assertEquals(List.of(10L, 11L, 12L), response.stream().map(ReservationResponse::getId).toList());
+        assertTrue(response.stream().allMatch(ReservationResponse::isActiveReservation));
+        assertEquals("READY_TO_SHIP", response.get(2).getOperationalStatus());
+    }
+
+    @Test
+    void findByBranchHistoryReturnsSentDeliveredAndCancelledReservations() {
+        Branch branch = branch();
+        Customer customer = customer(branch);
+        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
+        Reservation active = reservation(10L, item(ItemStatus.RESERVED, branch), customer, branch, channel);
+        Reservation shipped = reservation(11L, item(ItemStatus.RESERVED, branch), customer, branch, channel);
+        Reservation delivered = reservation(12L, item(ItemStatus.RESERVED, branch), customer, branch, channel);
+        Reservation cancelled = reservation(13L, item(ItemStatus.RESERVED, branch), customer, branch, channel);
+        cancelled.setStatus(ReservationStatus.CANCELLED);
+
+        when(repository.findByBranchIdOrderByCreatedAtDesc(6L))
+                .thenReturn(List.of(active, shipped, delivered, cancelled));
+        when(customerOrderService.findOrderIdByReservationId(ArgumentMatchers.anyLong())).thenReturn(null);
+        stubSellerName();
+        stubPackageSnapshot(10L, 101L, "PKG-READY", "READY", null, null, null);
+        stubPackageSnapshot(11L, 102L, "PKG-SHIPPED", "SHIPPED", 202L, "SHP-202", "OUT_FOR_DELIVERY");
+        stubPackageSnapshot(12L, 103L, "PKG-DELIVERED", "DELIVERED", 203L, "SHP-203", "DELIVERED");
+        stubNoPackage(13L);
+
+        List<ReservationResponse> response = service.findByBranch(6L, "history");
+
+        assertEquals(List.of(11L, 12L, 13L), response.stream().map(ReservationResponse::getId).toList());
+        assertTrue(response.stream().allMatch(ReservationResponse::isHistoricalReservation));
+        assertEquals("SHIPPED", response.get(0).getOperationalStatus());
+        assertEquals("DELIVERED", response.get(1).getOperationalStatus());
+        assertEquals("CANCELLED", response.get(2).getOperationalStatus());
+    }
+
+    @Test
+    void findByBranchAllReturnsActiveAndHistoricalReservations() {
+        Branch branch = branch();
+        Customer customer = customer(branch);
+        SalesChannel channel = channel(2L, ChannelCode.DOOR_RESERVATION);
+        Reservation active = reservation(10L, item(ItemStatus.RESERVED, branch), customer, branch, channel);
+        Reservation shipped = reservation(11L, item(ItemStatus.RESERVED, branch), customer, branch, channel);
+
+        when(repository.findByBranchIdOrderByCreatedAtDesc(6L)).thenReturn(List.of(active, shipped));
+        when(customerOrderService.findOrderIdByReservationId(ArgumentMatchers.anyLong())).thenReturn(null);
+        stubSellerName();
+        stubNoPackage(10L);
+        stubPackageSnapshot(11L, 102L, "PKG-SHIPPED", "SHIPPED", 202L, "SHP-202", "OUT_FOR_DELIVERY");
+
+        List<ReservationResponse> response = service.findByBranch(6L, "all");
+
+        assertEquals(List.of(10L, 11L), response.stream().map(ReservationResponse::getId).toList());
+        assertTrue(response.get(0).isActiveReservation());
+        assertTrue(response.get(1).isHistoricalReservation());
+    }
 
     @Test
     void createDoorReservationUsesAtomicAvailableToReservedUpdate() {
@@ -1039,10 +1118,45 @@ class ReservationServiceTests {
 
     private void stubSellerName() {
         when(jdbcTemplate.query(
-                anyString(),
+                ArgumentMatchers.contains("SELECT name FROM users"),
                 ArgumentMatchers.<RowMapper<String>>any(),
                 eq(99L)
         )).thenReturn(List.of("Seller"));
+    }
+
+    private void stubNoPackage(Long reservationId) {
+        when(jdbcTemplate.query(
+                ArgumentMatchers.contains("FROM customer_package_items"),
+                ArgumentMatchers.<RowMapper<Object>>any(),
+                eq(reservationId)
+        )).thenReturn(List.of());
+    }
+
+    private void stubPackageSnapshot(Long reservationId,
+                                     Long packageId,
+                                     String packageFolio,
+                                     String packageStatus,
+                                     Long shipmentId,
+                                     String shipmentFolio,
+                                     String shipmentStatus) {
+        when(jdbcTemplate.query(
+                ArgumentMatchers.contains("FROM customer_package_items"),
+                ArgumentMatchers.<RowMapper<Object>>any(),
+                eq(reservationId)
+        )).thenAnswer(invocation -> {
+            RowMapper<Object> mapper = invocation.getArgument(1);
+            ResultSet rs = mock(ResultSet.class);
+            when(rs.getLong("customer_package_id")).thenReturn(packageId);
+            when(rs.getString("customer_package_folio")).thenReturn(packageFolio);
+            when(rs.getString("customer_package_status")).thenReturn(packageStatus);
+            when(rs.getObject("shipment_id")).thenReturn(shipmentId);
+            if (shipmentId != null) {
+                when(rs.getLong("shipment_id")).thenReturn(shipmentId);
+            }
+            when(rs.getString("shipment_folio")).thenReturn(shipmentFolio);
+            when(rs.getString("shipment_status")).thenReturn(shipmentStatus);
+            return List.of(mapper.mapRow(rs, 0));
+        });
     }
 
     private void stubCancelFlow(Reservation reservation) {
