@@ -1,5 +1,7 @@
 # SHIPMENT-RECEIVED-A Confirmar recibido y cierre operativo
 
+> Actualizacion SHIPMENT-TIMELINE-A: al confirmar recibido, la linea de tiempo muestra `Recibido` como paso completado y ya no conserva `Cancelado` como pendiente en envios no cancelados.
+
 ## Problema detectado
 
 Despues de marcar un envio como enviado faltaba un flujo directo para confirmar que el cliente recibio el paquete y dejar claro que sucede con el paquete relacionado.

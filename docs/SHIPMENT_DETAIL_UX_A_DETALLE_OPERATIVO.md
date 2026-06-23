@@ -4,6 +4,7 @@ Fecha: 2026-06-22
 
 > Actualizacion SHIPMENT-BUTTONS-A: las acciones criticas del detalle ya no usan `Alert.alert` como confirmacion. `Marcar enviado`, `Cancelar envio` y `Reabrir envio` usan modal propio, loading y aviso visible. El despacho toma la guia del shipment o del paquete relacionado si el shipment aun no la tiene.
 > Actualizacion SHIPMENT-RECEIVED-A: cuando el envio esta `OUT_FOR_DELIVERY`, `Confirmar recibido` abre modal real con nota opcional, llama `PATCH /api/shipments/{id}/confirm-received`, actualiza timeline y mueve shipment/paquete a `DELIVERED` sin tocar pagos ni costo de envio.
+> Actualizacion SHIPMENT-TIMELINE-A: la linea de tiempo ahora es contextual. `Cancelado` solo aparece para envios `CANCELLED`; en el flujo normal se muestran creado, guia si aplica, marcado enviado y recibido.
 
 ## Problema
 
@@ -39,7 +40,7 @@ El backend no expone en esta fase un endpoint para editar guia de un shipment ya
 - Seccion `Paqueteria y guia` con guia, costo, cobro y bloqueo visible si falta guia.
 - Seccion `Paquete relacionado` con total, envio, estado de pago, estado del paquete y acciones.
 - Seccion `Prendas incluidas` usando el detalle del paquete.
-- Linea de tiempo compacta: creado, guia registrada, enviado, recibido/resuelto y cancelado.
+- Linea de tiempo compacta y contextual: creado, guia registrada si aplica, enviado y recibido. `Cancelado` se muestra solo cuando el envio realmente esta cancelado.
 - Acciones ordenadas por contexto.
 
 ## Cambios funcionales

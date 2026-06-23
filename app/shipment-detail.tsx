@@ -47,6 +47,12 @@ type NoticeState = {
 } | null;
 
 type ConfirmAction = 'dispatch' | 'receive' | 'cancel' | 'reopen';
+type TimelineStep = {
+  label: string;
+  value: string;
+  done: boolean;
+  tone?: NoticeTone;
+};
 
 function money(value?: number | null) {
   return `$${Number(value ?? 0).toFixed(2)} MXN`;
@@ -158,6 +164,73 @@ function getDeliveredAt(detail: ShipmentDetail) {
     .map((line) => line.deliveredAt)
     .filter((value): value is string => Boolean(value));
   return dates[0] ?? null;
+}
+
+function completedOrPending(dateValue?: string | null, isDone?: boolean) {
+  if (dateValue) return formatDate(dateValue);
+  return isDone ? 'Completado' : 'Pendiente';
+}
+
+function buildShipmentTimeline(detail: ShipmentDetail, effectiveGuide: string): TimelineStep[] {
+  const deliveredAt = getDeliveredAt(detail);
+  const isCancelled = detail.status === 'CANCELLED';
+  const isDelivered = detail.status === 'DELIVERED';
+  const isInTransit = detail.status === 'OUT_FOR_DELIVERY';
+  const hasGuideValue = Boolean(effectiveGuide);
+  const showGuideStep = hasGuideValue || detail.deliveryType === 'CARRIER';
+
+  if (isCancelled) {
+    const cancelledSteps: TimelineStep[] = [
+      { label: 'Envío creado', value: formatDate(detail.createdAt), done: Boolean(detail.createdAt) },
+    ];
+
+    if (hasGuideValue) {
+      cancelledSteps.push({ label: 'Guía registrada', value: effectiveGuide, done: true });
+    }
+
+    cancelledSteps.push({
+      label: 'Cancelado',
+      value: formatDate(detail.cancelledAt),
+      done: true,
+      tone: 'danger',
+    });
+
+    return cancelledSteps;
+  }
+
+  const steps: TimelineStep[] = [
+    { label: 'Envío creado', value: formatDate(detail.createdAt), done: Boolean(detail.createdAt) },
+  ];
+
+  if (showGuideStep) {
+    steps.push({ label: 'Guía registrada', value: effectiveGuide || 'Pendiente', done: hasGuideValue });
+  }
+
+  const sentDone = Boolean(detail.dispatchedAt) || isInTransit || isDelivered || detail.status === 'CLOSED_WITH_INCIDENTS';
+  steps.push({
+    label: 'Marcado enviado',
+    value: completedOrPending(detail.dispatchedAt, sentDone),
+    done: sentDone,
+  });
+
+  if (detail.status === 'CLOSED_WITH_INCIDENTS') {
+    steps.push({
+      label: 'Resuelto con incidencias',
+      value: completedOrPending(deliveredAt, true),
+      done: true,
+      tone: 'warning',
+    });
+    return steps;
+  }
+
+  const receivedDone = Boolean(deliveredAt) || isDelivered;
+  steps.push({
+    label: 'Recibido',
+    value: completedOrPending(deliveredAt, receivedDone),
+    done: receivedDone,
+  });
+
+  return steps;
 }
 
 async function fetchPackageDetails(lines: ShipmentPackageLine[]) {
@@ -1077,40 +1150,47 @@ export default function ShipmentDetailScreen() {
 
   const renderTimeline = () => {
     if (!detail) return null;
-    const deliveredAt = getDeliveredAt(detail);
-    const steps = [
-      { label: 'Envio creado', value: formatDate(detail.createdAt), done: Boolean(detail.createdAt) },
-      { label: 'Guia registrada', value: effectiveGuide || 'Pendiente', done: hasGuide },
-      { label: 'Marcado enviado', value: formatDate(detail.dispatchedAt), done: Boolean(detail.dispatchedAt) },
-      { label: 'Recibido / resuelto', value: formatDate(deliveredAt), done: Boolean(deliveredAt) || detail.status === 'DELIVERED' },
-      { label: 'Cancelado', value: formatDate(detail.cancelledAt), done: Boolean(detail.cancelledAt) },
-    ];
+    const steps = buildShipmentTimeline(detail, effectiveGuide);
 
     return (
       <AppCard>
         <AppText variant="subtitle" bold>
-          Linea de tiempo
+          Línea de tiempo
         </AppText>
         <View style={styles.timeline}>
-          {steps.map((step) => (
-            <View key={step.label} style={styles.timelineRow}>
-              <View
-                style={[
-                  styles.timelineDot,
-                  {
-                    backgroundColor: step.done ? theme.colors.success : theme.colors.surfaceAlt,
-                    borderColor: step.done ? theme.colors.success : theme.colors.border,
-                  },
-                ]}
-              />
-              <View style={styles.flex1}>
-                <AppText bold={step.done}>{step.label}</AppText>
-                <AppText variant="caption" color={theme.colors.mutedText}>
-                  {step.value}
-                </AppText>
+          {steps.map((step) => {
+            const stepColor =
+              step.tone === 'danger'
+                ? theme.colors.danger
+                : step.tone === 'warning'
+                  ? theme.colors.warning
+                  : theme.colors.success;
+
+            return (
+              <View key={step.label} style={styles.timelineRow}>
+                <View
+                  style={[
+                    styles.timelineDot,
+                    {
+                      backgroundColor: step.done ? stepColor : theme.colors.surfaceAlt,
+                      borderColor: step.done ? stepColor : theme.colors.border,
+                    },
+                  ]}
+                />
+                <View style={styles.flex1}>
+                  <AppText
+                    bold={step.done}
+                    color={step.done && step.tone === 'danger' ? theme.colors.danger : undefined}
+                  >
+                    {step.label}
+                  </AppText>
+                  <AppText variant="caption" color={theme.colors.mutedText}>
+                    {step.value}
+                  </AppText>
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       </AppCard>
     );

@@ -2,6 +2,8 @@
 
 Fecha: 2026-06-22
 
+> Actualizacion SHIPMENT-TIMELINE-A: `Cancelado` deja de mostrarse como paso pendiente de la linea de tiempo. La accion de cancelar permanece en acciones cuando aplica; la timeline solo muestra el evento cancelado cuando el shipment esta `CANCELLED`.
+
 ## Problema detectado
 
 En `/shipment-detail?id=2&returnTo=%2Fshipments`, el boton `Marcar enviado` se veia disponible, pero al presionarlo no habia modal, loading, error ni cambio de estado perceptible.

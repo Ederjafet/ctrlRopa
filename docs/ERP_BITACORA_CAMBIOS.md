@@ -1,5 +1,26 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-22 - SHIPMENT-TIMELINE-A timeline contextual de envios
+
+Tipo: frontend, UX operativa, envios, documentacion.
+
+Objetivo:
+
+- Evitar que `Cancelado` aparezca como paso pendiente en envios no cancelados.
+
+Cambios realizados:
+
+- `app/shipment-detail.tsx` construye la linea de tiempo con `buildShipmentTimeline`.
+- `Cancelado` solo se muestra cuando el estado real del shipment es `CANCELLED`.
+- El flujo normal muestra creado, guia si aplica, marcado enviado y `Recibido`.
+- `Recibido / resuelto` se reemplaza por una etiqueta operativa clara: `Recibido`.
+- Se documenta la fase en `docs/SHIPMENT_TIMELINE_A_CONTEXTUAL.md`.
+
+Restricciones respetadas:
+
+- No se tocaron backend, pagos, paquetes, estados ni endpoints.
+- No se cambiaron reglas de marcar enviado ni confirmar recibido.
+
 ## 2026-06-22 - SHIPMENT-RECEIVED-A confirmar recibido y cierre operativo
 
 Tipo: frontend, backend, envios, paquetes, permisos, tests, documentacion.
