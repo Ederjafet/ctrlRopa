@@ -1,5 +1,31 @@
 # ERP - Bitacora de cambios
 
+## 2026-06-22 - PACKAGE-SHIPPING-B direccion de envio por paquete
+
+Tipo: backend, frontend, paquetes, envios, direcciones, migracion, tests, documentacion.
+
+Objetivo:
+
+- Guardar la direccion exacta usada por cada paquete antes de liberarlo a envio, sin depender de la direccion actual del cliente.
+
+Cambios realizados:
+
+- Se crea `V66__package_shipping_address_snapshot.sql` con snapshot de direccion en `customer_packages`.
+- Se agrega `PATCH /api/customer-packages/{packageId}/shipping` para guardar tipo de entrega, fuente de direccion, snapshot, costo y modalidad.
+- `Marcar listo para envio` ahora exige tipo de entrega y direccion confirmada cuando aplica.
+- `/customer-package-detail` agrega bloque `Direccion y envio` con direccion principal, guardada, temporal, recoleccion, guia del cliente y por cobrar.
+- `/shipments` prepara envios usando el snapshot del paquete y ya no exige direccion viva del cliente.
+- `/shipment-detail` muestra destinatario, telefono, direccion snapshot, tipo de entrega y costo.
+- Se agregan pruebas de direccion personalizada, direccion principal y recoleccion en tienda.
+- Se documenta la fase en `docs/PACKAGE_SHIPPING_B_DIRECCION_ENVIO.md`.
+
+Restricciones respetadas:
+
+- No se cambia direccion principal sin confirmacion.
+- No se libera envio sin direccion cuando aplica.
+- No se integra paqueteria real ni mapas.
+- No se reseteo base de datos.
+
 ## 2026-06-22 - PACKAGE-ITEM-REMOVE-D quitar prenda con pago y saldo a favor
 
 Tipo: backend, frontend, paquetes, pagos, saldo a favor, permisos, tests, documentacion.

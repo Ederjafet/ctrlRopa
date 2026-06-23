@@ -51,6 +51,53 @@ public class CustomerPackage {
     @Column(name = "shipping_notes", columnDefinition = "TEXT")
     private String shippingNotes;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "delivery_type", length = 30)
+    private CustomerPackageDeliveryType deliveryType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "shipping_address_source", length = 40)
+    private CustomerPackageAddressSource shippingAddressSource;
+
+    @Column(name = "shipping_address_confirmed", nullable = false)
+    private boolean shippingAddressConfirmed;
+
+    @Column(name = "source_customer_address_id")
+    private Long sourceCustomerAddressId;
+
+    @Column(name = "ship_to_name", length = 120)
+    private String shipToName;
+
+    @Column(name = "ship_to_phone", length = 40)
+    private String shipToPhone;
+
+    @Column(name = "ship_to_line1", length = 255)
+    private String shipToLine1;
+
+    @Column(name = "ship_to_line2", length = 255)
+    private String shipToLine2;
+
+    @Column(name = "ship_to_city", length = 120)
+    private String shipToCity;
+
+    @Column(name = "ship_to_state", length = 120)
+    private String shipToState;
+
+    @Column(name = "ship_to_postal_code", length = 20)
+    private String shipToPostalCode;
+
+    @Column(name = "ship_to_country", length = 120)
+    private String shipToCountry;
+
+    @Column(name = "ship_to_references", columnDefinition = "TEXT")
+    private String shipToReferences;
+
+    @Column(name = "shipping_collect", nullable = false)
+    private boolean shippingCollect;
+
+    @Column(name = "customer_provided_label", nullable = false)
+    private boolean customerProvidedLabel;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -164,6 +211,126 @@ public class CustomerPackage {
 
     public void setShippingNotes(String shippingNotes) {
         this.shippingNotes = shippingNotes;
+    }
+
+    public CustomerPackageDeliveryType getDeliveryType() {
+        return deliveryType;
+    }
+
+    public void setDeliveryType(CustomerPackageDeliveryType deliveryType) {
+        this.deliveryType = deliveryType;
+    }
+
+    public CustomerPackageAddressSource getShippingAddressSource() {
+        return shippingAddressSource;
+    }
+
+    public void setShippingAddressSource(CustomerPackageAddressSource shippingAddressSource) {
+        this.shippingAddressSource = shippingAddressSource;
+    }
+
+    public boolean isShippingAddressConfirmed() {
+        return shippingAddressConfirmed;
+    }
+
+    public void setShippingAddressConfirmed(boolean shippingAddressConfirmed) {
+        this.shippingAddressConfirmed = shippingAddressConfirmed;
+    }
+
+    public Long getSourceCustomerAddressId() {
+        return sourceCustomerAddressId;
+    }
+
+    public void setSourceCustomerAddressId(Long sourceCustomerAddressId) {
+        this.sourceCustomerAddressId = sourceCustomerAddressId;
+    }
+
+    public String getShipToName() {
+        return shipToName;
+    }
+
+    public void setShipToName(String shipToName) {
+        this.shipToName = shipToName;
+    }
+
+    public String getShipToPhone() {
+        return shipToPhone;
+    }
+
+    public void setShipToPhone(String shipToPhone) {
+        this.shipToPhone = shipToPhone;
+    }
+
+    public String getShipToLine1() {
+        return shipToLine1;
+    }
+
+    public void setShipToLine1(String shipToLine1) {
+        this.shipToLine1 = shipToLine1;
+    }
+
+    public String getShipToLine2() {
+        return shipToLine2;
+    }
+
+    public void setShipToLine2(String shipToLine2) {
+        this.shipToLine2 = shipToLine2;
+    }
+
+    public String getShipToCity() {
+        return shipToCity;
+    }
+
+    public void setShipToCity(String shipToCity) {
+        this.shipToCity = shipToCity;
+    }
+
+    public String getShipToState() {
+        return shipToState;
+    }
+
+    public void setShipToState(String shipToState) {
+        this.shipToState = shipToState;
+    }
+
+    public String getShipToPostalCode() {
+        return shipToPostalCode;
+    }
+
+    public void setShipToPostalCode(String shipToPostalCode) {
+        this.shipToPostalCode = shipToPostalCode;
+    }
+
+    public String getShipToCountry() {
+        return shipToCountry;
+    }
+
+    public void setShipToCountry(String shipToCountry) {
+        this.shipToCountry = shipToCountry;
+    }
+
+    public String getShipToReferences() {
+        return shipToReferences;
+    }
+
+    public void setShipToReferences(String shipToReferences) {
+        this.shipToReferences = shipToReferences;
+    }
+
+    public boolean isShippingCollect() {
+        return shippingCollect;
+    }
+
+    public void setShippingCollect(boolean shippingCollect) {
+        this.shippingCollect = shippingCollect;
+    }
+
+    public boolean isCustomerProvidedLabel() {
+        return customerProvidedLabel;
+    }
+
+    public void setCustomerProvidedLabel(boolean customerProvidedLabel) {
+        this.customerProvidedLabel = customerProvidedLabel;
     }
 
     public LocalDateTime getCreatedAt() {

@@ -13,12 +13,15 @@ import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { hasPermission } from '@/services/accessControl';
 import { getBalanceByPackageFolio, type BalanceSummary } from '@/services/balanceService';
 import { getPaymentMethods, type PaymentMethod } from '@/services/catalogService';
+import { getCustomerAddresses, type CustomerAddress } from '@/services/customerAddressService';
 import {
   addCustomerPackageItemByCode,
   addCustomerPackageItemByQr,
   canMarkCustomerPackageReady,
   cancelCustomerPackage,
+  CustomerPackageAddressSource,
   CustomerPackageDetail,
+  CustomerPackageDeliveryType,
   CustomerPackageItemLine,
   CustomerPackageShipmentLine,
   getCustomerPackageDetail,
@@ -26,7 +29,7 @@ import {
   isCustomerPackageOpen,
   markCustomerPackageReady,
   removeCustomerPackageItem,
-  updateCustomerPackageShippingCost,
+  updateCustomerPackageShipping,
 } from '@/services/customerPackageService';
 import { getItemsByBranch, Item } from '@/services/itemService';
 import { createPaymentByPackageFolio } from '@/services/paymentService';
@@ -81,6 +84,46 @@ function collectionStatusLabel(status?: string | null) {
   return status || 'Sin estado';
 }
 
+function deliveryTypeLabel(type?: string | null) {
+  if (type === 'PARCEL_SERVICE') return 'Paqueteria';
+  if (type === 'LOCAL_DELIVERY') return 'Entrega local';
+  if (type === 'STORE_PICKUP') return 'Recoleccion en tienda';
+  if (type === 'CUSTOMER_PROVIDED_LABEL') return 'Cliente envia guia';
+  if (type === 'COLLECT_SHIPPING') return 'Envio por cobrar';
+  if (type === 'OTHER') return 'Otro';
+  return type || 'Sin definir';
+}
+
+function addressSourceLabel(source?: string | null) {
+  if (source === 'CUSTOMER_PRIMARY_ADDRESS') return 'Direccion principal';
+  if (source === 'CUSTOMER_SAVED_ADDRESS') return 'Direccion guardada';
+  if (source === 'CUSTOM_PACKAGE_ADDRESS') return 'Direccion del paquete';
+  if (source === 'PICKUP_NO_ADDRESS') return 'Sin direccion';
+  if (source === 'CUSTOMER_PROVIDED_LABEL') return 'Guia del cliente';
+  if (source === 'LOCAL_DELIVERY') return 'Entrega local';
+  return source || 'Sin fuente';
+}
+
+function deliveryRequiresAddress(type?: string | null) {
+  return type === 'PARCEL_SERVICE' || type === 'LOCAL_DELIVERY' || type === 'COLLECT_SHIPPING';
+}
+
+function deliveryUsesPackageCost(type?: string | null) {
+  return type !== 'STORE_PICKUP' && type !== 'CUSTOMER_PROVIDED_LABEL' && type !== 'COLLECT_SHIPPING';
+}
+
+function formatPackageAddress(detail?: CustomerPackageDetail | null) {
+  const parts = [
+    detail?.shipToLine1,
+    detail?.shipToLine2,
+    detail?.shipToCity,
+    detail?.shipToState,
+    detail?.shipToPostalCode,
+    detail?.shipToCountry,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(', ') : 'Sin direccion';
+}
+
 function compactDate(value?: string | null) {
   if (!value) return 'Sin fecha';
   const date = new Date(value);
@@ -127,8 +170,12 @@ function getMarkReadyBlockedReason(
   if (!canManagePackage) return 'No tienes permiso para marcar listo para envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.';
   if (detail.status !== 'OPEN') return `El paquete no puede prepararse para envio en su estado actual: ${statusLabel(detail.status)}.`;
   if (Number(detail.totalItems ?? 0) <= 0) return 'Agrega al menos una prenda antes de liberar envio.';
+  if (!detail.deliveryType) return 'Selecciona el tipo de entrega antes de marcar listo para envio.';
+  if (deliveryRequiresAddress(detail.deliveryType) && detail.shippingAddressConfirmed !== true) {
+    return 'Captura o selecciona la direccion de envio antes de marcar listo para envio.';
+  }
   if (detail.shippingCostConfirmed !== true) {
-    return 'Antes de marcar listo para envio, captura el costo de paqueteria o marca envio sin costo.';
+    return 'Confirma el costo de envio o marca una opcion sin costo/por cobrar.';
   }
   if (Number(Number(detail.pendingAmount ?? 0).toFixed(2)) > 0) {
     return `No puedes marcar listo para envio porque el paquete tiene saldo pendiente de ${money(detail.pendingAmount)}.`;
@@ -153,6 +200,7 @@ function getNextStep(
   hasPending: boolean,
   canReady: boolean,
   shippingConfirmed: boolean,
+  addressReady: boolean,
   shipments: CustomerPackageShipmentLine[]
 ) {
   if (detail.status === 'CANCELLED') return 'Paquete cancelado. No requiere acciones operativas.';
@@ -161,7 +209,9 @@ function getNextStep(
     return 'Enviado. Da seguimiento desde el detalle del envio asociado.';
   }
   if (detail.status === 'READY') return 'Listo para envio. Registra o revisa el envio asociado.';
-  if (!shippingConfirmed) return 'Falta definir costo de paqueteria o confirmar envio sin costo.';
+  if (!detail.deliveryType) return 'Falta seleccionar el tipo de entrega.';
+  if (!addressReady) return 'Falta confirmar la direccion o modalidad de entrega.';
+  if (!shippingConfirmed) return 'Falta definir costo de envio o confirmar una opcion sin costo/por cobrar.';
   if (hasPending) return 'Falta registrar abono para liberar el envio.';
   if ((detail.totalItems ?? 0) <= 0) return 'Agrega prendas antes de preparar el envio.';
   if (canReady) return 'Paquete pagado. Puedes marcarlo listo para envio.';
@@ -394,6 +444,22 @@ export default function CustomerPackageDetailScreen() {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentReference, setPaymentReference] = useState('');
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<number | null>(null);
+  const [customerAddresses, setCustomerAddresses] = useState<CustomerAddress[]>([]);
+  const [deliveryType, setDeliveryType] = useState<CustomerPackageDeliveryType>('PARCEL_SERVICE');
+  const [addressSource, setAddressSource] = useState<CustomerPackageAddressSource>('CUSTOM_PACKAGE_ADDRESS');
+  const [sourceCustomerAddressId, setSourceCustomerAddressId] = useState<number | null>(null);
+  const [addressLabel, setAddressLabel] = useState('');
+  const [shipToName, setShipToName] = useState('');
+  const [shipToPhone, setShipToPhone] = useState('');
+  const [shipToLine1, setShipToLine1] = useState('');
+  const [shipToLine2, setShipToLine2] = useState('');
+  const [shipToCity, setShipToCity] = useState('');
+  const [shipToState, setShipToState] = useState('');
+  const [shipToPostalCode, setShipToPostalCode] = useState('');
+  const [shipToCountry, setShipToCountry] = useState('Mexico');
+  const [shipToReferences, setShipToReferences] = useState('');
+  const [saveAddressToCustomer, setSaveAddressToCustomer] = useState(false);
+  const [makePrimaryAddress, setMakePrimaryAddress] = useState(false);
   const [shippingCostInput, setShippingCostInput] = useState('');
   const [shippingCostWaived, setShippingCostWaived] = useState(false);
   const [shippingCarrier, setShippingCarrier] = useState('');
@@ -412,6 +478,23 @@ export default function CustomerPackageDetailScreen() {
 
   const syncShippingForm = useCallback((packageDetail: CustomerPackageDetail) => {
     const confirmed = packageDetail.shippingCostConfirmed === true;
+    const nextDeliveryType = packageDetail.deliveryType ?? 'PARCEL_SERVICE';
+    const nextAddressSource = packageDetail.shippingAddressSource ?? (deliveryRequiresAddress(nextDeliveryType) ? 'CUSTOM_PACKAGE_ADDRESS' : 'PICKUP_NO_ADDRESS');
+    setDeliveryType(nextDeliveryType);
+    setAddressSource(nextAddressSource);
+    setSourceCustomerAddressId(packageDetail.sourceCustomerAddressId ?? null);
+    setShipToName(packageDetail.shipToName ?? packageDetail.customerName ?? '');
+    setShipToPhone(packageDetail.shipToPhone ?? packageDetail.customerPhone ?? '');
+    setShipToLine1(packageDetail.shipToLine1 ?? '');
+    setShipToLine2(packageDetail.shipToLine2 ?? '');
+    setShipToCity(packageDetail.shipToCity ?? '');
+    setShipToState(packageDetail.shipToState ?? '');
+    setShipToPostalCode(packageDetail.shipToPostalCode ?? '');
+    setShipToCountry(packageDetail.shipToCountry ?? 'Mexico');
+    setShipToReferences(packageDetail.shipToReferences ?? '');
+    setSaveAddressToCustomer(false);
+    setMakePrimaryAddress(false);
+    setAddressLabel('');
     setShippingCostWaived(packageDetail.shippingCostWaived === true);
     setShippingCostInput(
       confirmed && packageDetail.shippingCostAmount != null
@@ -441,13 +524,15 @@ export default function CustomerPackageDetailScreen() {
 
       setDetail(packageDetail);
       syncShippingForm(packageDetail);
-      const [itemsData, methodsData, balanceData] = await Promise.all([
+      const [itemsData, methodsData, balanceData, addressesData] = await Promise.all([
         getItemsByBranch(packageDetail.branchId),
         getPaymentMethods(packageDetail.branchId),
         getBalanceByPackageFolio(packageDetail.folio),
+        getCustomerAddresses(packageDetail.customerId),
       ]);
       setBranchItems(itemsData);
       setPaymentMethods(methodsData);
+      setCustomerAddresses(addressesData.filter((address) => address.status !== 'INACTIVE'));
       setSelectedPaymentMethodId((current) => current ?? methodsData[0]?.id ?? null);
       setBalanceSummary(balanceData);
     } catch (error: any) {
@@ -474,13 +559,24 @@ export default function CustomerPackageDetailScreen() {
   const items = useMemo(() => detail?.items ?? [], [detail?.items]);
   const shipments = useMemo(() => detail?.shipments ?? [], [detail?.shipments]);
   const shippingConfirmed = detail?.shippingCostConfirmed === true;
+  const addressConfirmed = detail?.shippingAddressConfirmed === true;
+  const requiresAddress = deliveryRequiresAddress(deliveryType);
+  const costEditable = deliveryUsesPackageCost(deliveryType);
   const currentShippingCost = shippingConfirmed ? Number(detail?.shippingCostAmount ?? 0) : 0;
   const currentShippingWaived = detail?.shippingCostWaived === true;
   const shippingStatusText = !shippingConfirmed
     ? 'No definido'
-    : currentShippingWaived
+    : detail?.shippingCollect
+      ? 'Por cobrar'
+      : detail?.customerProvidedLabel
+        ? 'Guia del cliente'
+        : currentShippingWaived
       ? 'Sin costo'
       : 'Confirmado';
+  const primaryAddress = customerAddresses.find((address) => address.isDefault) ?? null;
+  const selectedSavedAddress = sourceCustomerAddressId
+    ? customerAddresses.find((address) => address.id === sourceCustomerAddressId) ?? null
+    : null;
 
   const canManagePackage = hasPermission(session, 'CREATE_CLOSE_CUSTOMER_PACKAGE');
   const canRegisterPayments = hasPermission(session, 'REGISTER_PAYMENTS');
@@ -832,9 +928,44 @@ export default function CustomerPackageDetailScreen() {
       return;
     }
 
-    const shippingCost = shippingCostWaived ? 0 : Number(shippingCostInput.replace(',', '.'));
+    const effectiveCostWaived =
+      shippingCostWaived ||
+      deliveryType === 'STORE_PICKUP' ||
+      deliveryType === 'CUSTOMER_PROVIDED_LABEL' ||
+      deliveryType === 'COLLECT_SHIPPING';
+    const shippingCost = effectiveCostWaived ? 0 : Number(shippingCostInput.replace(',', '.'));
 
-    if (!shippingCostWaived && (!Number.isFinite(shippingCost) || shippingCost <= 0)) {
+    if (deliveryRequiresAddress(deliveryType)) {
+      if (addressSource === 'CUSTOMER_SAVED_ADDRESS' && !sourceCustomerAddressId) {
+        setNotice({
+          title: 'Direccion requerida',
+          message: 'Selecciona una direccion guardada del cliente.',
+          tone: 'warning',
+        });
+        return;
+      }
+
+      if ((addressSource === 'CUSTOM_PACKAGE_ADDRESS' || addressSource === 'LOCAL_DELIVERY') &&
+        (!shipToName.trim() || !shipToPhone.trim() || !shipToLine1.trim() || !shipToCity.trim() || !shipToState.trim() || !shipToPostalCode.trim())) {
+        setNotice({
+          title: 'Direccion incompleta',
+          message: 'Captura quien recibe, telefono, calle, ciudad, estado y codigo postal.',
+          tone: 'warning',
+        });
+        return;
+      }
+    }
+
+    if (deliveryType === 'CUSTOMER_PROVIDED_LABEL' && !trackingNumber.trim() && !shippingNotes.trim()) {
+      setNotice({
+        title: 'Guia o nota requerida',
+        message: 'Captura la guia o una nota del envio proporcionado por el cliente.',
+        tone: 'warning',
+      });
+      return;
+    }
+
+    if (!effectiveCostWaived && (!Number.isFinite(shippingCost) || shippingCost <= 0)) {
       setNotice({
         title: 'Costo de envio requerido',
         message:
@@ -849,9 +980,31 @@ export default function CustomerPackageDetailScreen() {
     try {
       setIsWorking(true);
       setIsSavingShipping(true);
-      const updated = await updateCustomerPackageShippingCost(detail.id, {
-        shippingCostAmount: shippingCostWaived ? 0 : shippingCost,
-        shippingCostWaived,
+      const updated = await updateCustomerPackageShipping(detail.id, {
+        deliveryType,
+        addressSource:
+          deliveryType === 'STORE_PICKUP'
+            ? 'PICKUP_NO_ADDRESS'
+            : deliveryType === 'CUSTOMER_PROVIDED_LABEL'
+              ? 'CUSTOMER_PROVIDED_LABEL'
+              : addressSource,
+        sourceCustomerAddressId,
+        addressLabel: addressLabel.trim() || null,
+        recipientName: shipToName.trim() || null,
+        recipientPhone: shipToPhone.trim() || null,
+        line1: shipToLine1.trim() || null,
+        line2: shipToLine2.trim() || null,
+        city: shipToCity.trim() || null,
+        state: shipToState.trim() || null,
+        postalCode: shipToPostalCode.trim() || null,
+        country: shipToCountry.trim() || 'Mexico',
+        references: shipToReferences.trim() || null,
+        saveAddressToCustomer,
+        makePrimaryAddress,
+        shippingCostAmount: effectiveCostWaived ? 0 : shippingCost,
+        shippingCostWaived: effectiveCostWaived,
+        collectShipping: deliveryType === 'COLLECT_SHIPPING',
+        customerProvidedLabel: deliveryType === 'CUSTOMER_PROVIDED_LABEL',
         shippingCarrier: shippingCarrier.trim() || null,
         trackingNumber: trackingNumber.trim() || null,
         shippingNotes: shippingNotes.trim() || null,
@@ -859,10 +1012,11 @@ export default function CustomerPackageDetailScreen() {
       setDetail(updated);
       syncShippingForm(updated);
       setNotice({
-        title: shippingCostWaived ? 'Envio sin costo' : 'Datos de envio guardados',
-        message: shippingCostWaived
-          ? 'Envio confirmado sin costo.'
-          : 'Datos de envio guardados correctamente. El total y saldo del paquete fueron actualizados.',
+        title: deliveryType === 'STORE_PICKUP' ? 'Recoleccion confirmada' : 'Direccion y envio guardados',
+        message:
+          deliveryType === 'STORE_PICKUP'
+            ? 'Recoleccion en tienda confirmada sin costo de envio.'
+            : 'Direccion y datos de envio guardados correctamente. El total y saldo del paquete fueron actualizados.',
         tone: 'success',
       });
     } catch (error: any) {
@@ -1002,7 +1156,7 @@ export default function CustomerPackageDetailScreen() {
   );
   const latestShipment = shipments[0] ?? null;
   const shipmentState = getShipmentState(detail, shipments);
-  const nextStep = getNextStep(detail, hasPending, canReady, shippingConfirmed, shipments);
+  const nextStep = getNextStep(detail, hasPending, canReady, shippingConfirmed, addressConfirmed || !deliveryRequiresAddress(detail.deliveryType), shipments);
   const isTerminalPackage = detail.status === 'CANCELLED' || detail.status === 'DELIVERED';
   const primaryAction =
     isTerminalPackage
@@ -1328,9 +1482,16 @@ export default function CustomerPackageDetailScreen() {
 
           <AppCard>
             <AppText variant="subtitle" bold>
-              Envio / Paqueteria
+              Direccion y envio
             </AppText>
             <View style={styles.shippingSummary}>
+              <InfoRow label="Tipo" value={deliveryTypeLabel(detail.deliveryType)} tone={!detail.deliveryType ? 'warning' : 'success'} />
+              <InfoRow
+                label="Direccion"
+                value={addressConfirmed || !deliveryRequiresAddress(detail.deliveryType) ? 'Confirmada' : 'Pendiente'}
+                tone={addressConfirmed || !deliveryRequiresAddress(detail.deliveryType) ? 'success' : 'warning'}
+              />
+              <InfoRow label="Fuente" value={addressSourceLabel(detail.shippingAddressSource)} />
               <InfoRow
                 label="Costo"
                 value={shippingConfirmed ? money(currentShippingCost) : 'Pendiente'}
@@ -1344,15 +1505,172 @@ export default function CustomerPackageDetailScreen() {
             {!shippingConfirmed ? (
               <View style={[styles.shippingNotice, { borderColor: theme.colors.warning, backgroundColor: theme.colors.surfaceAlt }]}>
                 <AppText variant="caption" bold color={theme.colors.warning}>
-                  Envio pendiente de definir
+                  Direccion o envio pendiente
                 </AppText>
                 <AppText variant="caption" color={theme.colors.mutedText}>
-                  Antes de marcar listo para envio, captura el costo de paqueteria o confirma envio sin costo.
+                  Antes de marcar listo para envio, selecciona tipo de entrega, confirma direccion si aplica y define costo o modalidad sin costo/por cobrar.
                 </AppText>
               </View>
             ) : null}
 
             <View style={styles.shippingForm}>
+              <View style={styles.compactSelector}>
+                <AppText variant="caption" color={theme.colors.mutedText} bold>
+                  Tipo de entrega
+                </AppText>
+                <View style={styles.selectorRow}>
+                  {(['PARCEL_SERVICE', 'LOCAL_DELIVERY', 'STORE_PICKUP', 'CUSTOMER_PROVIDED_LABEL', 'COLLECT_SHIPPING'] as CustomerPackageDeliveryType[]).map((type) => (
+                    <AppButton
+                      key={type}
+                      title={deliveryTypeLabel(type)}
+                      variant={deliveryType === type ? 'operation' : 'neutral'}
+                      onPress={() => {
+                        setDeliveryType(type);
+                        if (type === 'STORE_PICKUP') {
+                          setAddressSource('PICKUP_NO_ADDRESS');
+                          setShippingCostWaived(true);
+                          setShippingCostInput('0.00');
+                        } else if (type === 'CUSTOMER_PROVIDED_LABEL') {
+                          setAddressSource('CUSTOMER_PROVIDED_LABEL');
+                          setShippingCostWaived(true);
+                          setShippingCostInput('0.00');
+                        } else if (type === 'COLLECT_SHIPPING') {
+                          setShippingCostWaived(true);
+                          setShippingCostInput('0.00');
+                          setAddressSource(primaryAddress ? 'CUSTOMER_PRIMARY_ADDRESS' : 'CUSTOM_PACKAGE_ADDRESS');
+                        } else {
+                          setAddressSource(primaryAddress ? 'CUSTOMER_PRIMARY_ADDRESS' : 'CUSTOM_PACKAGE_ADDRESS');
+                        }
+                      }}
+                      style={styles.compactActionButton}
+                      disabled={!canEdit || !canManagePackage || isWorking}
+                    />
+                  ))}
+                </View>
+              </View>
+
+              {requiresAddress ? (
+                <View style={styles.compactSelector}>
+                  <AppText variant="caption" color={theme.colors.mutedText} bold>
+                    Direccion
+                  </AppText>
+                  <View style={styles.selectorRow}>
+                    <AppButton
+                      title="Principal"
+                      variant={addressSource === 'CUSTOMER_PRIMARY_ADDRESS' ? 'operation' : 'neutral'}
+                      onPress={() => {
+                        setAddressSource('CUSTOMER_PRIMARY_ADDRESS');
+                        setSourceCustomerAddressId(primaryAddress?.id ?? null);
+                      }}
+                      disabled={!primaryAddress || !canEdit || !canManagePackage || isWorking}
+                      disabledReason={!primaryAddress ? 'El cliente no tiene direccion principal activa.' : undefined}
+                      style={styles.compactActionButton}
+                    />
+                    <AppButton
+                      title="Guardada"
+                      variant={addressSource === 'CUSTOMER_SAVED_ADDRESS' ? 'operation' : 'neutral'}
+                      onPress={() => {
+                        setAddressSource('CUSTOMER_SAVED_ADDRESS');
+                        setSourceCustomerAddressId(selectedSavedAddress?.id ?? primaryAddress?.id ?? customerAddresses[0]?.id ?? null);
+                      }}
+                      disabled={customerAddresses.length === 0 || !canEdit || !canManagePackage || isWorking}
+                      disabledReason={customerAddresses.length === 0 ? 'El cliente no tiene direcciones guardadas.' : undefined}
+                      style={styles.compactActionButton}
+                    />
+                    <AppButton
+                      title="Otra direccion"
+                      variant={addressSource === 'CUSTOM_PACKAGE_ADDRESS' ? 'operation' : 'neutral'}
+                      onPress={() => {
+                        setAddressSource('CUSTOM_PACKAGE_ADDRESS');
+                        setSourceCustomerAddressId(null);
+                      }}
+                      disabled={!canEdit || !canManagePackage || isWorking}
+                      style={styles.compactActionButton}
+                    />
+                  </View>
+
+                  {addressSource === 'CUSTOMER_SAVED_ADDRESS' ? (
+                    <View style={styles.addressList}>
+                      {customerAddresses.map((address) => (
+                        <AppOptionRow
+                          key={address.id}
+                          title={`${sourceCustomerAddressId === address.id ? '[x] ' : ''}${address.label}${address.isDefault ? ' - Principal' : ''}`}
+                          subtitle={`${address.line1}, ${address.city || 'Sin ciudad'}`}
+                          onPress={() => setSourceCustomerAddressId(address.id)}
+                        />
+                      ))}
+                    </View>
+                  ) : null}
+
+                  {addressSource === 'CUSTOM_PACKAGE_ADDRESS' || addressSource === 'LOCAL_DELIVERY' ? (
+                    <View style={styles.addressFields}>
+                      <AppInput label="Recibe" value={shipToName} onChangeText={setShipToName} editable={canEdit && canManagePackage && !isWorking} />
+                      <AppInput label="Telefono" value={shipToPhone} onChangeText={setShipToPhone} editable={canEdit && canManagePackage && !isWorking} />
+                      <AppInput label="Calle y numero" value={shipToLine1} onChangeText={setShipToLine1} editable={canEdit && canManagePackage && !isWorking} />
+                      <AppInput label="Interior / referencias cortas" value={shipToLine2} onChangeText={setShipToLine2} editable={canEdit && canManagePackage && !isWorking} />
+                      <View style={styles.inlineFields}>
+                        <View style={styles.inlineField}>
+                          <AppInput label="Ciudad" value={shipToCity} onChangeText={setShipToCity} editable={canEdit && canManagePackage && !isWorking} />
+                        </View>
+                        <View style={styles.inlineField}>
+                          <AppInput label="Estado" value={shipToState} onChangeText={setShipToState} editable={canEdit && canManagePackage && !isWorking} />
+                        </View>
+                        <View style={styles.inlineField}>
+                          <AppInput label="CP" value={shipToPostalCode} onChangeText={setShipToPostalCode} editable={canEdit && canManagePackage && !isWorking} />
+                        </View>
+                      </View>
+                      <AppInput label="Pais" value={shipToCountry} onChangeText={setShipToCountry} editable={canEdit && canManagePackage && !isWorking} />
+                      <AppInput label="Referencias" value={shipToReferences} onChangeText={setShipToReferences} multiline editable={canEdit && canManagePackage && !isWorking} />
+                      <View style={styles.selectorRow}>
+                        <AppButton
+                          title={`${saveAddressToCustomer ? '[x]' : '[ ]'} Guardar en cliente`}
+                          variant={saveAddressToCustomer ? 'operation' : 'neutral'}
+                          onPress={() => setSaveAddressToCustomer((current) => !current)}
+                          disabled={!canEdit || !canManagePackage || isWorking}
+                          style={styles.compactActionButton}
+                        />
+                        <AppButton
+                          title={`${makePrimaryAddress ? '[x]' : '[ ]'} Hacer principal`}
+                          variant={makePrimaryAddress ? 'operation' : 'neutral'}
+                          onPress={() => setMakePrimaryAddress((current) => !current)}
+                          disabled={!saveAddressToCustomer || !canEdit || !canManagePackage || isWorking}
+                          style={styles.compactActionButton}
+                        />
+                      </View>
+                      {saveAddressToCustomer ? (
+                        <AppInput label="Etiqueta para cliente" value={addressLabel} onChangeText={setAddressLabel} placeholder="Ej. Trabajo, Mama, Casa" editable={canEdit && canManagePackage && !isWorking} />
+                      ) : null}
+                    </View>
+                  ) : null}
+
+                  {addressSource === 'CUSTOMER_PRIMARY_ADDRESS' && primaryAddress ? (
+                    <AppText variant="caption" color={theme.colors.mutedText}>
+                      Se copiara: {primaryAddress.line1}, {primaryAddress.city || 'Sin ciudad'}.
+                    </AppText>
+                  ) : null}
+                </View>
+              ) : (
+                <View style={[styles.shippingNotice, { borderColor: theme.colors.borderSubtle, backgroundColor: theme.colors.surfaceAlt }]}>
+                  <AppText variant="caption" bold>
+                    {deliveryTypeLabel(deliveryType)}
+                  </AppText>
+                  <AppText variant="caption" color={theme.colors.mutedText}>
+                    Esta modalidad no requiere direccion de envio dentro del paquete.
+                  </AppText>
+                </View>
+              )}
+
+              {detail.shippingAddressConfirmed ? (
+                <View style={[styles.shippingNotice, { borderColor: theme.colors.success, backgroundColor: theme.colors.surfaceAlt }]}>
+                  <AppText variant="caption" bold color={theme.colors.success}>
+                    Snapshot confirmado
+                  </AppText>
+                  <AppText variant="caption" color={theme.colors.mutedText}>
+                    {detail.shipToName || detail.customerName} · {detail.shipToPhone || detail.customerPhone || 'Sin telefono'} · {formatPackageAddress(detail)}
+                  </AppText>
+                </View>
+              ) : null}
+
               <AppButton
                 title={`${shippingCostWaived ? '[x]' : '[ ]'} Envio sin costo`}
                 variant={shippingCostWaived ? 'operation' : 'neutral'}
@@ -1365,9 +1683,11 @@ export default function CustomerPackageDetailScreen() {
                     return next;
                   });
                 }}
-                disabled={!canEdit || !canManagePackage || isWorking}
+                disabled={!costEditable || !canEdit || !canManagePackage || isWorking}
                 disabledReason={
-                  !canManagePackage
+                  !costEditable
+                    ? 'Esta modalidad no suma costo al paquete.'
+                    : !canManagePackage
                     ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
                     : !canEdit
                       ? 'Solo paquetes en preparacion pueden modificar datos de envio.'
@@ -1376,11 +1696,11 @@ export default function CustomerPackageDetailScreen() {
               />
               <AppInput
                 label="Costo de envio"
-                value={shippingCostWaived ? '0.00' : shippingCostInput}
+                value={!costEditable || shippingCostWaived ? '0.00' : shippingCostInput}
                 onChangeText={setShippingCostInput}
                 placeholder="0.00"
                 keyboardType="decimal-pad"
-                editable={!shippingCostWaived && canEdit && canManagePackage && !isWorking}
+                editable={costEditable && !shippingCostWaived && canEdit && canManagePackage && !isWorking}
               />
               <AppInput
                 label="Paqueteria"
@@ -1875,6 +2195,26 @@ const styles = StyleSheet.create({
   compactSelector: {
     gap: 8,
     marginBottom: 12,
+  },
+  selectorRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  addressList: {
+    gap: 8,
+  },
+  addressFields: {
+    gap: 8,
+  },
+  inlineFields: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  inlineField: {
+    flex: 1,
+    minWidth: 120,
   },
   actionsList: {
     gap: 8,

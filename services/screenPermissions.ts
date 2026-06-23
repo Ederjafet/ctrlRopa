@@ -373,6 +373,13 @@ export const SCREEN_PERMISSIONS: Record<ScreenPermissionKey, ScreenPermissionDef
         deniedMessage: 'No puedes aplicar saldo a favor.',
       },
       {
+        key: 'defineShippingAddress',
+        label: 'Definir direccion de envio',
+        permissionCode: 'CREATE_CLOSE_CUSTOMER_PACKAGE',
+        allowedMessage: 'Puedes seleccionar o capturar la direccion usada por el paquete.',
+        deniedMessage: 'No puedes modificar la direccion de envio del paquete.',
+      },
+      {
         key: 'defineShippingCost',
         label: 'Definir costo de envio',
         permissionCode: 'CREATE_CLOSE_CUSTOMER_PACKAGE',

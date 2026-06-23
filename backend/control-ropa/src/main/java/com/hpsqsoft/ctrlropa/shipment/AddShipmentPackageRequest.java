@@ -9,7 +9,6 @@ public class AddShipmentPackageRequest {
     @NotNull(message = "customerPackageId es obligatorio")
     private Long customerPackageId;
 
-    @NotNull(message = "deliveryAddressId es obligatorio")
     private Long deliveryAddressId;
 
     @NotNull(message = "paymentMode es obligatorio")

@@ -2,6 +2,20 @@ import { apiRequest } from '@/services/apiClient';
 
 export type CustomerPackageStatus = 'OPEN' | 'READY' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED' | string;
 export type CustomerPackagePaymentStatus = 'PAID' | 'PARTIAL' | 'PENDING' | 'UNPAID' | string;
+export type CustomerPackageDeliveryType =
+  | 'PARCEL_SERVICE'
+  | 'LOCAL_DELIVERY'
+  | 'STORE_PICKUP'
+  | 'CUSTOMER_PROVIDED_LABEL'
+  | 'COLLECT_SHIPPING'
+  | 'OTHER';
+export type CustomerPackageAddressSource =
+  | 'CUSTOMER_PRIMARY_ADDRESS'
+  | 'CUSTOMER_SAVED_ADDRESS'
+  | 'CUSTOM_PACKAGE_ADDRESS'
+  | 'PICKUP_NO_ADDRESS'
+  | 'CUSTOMER_PROVIDED_LABEL'
+  | 'LOCAL_DELIVERY';
 
 export type CustomerPackage = {
   id: number;
@@ -69,6 +83,21 @@ export type CustomerPackageDetail = CustomerPackage & {
   shippingNotes?: string | null;
   shippingCarrier?: string | null;
   trackingNumber?: string | null;
+  deliveryType?: CustomerPackageDeliveryType | null;
+  shippingAddressSource?: CustomerPackageAddressSource | null;
+  shippingAddressConfirmed?: boolean;
+  sourceCustomerAddressId?: number | null;
+  shipToName?: string | null;
+  shipToPhone?: string | null;
+  shipToLine1?: string | null;
+  shipToLine2?: string | null;
+  shipToCity?: string | null;
+  shipToState?: string | null;
+  shipToPostalCode?: string | null;
+  shipToCountry?: string | null;
+  shipToReferences?: string | null;
+  shippingCollect?: boolean;
+  customerProvidedLabel?: boolean;
   totalAmount?: number;
   paidAmount?: number;
   pendingAmount?: number;
@@ -100,8 +129,25 @@ export type PrepareCustomerPackageFromReservationRequest = {
 };
 
 export type UpdateCustomerPackageShippingRequest = {
+  deliveryType?: CustomerPackageDeliveryType | null;
+  addressSource?: CustomerPackageAddressSource | null;
+  sourceCustomerAddressId?: number | null;
+  addressLabel?: string | null;
+  recipientName?: string | null;
+  recipientPhone?: string | null;
+  line1?: string | null;
+  line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
+  references?: string | null;
+  saveAddressToCustomer?: boolean;
+  makePrimaryAddress?: boolean;
   shippingCostAmount?: number | null;
   shippingCostWaived: boolean;
+  collectShipping?: boolean;
+  customerProvidedLabel?: boolean;
   shippingNotes?: string | null;
   shippingCarrier?: string | null;
   trackingNumber?: string | null;
@@ -233,6 +279,16 @@ export async function updateCustomerPackageShippingCost(
   });
 }
 
+export async function updateCustomerPackageShipping(
+  id: number,
+  payload: UpdateCustomerPackageShippingRequest
+): Promise<CustomerPackageDetail> {
+  return apiRequest<CustomerPackageDetail>(`/api/customer-packages/${id}/shipping`, {
+    method: 'PATCH',
+    body: payload,
+  });
+}
+
 export async function cancelCustomerPackage(
   id: number,
   notes: string,
@@ -256,6 +312,10 @@ export function canMarkCustomerPackageReady(customerPackage?: CustomerPackageDet
   return (
     customerPackage.status === 'OPEN' &&
     Number(customerPackage.totalItems ?? 0) > 0 &&
+    customerPackage.deliveryType != null &&
+    (customerPackage.shippingAddressConfirmed === true ||
+      customerPackage.deliveryType === 'STORE_PICKUP' ||
+      customerPackage.deliveryType === 'CUSTOMER_PROVIDED_LABEL') &&
     customerPackage.shippingCostConfirmed === true &&
     Number(Number(customerPackage.pendingAmount ?? 0).toFixed(2)) <= 0
   );

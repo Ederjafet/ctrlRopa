@@ -2,6 +2,8 @@
 
 Fecha: 2026-06-22
 
+> Actualizacion PACKAGE-SHIPPING-B: la bandeja de Envios ahora prepara paquetes usando el snapshot de direccion guardado en `customer_packages`. Si el paquete usa direccion temporal o recoleccion, el envio puede crearse sin `delivery_address_id` y sigue mostrando la direccion/modalidad historica.
+
 ## Problema
 
 El paquete podia marcarse como listo para envio desde `/customer-package-detail`, pero no aparecia en `/shipments`.

@@ -8,7 +8,10 @@ import com.hpsqsoft.ctrlropa.catalog.SalesChannel;
 import com.hpsqsoft.ctrlropa.catalog.SalesChannelRepository;
 import com.hpsqsoft.ctrlropa.company.Company;
 import com.hpsqsoft.ctrlropa.customer.Customer;
+import com.hpsqsoft.ctrlropa.customer.CustomerAddress;
+import com.hpsqsoft.ctrlropa.customer.CustomerAddressRepository;
 import com.hpsqsoft.ctrlropa.customer.CustomerRepository;
+import com.hpsqsoft.ctrlropa.common.Status;
 import com.hpsqsoft.ctrlropa.inventory.Box;
 import com.hpsqsoft.ctrlropa.item.Item;
 import com.hpsqsoft.ctrlropa.item.ItemRepository;
@@ -52,6 +55,7 @@ class CustomerPackageServiceTests {
     private final CustomerPackageRepository repository = mock(CustomerPackageRepository.class);
     private final CustomerPackageItemRepository itemRepository = mock(CustomerPackageItemRepository.class);
     private final CustomerRepository customerRepository = mock(CustomerRepository.class);
+    private final CustomerAddressRepository customerAddressRepository = mock(CustomerAddressRepository.class);
     private final BranchRepository branchRepository = mock(BranchRepository.class);
     private final SaleRepository saleRepository = mock(SaleRepository.class);
     private final ReservationRepository reservationRepository = mock(ReservationRepository.class);
@@ -69,6 +73,7 @@ class CustomerPackageServiceTests {
             repository,
             itemRepository,
             customerRepository,
+            customerAddressRepository,
             branchRepository,
             saleRepository,
             reservationRepository,
@@ -298,6 +303,84 @@ class CustomerPackageServiceTests {
     }
 
     @Test
+    void updateShippingStoresCustomAddressSnapshotAndAddsCost() {
+        CustomerPackage customerPackage = customerPackage(activeReservation(false));
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(501L)).thenReturn(Optional.of(customerPackage));
+        when(repository.save(any(CustomerPackage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(itemRepository.findByCustomerPackageIdOrderByCreatedAtAsc(501L)).thenReturn(List.of());
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(501L))).thenReturn(List.of());
+        when(jdbcTemplate.queryForObject(anyString(), eq(BigDecimal.class), eq(501L)))
+                .thenReturn(BigDecimal.ZERO);
+
+        UpdateCustomerPackageShippingRequest request = customShippingRequest();
+        request.setShippingCostAmount(BigDecimal.valueOf(180).setScale(2));
+
+        CustomerPackageDetailResponse response = service.updateShipping(501L, request);
+
+        assertEquals("PARCEL_SERVICE", response.getDeliveryType());
+        assertEquals("CUSTOM_PACKAGE_ADDRESS", response.getShippingAddressSource());
+        assertEquals(true, response.getShippingAddressConfirmed());
+        assertEquals("Maria Lopez", response.getShipToName());
+        assertEquals("Calle 1 #123", response.getShipToLine1());
+        assertEquals(BigDecimal.valueOf(180).setScale(2), response.getShippingCostAmount());
+        verify(repository).save(customerPackage);
+    }
+
+    @Test
+    void updateShippingCopiesPrimaryCustomerAddress() {
+        CustomerPackage customerPackage = customerPackage(activeReservation(false));
+        CustomerAddress primaryAddress = customerAddress(customerPackage.getCustomer(), true);
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(501L)).thenReturn(Optional.of(customerPackage));
+        when(customerAddressRepository.findByCustomerIdAndStatusOrderByIsDefaultDescLabelAsc(20L, Status.ACTIVE))
+                .thenReturn(List.of(primaryAddress));
+        when(repository.save(any(CustomerPackage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(itemRepository.findByCustomerPackageIdOrderByCreatedAtAsc(501L)).thenReturn(List.of());
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(501L))).thenReturn(List.of());
+        when(jdbcTemplate.queryForObject(anyString(), eq(BigDecimal.class), eq(501L)))
+                .thenReturn(BigDecimal.ZERO);
+
+        UpdateCustomerPackageShippingRequest request = new UpdateCustomerPackageShippingRequest();
+        request.setDeliveryType(CustomerPackageDeliveryType.PARCEL_SERVICE);
+        request.setAddressSource(CustomerPackageAddressSource.CUSTOMER_PRIMARY_ADDRESS);
+        request.setShippingCostWaived(true);
+
+        CustomerPackageDetailResponse response = service.updateShipping(501L, request);
+
+        assertEquals(primaryAddress.getId(), response.getSourceCustomerAddressId());
+        assertEquals("CUSTOMER_PRIMARY_ADDRESS", response.getShippingAddressSource());
+        assertEquals(primaryAddress.getLine1(), response.getShipToLine1());
+        assertEquals(true, response.getShippingCostWaived());
+    }
+
+    @Test
+    void updateShippingStorePickupDoesNotRequireAddressAndSetsZeroCost() {
+        CustomerPackage customerPackage = customerPackage(activeReservation(false));
+
+        when(currentUser.getUserId()).thenReturn(99L);
+        when(repository.findById(501L)).thenReturn(Optional.of(customerPackage));
+        when(repository.save(any(CustomerPackage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(itemRepository.findByCustomerPackageIdOrderByCreatedAtAsc(501L)).thenReturn(List.of());
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(501L))).thenReturn(List.of());
+        when(jdbcTemplate.queryForObject(anyString(), eq(BigDecimal.class), eq(501L)))
+                .thenReturn(BigDecimal.ZERO);
+
+        UpdateCustomerPackageShippingRequest request = new UpdateCustomerPackageShippingRequest();
+        request.setDeliveryType(CustomerPackageDeliveryType.STORE_PICKUP);
+
+        CustomerPackageDetailResponse response = service.updateShipping(501L, request);
+
+        assertEquals("STORE_PICKUP", response.getDeliveryType());
+        assertEquals("PICKUP_NO_ADDRESS", response.getShippingAddressSource());
+        assertEquals(true, response.getShippingAddressConfirmed());
+        assertEquals(true, response.getShippingCostConfirmed());
+        assertEquals(BigDecimal.ZERO, response.getShippingCostAmount());
+    }
+
+    @Test
     void markReadyWithoutShippingConfirmedIsRejected() {
         CustomerPackage customerPackage = customerPackage(activeReservation(false));
 
@@ -317,6 +400,7 @@ class CustomerPackageServiceTests {
         CustomerPackage customerPackage = customerPackage(reservation);
         customerPackage.setShippingCostConfirmed(true);
         customerPackage.setShippingCostAmount(BigDecimal.valueOf(190).setScale(2));
+        confirmParcelAddress(customerPackage);
         CustomerPackageItem packageItem = packageItem(customerPackage, reservation);
 
         when(currentUser.getUserId()).thenReturn(99L);
@@ -345,6 +429,7 @@ class CustomerPackageServiceTests {
         customerPackage.setShippingCostConfirmed(true);
         customerPackage.setShippingCostWaived(true);
         customerPackage.setShippingCostAmount(BigDecimal.ZERO);
+        confirmStorePickup(customerPackage);
         CustomerPackageItem packageItem = packageItem(customerPackage, reservation);
 
         when(currentUser.getUserId()).thenReturn(99L);
@@ -369,6 +454,7 @@ class CustomerPackageServiceTests {
         CustomerPackage customerPackage = customerPackage(reservation);
         customerPackage.setShippingCostConfirmed(true);
         customerPackage.setShippingCostAmount(BigDecimal.valueOf(190).setScale(2));
+        confirmParcelAddress(customerPackage);
         CustomerPackageItem packageItem = packageItem(customerPackage, reservation);
 
         when(currentUser.getUserId()).thenReturn(99L);
@@ -397,6 +483,7 @@ class CustomerPackageServiceTests {
         CustomerPackage customerPackage = customerPackage(reservation);
         customerPackage.setShippingCostConfirmed(true);
         customerPackage.setShippingCostAmount(BigDecimal.valueOf(190).setScale(2));
+        confirmParcelAddress(customerPackage);
         CustomerPackageItem packageItem = packageItem(customerPackage, reservation);
 
         when(currentUser.getUserId()).thenReturn(99L);
@@ -425,6 +512,7 @@ class CustomerPackageServiceTests {
         customerPackage.setShippingCostConfirmed(true);
         customerPackage.setShippingCostWaived(true);
         customerPackage.setShippingCostAmount(BigDecimal.ZERO.setScale(2));
+        confirmStorePickup(customerPackage);
         CustomerPackageItem packageItem = packageItem(customerPackage, reservation);
 
         when(currentUser.getUserId()).thenReturn(99L);
@@ -450,6 +538,7 @@ class CustomerPackageServiceTests {
         customerPackage.setShippingCostConfirmed(true);
         customerPackage.setShippingCostWaived(true);
         customerPackage.setShippingCostAmount(BigDecimal.ZERO.setScale(2));
+        confirmStorePickup(customerPackage);
         CustomerPackageItem packageItem = packageItem(customerPackage, reservation);
         CustomerPackageDetailResponse.ShipmentLine activeShipment = new CustomerPackageDetailResponse.ShipmentLine(
                 900L,
@@ -727,6 +816,55 @@ class CustomerPackageServiceTests {
         customerPackage.setCreatedByUserId(99L);
         ReflectionTestUtils.setField(customerPackage, "createdAt", LocalDateTime.now());
         return customerPackage;
+    }
+
+    private void confirmParcelAddress(CustomerPackage customerPackage) {
+        customerPackage.setDeliveryType(CustomerPackageDeliveryType.PARCEL_SERVICE);
+        customerPackage.setShippingAddressSource(CustomerPackageAddressSource.CUSTOM_PACKAGE_ADDRESS);
+        customerPackage.setShippingAddressConfirmed(true);
+        customerPackage.setShipToName("Maria Lopez");
+        customerPackage.setShipToPhone("5555555555");
+        customerPackage.setShipToLine1("Calle 1 #123");
+        customerPackage.setShipToCity("Ciudad de Mexico");
+        customerPackage.setShipToState("CDMX");
+        customerPackage.setShipToPostalCode("01000");
+        customerPackage.setShipToCountry("Mexico");
+    }
+
+    private void confirmStorePickup(CustomerPackage customerPackage) {
+        customerPackage.setDeliveryType(CustomerPackageDeliveryType.STORE_PICKUP);
+        customerPackage.setShippingAddressSource(CustomerPackageAddressSource.PICKUP_NO_ADDRESS);
+        customerPackage.setShippingAddressConfirmed(true);
+    }
+
+    private UpdateCustomerPackageShippingRequest customShippingRequest() {
+        UpdateCustomerPackageShippingRequest request = new UpdateCustomerPackageShippingRequest();
+        request.setDeliveryType(CustomerPackageDeliveryType.PARCEL_SERVICE);
+        request.setAddressSource(CustomerPackageAddressSource.CUSTOM_PACKAGE_ADDRESS);
+        request.setRecipientName("Maria Lopez");
+        request.setRecipientPhone("5555555555");
+        request.setLine1("Calle 1 #123");
+        request.setCity("Ciudad de Mexico");
+        request.setState("CDMX");
+        request.setPostalCode("01000");
+        request.setCountry("Mexico");
+        request.setShippingCostWaived(false);
+        return request;
+    }
+
+    private CustomerAddress customerAddress(Customer customer, boolean isDefault) {
+        CustomerAddress address = new CustomerAddress();
+        ReflectionTestUtils.setField(address, "id", 44L);
+        address.setCustomer(customer);
+        address.setLabel("Casa");
+        address.setLine1("Av Principal 10");
+        address.setCity("Ciudad de Mexico");
+        address.setState("CDMX");
+        address.setPostalCode("01000");
+        address.setCountry("Mexico");
+        address.setIsDefault(isDefault);
+        address.setStatus(Status.ACTIVE);
+        return address;
     }
 
     private CustomerPackageItem packageItem(CustomerPackage customerPackage, Reservation reservation) {

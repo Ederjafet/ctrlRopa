@@ -2,6 +2,8 @@
 
 Fecha: 2026-06-22
 
+> Actualizacion PACKAGE-SHIPPING-B: el costo de envio ahora se guarda junto con `delivery_type`, fuente de direccion y snapshot historico de la direccion usada por el paquete. La UI nueva utiliza `PATCH /api/customer-packages/{packageId}/shipping`; `/shipping-cost` se conserva por compatibilidad.
+
 ## Problema detectado
 
 `/customer-package-detail` permitia intentar `Marcar listo para envio`, pero no existia un lugar claro para capturar el costo de paqueteria. Eso dejaba una brecha operativa: el costo de envio podia quedar fuera del total cobrado antes de liberar el paquete.

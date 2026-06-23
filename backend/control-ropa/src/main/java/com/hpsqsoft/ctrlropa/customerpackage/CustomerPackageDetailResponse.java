@@ -30,6 +30,21 @@ public class CustomerPackageDetailResponse {
     private String shippingNotes;
     private String shippingCarrier;
     private String trackingNumber;
+    private String deliveryType;
+    private String shippingAddressSource;
+    private Boolean shippingAddressConfirmed;
+    private Long sourceCustomerAddressId;
+    private String shipToName;
+    private String shipToPhone;
+    private String shipToLine1;
+    private String shipToLine2;
+    private String shipToCity;
+    private String shipToState;
+    private String shipToPostalCode;
+    private String shipToCountry;
+    private String shipToReferences;
+    private Boolean shippingCollect;
+    private Boolean customerProvidedLabel;
     private BigDecimal totalAmount;
     private BigDecimal paidAmount;
     private BigDecimal pendingAmount;
@@ -62,6 +77,21 @@ public class CustomerPackageDetailResponse {
                                          String shippingNotes,
                                          String shippingCarrier,
                                          String trackingNumber,
+                                         String deliveryType,
+                                         String shippingAddressSource,
+                                         Boolean shippingAddressConfirmed,
+                                         Long sourceCustomerAddressId,
+                                         String shipToName,
+                                         String shipToPhone,
+                                         String shipToLine1,
+                                         String shipToLine2,
+                                         String shipToCity,
+                                         String shipToState,
+                                         String shipToPostalCode,
+                                         String shipToCountry,
+                                         String shipToReferences,
+                                         Boolean shippingCollect,
+                                         Boolean customerProvidedLabel,
                                          BigDecimal totalAmount,
                                          BigDecimal paidAmount,
                                          BigDecimal pendingAmount,
@@ -92,6 +122,21 @@ public class CustomerPackageDetailResponse {
         this.shippingNotes = shippingNotes;
         this.shippingCarrier = shippingCarrier;
         this.trackingNumber = trackingNumber;
+        this.deliveryType = deliveryType;
+        this.shippingAddressSource = shippingAddressSource;
+        this.shippingAddressConfirmed = shippingAddressConfirmed;
+        this.sourceCustomerAddressId = sourceCustomerAddressId;
+        this.shipToName = shipToName;
+        this.shipToPhone = shipToPhone;
+        this.shipToLine1 = shipToLine1;
+        this.shipToLine2 = shipToLine2;
+        this.shipToCity = shipToCity;
+        this.shipToState = shipToState;
+        this.shipToPostalCode = shipToPostalCode;
+        this.shipToCountry = shipToCountry;
+        this.shipToReferences = shipToReferences;
+        this.shippingCollect = shippingCollect;
+        this.customerProvidedLabel = customerProvidedLabel;
         this.totalAmount = totalAmount;
         this.paidAmount = paidAmount;
         this.pendingAmount = pendingAmount;
@@ -124,6 +169,21 @@ public class CustomerPackageDetailResponse {
     public String getShippingNotes() { return shippingNotes; }
     public String getShippingCarrier() { return shippingCarrier; }
     public String getTrackingNumber() { return trackingNumber; }
+    public String getDeliveryType() { return deliveryType; }
+    public String getShippingAddressSource() { return shippingAddressSource; }
+    public Boolean getShippingAddressConfirmed() { return shippingAddressConfirmed; }
+    public Long getSourceCustomerAddressId() { return sourceCustomerAddressId; }
+    public String getShipToName() { return shipToName; }
+    public String getShipToPhone() { return shipToPhone; }
+    public String getShipToLine1() { return shipToLine1; }
+    public String getShipToLine2() { return shipToLine2; }
+    public String getShipToCity() { return shipToCity; }
+    public String getShipToState() { return shipToState; }
+    public String getShipToPostalCode() { return shipToPostalCode; }
+    public String getShipToCountry() { return shipToCountry; }
+    public String getShipToReferences() { return shipToReferences; }
+    public Boolean getShippingCollect() { return shippingCollect; }
+    public Boolean getCustomerProvidedLabel() { return customerProvidedLabel; }
     public BigDecimal getTotalAmount() { return totalAmount; }
     public BigDecimal getPaidAmount() { return paidAmount; }
     public BigDecimal getPendingAmount() { return pendingAmount; }

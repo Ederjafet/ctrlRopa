@@ -115,6 +115,16 @@ public class ShipmentDetailResponse {
         private String customerName;
         private Long deliveryAddressId;
         private String deliveryAddressLabel;
+        private String deliveryType;
+        private String shippingAddressSource;
+        private String recipientName;
+        private String recipientPhone;
+        private String deliveryAddressText;
+        private String deliveryReferences;
+        private BigDecimal shippingCostAmount;
+        private Boolean shippingCostWaived;
+        private Boolean shippingCollect;
+        private Boolean customerProvidedLabel;
         private String paymentMode;
         private BigDecimal expectedCollectionAmount;
         private String status;
@@ -133,6 +143,16 @@ public class ShipmentDetailResponse {
                            String customerName,
                            Long deliveryAddressId,
                            String deliveryAddressLabel,
+                           String deliveryType,
+                           String shippingAddressSource,
+                           String recipientName,
+                           String recipientPhone,
+                           String deliveryAddressText,
+                           String deliveryReferences,
+                           BigDecimal shippingCostAmount,
+                           Boolean shippingCostWaived,
+                           Boolean shippingCollect,
+                           Boolean customerProvidedLabel,
                            String paymentMode,
                            BigDecimal expectedCollectionAmount,
                            String status,
@@ -150,6 +170,16 @@ public class ShipmentDetailResponse {
             this.customerName = customerName;
             this.deliveryAddressId = deliveryAddressId;
             this.deliveryAddressLabel = deliveryAddressLabel;
+            this.deliveryType = deliveryType;
+            this.shippingAddressSource = shippingAddressSource;
+            this.recipientName = recipientName;
+            this.recipientPhone = recipientPhone;
+            this.deliveryAddressText = deliveryAddressText;
+            this.deliveryReferences = deliveryReferences;
+            this.shippingCostAmount = shippingCostAmount;
+            this.shippingCostWaived = shippingCostWaived;
+            this.shippingCollect = shippingCollect;
+            this.customerProvidedLabel = customerProvidedLabel;
             this.paymentMode = paymentMode;
             this.expectedCollectionAmount = expectedCollectionAmount;
             this.status = status;
@@ -188,6 +218,46 @@ public class ShipmentDetailResponse {
 
         public String getDeliveryAddressLabel() {
             return deliveryAddressLabel;
+        }
+
+        public String getDeliveryType() {
+            return deliveryType;
+        }
+
+        public String getShippingAddressSource() {
+            return shippingAddressSource;
+        }
+
+        public String getRecipientName() {
+            return recipientName;
+        }
+
+        public String getRecipientPhone() {
+            return recipientPhone;
+        }
+
+        public String getDeliveryAddressText() {
+            return deliveryAddressText;
+        }
+
+        public String getDeliveryReferences() {
+            return deliveryReferences;
+        }
+
+        public BigDecimal getShippingCostAmount() {
+            return shippingCostAmount;
+        }
+
+        public Boolean getShippingCostWaived() {
+            return shippingCostWaived;
+        }
+
+        public Boolean getShippingCollect() {
+            return shippingCollect;
+        }
+
+        public Boolean getCustomerProvidedLabel() {
+            return customerProvidedLabel;
         }
 
         public String getPaymentMode() {

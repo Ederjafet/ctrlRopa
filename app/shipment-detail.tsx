@@ -446,7 +446,14 @@ export default function ShipmentDetailScreen() {
               <View key={line.id} style={[styles.packageLine, { borderBottomColor: theme.colors.border }]}> 
                 <AppText bold>{line.customerPackageFolio || `Paquete #${line.customerPackageId}`}</AppText>
                 <AppText>Cliente: {line.customerName || `#${line.customerId}`}</AppText>
-                <AppText>Dirección: {line.deliveryAddressLabel || `#${line.deliveryAddressId}`}</AppText>
+                <AppText>Direccion: {line.deliveryAddressText || line.deliveryAddressLabel || (line.deliveryAddressId ? `#${line.deliveryAddressId}` : 'Sin direccion')}</AppText>
+                <AppText>Recibe: {line.recipientName || line.customerName || 'No indicado'}</AppText>
+                <AppText>Telefono: {line.recipientPhone || 'No indicado'}</AppText>
+                <AppText>Tipo entrega: {line.deliveryType || 'Sin tipo'}</AppText>
+                {line.deliveryReferences ? <AppText>Referencias: {line.deliveryReferences}</AppText> : null}
+                <AppText>
+                  Costo envio: {line.shippingCollect ? 'Por cobrar' : line.shippingCostWaived ? 'Sin costo' : money(line.shippingCostAmount)}
+                </AppText>
                 <AppText>Pago: {paymentModeLabel(line.paymentMode)}</AppText>
                 {line.paymentMode === 'COD' ? (
                   <AppText>Contra entrega esperado: {money(line.expectedCollectionAmount)}</AppText>

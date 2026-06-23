@@ -22,7 +22,7 @@ public class ShipmentPackage {
     @Column(name = "customer_id", nullable = false)
     private Long customerId;
 
-    @Column(name = "delivery_address_id", nullable = false)
+    @Column(name = "delivery_address_id")
     private Long deliveryAddressId;
 
     @Enumerated(EnumType.STRING)

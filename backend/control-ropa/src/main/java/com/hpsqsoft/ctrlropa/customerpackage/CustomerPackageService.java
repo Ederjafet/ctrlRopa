@@ -6,7 +6,10 @@ import com.hpsqsoft.ctrlropa.branch.BranchRepository;
 import com.hpsqsoft.ctrlropa.catalog.SalesChannel;
 import com.hpsqsoft.ctrlropa.catalog.SalesChannelRepository;
 import com.hpsqsoft.ctrlropa.customer.Customer;
+import com.hpsqsoft.ctrlropa.customer.CustomerAddress;
+import com.hpsqsoft.ctrlropa.customer.CustomerAddressRepository;
 import com.hpsqsoft.ctrlropa.customer.CustomerRepository;
+import com.hpsqsoft.ctrlropa.common.Status;
 import com.hpsqsoft.ctrlropa.item.Item;
 import com.hpsqsoft.ctrlropa.item.ItemRepository;
 import com.hpsqsoft.ctrlropa.item.ItemStatus;
@@ -44,6 +47,7 @@ public class CustomerPackageService {
     private final CustomerPackageRepository repository;
     private final CustomerPackageItemRepository itemRepository;
     private final CustomerRepository customerRepository;
+    private final CustomerAddressRepository customerAddressRepository;
     private final BranchRepository branchRepository;
     private final SaleRepository saleRepository;
     private final ReservationRepository reservationRepository;
@@ -60,6 +64,7 @@ public class CustomerPackageService {
     public CustomerPackageService(CustomerPackageRepository repository,
                                   CustomerPackageItemRepository itemRepository,
                                   CustomerRepository customerRepository,
+                                  CustomerAddressRepository customerAddressRepository,
                                   BranchRepository branchRepository,
                                   SaleRepository saleRepository,
                                   ReservationRepository reservationRepository,
@@ -75,6 +80,7 @@ public class CustomerPackageService {
         this.repository = repository;
         this.itemRepository = itemRepository;
         this.customerRepository = customerRepository;
+        this.customerAddressRepository = customerAddressRepository;
         this.branchRepository = branchRepository;
         this.saleRepository = saleRepository;
         this.reservationRepository = reservationRepository;
@@ -326,8 +332,17 @@ public class CustomerPackageService {
             throw new IllegalArgumentException("Solo paquetes en OPEN pueden pasar a READY");
         }
 
-        if (!isShippingConfirmedForReady(customerPackage)) {
-            throw new IllegalArgumentException("Antes de marcar listo para envio, captura el costo de paqueteria o marca el envio como sin costo.");
+        String preliminaryBlockedReason = getMarkReadyBlockedReason(
+                customerPackage,
+                1,
+                BigDecimal.ZERO,
+                true
+        );
+        if (preliminaryBlockedReason != null
+                && (preliminaryBlockedReason.startsWith("Selecciona")
+                || preliminaryBlockedReason.startsWith("Captura")
+                || preliminaryBlockedReason.startsWith("Confirma"))) {
+            throw new IllegalArgumentException(preliminaryBlockedReason);
         }
 
         CustomerPackageDetailResponse detail = toDetail(customerPackage);
@@ -383,6 +398,40 @@ public class CustomerPackageService {
             customerPackage.setShippingCostConfirmed(true);
             customerPackage.setShippingCostWaived(false);
         }
+
+        customerPackage.setShippingCarrier(cleanNullable(request.getShippingCarrier()));
+        customerPackage.setTrackingNumber(cleanNullable(request.getTrackingNumber()));
+        customerPackage.setShippingNotes(cleanNullable(request.getShippingNotes()));
+
+        repository.save(customerPackage);
+        return findDetail(packageId);
+    }
+
+    public CustomerPackageDetailResponse updateShipping(Long packageId, UpdateCustomerPackageShippingRequest request) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.CREATE_CLOSE_CUSTOMER_PACKAGE);
+        if (request == null) {
+            throw new IllegalArgumentException("Datos de envio requeridos");
+        }
+
+        CustomerPackage customerPackage = findEntity(packageId);
+
+        if (customerPackage.getStatus() != CustomerPackageStatus.OPEN) {
+            throw new IllegalArgumentException("Solo paquetes en preparacion pueden modificar datos de envio");
+        }
+
+        CustomerPackageDeliveryType deliveryType = request.getDeliveryType();
+        if (deliveryType == null) {
+            throw new IllegalArgumentException("Selecciona el tipo de entrega antes de guardar envio.");
+        }
+
+        customerPackage.setDeliveryType(deliveryType);
+        customerPackage.setShippingCollect(deliveryType == CustomerPackageDeliveryType.COLLECT_SHIPPING
+                || Boolean.TRUE.equals(request.getCollectShipping()));
+        customerPackage.setCustomerProvidedLabel(deliveryType == CustomerPackageDeliveryType.CUSTOMER_PROVIDED_LABEL
+                || Boolean.TRUE.equals(request.getCustomerProvidedLabel()));
+
+        applyShippingAddress(customerPackage, request, deliveryType);
+        applyShippingCost(customerPackage, request, deliveryType);
 
         customerPackage.setShippingCarrier(cleanNullable(request.getShippingCarrier()));
         customerPackage.setTrackingNumber(cleanNullable(request.getTrackingNumber()));
@@ -611,6 +660,21 @@ public class CustomerPackageService {
                 customerPackage.getShippingNotes(),
                 customerPackage.getShippingCarrier(),
                 customerPackage.getTrackingNumber(),
+                customerPackage.getDeliveryType() != null ? customerPackage.getDeliveryType().name() : null,
+                customerPackage.getShippingAddressSource() != null ? customerPackage.getShippingAddressSource().name() : null,
+                customerPackage.isShippingAddressConfirmed(),
+                customerPackage.getSourceCustomerAddressId(),
+                customerPackage.getShipToName(),
+                customerPackage.getShipToPhone(),
+                customerPackage.getShipToLine1(),
+                customerPackage.getShipToLine2(),
+                customerPackage.getShipToCity(),
+                customerPackage.getShipToState(),
+                customerPackage.getShipToPostalCode(),
+                customerPackage.getShipToCountry(),
+                customerPackage.getShipToReferences(),
+                customerPackage.isShippingCollect(),
+                customerPackage.isCustomerProvidedLabel(),
                 totalAmount,
                 paidAmount,
                 pendingAmount,
@@ -855,6 +919,238 @@ public class CustomerPackageService {
         return null;
     }
 
+    private void applyShippingAddress(CustomerPackage customerPackage,
+                                      UpdateCustomerPackageShippingRequest request,
+                                      CustomerPackageDeliveryType deliveryType) {
+        if (deliveryType == CustomerPackageDeliveryType.STORE_PICKUP) {
+            clearPackageAddressSnapshot(customerPackage, CustomerPackageAddressSource.PICKUP_NO_ADDRESS);
+            customerPackage.setShippingAddressConfirmed(true);
+            return;
+        }
+
+        if (deliveryType == CustomerPackageDeliveryType.CUSTOMER_PROVIDED_LABEL) {
+            if (isBlank(request.getTrackingNumber()) && isBlank(request.getShippingNotes())) {
+                throw new IllegalArgumentException("Captura la guia o notas del envio proporcionado por el cliente.");
+            }
+            clearPackageAddressSnapshot(customerPackage, CustomerPackageAddressSource.CUSTOMER_PROVIDED_LABEL);
+            customerPackage.setShippingAddressConfirmed(true);
+            return;
+        }
+
+        CustomerPackageAddressSource source = request.getAddressSource();
+        if (source == null && deliveryTypeRequiresAddress(deliveryType)) {
+            source = CustomerPackageAddressSource.CUSTOM_PACKAGE_ADDRESS;
+        }
+
+        if (deliveryTypeRequiresAddress(deliveryType) && source == null) {
+            throw new IllegalArgumentException("Captura o selecciona la direccion de envio antes de guardar.");
+        }
+
+        if (source == CustomerPackageAddressSource.PICKUP_NO_ADDRESS
+                || source == CustomerPackageAddressSource.CUSTOMER_PROVIDED_LABEL) {
+            if (deliveryTypeRequiresAddress(deliveryType)) {
+                throw new IllegalArgumentException("Este tipo de entrega requiere una direccion de envio.");
+            }
+            clearPackageAddressSnapshot(customerPackage, source);
+            customerPackage.setShippingAddressConfirmed(true);
+            return;
+        }
+
+        CustomerAddress savedAddress = null;
+        if (source == CustomerPackageAddressSource.CUSTOMER_PRIMARY_ADDRESS) {
+            savedAddress = findPrimaryAddress(customerPackage);
+            copyAddressSnapshot(customerPackage, request, savedAddress, source);
+        } else if (source == CustomerPackageAddressSource.CUSTOMER_SAVED_ADDRESS) {
+            savedAddress = findCustomerAddress(customerPackage, request.getSourceCustomerAddressId());
+            copyAddressSnapshot(customerPackage, request, savedAddress, source);
+        } else {
+            copyRequestAddressSnapshot(customerPackage, request, source == null ? CustomerPackageAddressSource.CUSTOM_PACKAGE_ADDRESS : source);
+            if (Boolean.TRUE.equals(request.getSaveAddressToCustomer())) {
+                savedAddress = createSavedAddressFromRequest(customerPackage, request);
+                customerPackage.setSourceCustomerAddressId(savedAddress.getId());
+            }
+        }
+
+        customerPackage.setShippingAddressConfirmed(true);
+    }
+
+    private void applyShippingCost(CustomerPackage customerPackage,
+                                   UpdateCustomerPackageShippingRequest request,
+                                   CustomerPackageDeliveryType deliveryType) {
+        if (deliveryType == CustomerPackageDeliveryType.STORE_PICKUP
+                || deliveryType == CustomerPackageDeliveryType.CUSTOMER_PROVIDED_LABEL
+                || deliveryType == CustomerPackageDeliveryType.COLLECT_SHIPPING) {
+            customerPackage.setShippingCostAmount(BigDecimal.ZERO);
+            customerPackage.setShippingCostConfirmed(true);
+            customerPackage.setShippingCostWaived(true);
+            return;
+        }
+
+        boolean waived = Boolean.TRUE.equals(request.getShippingCostWaived());
+        if (waived) {
+            customerPackage.setShippingCostAmount(BigDecimal.ZERO);
+            customerPackage.setShippingCostConfirmed(true);
+            customerPackage.setShippingCostWaived(true);
+            return;
+        }
+
+        BigDecimal shippingCost = request.getShippingCostAmount();
+        if (shippingCost == null) {
+            throw new IllegalArgumentException("Confirma el costo de envio o marca una opcion sin costo/por cobrar.");
+        }
+
+        if (shippingCost.signum() < 0) {
+            throw new IllegalArgumentException("El costo de envio no puede ser negativo.");
+        }
+
+        if (shippingCost.compareTo(BigDecimal.ZERO) == 0) {
+            throw new IllegalArgumentException("Para costo 0 marca explicitamente envio sin costo.");
+        }
+
+        customerPackage.setShippingCostAmount(shippingCost);
+        customerPackage.setShippingCostConfirmed(true);
+        customerPackage.setShippingCostWaived(false);
+    }
+
+    private CustomerAddress findPrimaryAddress(CustomerPackage customerPackage) {
+        return customerAddressRepository
+                .findByCustomerIdAndStatusOrderByIsDefaultDescLabelAsc(
+                        customerPackage.getCustomer().getId(),
+                        Status.ACTIVE
+                )
+                .stream()
+                .filter(address -> Boolean.TRUE.equals(address.getIsDefault()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("El cliente no tiene direccion principal activa."));
+    }
+
+    private CustomerAddress findCustomerAddress(CustomerPackage customerPackage, Long addressId) {
+        if (addressId == null) {
+            throw new IllegalArgumentException("Selecciona una direccion guardada del cliente.");
+        }
+
+        CustomerAddress address = customerAddressRepository.findById(addressId)
+                .orElseThrow(() -> new IllegalArgumentException("Direccion de envio no encontrada."));
+        tenantAccessGuard.requireBranch(
+                address.getCustomer().getBranch().getId(),
+                "La direccion no pertenece a la sucursal activa"
+        );
+
+        if (!address.getCustomer().getId().equals(customerPackage.getCustomer().getId())) {
+            throw new IllegalArgumentException("La direccion no pertenece al cliente del paquete.");
+        }
+
+        if (address.getStatus() != Status.ACTIVE) {
+            throw new IllegalArgumentException("La direccion seleccionada no esta activa.");
+        }
+
+        return address;
+    }
+
+    private void copyAddressSnapshot(CustomerPackage customerPackage,
+                                     UpdateCustomerPackageShippingRequest request,
+                                     CustomerAddress address,
+                                     CustomerPackageAddressSource source) {
+        customerPackage.setShippingAddressSource(source);
+        customerPackage.setSourceCustomerAddressId(address.getId());
+        customerPackage.setShipToName(firstNonBlank(request.getRecipientName(), customerPackage.getCustomer().getName()));
+        customerPackage.setShipToPhone(firstNonBlank(request.getRecipientPhone(), customerPackage.getCustomer().getPhone()));
+        customerPackage.setShipToLine1(address.getLine1());
+        customerPackage.setShipToLine2(address.getLine2());
+        customerPackage.setShipToCity(address.getCity());
+        customerPackage.setShipToState(address.getState());
+        customerPackage.setShipToPostalCode(address.getPostalCode());
+        customerPackage.setShipToCountry(address.getCountry());
+        customerPackage.setShipToReferences(cleanNullable(request.getReferences()));
+    }
+
+    private void copyRequestAddressSnapshot(CustomerPackage customerPackage,
+                                            UpdateCustomerPackageShippingRequest request,
+                                            CustomerPackageAddressSource source) {
+        validateAddressFields(request);
+        customerPackage.setShippingAddressSource(source);
+        customerPackage.setSourceCustomerAddressId(null);
+        customerPackage.setShipToName(cleanRequired(request.getRecipientName(), "Captura la persona que recibe el paquete."));
+        customerPackage.setShipToPhone(cleanRequired(request.getRecipientPhone(), "Captura el telefono de contacto para el envio."));
+        customerPackage.setShipToLine1(cleanRequired(request.getLine1(), "Captura calle y numero de la direccion de envio."));
+        customerPackage.setShipToLine2(cleanNullable(request.getLine2()));
+        customerPackage.setShipToCity(cleanRequired(request.getCity(), "Captura la ciudad de la direccion de envio."));
+        customerPackage.setShipToState(cleanRequired(request.getState(), "Captura el estado de la direccion de envio."));
+        customerPackage.setShipToPostalCode(cleanRequired(request.getPostalCode(), "Captura el codigo postal de la direccion de envio."));
+        customerPackage.setShipToCountry(firstNonBlank(request.getCountry(), "Mexico"));
+        customerPackage.setShipToReferences(cleanNullable(request.getReferences()));
+    }
+
+    private CustomerAddress createSavedAddressFromRequest(CustomerPackage customerPackage,
+                                                          UpdateCustomerPackageShippingRequest request) {
+        CustomerAddress address = new CustomerAddress();
+        address.setCustomer(customerPackage.getCustomer());
+        address.setLabel(buildAddressLabel(customerPackage, request));
+        address.setLine1(cleanRequired(request.getLine1(), "Captura calle y numero de la direccion de envio."));
+        address.setLine2(cleanNullable(request.getLine2()));
+        address.setCity(cleanRequired(request.getCity(), "Captura la ciudad de la direccion de envio."));
+        address.setState(cleanRequired(request.getState(), "Captura el estado de la direccion de envio."));
+        address.setPostalCode(cleanRequired(request.getPostalCode(), "Captura el codigo postal de la direccion de envio."));
+        address.setCountry(firstNonBlank(request.getCountry(), "Mexico"));
+        address.setIsDefault(Boolean.TRUE.equals(request.getMakePrimaryAddress()));
+        address.setStatus(Status.ACTIVE);
+
+        if (Boolean.TRUE.equals(request.getMakePrimaryAddress())) {
+            clearDefaultAddress(customerPackage.getCustomer().getId());
+        }
+
+        return customerAddressRepository.save(address);
+    }
+
+    private void clearDefaultAddress(Long customerId) {
+        List<CustomerAddress> addresses = customerAddressRepository
+                .findByCustomerIdAndStatusOrderByIsDefaultDescLabelAsc(customerId, Status.ACTIVE);
+        for (CustomerAddress address : addresses) {
+            if (Boolean.TRUE.equals(address.getIsDefault())) {
+                address.setIsDefault(false);
+                customerAddressRepository.save(address);
+            }
+        }
+    }
+
+    private String buildAddressLabel(CustomerPackage customerPackage, UpdateCustomerPackageShippingRequest request) {
+        String base = firstNonBlank(request.getAddressLabel(), "Envio " + customerPackage.getFolio());
+        if (!customerAddressRepository.existsByCustomerIdAndLabel(customerPackage.getCustomer().getId(), base)) {
+            return base;
+        }
+
+        int suffix = 2;
+        String candidate;
+        do {
+            candidate = base + " " + suffix;
+            suffix++;
+        } while (customerAddressRepository.existsByCustomerIdAndLabel(customerPackage.getCustomer().getId(), candidate));
+        return candidate;
+    }
+
+    private void clearPackageAddressSnapshot(CustomerPackage customerPackage, CustomerPackageAddressSource source) {
+        customerPackage.setShippingAddressSource(source);
+        customerPackage.setSourceCustomerAddressId(null);
+        customerPackage.setShipToName(null);
+        customerPackage.setShipToPhone(null);
+        customerPackage.setShipToLine1(null);
+        customerPackage.setShipToLine2(null);
+        customerPackage.setShipToCity(null);
+        customerPackage.setShipToState(null);
+        customerPackage.setShipToPostalCode(null);
+        customerPackage.setShipToCountry(null);
+        customerPackage.setShipToReferences(null);
+    }
+
+    private void validateAddressFields(UpdateCustomerPackageShippingRequest request) {
+        cleanRequired(request.getRecipientName(), "Captura la persona que recibe el paquete.");
+        cleanRequired(request.getRecipientPhone(), "Captura el telefono de contacto para el envio.");
+        cleanRequired(request.getLine1(), "Captura calle y numero de la direccion de envio.");
+        cleanRequired(request.getCity(), "Captura la ciudad de la direccion de envio.");
+        cleanRequired(request.getState(), "Captura el estado de la direccion de envio.");
+        cleanRequired(request.getPostalCode(), "Captura el codigo postal de la direccion de envio.");
+    }
+
     private String getMarkReadyBlockedReason(CustomerPackage customerPackage,
                                              int itemCount,
                                              BigDecimal pendingAmount,
@@ -871,8 +1167,17 @@ public class CustomerPackageService {
             return "Agrega al menos una prenda antes de liberar envio.";
         }
 
+        if (customerPackage.getDeliveryType() == null) {
+            return "Selecciona el tipo de entrega antes de marcar listo para envio.";
+        }
+
+        if (deliveryTypeRequiresAddress(customerPackage.getDeliveryType())
+                && !customerPackage.isShippingAddressConfirmed()) {
+            return "Captura o selecciona la direccion de envio antes de marcar listo para envio.";
+        }
+
         if (!isShippingConfirmedForReady(customerPackage)) {
-            return "Antes de marcar listo para envio, captura el costo de paqueteria o marca envio sin costo.";
+            return "Confirma el costo de envio o marca una opcion sin costo/por cobrar.";
         }
 
         BigDecimal normalizedPending = normalizeMoney(pendingAmount);
@@ -892,6 +1197,18 @@ public class CustomerPackageService {
             return false;
         }
 
+        CustomerPackageDeliveryType deliveryType = detail.getDeliveryType() == null
+                ? null
+                : CustomerPackageDeliveryType.valueOf(detail.getDeliveryType());
+        if (deliveryType == null) {
+            return false;
+        }
+
+        if (deliveryTypeRequiresAddress(deliveryType)
+                && !Boolean.TRUE.equals(detail.getShippingAddressConfirmed())) {
+            return false;
+        }
+
         if (normalizeMoney(detail.getPendingAmount()).compareTo(BigDecimal.ZERO) > 0) {
             return false;
         }
@@ -905,6 +1222,15 @@ public class CustomerPackageService {
     }
 
     private boolean isShippingConfirmedForReady(CustomerPackage customerPackage) {
+        if (customerPackage.getDeliveryType() == null) {
+            return false;
+        }
+
+        if (deliveryTypeRequiresAddress(customerPackage.getDeliveryType())
+                && !customerPackage.isShippingAddressConfirmed()) {
+            return false;
+        }
+
         if (!customerPackage.isShippingCostConfirmed()) {
             return false;
         }
@@ -915,6 +1241,12 @@ public class CustomerPackageService {
 
         return customerPackage.getShippingCostAmount() != null
                 && customerPackage.getShippingCostAmount().compareTo(BigDecimal.ZERO) >= 0;
+    }
+
+    private boolean deliveryTypeRequiresAddress(CustomerPackageDeliveryType deliveryType) {
+        return deliveryType == CustomerPackageDeliveryType.PARCEL_SERVICE
+                || deliveryType == CustomerPackageDeliveryType.LOCAL_DELIVERY
+                || deliveryType == CustomerPackageDeliveryType.COLLECT_SHIPPING;
     }
 
     private boolean isEditableForItemRemoval(CustomerPackageStatus status) {
@@ -1014,6 +1346,26 @@ public class CustomerPackageService {
             return null;
         }
         return value.trim();
+    }
+
+    private String cleanRequired(String value, String message) {
+        String cleaned = cleanNullable(value);
+        if (cleaned == null) {
+            throw new IllegalArgumentException(message);
+        }
+        return cleaned;
+    }
+
+    private String firstNonBlank(String first, String fallback) {
+        String cleaned = cleanNullable(first);
+        if (cleaned != null) {
+            return cleaned;
+        }
+        return cleanNullable(fallback);
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private void validateCustomerInActiveTenant(Long customerId) {

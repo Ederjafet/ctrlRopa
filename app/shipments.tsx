@@ -3,12 +3,10 @@ import AppBottomModal from '@/components/ui/AppBottomModal';
 import AppButton from '@/components/ui/AppButton';
 import AppCard from '@/components/ui/AppCard';
 import AppInput from '@/components/ui/AppInput';
-import AppOptionRow from '@/components/ui/AppOptionRow';
 import ScreenPermissionHeaderAction from '@/components/ui/ScreenPermissionHeaderAction';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
 import { hasRole } from '@/services/accessControl';
-import { CustomerAddress, getCustomerAddresses } from '@/services/customerAddressService';
 import {
   CustomerPackageDetail,
   getReadyCustomerPackagesForShipment,
@@ -42,6 +40,27 @@ function normalize(value?: string | null) {
   return (value ?? '').toLowerCase().trim();
 }
 
+function packageDeliveryTypeLabel(type?: string | null) {
+  if (type === 'PARCEL_SERVICE') return 'Paqueteria';
+  if (type === 'LOCAL_DELIVERY') return 'Entrega local';
+  if (type === 'STORE_PICKUP') return 'Recoleccion en tienda';
+  if (type === 'CUSTOMER_PROVIDED_LABEL') return 'Cliente envia guia';
+  if (type === 'COLLECT_SHIPPING') return 'Envio por cobrar';
+  return type || 'Sin tipo';
+}
+
+function formatPackageAddress(customerPackage?: CustomerPackageDetail | null) {
+  const parts = [
+    customerPackage?.shipToLine1,
+    customerPackage?.shipToLine2,
+    customerPackage?.shipToCity,
+    customerPackage?.shipToState,
+    customerPackage?.shipToPostalCode,
+    customerPackage?.shipToCountry,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(', ') : 'Sin direccion';
+}
+
 export default function ShipmentsScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
@@ -57,8 +76,6 @@ export default function ShipmentsScreen() {
   const [prepareModalVisible, setPrepareModalVisible] = useState(false);
   const [actionsShipment, setActionsShipment] = useState<Shipment | null>(null);
   const [selectedReadyPackage, setSelectedReadyPackage] = useState<CustomerPackageDetail | null>(null);
-  const [readyPackageAddresses, setReadyPackageAddresses] = useState<CustomerAddress[]>([]);
-  const [selectedReadyAddress, setSelectedReadyAddress] = useState<CustomerAddress | null>(null);
   const [deliveryType, setDeliveryType] = useState<ShipmentDeliveryType>('LOCAL');
   const [guideReference, setGuideReference] = useState('');
 
@@ -146,33 +163,15 @@ export default function ShipmentsScreen() {
     }
   };
 
-  const openPreparePackageModal = async (customerPackage: CustomerPackageDetail) => {
-    try {
-      setIsPreparingPackage(true);
-      setSelectedReadyPackage(customerPackage);
-      setSelectedReadyAddress(null);
-      setDeliveryType('LOCAL');
-      setGuideReference(customerPackage.trackingNumber?.trim() || '');
-
-      const addresses = await getCustomerAddresses(customerPackage.customerId);
-      const activeAddresses = addresses.filter((address) => address.status !== 'INACTIVE');
-      setReadyPackageAddresses(activeAddresses);
-      setSelectedReadyAddress(activeAddresses.find((address) => address.isDefault) ?? activeAddresses[0] ?? null);
-      setPrepareModalVisible(true);
-    } catch (error: any) {
-      Alert.alert('Envios', error.message || 'No se pudieron cargar las direcciones del cliente.');
-    } finally {
-      setIsPreparingPackage(false);
-    }
+  const openPreparePackageModal = (customerPackage: CustomerPackageDetail) => {
+    setSelectedReadyPackage(customerPackage);
+    setDeliveryType(customerPackage.deliveryType === 'PARCEL_SERVICE' ? 'CARRIER' : 'LOCAL');
+    setGuideReference(customerPackage.trackingNumber?.trim() || '');
+    setPrepareModalVisible(true);
   };
 
   const handlePrepareReadyPackage = async () => {
     if (!session || !selectedReadyPackage) return;
-
-    if (!selectedReadyAddress) {
-      Alert.alert('Envios', 'Selecciona una direccion activa para preparar el envio.');
-      return;
-    }
 
     if (deliveryType === 'CARRIER' && !guideReference.trim()) {
       Alert.alert('Envios', 'Captura la guia o referencia para envios por paqueteria.');
@@ -190,15 +189,13 @@ export default function ShipmentsScreen() {
 
       const detail = await addPackageToShipment(created.id, {
         customerPackageId: selectedReadyPackage.id,
-        deliveryAddressId: selectedReadyAddress.id,
+        deliveryAddressId: selectedReadyPackage.sourceCustomerAddressId ?? null,
         paymentMode: 'PREPAID',
         expectedCodAmount: null,
       });
 
       setPrepareModalVisible(false);
       setSelectedReadyPackage(null);
-      setReadyPackageAddresses([]);
-      setSelectedReadyAddress(null);
       setGuideReference('');
       setDeliveryType('LOCAL');
       await loadData();
@@ -472,8 +469,6 @@ export default function ShipmentsScreen() {
           if (isPreparingPackage) return;
           setPrepareModalVisible(false);
           setSelectedReadyPackage(null);
-          setReadyPackageAddresses([]);
-          setSelectedReadyAddress(null);
         }}
         maxHeight="90%"
       >
@@ -487,33 +482,21 @@ export default function ShipmentsScreen() {
             </AppCard>
 
             <AppText bold>Direccion de entrega</AppText>
-            {readyPackageAddresses.length === 0 ? (
-              <AppCard>
-                <AppText color={theme.colors.warning}>
-                  Este cliente no tiene direcciones activas. Registra una direccion antes de preparar el envio.
-                </AppText>
-                <AppButton
-                  title="Ver cliente"
-                  variant="secondary"
-                  onPress={() => router.push(`/customers/${selectedReadyPackage.customerId}` as any)}
-                />
-              </AppCard>
-            ) : (
-              readyPackageAddresses.map((address) => (
-                <AppOptionRow
-                  key={address.id}
-                  title={`${address.label}${address.isDefault ? ' · Principal' : ''}`}
-                  subtitle={`${address.line1}, ${address.city}`}
-                  onPress={() => setSelectedReadyAddress(address)}
-                >
-                  {selectedReadyAddress?.id === address.id ? (
-                    <AppText variant="caption" color={theme.colors.success} bold>
-                      Seleccionada
-                    </AppText>
-                  ) : null}
-                </AppOptionRow>
-              ))
-            )}
+            <AppCard>
+              <AppText bold>{packageDeliveryTypeLabel(selectedReadyPackage.deliveryType)}</AppText>
+              <AppText color={theme.colors.mutedText}>
+                Recibe: {selectedReadyPackage.shipToName || selectedReadyPackage.customerName || 'No aplica'}
+              </AppText>
+              <AppText color={theme.colors.mutedText}>
+                Telefono: {selectedReadyPackage.shipToPhone || selectedReadyPackage.customerPhone || 'No aplica'}
+              </AppText>
+              <AppText color={theme.colors.mutedText}>
+                {formatPackageAddress(selectedReadyPackage)}
+              </AppText>
+              {selectedReadyPackage.shipToReferences ? (
+                <AppText color={theme.colors.mutedText}>Referencias: {selectedReadyPackage.shipToReferences}</AppText>
+              ) : null}
+            </AppCard>
 
             <AppText bold>Tipo de entrega</AppText>
             <View style={styles.typeRow}>
@@ -560,8 +543,7 @@ export default function ShipmentsScreen() {
               title={isPreparingPackage ? 'Preparando...' : 'Crear envio y abrir detalle'}
               onPress={handlePrepareReadyPackage}
               loading={isPreparingPackage}
-              disabled={isPreparingPackage || !selectedReadyAddress}
-              disabledReason={!selectedReadyAddress ? 'Selecciona una direccion activa.' : undefined}
+              disabled={isPreparingPackage}
             />
           </View>
         ) : null}

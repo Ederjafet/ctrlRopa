@@ -43,8 +43,18 @@ export type ShipmentPackageLine = {
   customerPackageFolio?: string;
   customerId: number;
   customerName?: string;
-  deliveryAddressId: number;
+  deliveryAddressId?: number | null;
   deliveryAddressLabel?: string;
+  deliveryType?: string | null;
+  shippingAddressSource?: string | null;
+  recipientName?: string | null;
+  recipientPhone?: string | null;
+  deliveryAddressText?: string | null;
+  deliveryReferences?: string | null;
+  shippingCostAmount?: number | null;
+  shippingCostWaived?: boolean;
+  shippingCollect?: boolean;
+  customerProvidedLabel?: boolean;
   paymentMode: ShipmentPackagePaymentMode | string;
   expectedCollectionAmount?: number | null;
   status: ShipmentPackageStatus;
@@ -70,7 +80,7 @@ export type CreateShipmentRequest = {
 
 export type AddShipmentPackageRequest = {
   customerPackageId: number;
-  deliveryAddressId: number;
+  deliveryAddressId?: number | null;
   paymentMode: ShipmentPackagePaymentMode;
   expectedCodAmount?: number | null;
 };

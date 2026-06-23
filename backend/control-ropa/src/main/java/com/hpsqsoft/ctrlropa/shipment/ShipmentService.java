@@ -5,6 +5,7 @@ import com.hpsqsoft.ctrlropa.branch.BranchRepository;
 import com.hpsqsoft.ctrlropa.customer.CustomerAddress;
 import com.hpsqsoft.ctrlropa.customer.CustomerAddressRepository;
 import com.hpsqsoft.ctrlropa.customerpackage.CustomerPackage;
+import com.hpsqsoft.ctrlropa.customerpackage.CustomerPackageDeliveryType;
 import com.hpsqsoft.ctrlropa.customerpackage.CustomerPackageItem;
 import com.hpsqsoft.ctrlropa.customerpackage.CustomerPackageItemRepository;
 import com.hpsqsoft.ctrlropa.customerpackage.CustomerPackageRepository;
@@ -142,12 +143,21 @@ public class ShipmentService {
             throw new IllegalArgumentException("El paquete no pertenece a la sucursal del shipment");
         }
 
-        CustomerAddress address = customerAddressRepository.findById(request.getDeliveryAddressId())
+        CustomerAddress address = null;
+        if (request.getDeliveryAddressId() != null) {
+            address = customerAddressRepository.findById(request.getDeliveryAddressId())
                 .orElseThrow(() -> new IllegalArgumentException("Dirección de entrega no encontrada"));
-        tenantAccessGuard.requireBranch(address.getCustomer().getBranch().getId(), "La direccion no pertenece a la sucursal activa");
+            tenantAccessGuard.requireBranch(address.getCustomer().getBranch().getId(), "La direccion no pertenece a la sucursal activa");
 
-        if (!address.getCustomer().getId().equals(customerPackage.getCustomer().getId())) {
+            if (!address.getCustomer().getId().equals(customerPackage.getCustomer().getId())) {
             throw new IllegalArgumentException("La dirección no pertenece al cliente del paquete");
+        }
+
+        } else if (!customerPackage.isShippingAddressConfirmed()) {
+            throw new IllegalArgumentException("El paquete no tiene direccion de envio confirmada");
+        } else if (deliveryTypeRequiresAddress(customerPackage.getDeliveryType())
+                && (customerPackage.getShipToLine1() == null || customerPackage.getShipToLine1().isBlank())) {
+            throw new IllegalArgumentException("El paquete no tiene snapshot de direccion de envio");
         }
 
         if (hasActiveAssignment(customerPackage.getId())) {
@@ -161,7 +171,7 @@ public class ShipmentService {
         shipmentPackage.setShipmentId(shipment.getId());
         shipmentPackage.setCustomerPackageId(customerPackage.getId());
         shipmentPackage.setCustomerId(customerPackage.getCustomer().getId());
-        shipmentPackage.setDeliveryAddressId(address.getId());
+        shipmentPackage.setDeliveryAddressId(address != null ? address.getId() : null);
         shipmentPackage.setPaymentMode(request.getPaymentMode());
         shipmentPackage.setExpectedCollectionAmount(
                 request.getPaymentMode() == ShipmentPackagePaymentMode.COD ? request.getExpectedCodAmount() : null
@@ -627,11 +637,19 @@ public class ShipmentService {
         return cleaned.isBlank() ? null : cleaned;
     }
 
+    private boolean deliveryTypeRequiresAddress(CustomerPackageDeliveryType deliveryType) {
+        return deliveryType == CustomerPackageDeliveryType.PARCEL_SERVICE
+                || deliveryType == CustomerPackageDeliveryType.LOCAL_DELIVERY
+                || deliveryType == CustomerPackageDeliveryType.COLLECT_SHIPPING;
+    }
+
     private ShipmentDetailResponse.PackageLine toPackageLine(ShipmentPackage shipmentPackage) {
         CustomerPackage customerPackage = customerPackageRepository.findById(shipmentPackage.getCustomerPackageId())
                 .orElseThrow(() -> new IllegalArgumentException("Paquete no encontrado"));
-        CustomerAddress address = customerAddressRepository.findById(shipmentPackage.getDeliveryAddressId())
-                .orElseThrow(() -> new IllegalArgumentException("Dirección no encontrada"));
+        CustomerAddress address = shipmentPackage.getDeliveryAddressId() == null
+                ? null
+                : customerAddressRepository.findById(shipmentPackage.getDeliveryAddressId())
+                .orElseThrow(() -> new IllegalArgumentException("Direccion no encontrada"));
 
         return new ShipmentDetailResponse.PackageLine(
                 shipmentPackage.getId(),
@@ -639,8 +657,18 @@ public class ShipmentService {
                 customerPackage.getFolio(),
                 customerPackage.getCustomer().getId(),
                 customerPackage.getCustomer().getName(),
-                address.getId(),
-                address.getLabel(),
+                address != null ? address.getId() : null,
+                resolveDeliveryAddressLabel(customerPackage, address),
+                customerPackage.getDeliveryType() != null ? customerPackage.getDeliveryType().name() : null,
+                customerPackage.getShippingAddressSource() != null ? customerPackage.getShippingAddressSource().name() : null,
+                customerPackage.getShipToName(),
+                customerPackage.getShipToPhone(),
+                resolveDeliveryAddressText(customerPackage, address),
+                customerPackage.getShipToReferences(),
+                customerPackage.isShippingCostConfirmed() ? customerPackage.getShippingCostAmount() : null,
+                customerPackage.isShippingCostWaived(),
+                customerPackage.isShippingCollect(),
+                customerPackage.isCustomerProvidedLabel(),
                 shipmentPackage.getPaymentMode().name(),
                 shipmentPackage.getExpectedCollectionAmount(),
                 shipmentPackage.getStatus().name(),
@@ -652,6 +680,56 @@ public class ShipmentService {
                 shipmentPackage.getDeliveredAt(),
                 shipmentPackage.getReturnedAt()
         );
+    }
+
+    private String resolveDeliveryAddressLabel(CustomerPackage customerPackage, CustomerAddress address) {
+        if (address != null) {
+            return address.getLabel();
+        }
+
+        if (customerPackage.getDeliveryType() == CustomerPackageDeliveryType.STORE_PICKUP) {
+            return "Recoleccion en tienda";
+        }
+
+        if (customerPackage.getDeliveryType() == CustomerPackageDeliveryType.CUSTOMER_PROVIDED_LABEL) {
+            return "Guia proporcionada por cliente";
+        }
+
+        if (customerPackage.getDeliveryType() == CustomerPackageDeliveryType.COLLECT_SHIPPING) {
+            return "Envio por cobrar";
+        }
+
+        return "Direccion del paquete";
+    }
+
+    private String resolveDeliveryAddressText(CustomerPackage customerPackage, CustomerAddress address) {
+        if (address != null) {
+            return joinAddress(address.getLine1(), address.getLine2(), address.getCity(), address.getState(), address.getPostalCode(), address.getCountry());
+        }
+
+        return joinAddress(
+                customerPackage.getShipToLine1(),
+                customerPackage.getShipToLine2(),
+                customerPackage.getShipToCity(),
+                customerPackage.getShipToState(),
+                customerPackage.getShipToPostalCode(),
+                customerPackage.getShipToCountry()
+        );
+    }
+
+    private String joinAddress(String... parts) {
+        StringBuilder builder = new StringBuilder();
+        for (String part : parts) {
+            String cleaned = cleanNullable(part);
+            if (cleaned == null) {
+                continue;
+            }
+            if (!builder.isEmpty()) {
+                builder.append(", ");
+            }
+            builder.append(cleaned);
+        }
+        return builder.isEmpty() ? null : builder.toString();
     }
 
     private String generateUniqueFolio() {
