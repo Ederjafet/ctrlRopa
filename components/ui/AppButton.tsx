@@ -5,6 +5,7 @@ type Props = PressableProps & {
   title: string;
   variant?:
     | 'primary'
+    | 'cta'
     | 'secondary'
     | 'neutral'
     | 'warning'
