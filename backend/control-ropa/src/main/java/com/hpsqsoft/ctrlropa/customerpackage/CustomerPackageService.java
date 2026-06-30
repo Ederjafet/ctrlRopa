@@ -96,6 +96,7 @@ public class CustomerPackageService {
     }
 
     public CustomerPackageResponse create(CreateCustomerPackageRequest request) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.CREATE_CUSTOMER_PACKAGE);
         Customer customer = customerRepository.findById(request.getCustomerId())
                 .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado"));
 
@@ -119,6 +120,7 @@ public class CustomerPackageService {
     }
 
     public CustomerPackageDetailResponse prepareFromOrder(Long orderId, PrepareCustomerPackageFromOrderRequest request) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.CREATE_CUSTOMER_PACKAGE);
         CustomerOrder order = customerOrderService.findEntityById(orderId);
         List<CustomerOrderItem> orderItems = customerOrderItemRepository.findByCustomerOrderIdOrderByCreatedAtAsc(orderId);
 
@@ -160,6 +162,7 @@ public class CustomerPackageService {
 
     public CustomerPackageDetailResponse prepareFromReservation(Long reservationId,
                                                                 PrepareCustomerPackageFromReservationRequest request) {
+        accessService.assertCan(currentUser.getUserId(), PermissionCode.CREATE_CUSTOMER_PACKAGE);
         Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada"));
         tenantAccessGuard.requireBranch(reservation.getBranch().getId(), "La reserva no pertenece a la sucursal activa");

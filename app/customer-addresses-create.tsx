@@ -66,8 +66,8 @@ export default function CustomerAddressesCreateScreen() {
 
   const readinessMessage = useMemo(() => {
     if (!validCustomerId) return 'El identificador de cliente no es valido.';
-    if (!canEditCustomer) return 'No tienes permiso para crear direcciones. Permiso requerido: EDIT_CUSTOMER.';
-    if (!label.trim()) return 'Captura una etiqueta para identificar la direccion.';
+    if (!canEditCustomer) return 'No tienes permiso para crear direcciónes. Permiso requerido: EDIT_CUSTOMER.';
+    if (!label.trim()) return 'Captura una etiqueta para identificar la dirección.';
     if (!line1.trim()) return 'Captura calle, numero y colonia.';
     if (!city.trim()) return 'Captura ciudad o municipio.';
     if (!stateName.trim()) return 'Captura estado.';
@@ -130,7 +130,7 @@ export default function CustomerAddressesCreateScreen() {
     if (!canEditCustomer) {
       setNotice({
         tone: 'warning',
-        message: 'No tienes permiso para crear direcciones. Permiso requerido: EDIT_CUSTOMER.',
+        message: 'No tienes permiso para crear direcciónes. Permiso requerido: EDIT_CUSTOMER.',
       });
       return;
     }
@@ -141,7 +141,7 @@ export default function CustomerAddressesCreateScreen() {
     }
 
     if (isDefault && hasPrimaryAddress) {
-      const confirmed = confirmReplacePrimary('Este cliente ya tiene direccion principal. Deseas reemplazarla?');
+      const confirmed = confirmReplacePrimary('Este cliente ya tiene dirección principal. Deseas reemplazarla?');
       if (!confirmed) return;
     }
 
@@ -159,10 +159,10 @@ export default function CustomerAddressesCreateScreen() {
         status: 'ACTIVE',
       });
 
-      setNotice({ tone: 'success', message: 'Direccion guardada correctamente.' });
+      setNotice({ tone: 'success', message: 'Dirección guardada correctamente.' });
       setTimeout(() => router.replace(backRoute as any), 650);
     } catch (error: any) {
-      setNotice({ tone: 'danger', message: error.message || 'No se pudo crear la direccion.' });
+      setNotice({ tone: 'danger', message: error.message || 'No se pudo crear la dirección.' });
     } finally {
       setIsSaving(false);
     }
@@ -170,7 +170,7 @@ export default function CustomerAddressesCreateScreen() {
 
   if (isLoading) {
     return (
-      <AppShellPage title="Nueva direccion" subtitle="Direccion de envio del cliente" activeRoute="customers" session={session}>
+      <AppShellPage title="Nueva dirección" subtitle="Dirección de envío del cliente" activeRoute="customers" session={session}>
         <ActivityIndicator />
       </AppShellPage>
     );
@@ -178,7 +178,7 @@ export default function CustomerAddressesCreateScreen() {
 
   if (!validCustomerId) {
     return (
-      <AppShellPage title="Cliente no valido" subtitle="No se pudo abrir la direccion" activeRoute="customers" session={session}>
+      <AppShellPage title="Cliente no valido" subtitle="No se pudo abrir la dirección" activeRoute="customers" session={session}>
         <AppCard variant="warning">
           <AppText bold>Cliente no valido.</AppText>
           <AppText color={theme.colors.mutedText}>Revisa la ruta o vuelve a la lista de clientes.</AppText>
@@ -190,13 +190,13 @@ export default function CustomerAddressesCreateScreen() {
 
   return (
     <AppShellPage
-      title="Nueva direccion"
-      subtitle={customer ? `Cliente: ${customer.name}` : 'Direccion de envio del cliente'}
+      title="Nueva dirección"
+      subtitle={customer ? `Cliente: ${customer.name}` : 'Dirección de envío del cliente'}
       activeRoute="customers"
       session={session}
       rightContent={
         <View style={styles.headerActions}>
-          <ScreenPermissionHeaderAction screenKey="customerAddressesCreate" screenTitle="Direccion del cliente" session={session} />
+          <ScreenPermissionHeaderAction screenKey="customerAddressesCreate" screenTitle="Dirección del cliente" session={session} />
           <AppButton title="Volver" variant="secondary" onPress={() => router.replace(backRoute as any)} />
         </View>
       }
@@ -211,9 +211,9 @@ export default function CustomerAddressesCreateScreen() {
       <AppCard variant={canEditCustomer ? 'info' : 'warning'}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionText}>
-            <AppText variant="subtitle" bold>Direccion guardada del cliente</AppText>
+            <AppText variant="subtitle" bold>Dirección guardada del cliente</AppText>
             <AppText color={theme.colors.mutedText}>
-              Sirve como base para paquetes. Cada paquete conserva una copia exacta de la direccion usada en su envio.
+              Sirve como base para paquetes. Cada paquete conserva una copia exacta de la dirección usada en su envío.
             </AppText>
           </View>
           <AppText color={canEditCustomer ? theme.colors.success : theme.colors.warning} bold>
@@ -225,7 +225,7 @@ export default function CustomerAddressesCreateScreen() {
       <View style={styles.contentGrid}>
         <View style={styles.mainColumn}>
           <AppCard>
-            <AppText variant="subtitle" bold>Datos de direccion</AppText>
+            <AppText variant="subtitle" bold>Datos de dirección</AppText>
             <AppInput label="Etiqueta *" value={label} onChangeText={setLabel} placeholder="Casa, Trabajo, Mama, Oficina" error={errors.label} editable={canEditCustomer && !isSaving} />
             <AppInput label="Calle, numero y colonia *" value={line1} onChangeText={setLine1} placeholder="Calle 1 #123, Col. Centro" error={errors.line1} editable={canEditCustomer && !isSaving} />
             <AppInput label="Interior / referencias cortas" value={line2} onChangeText={setLine2} placeholder="Depto, piso, entre calles" editable={canEditCustomer && !isSaving} />
@@ -252,20 +252,20 @@ export default function CustomerAddressesCreateScreen() {
           <AppCard>
             <AppText variant="subtitle" bold>Uso operativo</AppText>
             <AppText color={theme.colors.mutedText}>
-              El destinatario y telefono final se capturan en el paquete cuando se define direccion y envio.
+              El destinatario y teléfono final se completan en Envíos cuando se prepara la logística.
             </AppText>
             <AppButton
               title={`${isDefault ? '[x]' : '[ ]'} Marcar como principal`}
               variant={isDefault ? 'operation' : 'neutral'}
               onPress={() => setIsDefault((current) => !current)}
               disabled={!canEditCustomer || isSaving}
-              disabledReason="No tienes permiso para cambiar la direccion principal. Permiso requerido: EDIT_CUSTOMER."
+              disabledReason="No tienes permiso para cambiar la dirección principal. Permiso requerido: EDIT_CUSTOMER."
               style={styles.actionButton}
             />
             <AppText variant="caption" color={theme.colors.mutedText}>
               {hasPrimaryAddress && isDefault
-                ? 'Al guardar se desmarcara la direccion principal anterior.'
-                : 'Solo una direccion puede quedar como principal.'}
+                ? 'Al guardar se desmarcara la dirección principal anterior.'
+                : 'Solo una dirección puede quedar como principal.'}
             </AppText>
           </AppCard>
 
@@ -273,7 +273,7 @@ export default function CustomerAddressesCreateScreen() {
             <AppText variant="subtitle" bold>Estado</AppText>
             <AppText>{readinessMessage}</AppText>
             <AppButton
-              title="Guardar direccion"
+              title="Guardar dirección"
               onPress={handleSave}
               loading={isSaving}
               disabled={!canEditCustomer || isSaving}

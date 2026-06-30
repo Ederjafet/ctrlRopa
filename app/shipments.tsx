@@ -98,6 +98,25 @@ function packageDeliveryTypeLabel(type?: string | null) {
   return type || 'Sin tipo';
 }
 
+function logisticsSourceLabel(source?: string | null) {
+  if (source === 'SHIPMENT') return 'Datos del envio';
+  if (source === 'SHIPMENT_WITH_LEGACY_FALLBACK') return 'Envio + legacy';
+  if (source === 'LEGACY_PACKAGE') return 'Legacy paquete';
+  if (source === 'MIXED_LEGACY') return 'Legacy por definir';
+  return 'Sin datos logisticos';
+}
+
+function getPackageDestinationForShipment(customerPackage: CustomerPackageDetail) {
+  const address = formatPackageAddress(customerPackage);
+  return address !== 'Sin direccion' ? address : packageDeliveryTypeLabel(customerPackage.deliveryType);
+}
+
+function getPackageShippingCostForShipment(customerPackage: CustomerPackageDetail) {
+  if (customerPackage.shippingCostConfirmed && !customerPackage.shippingCollect && !customerPackage.customerProvidedLabel) {
+    return customerPackage.shippingCostWaived ? 0 : Number(customerPackage.shippingCostAmount ?? 0);
+  }
+  return null;
+}
 function packageStatusLabel(status?: string | null) {
   if (status === 'READY_FOR_SHIPMENT') return 'Listo para envio';
   if (status === 'OPEN') return 'Abierto';
@@ -375,6 +394,15 @@ export default function ShipmentsScreen() {
         expectedCodAmount: null,
         deliveryType,
         guideReference: guideReference.trim() || null,
+        recipientName: selectedReadyPackage.shipToName || selectedReadyPackage.customerName || null,
+        recipientPhone: selectedReadyPackage.shipToPhone || selectedReadyPackage.customerPhone || null,
+        destinationSummary: getPackageDestinationForShipment(selectedReadyPackage),
+        destinationCity: selectedReadyPackage.shipToCity || null,
+        destinationState: selectedReadyPackage.shipToState || null,
+        destinationPostalCode: selectedReadyPackage.shipToPostalCode || null,
+        shippingCarrier: selectedReadyPackage.shippingCarrier || null,
+        realShippingCost: getPackageShippingCostForShipment(selectedReadyPackage),
+        shippingNotes: selectedReadyPackage.shippingNotes || null,
         createdByUserId: session.userId,
       });
 
@@ -500,10 +528,10 @@ export default function ShipmentsScreen() {
                 Paquete listo sin envio creado
               </AppText>
               <AppText bold numberOfLines={1}>
-                {customerPackage.folio} · {customerPackage.customerName || `Cliente #${customerPackage.customerId}`}
+                {customerPackage.folio} - {customerPackage.customerName || `Cliente #${customerPackage.customerId}`}
               </AppText>
               <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
-                {customerPackage.customerPhone || 'Sin telefono'} · {packageDeliveryTypeLabel(customerPackage.deliveryType)}
+                {customerPackage.customerPhone || 'Sin telefono'} - {packageDeliveryTypeLabel(customerPackage.deliveryType)}
               </AppText>
             </View>
             <View style={[styles.statusBadge, { backgroundColor: theme.colors.warningBackground }]}>
@@ -548,7 +576,7 @@ export default function ShipmentsScreen() {
 
           <View style={[styles.addressBlock, { backgroundColor: theme.colors.surfaceAlt }]}>
             <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
-              Recibe: {customerPackage.shipToName || customerPackage.customerName || 'No aplica'} · {customerPackage.shipToPhone || customerPackage.customerPhone || 'Sin telefono'}
+              Recibe: {customerPackage.shipToName || customerPackage.customerName || 'No aplica'} - {customerPackage.shipToPhone || customerPackage.customerPhone || 'Sin telefono'}
             </AppText>
             <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={2}>
               {formatPackageAddress(customerPackage)}
@@ -633,10 +661,10 @@ export default function ShipmentsScreen() {
                 Envio real #{shipment.id}
               </AppText>
               <AppText bold numberOfLines={1}>
-                {shipment.folio} · {shipmentDeliveryTypeLabel(shipment.deliveryType)}
+                {shipment.folio} - {shipmentDeliveryTypeLabel(shipment.deliveryType)}
               </AppText>
               <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
-                {shipment.packageCount ?? 0} paquete{shipment.packageCount === 1 ? '' : 's'} · {shipment.guideReference ? `Guia ${shipment.guideReference}` : 'Sin guia'}
+                {shipment.packageCount ?? 0} paquete{shipment.packageCount === 1 ? '' : 's'} - {shipment.guideReference ? `Guia ${shipment.guideReference}` : 'Sin guia'}
               </AppText>
             </View>
             <View style={[styles.statusBadge, { backgroundColor: theme.colors.surfaceAlt }]}>
@@ -733,6 +761,9 @@ export default function ShipmentsScreen() {
             </AppText>
             <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
               Paqueteria: {shipment.shippingCarrier || shipmentDeliveryTypeLabel(shipment.deliveryType)} - Estado paquete: {packageStatusLabel(shipment.primaryPackageStatus)}
+            </AppText>
+            <AppText variant="caption" color={shipment.logisticsWarning ? theme.colors.warning : theme.colors.mutedText} numberOfLines={2}>
+              Logistica: {logisticsSourceLabel(shipment.logisticsSource)}{shipment.logisticsWarning ? ` - ${shipment.logisticsWarning}` : ''}
             </AppText>
           </View>
 
@@ -859,7 +890,7 @@ export default function ShipmentsScreen() {
             <AppCard variant="subtle">
               <AppText bold>{selectedReadyPackage.customerName || `Cliente #${selectedReadyPackage.customerId}`}</AppText>
               <AppText color={theme.colors.mutedText}>
-                Total {money(selectedReadyPackage.totalAmount)} · Envio {selectedReadyPackage.shippingCostWaived ? 'sin costo' : money(selectedReadyPackage.shippingCostAmount)}
+                Total {money(selectedReadyPackage.totalAmount)} - Envio {selectedReadyPackage.shippingCostWaived ? 'sin costo' : money(selectedReadyPackage.shippingCostAmount)}
               </AppText>
             </AppCard>
 

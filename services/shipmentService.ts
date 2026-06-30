@@ -52,6 +52,12 @@ export type Shipment = {
   shippingCarrier?: string | null;
   packageTrackingNumber?: string | null;
   shippingCostAmount?: number | null;
+  shippingNotes?: string | null;
+  logisticsSource?: string | null;
+  logisticsWarning?: string | null;
+  quotedAt?: string | null;
+  readyAt?: string | null;
+  receivedAt?: string | null;
   packageTotalAmount?: number | null;
   paymentMode?: ShipmentPackagePaymentMode | string | null;
   requiresAttention?: boolean;
@@ -104,9 +110,33 @@ export type CreateShipmentRequest = {
   expectedCodAmount?: number | null;
   deliveryType: ShipmentDeliveryType;
   guideReference?: string | null;
+  recipientName?: string | null;
+  recipientPhone?: string | null;
+  destinationSummary?: string | null;
+  destinationCity?: string | null;
+  destinationState?: string | null;
+  destinationPostalCode?: string | null;
+  shippingCarrier?: string | null;
+  realShippingCost?: number | null;
+  shippingNotes?: string | null;
   createdByUserId: number;
 };
 
+export type UpdateShipmentLogisticsRequest = {
+  deliveryType?: ShipmentDeliveryType | null;
+  recipientName?: string | null;
+  recipientPhone?: string | null;
+  destinationSummary?: string | null;
+  destinationCity?: string | null;
+  destinationState?: string | null;
+  destinationPostalCode?: string | null;
+  shippingCarrier?: string | null;
+  trackingNumber?: string | null;
+  realShippingCost?: number | null;
+  shippingNotes?: string | null;
+  quotedAt?: string | null;
+  readyAt?: string | null;
+};
 export type AddShipmentPackageRequest = {
   customerPackageId: number;
   deliveryAddressId?: number | null;
@@ -125,6 +155,98 @@ export type ConfirmShipmentReceivedRequest = {
   receivedAt?: string | null;
   notes?: string | null;
   deliveryConfirmedByUserId: number;
+};
+export type ShipmentCostShareMethod = 'EQUAL_SPLIT' | 'MANUAL' | 'STORE_ABSORBED' | string;
+
+export type ShipmentCostShareLine = {
+  packageId: number;
+  packageCode?: string | null;
+  customerId: number;
+  customerName?: string | null;
+  assignedAmount?: number | null;
+  notes?: string | null;
+};
+
+export type ShipmentCostShareResponse = {
+  shipmentId: number;
+  realShippingCost?: number | null;
+  shareMethod?: ShipmentCostShareMethod | null;
+  assignedTotal?: number | null;
+  absorbedAmount?: number | null;
+  overAssignedAmount?: number | null;
+  shares: ShipmentCostShareLine[];
+};
+
+export type ShipmentCostShareRequest = {
+  shareMethod: ShipmentCostShareMethod;
+  shares?: Array<{
+    packageId: number;
+    assignedAmount?: number | null;
+    notes?: string | null;
+  }>;
+};
+export type ShipmentPaymentStatus = 'REGISTERED' | 'CANCELLED' | string;
+
+export type ShipmentShippingPaymentLine = {
+  id: number;
+  costShareId: number;
+  packageId: number;
+  packageReference?: string | null;
+  customerId: number;
+  customerName?: string | null;
+  paidByCustomerId?: number | null;
+  paidByCustomerName?: string | null;
+  amount?: number | null;
+  paymentMethod?: string | null;
+  reference?: string | null;
+  notes?: string | null;
+  status?: ShipmentPaymentStatus | null;
+  registeredAt?: string | null;
+  registeredBy?: number | null;
+  cancelledAt?: string | null;
+  cancelledBy?: number | null;
+  cancelReason?: string | null;
+};
+
+export type ShipmentShippingPaymentShare = {
+  costShareId: number;
+  packageId: number;
+  packageReference?: string | null;
+  customerId: number;
+  customerName?: string | null;
+  assignedAmount?: number | null;
+  paidAmount?: number | null;
+  balanceAmount?: number | null;
+  payments: ShipmentShippingPaymentLine[];
+};
+
+export type ShipmentShippingPaymentsResponse = {
+  shipmentId: number;
+  realShippingCost?: number | null;
+  assignedTotal?: number | null;
+  paidTotal?: number | null;
+  shippingBalance?: number | null;
+  absorbedAmount?: number | null;
+  overAssignedAmount?: number | null;
+  shares: ShipmentShippingPaymentShare[];
+  payments: ShipmentShippingPaymentLine[];
+};
+
+export type RegisterShipmentShippingPaymentRequest = {
+  costShareId?: number | null;
+  packageId?: number | null;
+  customerId?: number | null;
+  paidByCustomerId?: number | null;
+  amount: number;
+  paymentMethod?: string | null;
+  reference?: string | null;
+  notes?: string | null;
+  registeredAt?: string | null;
+};
+
+export type CancelShipmentShippingPaymentRequest = {
+  cancelReason?: string | null;
+  cancelledAt?: string | null;
 };
 
 export async function getShipmentsByBranch(branchId: number): Promise<Shipment[]> {
@@ -156,6 +278,52 @@ export async function addPackageToShipment(
   });
 }
 
+export async function updateShipmentLogistics(
+  shipmentId: number,
+  payload: UpdateShipmentLogisticsRequest
+): Promise<ShipmentDetail> {
+  return apiRequest<ShipmentDetail>(`/api/shipments/${shipmentId}/logistics`, {
+    method: 'PATCH',
+    body: payload,
+  });
+}
+export async function getShipmentCostShares(shipmentId: number): Promise<ShipmentCostShareResponse> {
+  return apiRequest<ShipmentCostShareResponse>(`/api/shipments/${shipmentId}/cost-shares`);
+}
+
+export async function updateShipmentCostShares(
+  shipmentId: number,
+  payload: ShipmentCostShareRequest
+): Promise<ShipmentCostShareResponse> {
+  return apiRequest<ShipmentCostShareResponse>(`/api/shipments/${shipmentId}/cost-shares`, {
+    method: 'PUT',
+    body: payload,
+  });
+}
+export async function getShipmentShippingPayments(shipmentId: number): Promise<ShipmentShippingPaymentsResponse> {
+  return apiRequest<ShipmentShippingPaymentsResponse>(`/api/shipments/${shipmentId}/shipping-payments`);
+}
+
+export async function registerShipmentShippingPayment(
+  shipmentId: number,
+  payload: RegisterShipmentShippingPaymentRequest
+): Promise<ShipmentShippingPaymentsResponse> {
+  return apiRequest<ShipmentShippingPaymentsResponse>(`/api/shipments/${shipmentId}/shipping-payments`, {
+    method: 'POST',
+    body: payload,
+  });
+}
+
+export async function cancelShipmentShippingPayment(
+  shipmentId: number,
+  paymentId: number,
+  payload: CancelShipmentShippingPaymentRequest
+): Promise<ShipmentShippingPaymentsResponse> {
+  return apiRequest<ShipmentShippingPaymentsResponse>(`/api/shipments/${shipmentId}/shipping-payments/${paymentId}/cancel`, {
+    method: 'PATCH',
+    body: payload,
+  });
+}
 export async function dispatchShipment(
   shipmentId: number,
   dispatchedByUserId: number

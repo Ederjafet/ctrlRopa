@@ -36,6 +36,9 @@ public class ShipmentResponse {
     private String shippingCarrier;
     private String packageTrackingNumber;
     private BigDecimal shippingCostAmount;
+    private String shippingNotes;
+    private String logisticsSource;
+    private String logisticsWarning;
     private BigDecimal packageTotalAmount;
     private String paymentMode;
     private boolean requiresAttention;
@@ -76,6 +79,9 @@ public class ShipmentResponse {
                             String shippingCarrier,
                             String packageTrackingNumber,
                             BigDecimal shippingCostAmount,
+                            String shippingNotes,
+                            String logisticsSource,
+                            String logisticsWarning,
                             BigDecimal packageTotalAmount,
                             String paymentMode,
                             boolean requiresAttention,
@@ -115,6 +121,9 @@ public class ShipmentResponse {
         this.shippingCarrier = shippingCarrier;
         this.packageTrackingNumber = packageTrackingNumber;
         this.shippingCostAmount = shippingCostAmount;
+        this.shippingNotes = shippingNotes;
+        this.logisticsSource = logisticsSource;
+        this.logisticsWarning = logisticsWarning;
         this.packageTotalAmount = packageTotalAmount;
         this.paymentMode = paymentMode;
         this.requiresAttention = requiresAttention;
@@ -247,6 +256,18 @@ public class ShipmentResponse {
 
     public BigDecimal getShippingCostAmount() {
         return shippingCostAmount;
+    }
+
+    public String getShippingNotes() {
+        return shippingNotes;
+    }
+
+    public String getLogisticsSource() {
+        return logisticsSource;
+    }
+
+    public String getLogisticsWarning() {
+        return logisticsWarning;
     }
 
     public BigDecimal getPackageTotalAmount() {

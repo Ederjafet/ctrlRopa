@@ -13,6 +13,20 @@ public class ShipmentDetailResponse {
     private String deliveryType;
     private String status;
     private String guideReference;
+    private String recipientName;
+    private String recipientPhone;
+    private String destinationSummary;
+    private String destinationCity;
+    private String destinationState;
+    private String destinationPostalCode;
+    private String shippingCarrier;
+    private BigDecimal shippingCostAmount;
+    private String shippingNotes;
+    private String logisticsSource;
+    private String logisticsWarning;
+    private LocalDateTime quotedAt;
+    private LocalDateTime readyAt;
+    private LocalDateTime receivedAt;
     private LocalDateTime createdAt;
     private Long createdByUserId;
     private LocalDateTime dispatchedAt;
@@ -28,6 +42,20 @@ public class ShipmentDetailResponse {
                                   String deliveryType,
                                   String status,
                                   String guideReference,
+                                  String recipientName,
+                                  String recipientPhone,
+                                  String destinationSummary,
+                                  String destinationCity,
+                                  String destinationState,
+                                  String destinationPostalCode,
+                                  String shippingCarrier,
+                                  BigDecimal shippingCostAmount,
+                                  String shippingNotes,
+                                  String logisticsSource,
+                                  String logisticsWarning,
+                                  LocalDateTime quotedAt,
+                                  LocalDateTime readyAt,
+                                  LocalDateTime receivedAt,
                                   LocalDateTime createdAt,
                                   Long createdByUserId,
                                   LocalDateTime dispatchedAt,
@@ -42,6 +70,20 @@ public class ShipmentDetailResponse {
         this.deliveryType = deliveryType;
         this.status = status;
         this.guideReference = guideReference;
+        this.recipientName = recipientName;
+        this.recipientPhone = recipientPhone;
+        this.destinationSummary = destinationSummary;
+        this.destinationCity = destinationCity;
+        this.destinationState = destinationState;
+        this.destinationPostalCode = destinationPostalCode;
+        this.shippingCarrier = shippingCarrier;
+        this.shippingCostAmount = shippingCostAmount;
+        this.shippingNotes = shippingNotes;
+        this.logisticsSource = logisticsSource;
+        this.logisticsWarning = logisticsWarning;
+        this.quotedAt = quotedAt;
+        this.readyAt = readyAt;
+        this.receivedAt = receivedAt;
         this.createdAt = createdAt;
         this.createdByUserId = createdByUserId;
         this.dispatchedAt = dispatchedAt;
@@ -77,6 +119,62 @@ public class ShipmentDetailResponse {
 
     public String getGuideReference() {
         return guideReference;
+    }
+
+    public String getRecipientName() {
+        return recipientName;
+    }
+
+    public String getRecipientPhone() {
+        return recipientPhone;
+    }
+
+    public String getDestinationSummary() {
+        return destinationSummary;
+    }
+
+    public String getDestinationCity() {
+        return destinationCity;
+    }
+
+    public String getDestinationState() {
+        return destinationState;
+    }
+
+    public String getDestinationPostalCode() {
+        return destinationPostalCode;
+    }
+
+    public String getShippingCarrier() {
+        return shippingCarrier;
+    }
+
+    public BigDecimal getShippingCostAmount() {
+        return shippingCostAmount;
+    }
+
+    public String getShippingNotes() {
+        return shippingNotes;
+    }
+
+    public String getLogisticsSource() {
+        return logisticsSource;
+    }
+
+    public String getLogisticsWarning() {
+        return logisticsWarning;
+    }
+
+    public LocalDateTime getQuotedAt() {
+        return quotedAt;
+    }
+
+    public LocalDateTime getReadyAt() {
+        return readyAt;
+    }
+
+    public LocalDateTime getReceivedAt() {
+        return receivedAt;
     }
 
     public LocalDateTime getCreatedAt() {

@@ -6,6 +6,7 @@ import AppInput from '@/components/ui/AppInput';
 import ScreenPermissionHeaderAction from '@/components/ui/ScreenPermissionHeaderAction';
 import AppText from '@/components/ui/AppText';
 import { useAppTheme } from '@/context/AppThemeContext';
+import { hasPermission } from '@/services/accessControl';
 import { getCustomerBalance } from '@/services/balanceService';
 import { Customer, getCustomerById } from '@/services/customerService';
 import {
@@ -26,7 +27,7 @@ function formatMoney(value?: number | null) {
 
 function statusLabel(status?: string) {
   if (status === 'OPEN') return 'Abierto';
-  if (status === 'READY') return 'Listo para envio';
+  if (status === 'READY') return 'Listo para envío';
   if (status === 'SHIPPED') return 'Enviado';
   if (status === 'DELIVERED') return 'Entregado';
   if (status === 'CANCELLED') return 'Cancelado';
@@ -40,12 +41,105 @@ function paymentLabel(status?: string) {
   return status || 'Sin pago';
 }
 
+type ShippingFilter = 'ALL' | 'NO_SHIPMENT' | 'PENDING' | 'PREPARING' | 'SHIPPED' | 'DELIVERED';
+type ShippingTone = 'default' | 'success' | 'warning' | 'info';
+
+const SHIPPING_FILTERS: { key: ShippingFilter; label: string }[] = [
+  { key: 'ALL', label: 'Todos' },
+  { key: 'NO_SHIPMENT', label: 'Sin envío' },
+  { key: 'PENDING', label: 'Pendiente configurar' },
+  { key: 'PREPARING', label: 'En preparacion' },
+  { key: 'SHIPPED', label: 'Enviado' },
+  { key: 'DELIVERED', label: 'Entregado' },
+];
+
+function getLatestPackageShipment(item: CustomerPackageDetail) {
+  return item.shipments?.[0] ?? null;
+}
+
+function getPackageShippingVisibility(item: CustomerPackageDetail): {
+  line: string;
+  badge: string;
+  tone: ShippingTone;
+  group: Exclude<ShippingFilter, 'ALL'>;
+} {
+  const latestShipment = getLatestPackageShipment(item);
+
+  if (!latestShipment) {
+    if (item.status === 'READY') {
+      return {
+        line: 'Envío: Pendiente de configurar',
+        badge: 'Pendiente',
+        tone: 'warning',
+        group: 'PENDING',
+      };
+    }
+
+    return {
+      line: 'Envío: Sin envío',
+      badge: 'Sin envío',
+      tone: 'default',
+      group: 'NO_SHIPMENT',
+    };
+  }
+
+  const status = latestShipment.shipmentStatus || latestShipment.packageShipmentStatus || item.status;
+  const folio = latestShipment.shipmentFolio || `#${latestShipment.shipmentId}`;
+
+  if (status === 'OUT_FOR_DELIVERY' || status === 'SHIPPED') {
+    return {
+      line: `Envío: Enviado - ${folio}`,
+      badge: 'Enviado',
+      tone: 'info',
+      group: 'SHIPPED',
+    };
+  }
+
+  if (status === 'DELIVERED') {
+    return {
+      line: `Envío: Entregado - ${folio}`,
+      badge: 'Entregado',
+      tone: 'success',
+      group: 'DELIVERED',
+    };
+  }
+
+  if (status === 'CANCELLED' || status === 'CLOSED_WITH_INCIDENTS') {
+    return {
+      line: `Envío: Pendiente de configurar - ${folio}`,
+      badge: 'Pendiente',
+      tone: 'warning',
+      group: 'PENDING',
+    };
+  }
+
+  return {
+    line: `Envío: En preparacion - ${folio}`,
+    badge: 'En preparacion',
+    tone: 'info',
+    group: 'PREPARING',
+  };
+}
+
+function matchesShippingFilter(item: CustomerPackageDetail, filter: ShippingFilter) {
+  const shipping = getPackageShippingVisibility(item);
+
+  if (filter === 'ALL') return true;
+  return shipping.group === filter;
+}
+
+function shippingToneColor(theme: ReturnType<typeof useAppTheme>['theme'], tone: ShippingTone) {
+  if (tone === 'success') return theme.colors.success;
+  if (tone === 'warning') return theme.colors.warning;
+  if (tone === 'info') return theme.colors.accent;
+  return theme.colors.mutedText;
+}
 function nextActionForPackage(item: CustomerPackageDetail) {
   if (item.status === 'CANCELLED') return 'Sin accion';
   if (item.status === 'SHIPPED' || item.status === 'DELIVERED') return 'Seguimiento';
   if (Number(item.pendingAmount ?? 0) > 0) return 'Registrar abono';
-  if (item.status === 'OPEN') return 'Liberar envio';
-  if (item.status === 'READY') return 'Marcar enviado';
+  if (getLatestPackageShipment(item)) return 'Ver envío';
+  if (item.status === 'READY') return 'Crear envío';
   return 'Detalle';
 }
 
@@ -61,6 +155,7 @@ export default function CustomerPackagesScreen() {
   const [packages, setPackages] = useState<CustomerPackageDetail[]>([]);
   const [customerBalances, setCustomerBalances] = useState<Record<number, number>>({});
   const [search, setSearch] = useState('');
+  const [shippingFilter, setShippingFilter] = useState<ShippingFilter>('ALL');
   const [notes, setNotes] = useState('');
   const [actionsPackage, setActionsPackage] = useState<CustomerPackageDetail | null>(null);
   const [createModalVisible, setCreateModalVisible] = useState(false);
@@ -125,20 +220,26 @@ export default function CustomerPackagesScreen() {
 
   const filteredPackages = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return packages;
+    const searchedPackages = term
+      ? packages.filter((item) => {
+          const shipping = getPackageShippingVisibility(item);
+          const text = `${item.folio || ''} ${item.id} ${item.customerName || ''} ${
+            item.customerPhone || ''
+          } ${item.status || ''} ${item.paymentStatus || ''} ${item.deliveryType || ''} ${item.shippingCarrier || ''} ${shipping.line} ${shipping.badge}`.toLowerCase();
+          return text.includes(term);
+        })
+      : packages;
 
-    return packages.filter((item) => {
-      const text = `${item.folio || ''} ${item.id} ${item.customerName || ''} ${
-        item.customerPhone || ''
-      } ${item.status || ''} ${item.paymentStatus || ''}`.toLowerCase();
-      return text.includes(term);
-    });
-  }, [packages, search]);
+    return searchedPackages.filter((item) => matchesShippingFilter(item, shippingFilter));
+  }, [packages, search, shippingFilter]);
 
   const openPackages = useMemo(
     () => filteredPackages.filter((item) => item.status === 'OPEN' || item.status === 'READY'),
     [filteredPackages]
   );
+
+  const canCreatePackage = hasPermission(session, 'CREATE_CUSTOMER_PACKAGE');
+  const canManageShipments = hasPermission(session, 'MANAGE_SHIPMENTS');
 
   const historicalPackages = useMemo(
     () => filteredPackages.filter((item) => item.status !== 'OPEN' && item.status !== 'READY'),
@@ -175,13 +276,16 @@ export default function CustomerPackagesScreen() {
         session={session}
         buttonStyle={styles.headerButton}
       />
-      <AppButton
-        title="Nuevo paquete"
-        onPress={() => setCreateModalVisible(true)}
-        disabled={!selectedCustomerId}
-        disabledReason="Selecciona un cliente formal o crea el paquete desde Apartados para elegir prendas elegibles."
-        style={styles.headerButton}
-      />
+      {canCreatePackage ? (
+        <AppButton
+          title="Nuevo paquete"
+          variant="cta"
+          onPress={() => setCreateModalVisible(true)}
+          disabled={!selectedCustomerId}
+          disabledReason="Para crear un paquete, primero selecciona un cliente formal o crea el paquete desde Apartados para elegir prendas elegibles."
+          style={styles.headerCtaButton}
+        />
+      ) : null}
       {selectedCustomerId ? (
         <AppButton
           title="Ver todos"
@@ -196,6 +300,9 @@ export default function CustomerPackagesScreen() {
   const renderPackage = (item: CustomerPackageDetail) => {
     const balance = customerBalances[item.customerId] ?? 0;
     const pending = Number(item.pendingAmount ?? 0);
+    const shipping = getPackageShippingVisibility(item);
+    const shippingColor = shippingToneColor(theme, shipping.tone);
+    const latestShipment = getLatestPackageShipment(item);
 
     return (
       <View
@@ -216,16 +323,16 @@ export default function CustomerPackagesScreen() {
             {item.customerName || `Cliente #${item.customerId}`}
           </AppText>
           <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
-            {item.customerPhone || 'Sin telefono'} - {item.totalItems || 0} prendas
+            {item.customerPhone || 'Sin teléfono'} - {item.totalItems || 0} prendas
           </AppText>
         </View>
 
         <View style={styles.packageMeta}>
           <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
-            {paymentLabel(item.paymentStatus)} - Total {formatMoney(item.totalAmount)}
+            {paymentLabel(item.paymentStatus)} - Total mercancía {formatMoney(item.itemSubtotalAmount ?? item.totalAmount)}
           </AppText>
           <AppText variant="caption" color={pending > 0 ? theme.colors.warning : theme.colors.success} numberOfLines={1}>
-            Abonado {formatMoney(item.paidAmount)} - Saldo {formatMoney(item.pendingAmount)}
+            Abonado mercancía {formatMoney(item.paidAmount)} - Saldo mercancía {formatMoney(item.pendingAmount)}
           </AppText>
           {balance > 0 ? (
             <AppText variant="caption" color={theme.colors.success} numberOfLines={1}>
@@ -235,6 +342,16 @@ export default function CustomerPackagesScreen() {
         </View>
 
         <View style={styles.packageMeta}>
+          <View style={styles.shippingLine}>
+            <AppText variant="caption" color={shippingColor} numberOfLines={1} style={styles.shippingLineText}>
+              {shipping.line}
+            </AppText>
+            <View style={[styles.shippingBadge, { borderColor: shippingColor, backgroundColor: theme.colors.surfaceAlt }]}>
+              <AppText variant="caption" bold color={shippingColor} numberOfLines={1}>
+                {shipping.badge}
+              </AppText>
+            </View>
+          </View>
           <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
             Estado: {statusLabel(item.status)}
           </AppText>
@@ -250,6 +367,18 @@ export default function CustomerPackagesScreen() {
             onPress={() => router.push(`/customer-package-detail?id=${item.id}` as any)}
             style={styles.compactButton}
           />
+          {canManageShipments ? (
+            <AppButton
+              title={latestShipment ? 'Ver envío' : 'Crear envío'}
+              variant={latestShipment ? 'secondary' : 'operation'}
+              onPress={() =>
+                latestShipment
+                  ? router.push(`/shipment-detail?id=${latestShipment.shipmentId}` as any)
+                  : router.push('/shipments' as any)
+              }
+              style={styles.compactButton}
+            />
+          ) : null}
           <AppButton
             title="Mas"
             variant="secondary"
@@ -265,7 +394,7 @@ export default function CustomerPackagesScreen() {
     return (
       <AppShellPage
         title="Paquetes"
-        subtitle="Bandeja operativa de paquetes, pagos y envio"
+        subtitle="Bandeja operativa de paquetes y mercancía"
         activeRoute="customer-packages"
         compactHeader
         rightContent={renderHeaderActions()}
@@ -278,7 +407,7 @@ export default function CustomerPackagesScreen() {
   return (
     <AppShellPage
       title="Paquetes"
-      subtitle="Bandeja operativa de paquetes, pagos y envio"
+      subtitle="Bandeja operativa de paquetes y mercancía"
       metadata={customer?.name ? `Cliente: ${customer.name}` : 'Paquetes por sucursal'}
       activeRoute="customer-packages"
       compactHeader
@@ -292,8 +421,8 @@ export default function CustomerPackagesScreen() {
             </AppText>
             <AppText color={theme.colors.mutedText}>
               {selectedCustomerId
-                ? `${customer?.name || 'Cliente'} - ${customer?.phone || 'Sin telefono'}`
-                : 'Busca por folio, cliente, telefono o estado.'}
+                ? `${customer?.name || 'Cliente'} - ${customer?.phone || 'Sin teléfono'}`
+                : 'Busca por folio, cliente, teléfono o estado.'}
             </AppText>
           </View>
           <AppInput
@@ -303,6 +432,17 @@ export default function CustomerPackagesScreen() {
             onChangeText={setSearch}
             style={styles.searchInput}
           />
+        </View>
+        <View style={styles.filterChips}>
+          {SHIPPING_FILTERS.map((filter) => (
+            <AppButton
+              key={filter.key}
+              title={filter.label}
+              variant={shippingFilter === filter.key ? 'operation' : 'neutral'}
+              onPress={() => setShippingFilter(filter.key)}
+              style={styles.filterButton}
+            />
+          ))}
         </View>
       </AppCard>
 
@@ -351,6 +491,7 @@ export default function CustomerPackagesScreen() {
 
         <AppButton
           title={isCreating ? 'Creando...' : 'Crear paquete'}
+          variant="cta"
           onPress={handleCreatePackage}
           loading={isCreating}
           disabled={isCreating}
@@ -369,7 +510,10 @@ export default function CustomerPackagesScreen() {
                 {actionsPackage.customerName || `Cliente #${actionsPackage.customerId}`}
               </AppText>
               <AppText variant="caption" color={theme.colors.mutedText}>
-                Total {formatMoney(actionsPackage.totalAmount)} - Saldo {formatMoney(actionsPackage.pendingAmount)}
+                Mercancia {formatMoney(actionsPackage.itemSubtotalAmount ?? actionsPackage.totalAmount)} - Saldo mercancía {formatMoney(actionsPackage.pendingAmount)}
+              </AppText>
+              <AppText variant="caption" color={shippingToneColor(theme, getPackageShippingVisibility(actionsPackage).tone)}>
+                {getPackageShippingVisibility(actionsPackage).line}
               </AppText>
             </AppCard>
             <View style={styles.modalActionsStack}>
@@ -382,6 +526,21 @@ export default function CustomerPackagesScreen() {
                   router.push(`/customer-package-detail?id=${id}` as any);
                 }}
               />
+              {canManageShipments ? (
+                <AppButton
+                  title={getLatestPackageShipment(actionsPackage) ? 'Ver envío' : 'Crear envío'}
+                  variant="secondary"
+                  onPress={() => {
+                    const shipment = getLatestPackageShipment(actionsPackage);
+                    setActionsPackage(null);
+                    if (shipment) {
+                      router.push(`/shipment-detail?id=${shipment.shipmentId}` as any);
+                    } else {
+                      router.push('/shipments' as any);
+                    }
+                  }}
+                />
+              ) : null}
               <AppButton
                 title="Registrar abono"
                 variant="operation"
@@ -392,12 +551,6 @@ export default function CustomerPackagesScreen() {
                 }}
                 disabled={Number(actionsPackage.pendingAmount ?? 0) <= 0}
                 disabledReason="El paquete ya esta liquidado."
-              />
-              <AppButton
-                title="Liberar envio"
-                variant="neutral"
-                disabled={Number(actionsPackage.pendingAmount ?? 0) > 0}
-                disabledReason="Este paquete tiene saldo pendiente."
               />
             </View>
           </>
@@ -417,6 +570,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
+  filterButton: {
+    minHeight: 30,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  filterChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 10,
+  },
   headerActions: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -429,6 +593,12 @@ const styles = StyleSheet.create({
     minWidth: 94,
     paddingHorizontal: 10,
     paddingVertical: 6,
+  },
+  headerCtaButton: {
+    minHeight: 52,
+    minWidth: 150,
+    paddingHorizontal: 24,
+    paddingVertical: 15,
   },
   modalActionsStack: {
     gap: 8,
@@ -459,6 +629,22 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 10,
     padding: 12,
+  },
+  shippingBadge: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  shippingLine: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  shippingLineText: {
+    flexShrink: 1,
+    minWidth: 160,
   },
   searchHeader: {
     alignItems: 'flex-end',
