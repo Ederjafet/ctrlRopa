@@ -48,6 +48,40 @@ public class ShipmentController {
         return service.addPackageByFolio(shipmentFolio, packageFolio, request);
     }
 
+    @PatchMapping("/{id}/logistics")
+    public ShipmentDetailResponse updateLogistics(@PathVariable Long id,
+                                                  @Valid @RequestBody UpdateShipmentLogisticsRequest request) {
+        return service.updateLogistics(id, request);
+    }
+
+    @GetMapping("/{id}/cost-shares")
+    public ShipmentCostShareResponse getCostShares(@PathVariable Long id) {
+        return service.getCostShares(id);
+    }
+
+    @PutMapping("/{id}/cost-shares")
+    public ShipmentCostShareResponse updateCostShares(@PathVariable Long id,
+                                                      @Valid @RequestBody ShipmentCostShareRequest request) {
+        return service.updateCostShares(id, request);
+    }
+    @GetMapping("/{id}/shipping-payments")
+    public ShipmentPaymentsResponse getShippingPayments(@PathVariable Long id) {
+        return service.getShippingPayments(id);
+    }
+
+    @PostMapping("/{id}/shipping-payments")
+    public ShipmentPaymentsResponse registerShippingPayment(@PathVariable Long id,
+                                                            @Valid @RequestBody RegisterShipmentPaymentRequest request) {
+        return service.registerShippingPayment(id, request);
+    }
+
+    @PatchMapping("/{shipmentId}/shipping-payments/{paymentId}/cancel")
+    public ShipmentPaymentsResponse cancelShippingPayment(@PathVariable Long shipmentId,
+                                                          @PathVariable Long paymentId,
+                                                          @RequestBody(required = false) CancelShipmentPaymentRequest request) {
+        return service.cancelShippingPayment(shipmentId, paymentId, request);
+    }
+
     @PatchMapping("/{id}/dispatch")
     public ShipmentDetailResponse dispatch(@PathVariable Long id,
                                            @Valid @RequestBody DispatchShipmentRequest request) {

@@ -72,3 +72,6 @@ git-diffs/
 .tmp-pdf-images/
 qa-reports/
 backups/
+
+# Local private evidence/artifacts
+_local-private/

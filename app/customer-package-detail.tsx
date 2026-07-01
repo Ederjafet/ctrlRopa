@@ -52,7 +52,7 @@ function formatDate(value?: string | null) {
 
 function statusLabel(status?: string | null) {
   if (status === 'OPEN') return 'En preparacion';
-  if (status === 'READY') return 'Listo para envio';
+  if (status === 'READY') return 'Listo para envío';
   if (status === 'SHIPPED') return 'Enviado';
   if (status === 'DELIVERED') return 'Entregado';
   if (status === 'CANCELLED') return 'Cancelado';
@@ -88,17 +88,17 @@ function deliveryTypeLabel(type?: string | null) {
   if (type === 'PARCEL_SERVICE') return 'Paqueteria';
   if (type === 'LOCAL_DELIVERY') return 'Entrega local';
   if (type === 'STORE_PICKUP') return 'Recoleccion en tienda';
-  if (type === 'CUSTOMER_PROVIDED_LABEL') return 'Cliente envia guia';
-  if (type === 'COLLECT_SHIPPING') return 'Envio por cobrar';
+  if (type === 'CUSTOMER_PROVIDED_LABEL') return 'Cliente envia guía';
+  if (type === 'COLLECT_SHIPPING') return 'Envío por cobrar';
   if (type === 'OTHER') return 'Otro';
   return type || 'Sin definir';
 }
 
 function addressSourceLabel(source?: string | null) {
-  if (source === 'CUSTOMER_PRIMARY_ADDRESS') return 'Direccion principal';
-  if (source === 'CUSTOMER_SAVED_ADDRESS') return 'Direccion guardada';
-  if (source === 'CUSTOM_PACKAGE_ADDRESS') return 'Direccion del paquete';
-  if (source === 'PICKUP_NO_ADDRESS') return 'Sin direccion';
+  if (source === 'CUSTOMER_PRIMARY_ADDRESS') return 'Dirección principal';
+  if (source === 'CUSTOMER_SAVED_ADDRESS') return 'Dirección guardada';
+  if (source === 'CUSTOM_PACKAGE_ADDRESS') return 'Dirección del paquete';
+  if (source === 'PICKUP_NO_ADDRESS') return 'Sin dirección';
   if (source === 'CUSTOMER_PROVIDED_LABEL') return 'Guia del cliente';
   if (source === 'LOCAL_DELIVERY') return 'Entrega local';
   return source || 'Sin fuente';
@@ -120,27 +120,27 @@ const DELIVERY_TYPE_OPTIONS: {
   {
     type: 'PARCEL_SERVICE',
     title: 'Paqueteria',
-    description: 'Requiere direccion y costo de envio o por cobrar.',
+    description: 'Requiere dirección y costo de envío o por cobrar.',
   },
   {
     type: 'LOCAL_DELIVERY',
     title: 'Entrega local',
-    description: 'Requiere direccion y costo o envio sin costo.',
+    description: 'Requiere dirección y costo o envío sin costo.',
   },
   {
     type: 'STORE_PICKUP',
     title: 'Recoleccion',
-    description: 'No requiere direccion y confirma costo cero.',
+    description: 'No requiere dirección y confirma costo cero.',
   },
   {
     type: 'CUSTOMER_PROVIDED_LABEL',
-    title: 'Cliente envia guia',
-    description: 'No suma costo al paquete; captura guia o nota.',
+    title: 'Cliente envia guía',
+    description: 'No suma costo al paquete; captura guía o nota.',
   },
   {
     type: 'COLLECT_SHIPPING',
     title: 'Por cobrar',
-    description: 'Requiere direccion; el cliente paga al recibir.',
+    description: 'Requiere dirección; el cliente paga al recibir.',
   },
 ];
 
@@ -153,7 +153,7 @@ function formatPackageAddress(detail?: CustomerPackageDetail | null) {
     detail?.shipToPostalCode,
     detail?.shipToCountry,
   ].filter(Boolean);
-  return parts.length > 0 ? parts.join(', ') : 'Sin direccion';
+  return parts.length > 0 ? parts.join(', ') : 'Sin dirección';
 }
 
 function hasPackageAddressSnapshot(detail?: CustomerPackageDetail | null) {
@@ -183,7 +183,7 @@ function getShippingReadiness(detail: CustomerPackageDetail | null, hasPending: 
     return {
       label: 'Incompleto',
       tone: 'warning' as const,
-      nextStep: 'Carga el paquete para revisar direccion y envio.',
+      nextStep: 'Carga el paquete para revisar dirección y envío.',
       typeReady: false,
       addressReady: false,
       costReady: false,
@@ -216,9 +216,9 @@ function getShippingReadiness(detail: CustomerPackageDetail | null, hasPending: 
 
   if (!addressReady) {
     return {
-      label: 'Direccion pendiente',
+      label: 'Dirección pendiente',
       tone: 'warning' as const,
-      nextStep: 'Captura o selecciona la direccion de envio.',
+      nextStep: 'Captura o selecciona la dirección de envío.',
       typeReady,
       addressReady,
       costReady,
@@ -230,7 +230,7 @@ function getShippingReadiness(detail: CustomerPackageDetail | null, hasPending: 
     return {
       label: 'Costo pendiente',
       tone: 'warning' as const,
-      nextStep: 'Confirma costo de envio, envio sin costo, por cobrar o guia del cliente.',
+      nextStep: 'Confirma costo de envío, envío sin costo, por cobrar o guía del cliente.',
       typeReady,
       addressReady,
       costReady,
@@ -251,9 +251,9 @@ function getShippingReadiness(detail: CustomerPackageDetail | null, hasPending: 
   }
 
   return {
-    label: 'Listo para envio',
+    label: 'Listo para envío',
     tone: 'success' as const,
-    nextStep: 'Direccion, costo y pago estan completos. Puedes marcar listo para envio.',
+    nextStep: 'Mercancia pagada. Revisa el envío asociado desde Envíos.',
     typeReady,
     addressReady,
     costReady,
@@ -278,7 +278,7 @@ function getRemoveItemBlockedReason(
   if (item.canRemove === true) return '';
   if (item.canRemove === false && item.removeBlockedReason) return item.removeBlockedReason;
   if (!canManagePackage) return 'No tienes permiso para quitar prendas del paquete.';
-  if (!canEditPackage) return 'No puedes quitar prendas cuando el paquete ya esta listo para envio, enviado, cerrado o cancelado.';
+  if (!canEditPackage) return 'No puedes quitar prendas cuando el paquete ya esta listo para envío, enviado, cerrado o cancelado.';
   if (Number(item.paidAmount ?? 0) > 0) {
     return 'Esta prenda ya tiene abono aplicado. Para quitarla se requiere ajustar el pago o generar saldo a favor.';
   }
@@ -302,21 +302,21 @@ function getMarkReadyBlockedReason(
 ) {
   if (isWorking) return 'Ya hay una accion en proceso.';
   if (!detail) return 'No se pudo cargar el paquete.';
-  if (!canManagePackage) return 'No tienes permiso para marcar listo para envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.';
-  if (detail.status !== 'OPEN') return `El paquete no puede prepararse para envio en su estado actual: ${statusLabel(detail.status)}.`;
-  if (Number(detail.totalItems ?? 0) <= 0) return 'Agrega al menos una prenda antes de liberar envio.';
-  if (!detail.deliveryType) return 'Selecciona el tipo de entrega antes de marcar listo para envio.';
+  if (!canManagePackage) return 'No tienes permiso para marcar listo para envío. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.';
+  if (detail.status !== 'OPEN') return `El paquete no puede prepararse para envío en su estado actual: ${statusLabel(detail.status)}.`;
+  if (Number(detail.totalItems ?? 0) <= 0) return 'Agrega al menos una prenda antes de liberar envío.';
+  if (!detail.deliveryType) return 'Selecciona el tipo de entrega antes de marcar listo para envío.';
   if (
     deliveryRequiresAddress(detail.deliveryType) &&
     (detail.shippingAddressConfirmed !== true || !detail.shippingAddressSource || !hasPackageAddressSnapshot(detail))
   ) {
-    return 'Captura o selecciona la direccion de envio antes de marcar listo para envio.';
+    return 'Captura o selecciona la dirección de envío antes de marcar listo para envío.';
   }
   if (detail.shippingCostConfirmed !== true) {
-    return 'Confirma el costo de envio o marca una opcion sin costo/por cobrar.';
+    return 'Confirma el costo de envío o marca una opcion sin costo/por cobrar.';
   }
   if (Number(Number(detail.pendingAmount ?? 0).toFixed(2)) > 0) {
-    return `No puedes marcar listo para envio porque el paquete tiene saldo pendiente de ${money(detail.pendingAmount)}.`;
+    return `No puedes marcar listo para envío porque el paquete tiene saldo pendiente de ${money(detail.pendingAmount)}.`;
   }
   if (detail.canMarkReadyForShipment === true) return '';
   if (detail.markReadyForShipmentBlockedReason) return detail.markReadyForShipmentBlockedReason;
@@ -329,10 +329,10 @@ function getShipmentState(detail: CustomerPackageDetail, shipments: CustomerPack
     return `${statusLabel(latest.shipmentStatus)} / ${statusLabel(latest.packageShipmentStatus)}`;
   }
 
-  if (detail.status === 'READY') return 'Listo, sin envio';
+  if (detail.status === 'READY') return 'Listo, sin envío';
   if (detail.status === 'SHIPPED') return 'Enviado';
   if (detail.status === 'DELIVERED') return 'Entregado';
-  return 'Sin envio';
+  return 'Sin envío';
 }
 
 function getNextStep(
@@ -344,17 +344,17 @@ function getNextStep(
   shipments: CustomerPackageShipmentLine[]
 ) {
   if (detail.status === 'CANCELLED') return 'Paquete cancelado. No requiere acciones operativas.';
-  if (detail.status === 'DELIVERED') return 'Paquete entregado. Conserva la consulta de pagos y envio.';
+  if (detail.status === 'DELIVERED') return 'Paquete entregado. Conserva la consulta de pagos y envío.';
   if (shipments.length > 0 && detail.status === 'SHIPPED') {
-    return 'Enviado. Da seguimiento desde el detalle del envio asociado.';
+    return 'Enviado. Da seguimiento desde el detalle del envío asociado.';
   }
-  if (detail.status === 'READY') return 'Listo para envio. Registra o revisa el envio asociado.';
+  if (detail.status === 'READY') return 'Listo para envío. Registra o revisa el envío asociado.';
   if (!detail.deliveryType) return 'Falta seleccionar el tipo de entrega.';
-  if (!addressReady) return 'Falta confirmar la direccion o modalidad de entrega.';
-  if (!shippingConfirmed) return 'Falta definir costo de envio o confirmar una opcion sin costo/por cobrar.';
-  if (hasPending) return 'Falta registrar abono para liberar el envio.';
-  if ((detail.totalItems ?? 0) <= 0) return 'Agrega prendas antes de preparar el envio.';
-  if (canReady) return 'Paquete pagado. Puedes marcarlo listo para envio.';
+  if (!addressReady) return 'Falta confirmar la dirección o modalidad de entrega.';
+  if (!shippingConfirmed) return 'Mercancia pagada. Crea o revisa el envío desde Envíos.';
+  if (hasPending) return 'Falta registrar abono para liberar el envío.';
+  if ((detail.totalItems ?? 0) <= 0) return 'Agrega prendas antes de preparar el envío.';
+  if (canReady) return 'Paquete pagado. Puedes marcarlo listo para envío.';
   return 'Revisa prendas, pagos y permisos antes de continuar.';
 }
 
@@ -608,32 +608,26 @@ function PackageItemLine({
 
 function ShipmentLine({ shipment }: { shipment: CustomerPackageShipmentLine }) {
   const { theme } = useAppTheme();
-  const expected = Number(shipment.expectedCollectionAmount ?? 0);
-  const collected = Number(shipment.collectedAmount ?? 0);
 
   return (
     <View style={[styles.compactLine, { borderColor: theme.colors.borderSubtle, backgroundColor: theme.colors.surfaceAlt }]}>
       <View style={styles.lineMain}>
         <View style={styles.lineTitleBlock}>
           <AppText bold numberOfLines={1}>
-            {shipment.shipmentFolio || `Envio #${shipment.shipmentId}`}
+            {shipment.shipmentFolio || `Envío #${shipment.shipmentId}`}
           </AppText>
           <AppText variant="caption" color={theme.colors.mutedText}>
-            Paquete: {statusLabel(shipment.packageShipmentStatus)}
+            Paquete vinculado: {statusLabel(shipment.packageShipmentStatus)}
           </AppText>
         </View>
         <StatusPill label={statusLabel(shipment.shipmentStatus)} tone="info" />
       </View>
-      <View style={styles.lineMetaGrid}>
-        <InfoRow label="Modo" value={shipment.paymentMode || 'Sin modo'} />
-        <InfoRow label="Por cobrar" value={money(expected)} tone={expected > 0 ? 'warning' : 'default'} />
-        <InfoRow label="Cobrado" value={money(collected)} tone={collected > 0 ? 'success' : 'default'} />
-        <InfoRow label="Cobranza" value={collectionStatusLabel(shipment.collectionStatus)} />
-      </View>
+      <AppText variant="caption" color={theme.colors.mutedText}>
+        La dirección, guía, costo, reparto y pagos se consultan en Envíos.
+      </AppText>
     </View>
   );
 }
-
 export default function CustomerPackageDetailScreen() {
   const router = useRouter();
   const { id, folio } = useLocalSearchParams<{ id?: string; folio?: string }>();
@@ -1223,7 +1217,7 @@ export default function CustomerPackageDetailScreen() {
     if (!canManagePackage) {
       setNotice({
         title: 'Permiso requerido',
-        message: 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.',
+        message: 'No tienes permiso para modificar datos de envío. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.',
         tone: 'warning',
       });
       return;
@@ -1231,8 +1225,8 @@ export default function CustomerPackageDetailScreen() {
 
     if (!canEditShipping) {
       setNotice({
-        title: 'Paquete no editable para envio',
-        message: 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio.',
+        title: 'Paquete no editable para envío',
+        message: 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envío.',
         tone: 'warning',
       });
       return;
@@ -1241,7 +1235,7 @@ export default function CustomerPackageDetailScreen() {
     if (!deliveryType) {
       setNotice({
         title: 'Tipo de entrega requerido',
-        message: 'Selecciona el tipo de entrega antes de guardar direccion y envio.',
+        message: 'Selecciona el tipo de entrega antes de guardar dirección y envío.',
         tone: 'warning',
       });
       return;
@@ -1257,8 +1251,8 @@ export default function CustomerPackageDetailScreen() {
     if (deliveryRequiresAddress(deliveryType)) {
       if (addressSource === 'CUSTOMER_SAVED_ADDRESS' && !sourceCustomerAddressId) {
         setNotice({
-          title: 'Direccion requerida',
-          message: 'Selecciona una direccion guardada del cliente.',
+          title: 'Dirección requerida',
+          message: 'Selecciona una dirección guardada del cliente.',
           tone: 'warning',
         });
         return;
@@ -1267,8 +1261,8 @@ export default function CustomerPackageDetailScreen() {
       if ((addressSource === 'CUSTOM_PACKAGE_ADDRESS' || addressSource === 'LOCAL_DELIVERY') &&
         (!shipToName.trim() || !shipToPhone.trim() || !shipToLine1.trim() || !shipToCity.trim() || !shipToState.trim() || !shipToPostalCode.trim())) {
         setNotice({
-          title: 'Direccion incompleta',
-          message: 'Captura quien recibe, telefono, calle, ciudad, estado y codigo postal.',
+          title: 'Dirección incompleta',
+          message: 'Captura quien recibe, teléfono, calle, ciudad, estado y codigo postal.',
           tone: 'warning',
         });
         return;
@@ -1278,7 +1272,7 @@ export default function CustomerPackageDetailScreen() {
     if (deliveryType === 'CUSTOMER_PROVIDED_LABEL' && !trackingNumber.trim() && !shippingNotes.trim()) {
       setNotice({
         title: 'Guia o nota requerida',
-        message: 'Captura la guia o una nota del envio proporcionado por el cliente.',
+        message: 'Captura la guía o una nota del envío proporcionado por el cliente.',
         tone: 'warning',
       });
       return;
@@ -1286,11 +1280,11 @@ export default function CustomerPackageDetailScreen() {
 
     if (!effectiveCostWaived && (!Number.isFinite(shippingCost) || shippingCost <= 0)) {
       setNotice({
-        title: 'Costo de envio requerido',
+        title: 'Costo de envío requerido',
         message:
           shippingCost === 0
-            ? 'Para costo 0 marca explicitamente envio sin costo.'
-            : 'Captura un costo de paqueteria mayor a 0 o marca envio sin costo.',
+            ? 'Para costo 0 marca explicitamente envío sin costo.'
+            : 'Captura un costo de paquetería mayor a 0 o marca envío sin costo.',
         tone: 'warning',
       });
       return;
@@ -1331,17 +1325,17 @@ export default function CustomerPackageDetailScreen() {
       setDetail(updated);
       syncShippingForm(updated);
       setNotice({
-        title: deliveryType === 'STORE_PICKUP' ? 'Recoleccion confirmada' : 'Direccion y envio guardados',
+        title: deliveryType === 'STORE_PICKUP' ? 'Recoleccion confirmada' : 'Dirección y envío guardados',
         message:
           deliveryType === 'STORE_PICKUP'
-            ? 'Recoleccion en tienda confirmada sin costo de envio.'
-            : 'Direccion y datos de envio guardados correctamente. El total y saldo del paquete fueron actualizados.',
+            ? 'Recoleccion en tienda confirmada sin costo de envío.'
+            : 'Dirección y datos de envío guardados correctamente. El total y saldo del paquete fueron actualizados.',
         tone: 'success',
       });
     } catch (error: any) {
       setNotice({
-        title: 'No se pudo guardar envio',
-        message: error.message || 'No se pudieron guardar los datos de envio.',
+        title: 'No se pudo guardar envío',
+        message: error.message || 'No se pudieron guardar los datos de envío.',
         tone: 'danger',
       });
     } finally {
@@ -1356,7 +1350,7 @@ export default function CustomerPackageDetailScreen() {
     const blockedReason = getMarkReadyBlockedReason(detail, canManagePackage, isWorking);
     if (blockedReason) {
       setNotice({
-        title: 'No se puede liberar envio',
+        title: 'No se puede liberar envío',
         message: blockedReason,
         tone: 'warning',
       });
@@ -1380,7 +1374,7 @@ export default function CustomerPackageDetailScreen() {
     if (blockedReason) {
       setMarkReadyError(blockedReason);
       setNotice({
-        title: 'No se puede liberar envio',
+        title: 'No se puede liberar envío',
         message: blockedReason,
         tone: 'warning',
       });
@@ -1394,8 +1388,8 @@ export default function CustomerPackageDetailScreen() {
       setDetail(updated);
       setMarkReadyModalVisible(false);
       setNotice({
-        title: 'Paquete listo para envio',
-        message: 'Paquete marcado listo para envio. Ya aparece en la bandeja de Envios para prepararlo.',
+        title: 'Paquete listo para envío',
+        message: 'Paquete marcado listo para envío. Ya aparece en la bandeja de Envíos para prepararlo.',
         tone: 'success',
       });
     } catch (error: any) {
@@ -1446,7 +1440,7 @@ export default function CustomerPackageDetailScreen() {
     return (
       <AppShellPage
         title="Detalle de paquete"
-        subtitle="Preparacion, pagos y envio"
+        subtitle="Preparacion, prendas y pagos de mercancía"
         activeRoute="customer-packages"
       >
         <ActivityIndicator />
@@ -1487,54 +1481,24 @@ export default function CustomerPackageDetailScreen() {
           disabled: false,
           disabledReason: '',
         }
-      : detail.status === 'READY' && !latestShipment && !shippingReadyForOperations
+      : hasPending
         ? {
-            title: 'Completar direccion y envio',
-            onPress: handleSaveShipping,
-            disabled: !canEditShipping || !canManagePackage || isWorking || isSavingShipping,
-            disabledReason: !canManagePackage
-              ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
-              : !canEditShipping
-                ? 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio.'
-                : shippingReadiness.nextStep,
+            title: 'Registrar abono',
+            onPress: openPaymentModal,
+            disabled: !canRegisterPayments || isWorking,
+            disabledReason: !canRegisterPayments
+              ? 'No tienes permiso para registrar abonos. Permiso requerido: REGISTER_PAYMENTS.'
+              : 'Ya hay una accion en proceso.',
           }
-      : detail.status === 'READY' || detail.status === 'SHIPPED'
-      ? {
-          title: latestShipment ? 'Ver envio' : 'Ir a envios',
-          onPress: () =>
-            latestShipment
-              ? router.push(`/shipment-detail?id=${latestShipment.shipmentId}` as any)
-              : router.push('/shipments' as any),
-          disabled: !canManageShipments,
-          disabledReason: 'No tienes permiso para gestionar envios. Permiso requerido: MANAGE_SHIPMENTS.',
-        }
-        : !shippingConfirmed
-          ? {
-              title: 'Definir envio',
-              onPress: handleSaveShipping,
-              disabled: !canEditShipping || !canManagePackage || isWorking || isSavingShipping,
-              disabledReason: !canManagePackage
-                ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
-                : !canEditShipping
-                  ? 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio.'
-                  : 'Captura costo de paqueteria o marca envio sin costo.',
-            }
-        : hasPending
-          ? {
-              title: 'Registrar abono',
-              onPress: openPaymentModal,
-              disabled: !canRegisterPayments || isWorking,
-              disabledReason: !canRegisterPayments
-                ? 'No tienes permiso para registrar abonos. Permiso requerido: REGISTER_PAYMENTS.'
-                : 'Ya hay una accion en proceso.',
-            }
-          : {
-              title: 'Marcar listo para envio',
-              onPress: handleMarkReady,
-              disabled: isWorking,
-              disabledReason: markReadyBlockedReason || 'Ya hay una accion en proceso.',
-            };
-
+        : {
+            title: latestShipment ? 'Ver envío' : 'Crear envío',
+            onPress: () =>
+              latestShipment
+                ? router.push(`/shipment-detail?id=${latestShipment.shipmentId}` as any)
+                : router.push('/shipments' as any),
+            disabled: !canManageShipments || isWorking,
+            disabledReason: !canManageShipments ? 'No tienes permiso para gestionar envíos.' : 'Ya hay una accion en proceso.',
+          };
   return (
     <AppShellPage
       title="Detalle de paquete"
@@ -1576,7 +1540,7 @@ export default function CustomerPackageDetailScreen() {
               {detail.customerName || 'Sin cliente'}
             </AppText>
             <AppText variant="caption" color={theme.colors.mutedText}>
-              {detail.customerPhone || 'Sin telefono'} - {detail.branchName || detail.branchCode || 'Sin sucursal'} - {formatDate(detail.createdAt)}
+              {detail.customerPhone || 'Sin teléfono'} - {detail.branchName || detail.branchCode || 'Sin sucursal'} - {formatDate(detail.createdAt)}
             </AppText>
           </View>
           <View style={styles.heroBadges}>
@@ -1586,22 +1550,12 @@ export default function CustomerPackageDetailScreen() {
           </View>
         </View>
 
-        <AppResponsiveGrid phoneColumns={2} tabletColumns={3} desktopColumns={7} gap={8} style={styles.metricsGrid}>
+        <AppResponsiveGrid phoneColumns={2} tabletColumns={3} desktopColumns={6} gap={8} style={styles.metricsGrid}>
           <MetricCard label="Subtotal prendas" value={money(itemSubtotalAmount)} />
+          <MetricCard label="Total mercancía" value={money(itemSubtotalAmount)} />
+          <MetricCard label="Abonado mercancía" value={money(paidAmount)} tone={paidAmount > 0 ? 'success' : 'default'} />
           <MetricCard
-            label="Costo envio"
-            value={shippingConfirmed ? money(currentShippingCost) : 'Pendiente'}
-            helper={!detail.deliveryType && shippingConfirmed ? 'Completa tipo de entrega' : shippingConfirmed ? shippingStatusText : 'Define antes de liberar'}
-            tone={!shippingConfirmed || !detail.deliveryType ? 'warning' : currentShippingWaived ? 'success' : 'info'}
-          />
-          <MetricCard
-            label="Total paquete"
-            value={money(totalAmount)}
-            helper={!shippingConfirmed ? 'Parcial sin envio' : undefined}
-          />
-          <MetricCard label="Abonado" value={money(paidAmount)} tone={paidAmount > 0 ? 'success' : 'default'} />
-          <MetricCard
-            label="Saldo pendiente"
+            label="Saldo mercancía"
             value={pendingAmount > 0 ? money(pendingAmount) : 'Pagado'}
             tone={pendingAmount > 0 ? 'danger' : 'success'}
           />
@@ -1677,7 +1631,7 @@ export default function CustomerPackageDetailScreen() {
 
             {items.length === 0 ? (
               <View style={[styles.emptyState, { borderColor: theme.colors.borderSubtle }]}>
-                <AppText bold>Este paquete todavia no tiene prendas.</AppText>
+                <AppText bold>Este paquete todavía no tiene prendas.</AppText>
                 <AppText variant="caption" color={theme.colors.mutedText}>
                   Agrega una prenda disponible o vinculada al cliente para continuar.
                 </AppText>
@@ -1704,7 +1658,7 @@ export default function CustomerPackageDetailScreen() {
                   Pagos y abonos
                 </AppText>
                 <AppText variant="caption" color={theme.colors.mutedText}>
-                  Resumen financiero del paquete
+                  Resumen de abonos de mercancía
                 </AppText>
               </View>
               <AppButton
@@ -1723,16 +1677,11 @@ export default function CustomerPackageDetailScreen() {
               />
             </View>
 
-            <AppResponsiveGrid phoneColumns={1} tabletColumns={2} desktopColumns={6} gap={8}>
+            <AppResponsiveGrid phoneColumns={1} tabletColumns={2} desktopColumns={5} gap={8}>
               <MetricCard label="Subtotal prendas" value={money(itemSubtotalAmount)} />
-              <MetricCard
-                label="Envio"
-                value={shippingConfirmed ? money(currentShippingCost) : 'Pendiente'}
-                tone={!shippingConfirmed || !detail.deliveryType ? 'warning' : currentShippingWaived ? 'success' : 'info'}
-              />
-              <MetricCard label="Total" value={money(totalAmount)} helper={!shippingConfirmed ? 'Parcial sin envio' : undefined} />
-              <MetricCard label="Abonado" value={money(paidAmount)} tone={paidAmount > 0 ? 'success' : 'default'} />
-              <MetricCard label="Pendiente" value={money(pendingAmount)} tone={pendingAmount > 0 ? 'danger' : 'success'} />
+              <MetricCard label="Total mercancía" value={money(itemSubtotalAmount)} />
+              <MetricCard label="Abonado mercancía" value={money(paidAmount)} tone={paidAmount > 0 ? 'success' : 'default'} />
+              <MetricCard label="Saldo mercancía" value={money(pendingAmount)} tone={pendingAmount > 0 ? 'danger' : 'success'} />
               <MetricCard label="Estado" value={paymentStatusLabel(detail.paymentStatus)} tone={pendingAmount > 0 ? 'warning' : 'success'} />
             </AppResponsiveGrid>
 
@@ -1741,7 +1690,7 @@ export default function CustomerPackageDetailScreen() {
                 {paidAmount > 0 ? 'Abonos aplicados al paquete' : 'Aun no hay pagos registrados para este paquete.'}
               </AppText>
               <AppText variant="caption" color={theme.colors.mutedText}>
-                Los abonos se aplican contra prendas y, si esta confirmado, contra el costo de envio. El historial detallado queda disponible como backlog read-only.
+                Los abonos de esta sección aplican únicamente a mercancía. Los pagos de envío se registran desde el modulo Envíos.
               </AppText>
             </View>
           </AppCard>
@@ -1789,14 +1738,6 @@ export default function CustomerPackageDetailScreen() {
                 }
               />
               <AppButton
-                title="Marcar listo para envio"
-                variant="secondary"
-                onPress={handleMarkReady}
-                loading={isWorking}
-                disabled={Boolean(markReadyBlockedReason) || isWorking}
-                disabledReason={markReadyBlockedReason || 'Ya hay una accion en proceso.'}
-              />
-              <AppButton
                 title="Cancelar paquete"
                 variant="danger"
                 onPress={() => setCancelModalVisible(true)}
@@ -1813,414 +1754,66 @@ export default function CustomerPackageDetailScreen() {
           </AppCard>
 
           <AppCard>
-            <AppText variant="subtitle" bold>
-              Direccion y envio
-            </AppText>
-            <View style={[styles.shippingHero, { borderColor: theme.colors.borderSubtle, backgroundColor: theme.colors.surfaceAlt }]}>
-              <View style={styles.shippingHeroMain}>
-                <StatusPill label={shippingReadiness.label} tone={shippingReadiness.tone} />
+            <View style={styles.sectionHeader}>
+              <View>
+                <AppText variant="subtitle" bold>
+                  Resumen de envío
+                </AppText>
                 <AppText variant="caption" color={theme.colors.mutedText}>
-                  Proximo paso: {shippingReadiness.nextStep}
+                  La dirección, guía, paquetería, costo, reparto y pagos de envío se gestionan desde Envíos.
                 </AppText>
               </View>
-              {hasShippingDraftChanges ? <StatusPill label="Cambios pendientes de guardar" tone="warning" /> : null}
             </View>
 
             <View style={styles.shippingSummary}>
-              <InfoRow label="Tipo guardado" value={detail.deliveryType ? deliveryTypeLabel(detail.deliveryType) : 'Pendiente'} tone={!detail.deliveryType ? 'warning' : 'success'} />
-              <InfoRow label="Direccion" value={savedAddressText} tone={shippingReadiness.addressReady ? 'success' : detail.deliveryType ? 'warning' : 'default'} />
-              <InfoRow label="Fuente" value={savedAddressSourceText} tone={savedAddressSourceText === 'Pendiente' ? 'warning' : 'default'} />
-              <InfoRow label="Costo" value={getShippingCostText(detail)} tone={shippingReadiness.costReady ? 'success' : 'warning'} />
-              <InfoRow label="Paqueteria" value={detail.shippingCarrier || 'Sin definir'} />
-              <InfoRow label="Guia" value={detail.trackingNumber || 'Pendiente'} />
+              <InfoRow label="Estado de envío" value={shipmentState} />
+              <InfoRow label="Envío asociado" value={latestShipment?.shipmentFolio || 'Sin envío'} />
             </View>
 
-            {hasLegacyPartialShipping ? (
-              <View style={[styles.shippingNotice, { borderColor: theme.colors.warning, backgroundColor: theme.colors.surfaceAlt }]}>
-                <AppText variant="caption" bold color={theme.colors.warning}>
-                  Datos parciales heredados
-                </AppText>
-                <AppText variant="caption" color={theme.colors.mutedText}>
-                  Este paquete tiene costo, guia o direccion capturados, pero aun falta guardar el tipo de entrega para considerarlo completo.
-                </AppText>
-              </View>
-            ) : null}
-
-            {markReadyBlockedReason ? (
-              <View style={[styles.shippingNotice, { borderColor: theme.colors.warning, backgroundColor: theme.colors.surfaceAlt }]}>
-                <AppText variant="caption" bold color={theme.colors.warning}>
-                  Falta para liberar envio
-                </AppText>
-                <AppText variant="caption" color={theme.colors.mutedText}>
-                  {markReadyBlockedReason}
-                </AppText>
-              </View>
-            ) : null}
-
-            <View style={styles.shippingForm}>
-              <ShippingStep
-                number={1}
-                title="Tipo de entrega"
-                status={!deliveryType ? 'Pendiente' : typeDraftChanged ? 'Pendiente de guardar' : 'Guardado'}
-                tone={!deliveryType ? 'default' : typeDraftChanged ? 'warning' : 'success'}
-              >
-                <View style={styles.optionGrid}>
-                  {DELIVERY_TYPE_OPTIONS.map((option) => (
-                    <SelectableCard
-                      key={option.type}
-                      title={option.title}
-                      subtitle={option.description}
-                      selected={deliveryType === option.type}
-                      onPress={() => handleSelectDeliveryType(option.type)}
-                      disabled={!canEditShipping || !canManagePackage || isWorking}
-                      disabledReason={
-                        !canManagePackage
-                          ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
-                          : !canEditShipping
-                            ? 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio.'
-                            : 'Ya hay una accion en proceso.'
-                      }
-                    />
-                  ))}
-                </View>
-              </ShippingStep>
-
-              <ShippingStep
-                number={2}
-                title="Direccion o recoleccion"
-                status={
-                  !deliveryType
-                    ? 'En espera'
-                    : !requiresAddress
-                      ? 'No aplica'
-                      : shippingReadiness.addressReady && !addressDraftChanged
-                        ? 'Confirmada'
-                        : addressSource
-                          ? 'Pendiente de guardar'
-                          : 'Pendiente'
-                }
-                tone={
-                  !deliveryType
-                    ? 'default'
-                    : !requiresAddress || (shippingReadiness.addressReady && !addressDraftChanged)
-                      ? 'success'
-                      : 'warning'
-                }
-              >
-              {!deliveryType ? (
-                <AppText variant="caption" color={theme.colors.mutedText}>
-                  Primero selecciona el tipo de entrega.
-                </AppText>
-              ) : requiresAddress ? (
-                <View style={styles.compactSelector}>
-                  <View style={styles.optionGrid}>
-                    <SelectableCard
-                      title="Direccion principal"
-                      subtitle={primaryAddress ? `${primaryAddress.line1}, ${primaryAddress.city || 'Sin ciudad'}` : 'El cliente no tiene direccion principal activa.'}
-                      selected={addressSource === 'CUSTOMER_PRIMARY_ADDRESS'}
-                      onPress={() => {
-                        setAddressSource('CUSTOMER_PRIMARY_ADDRESS');
-                        setSourceCustomerAddressId(primaryAddress?.id ?? null);
-                      }}
-                      disabled={!primaryAddress || !canEditShipping || !canManagePackage || isWorking}
-                      disabledReason={
-                        !primaryAddress
-                          ? 'El cliente no tiene direccion principal activa.'
-                          : !canManagePackage
-                            ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
-                            : !canEditShipping
-                              ? 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio.'
-                              : 'Ya hay una accion en proceso.'
-                      }
-                    />
-                    <SelectableCard
-                      title="Direccion guardada"
-                      subtitle={customerAddresses.length > 0 ? 'Elige una direccion existente del cliente.' : 'No hay direcciones guardadas activas.'}
-                      selected={addressSource === 'CUSTOMER_SAVED_ADDRESS'}
-                      onPress={() => {
-                        setAddressSource('CUSTOMER_SAVED_ADDRESS');
-                        setSourceCustomerAddressId(selectedSavedAddress?.id ?? primaryAddress?.id ?? customerAddresses[0]?.id ?? null);
-                      }}
-                      disabled={customerAddresses.length === 0 || !canEditShipping || !canManagePackage || isWorking}
-                      disabledReason={
-                        customerAddresses.length === 0
-                          ? 'No hay direcciones guardadas activas.'
-                          : !canManagePackage
-                            ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
-                            : !canEditShipping
-                              ? 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio.'
-                              : 'Ya hay una accion en proceso.'
-                      }
-                    />
-                    <SelectableCard
-                      title="Otra direccion"
-                      subtitle="Captura una direccion solo para este paquete."
-                      selected={addressSource === 'CUSTOM_PACKAGE_ADDRESS'}
-                      onPress={() => {
-                        setAddressSource('CUSTOM_PACKAGE_ADDRESS');
-                        setSourceCustomerAddressId(null);
-                      }}
-                      disabled={!canEditShipping || !canManagePackage || isWorking}
-                      disabledReason={
-                        !canManagePackage
-                          ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
-                          : !canEditShipping
-                            ? 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio.'
-                            : 'Ya hay una accion en proceso.'
-                      }
-                    />
-                  </View>
-
-                  {addressSource === 'CUSTOMER_SAVED_ADDRESS' ? (
-                    <View style={styles.addressList}>
-                      {customerAddresses.map((address) => (
-                        <AppOptionRow
-                          key={address.id}
-                          title={`${sourceCustomerAddressId === address.id ? '[x] ' : ''}${address.label}${address.isDefault ? ' - Principal' : ''}`}
-                          subtitle={`${address.line1}, ${address.city || 'Sin ciudad'}`}
-                          onPress={() => setSourceCustomerAddressId(address.id)}
-                        />
-                      ))}
-                    </View>
-                  ) : null}
-
-                  {addressSource === 'CUSTOM_PACKAGE_ADDRESS' || addressSource === 'LOCAL_DELIVERY' ? (
-                    <View style={styles.addressFields}>
-                      <AppInput label="Recibe" value={shipToName} onChangeText={setShipToName} editable={canEditShipping && canManagePackage && !isWorking} />
-                      <AppInput label="Telefono" value={shipToPhone} onChangeText={setShipToPhone} editable={canEditShipping && canManagePackage && !isWorking} />
-                      <AppInput label="Calle y numero" value={shipToLine1} onChangeText={setShipToLine1} editable={canEditShipping && canManagePackage && !isWorking} />
-                      <AppInput label="Interior / referencias cortas" value={shipToLine2} onChangeText={setShipToLine2} editable={canEditShipping && canManagePackage && !isWorking} />
-                      <View style={styles.inlineFields}>
-                        <View style={styles.inlineField}>
-                          <AppInput label="Ciudad" value={shipToCity} onChangeText={setShipToCity} editable={canEditShipping && canManagePackage && !isWorking} />
-                        </View>
-                        <View style={styles.inlineField}>
-                          <AppInput label="Estado" value={shipToState} onChangeText={setShipToState} editable={canEditShipping && canManagePackage && !isWorking} />
-                        </View>
-                        <View style={styles.inlineField}>
-                          <AppInput label="CP" value={shipToPostalCode} onChangeText={setShipToPostalCode} editable={canEditShipping && canManagePackage && !isWorking} />
-                        </View>
-                      </View>
-                      <AppInput label="Pais" value={shipToCountry} onChangeText={setShipToCountry} editable={canEditShipping && canManagePackage && !isWorking} />
-                      <AppInput label="Referencias" value={shipToReferences} onChangeText={setShipToReferences} multiline editable={canEditShipping && canManagePackage && !isWorking} />
-                      <View style={styles.selectorRow}>
-                        <AppButton
-                          title={`${saveAddressToCustomer ? '[x]' : '[ ]'} Guardar en cliente`}
-                          variant={saveAddressToCustomer ? 'operation' : 'neutral'}
-                          onPress={() => setSaveAddressToCustomer((current) => !current)}
-                          disabled={!canEditShipping || !canManagePackage || isWorking}
-                          disabledReason={
-                            !canManagePackage
-                              ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
-                              : !canEditShipping
-                                ? 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio.'
-                                : 'Ya hay una accion en proceso.'
-                          }
-                          style={styles.compactActionButton}
-                        />
-                        <AppButton
-                          title={`${makePrimaryAddress ? '[x]' : '[ ]'} Hacer principal`}
-                          variant={makePrimaryAddress ? 'operation' : 'neutral'}
-                          onPress={() => setMakePrimaryAddress((current) => !current)}
-                          disabled={!saveAddressToCustomer || !canEditShipping || !canManagePackage || isWorking}
-                          disabledReason={
-                            !saveAddressToCustomer
-                              ? 'Primero marca Guardar en cliente.'
-                              : !canManagePackage
-                                ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
-                                : !canEditShipping
-                                  ? 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio.'
-                                  : 'Ya hay una accion en proceso.'
-                          }
-                          style={styles.compactActionButton}
-                        />
-                      </View>
-                      {saveAddressToCustomer ? (
-                        <AppInput label="Etiqueta para cliente" value={addressLabel} onChangeText={setAddressLabel} placeholder="Ej. Trabajo, Mama, Casa" editable={canEditShipping && canManagePackage && !isWorking} />
-                      ) : null}
-                    </View>
-                  ) : null}
-
-                  {addressSource === 'CUSTOMER_PRIMARY_ADDRESS' && primaryAddress ? (
-                    <AppText variant="caption" color={theme.colors.mutedText}>
-                      Se copiara: {primaryAddress.line1}, {primaryAddress.city || 'Sin ciudad'}.
-                    </AppText>
-                  ) : null}
-                </View>
-              ) : (
-                <View style={[styles.shippingNotice, { borderColor: theme.colors.borderSubtle, backgroundColor: theme.colors.surfaceAlt }]}>
-                  <AppText variant="caption" bold>
-                    {deliveryTypeLabel(deliveryType)}
-                  </AppText>
-                  <AppText variant="caption" color={theme.colors.mutedText}>
-                    Esta modalidad no requiere direccion de envio dentro del paquete.
-                  </AppText>
-                </View>
-              )}
-              </ShippingStep>
-
-              {detail.deliveryType && detail.shippingAddressConfirmed && hasPackageAddressSnapshot(detail) ? (
-                <View style={[styles.shippingNotice, { borderColor: theme.colors.success, backgroundColor: theme.colors.surfaceAlt }]}>
-                  <AppText variant="caption" bold color={theme.colors.success}>
-                    Snapshot confirmado
-                  </AppText>
-                  <AppText variant="caption" color={theme.colors.mutedText}>
-                    {detail.shipToName || detail.customerName} · {detail.shipToPhone || detail.customerPhone || 'Sin telefono'} · {formatPackageAddress(detail)}
-                  </AppText>
-                </View>
-              ) : null}
-
-              <ShippingStep
-                number={3}
-                title="Costo, guia y paqueteria"
-                status={
-                  !deliveryType
-                    ? 'En espera'
-                    : shippingReadiness.costReady && !costDraftChanged
-                      ? 'Confirmado'
-                      : shippingCostWaived || !costEditable
-                        ? 'Sin costo / no suma'
-                        : shippingCostInput
-                          ? 'Pendiente de guardar'
-                          : 'Pendiente'
-                }
-                tone={
-                  !deliveryType
-                    ? 'default'
-                    : shippingReadiness.costReady && !costDraftChanged
-                      ? 'success'
-                      : shippingCostWaived || !costEditable || shippingCostInput
-                        ? 'warning'
-                        : 'warning'
-                }
-              >
-              {!deliveryType ? (
-                <AppText variant="caption" color={theme.colors.mutedText}>
-                  Primero selecciona el tipo de entrega.
-                </AppText>
-              ) : (
-                <View style={styles.addressFields}>
-              <AppButton
-                title={`${shippingCostWaived ? '[x]' : '[ ]'} Envio sin costo`}
-                variant={shippingCostWaived ? 'operation' : 'neutral'}
-                onPress={() => {
-                  setShippingCostWaived((current) => {
-                    const next = !current;
-                    if (next) {
-                      setShippingCostInput('0.00');
-                    }
-                    return next;
-                  });
-                }}
-                disabled={!costEditable || !canEditShipping || !canManagePackage || isWorking}
-                disabledReason={
-                  !costEditable
-                    ? 'Esta modalidad no suma costo al paquete.'
-                    : !canManagePackage
-                    ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
-                    : !canEditShipping
-                      ? 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio.'
-                      : 'Ya hay una accion en proceso.'
-                }
-              />
-              <AppInput
-                label={deliveryType === 'COLLECT_SHIPPING' ? 'Costo para el paquete' : 'Costo de envio'}
-                value={!costEditable || shippingCostWaived ? '0.00' : shippingCostInput}
-                onChangeText={setShippingCostInput}
-                placeholder="0.00"
-                keyboardType="decimal-pad"
-                editable={costEditable && !shippingCostWaived && canEditShipping && canManagePackage && !isWorking}
-              />
-              <AppInput
-                label="Paqueteria"
-                value={shippingCarrier}
-                onChangeText={setShippingCarrier}
-                placeholder={deliveryType === 'LOCAL_DELIVERY' ? 'Ej. Entrega local' : 'Ej. Estafeta'}
-                editable={canEditShipping && canManagePackage && !isWorking}
-              />
-              <AppInput
-                label="Guia / referencia"
-                value={trackingNumber}
-                onChangeText={setTrackingNumber}
-                placeholder={deliveryType === 'CUSTOMER_PROVIDED_LABEL' ? 'Guia del cliente' : 'Pendiente'}
-                editable={canEditShipping && canManagePackage && !isWorking}
-              />
-              <AppInput
-                label="Notas"
-                value={shippingNotes}
-                onChangeText={setShippingNotes}
-                placeholder="Cliente paga envio, entrega local, etc."
-                multiline
-                editable={canEditShipping && canManagePackage && !isWorking}
-              />
-                </View>
-              )}
-              </ShippingStep>
-
-              <ShippingStep
-                number={4}
-                title="Guardar y confirmar"
-                status={hasShippingDraftChanges ? 'Cambios pendientes' : shippingReadiness.label}
-                tone={hasShippingDraftChanges ? 'warning' : shippingReadiness.tone}
-              >
+            <View style={[styles.shippingNotice, { borderColor: theme.colors.borderSubtle, backgroundColor: theme.colors.surfaceAlt }]}>
               <AppText variant="caption" color={theme.colors.mutedText}>
-                Guardar crea o actualiza el snapshot historico de direccion del paquete y recalcula total/saldo cuando el costo aplica.
+                Paquetes conserva mercancía, prendas, abonos y saldo de mercancía. Envíos es la verdad para logística y cobro/pago de envío.
               </AppText>
-              <AppButton
-                title="Guardar direccion y envio"
-                variant="operation"
-                onPress={handleSaveShipping}
-                loading={isSavingShipping}
-                disabled={!canEditShipping || !canManagePackage || isWorking}
-                disabledReason={
-                  !canManagePackage
-                    ? 'No tienes permiso para modificar datos de envio. Permiso requerido: CREATE_CLOSE_CUSTOMER_PACKAGE.'
-                    : !canEditShipping
-                      ? 'Solo paquetes en preparacion o listos sin enviar pueden modificar datos de envio.'
-                      : 'Ya hay una accion en proceso.'
-                }
-              />
-              </ShippingStep>
             </View>
 
-            <View style={[styles.shippingLogistics, { borderTopColor: theme.colors.borderSubtle }]}>
-              <InfoRow label="Estado logistico" value={shipmentState} />
-              <InfoRow label="Por cobrar en envio" value={shipments.length > 0 ? money(shipmentCollectAmount) : 'Sin envio'} />
-              <InfoRow label="Cobrado en envio" value={shipments.length > 0 ? money(shipmentCollectedAmount) : 'Sin envio'} />
-              <InfoRow label="Ultimo envio" value={latestShipment?.shipmentFolio || 'Sin envio'} />
+            {canManageShipments ? (
               <View style={styles.sideAction}>
                 <AppButton
-                  title={latestShipment ? 'Ver envio' : 'Ir a envios'}
+                  title={latestShipment ? 'Ver envío' : 'Crear envío'}
                   variant="secondary"
                   onPress={() =>
                     latestShipment
                       ? router.push(`/shipment-detail?id=${latestShipment.shipmentId}` as any)
                       : router.push('/shipments' as any)
                   }
-                  disabled={!canManageShipments}
-                  disabledReason="No tienes permiso para gestionar envios. Permiso requerido: MANAGE_SHIPMENTS."
                 />
               </View>
-              {shipments.length > 0 ? (
-                <View style={styles.lineList}>
-                  {shipments.map((shipment) => (
-                    <ShipmentLine key={shipment.shipmentPackageId} shipment={shipment} />
-                  ))}
-                </View>
-              ) : (
-                <AppText variant="caption" color={theme.colors.mutedText}>
-                  Este paquete todavia no tiene envio asociado.
-                </AppText>
-              )}
-            </View>
+            ) : (
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Tu usuario puede consultar el resumen del paquete. Las acciones operativas de envío se realizan en Envíos con permiso correspondiente.
+              </AppText>
+            )}
+
+            {shipments.length > 0 ? (
+              <View style={styles.lineList}>
+                {shipments.map((shipment) => (
+                  <ShipmentLine key={shipment.shipmentPackageId} shipment={shipment} />
+                ))}
+              </View>
+            ) : (
+              <AppText variant="caption" color={theme.colors.mutedText}>
+                Este paquete todavía no tiene envío asociado.
+              </AppText>
+            )}
           </AppCard>
+
 
           <AppCard>
             <AppText variant="subtitle" bold>
               Cliente y etiqueta
             </AppText>
             <InfoRow label="Cliente" value={detail.customerName || 'Sin cliente'} />
-            <InfoRow label="Telefono" value={detail.customerPhone || 'Sin telefono'} />
+            <InfoRow label="Telefono" value={detail.customerPhone || 'Sin teléfono'} />
             <InfoRow label="Sucursal" value={detail.branchName || detail.branchCode || 'Sin sucursal'} />
             {detail.notes ? <InfoRow label="Notas" value={detail.notes} /> : null}
             <PackageLabel detail={detail} />
@@ -2294,7 +1887,7 @@ export default function CustomerPackageDetailScreen() {
 
       <AppBottomModal
         visible={markReadyModalVisible}
-        title="Marcar listo para envio"
+        title="Ver envío"
         onClose={closeMarkReadyModal}
         footer={
           <View style={styles.modalActions}>
@@ -2321,23 +1914,22 @@ export default function CustomerPackageDetailScreen() {
               <InfoRow label="Paquete" value={detail.folio} />
               <InfoRow label="Estado actual" value={statusLabel(detail.status)} />
               <InfoRow label="Prendas" value={String(detail.totalItems ?? 0)} />
-              <InfoRow label="Envio" value={shippingConfirmed ? money(detail.shippingCostAmount) : 'Pendiente'} />
+              <InfoRow label="Envío asociado" value={latestShipment?.shipmentFolio || 'Sin envío'} />
             </AppCard>
 
             <AppResponsiveGrid phoneColumns={1} tabletColumns={2} desktopColumns={5} gap={8}>
               <MetricCard label="Subtotal prendas" value={money(detail.itemSubtotalAmount)} />
-              <MetricCard label="Envio" value={shippingConfirmed ? money(detail.shippingCostAmount) : 'Pendiente'} tone={shippingConfirmed ? 'default' : 'warning'} />
-              <MetricCard label="Total" value={money(detail.totalAmount)} />
-              <MetricCard label="Abonado" value={money(detail.paidAmount)} tone={Number(detail.paidAmount ?? 0) > 0 ? 'success' : 'default'} />
-              <MetricCard label="Pendiente" value={money(detail.pendingAmount)} tone={Number(detail.pendingAmount ?? 0) > 0 ? 'danger' : 'success'} />
+              <MetricCard label="Total mercancía" value={money(detail.itemSubtotalAmount)} />
+              <MetricCard label="Abonado mercancía" value={money(detail.paidAmount)} tone={Number(detail.paidAmount ?? 0) > 0 ? 'success' : 'default'} />
+              <MetricCard label="Saldo mercancía" value={money(detail.pendingAmount)} tone={Number(detail.pendingAmount ?? 0) > 0 ? 'danger' : 'success'} />
             </AppResponsiveGrid>
 
             <View style={[styles.shippingNotice, { borderColor: theme.colors.success, backgroundColor: theme.colors.surfaceAlt }]}>
               <AppText variant="caption" bold color={theme.colors.success}>
-                Listo para liberar a envio
+                Listo para liberar a envío
               </AppText>
               <AppText variant="caption" color={theme.colors.mutedText}>
-                El paquete tiene envio confirmado y saldo cubierto. Al confirmar cambiara a listo para envio.
+                El paquete tiene envío confirmado y saldo cubierto. Al confirmar cambiara a listo para envío.
               </AppText>
             </View>
 
@@ -2401,7 +1993,6 @@ export default function CustomerPackageDetailScreen() {
             {removeItemPreview ? (
               <AppResponsiveGrid phoneColumns={1} tabletColumns={2} desktopColumns={5} gap={8}>
                 <MetricCard label="Subtotal despues" value={money(removeItemPreview.subtotal)} />
-                <MetricCard label="Envio" value={money(removeItemPreview.shipping)} />
                 <MetricCard label="Total despues" value={money(removeItemPreview.total)} />
                 <MetricCard label="Abonado" value={money(removeItemPreview.paid)} />
                 <MetricCard label="Pendiente" value={money(removeItemPreview.pending)} tone={removeItemPreview.pending > 0 ? 'danger' : 'success'} />
@@ -2435,17 +2026,6 @@ export default function CustomerPackageDetailScreen() {
           <InfoRow label="Pendiente actual" value={money(detail.pendingAmount)} tone={hasPending ? 'danger' : 'success'} />
           <InfoRow label="Saldo a favor" value={money(balanceSummary?.balance)} tone={customerBalance > 0 ? 'success' : 'default'} />
         </AppCard>
-
-        {!shippingConfirmed ? (
-          <View style={[styles.shippingNotice, { borderColor: theme.colors.warning, backgroundColor: theme.colors.surfaceAlt }]}>
-            <AppText variant="caption" bold color={theme.colors.warning}>
-              Costo de envio pendiente
-            </AppText>
-            <AppText variant="caption" color={theme.colors.mutedText}>
-              Puedes registrar abonos, pero el saldo final puede cambiar cuando confirmes la paqueteria.
-            </AppText>
-          </View>
-        ) : null}
 
         <AppInput
           label="Monto"

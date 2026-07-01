@@ -68,6 +68,7 @@ public final class PermissionCode {
     public static final String VOID_PAYMENT = "VOID_PAYMENT";
 
     public static final String CREATE_CLOSE_CUSTOMER_PACKAGE = "CREATE_CLOSE_CUSTOMER_PACKAGE";
+    public static final String CREATE_CUSTOMER_PACKAGE = "CREATE_CUSTOMER_PACKAGE";
     public static final String MANAGE_SHIPMENTS = "MANAGE_SHIPMENTS";
 
     public static final String CANCEL_RESERVATION = "CANCEL_RESERVATION";

@@ -25,6 +25,30 @@ public class CreateShipmentRequest {
     @Size(max = 255, message = "guideReference no puede exceder 255 caracteres")
     private String guideReference;
 
+    @Size(max = 120, message = "recipientName no puede exceder 120 caracteres")
+    private String recipientName;
+
+    @Size(max = 40, message = "recipientPhone no puede exceder 40 caracteres")
+    private String recipientPhone;
+
+    private String destinationSummary;
+
+    @Size(max = 120, message = "destinationCity no puede exceder 120 caracteres")
+    private String destinationCity;
+
+    @Size(max = 120, message = "destinationState no puede exceder 120 caracteres")
+    private String destinationState;
+
+    @Size(max = 20, message = "destinationPostalCode no puede exceder 20 caracteres")
+    private String destinationPostalCode;
+
+    @Size(max = 100, message = "shippingCarrier no puede exceder 100 caracteres")
+    private String shippingCarrier;
+
+    private BigDecimal realShippingCost;
+
+    private String shippingNotes;
+
     @NotNull(message = "createdByUserId es obligatorio")
     private Long createdByUserId;
 
@@ -82,6 +106,78 @@ public class CreateShipmentRequest {
 
     public void setGuideReference(String guideReference) {
         this.guideReference = guideReference;
+    }
+
+    public String getRecipientName() {
+        return recipientName;
+    }
+
+    public void setRecipientName(String recipientName) {
+        this.recipientName = recipientName;
+    }
+
+    public String getRecipientPhone() {
+        return recipientPhone;
+    }
+
+    public void setRecipientPhone(String recipientPhone) {
+        this.recipientPhone = recipientPhone;
+    }
+
+    public String getDestinationSummary() {
+        return destinationSummary;
+    }
+
+    public void setDestinationSummary(String destinationSummary) {
+        this.destinationSummary = destinationSummary;
+    }
+
+    public String getDestinationCity() {
+        return destinationCity;
+    }
+
+    public void setDestinationCity(String destinationCity) {
+        this.destinationCity = destinationCity;
+    }
+
+    public String getDestinationState() {
+        return destinationState;
+    }
+
+    public void setDestinationState(String destinationState) {
+        this.destinationState = destinationState;
+    }
+
+    public String getDestinationPostalCode() {
+        return destinationPostalCode;
+    }
+
+    public void setDestinationPostalCode(String destinationPostalCode) {
+        this.destinationPostalCode = destinationPostalCode;
+    }
+
+    public String getShippingCarrier() {
+        return shippingCarrier;
+    }
+
+    public void setShippingCarrier(String shippingCarrier) {
+        this.shippingCarrier = shippingCarrier;
+    }
+
+    public BigDecimal getRealShippingCost() {
+        return realShippingCost;
+    }
+
+    public void setRealShippingCost(BigDecimal realShippingCost) {
+        this.realShippingCost = realShippingCost;
+    }
+
+    public String getShippingNotes() {
+        return shippingNotes;
+    }
+
+    public void setShippingNotes(String shippingNotes) {
+        this.shippingNotes = shippingNotes;
     }
 
     public Long getCreatedByUserId() {
