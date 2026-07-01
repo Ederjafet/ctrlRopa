@@ -178,6 +178,37 @@ export default function ShipmentDetailScreen() {
   const shipmentId = Number(params.id ?? params.shipmentId);
   const canManageShipments = hasPermission(session, 'MANAGE_SHIPMENTS');
   const currentUserId = session?.userId ?? 0;
+  const shipmentStatus = detail?.status;
+  const isFinalShipmentStatus =
+    shipmentStatus === 'DELIVERED' || shipmentStatus === 'CLOSED_WITH_INCIDENTS' || shipmentStatus === 'CANCELLED';
+  const hasShippingPaymentHistory = (shippingPayments?.payments.length ?? 0) > 0;
+  const logisticsDisabledReason = !canManageShipments
+    ? 'No tienes acceso para editar datos de envio.'
+    : shipmentStatus !== 'OPEN'
+      ? 'Solo se pueden editar datos logisticos mientras el envio esta en preparacion.'
+      : undefined;
+  const costShareDisabledReason = !canManageShipments
+    ? 'No tienes acceso para modificar el reparto de envio.'
+    : shipmentStatus !== 'OPEN'
+      ? 'Solo se puede modificar el reparto mientras el envio esta en preparacion.'
+      : hasShippingPaymentHistory
+        ? 'No se puede modificar el reparto porque ya existen pagos de envio registrados o cancelados.'
+        : undefined;
+  const shippingPaymentDisabledReason = !canManageShipments
+    ? 'No tienes acceso para registrar pagos de envio.'
+    : isFinalShipmentStatus
+      ? 'Los pagos de envio quedan bloqueados cuando el envio esta finalizado o cancelado.'
+      : undefined;
+  const dispatchDisabledReason = !canManageShipments
+    ? 'No tienes acceso para marcar envios como enviados.'
+    : shipmentStatus !== 'OPEN'
+      ? 'Solo se puede marcar como enviado un envio en preparacion.'
+      : detail?.blockedReason || undefined;
+  const confirmDisabledReason = !canManageShipments
+    ? 'No tienes acceso para confirmar recibido.'
+    : shipmentStatus !== 'OUT_FOR_DELIVERY'
+      ? 'Primero marca el envio como enviado.'
+      : detail?.blockedReason || undefined;
 
   const includedShippingCustomers = useMemo(() => {
     const source = shippingPayments?.shares ?? costShares?.shares ?? [];
@@ -245,6 +276,10 @@ export default function ShipmentDetailScreen() {
 
   const openLogisticsModal = () => {
     if (!detail) return;
+    if (logisticsDisabledReason) {
+      setNotice({ tone: 'warning', title: 'Logistica bloqueada', message: logisticsDisabledReason });
+      return;
+    }
     setRecipientName(detail.recipientName ?? '');
     setRecipientPhone(detail.recipientPhone ?? '');
     setDestinationSummary(detail.destinationSummary ?? '');
@@ -301,6 +336,10 @@ export default function ShipmentDetailScreen() {
 
   const openShareModal = () => {
     if (!detail) return;
+    if (costShareDisabledReason) {
+      setNotice({ tone: 'warning', title: 'Reparto bloqueado', message: costShareDisabledReason });
+      return;
+    }
     const initialMethod = costShares?.shareMethod ?? 'EQUAL_SPLIT';
     setShareMethod(initialMethod);
     setShareDraftLines(buildShareDraftFromDetail(detail, costShares, initialMethod));
@@ -374,6 +413,14 @@ export default function ShipmentDetailScreen() {
   };
 
   const openShippingPaymentModal = (share: ShipmentShippingPaymentShare) => {
+    if (shippingPaymentDisabledReason) {
+      setNotice({ tone: 'warning', title: 'Pago de envio bloqueado', message: shippingPaymentDisabledReason });
+      return;
+    }
+    if (numberOrZero(share.balanceAmount) <= 0) {
+      setNotice({ tone: 'info', title: 'Parte cubierta', message: 'Esta parte del envio no tiene saldo pendiente.' });
+      return;
+    }
     setSelectedShippingPaymentShare(share);
     setShippingPaymentAmount(
       numberOrZero(share.balanceAmount) > 0 ? numberOrZero(share.balanceAmount).toFixed(2) : ''
@@ -386,8 +433,23 @@ export default function ShipmentDetailScreen() {
     setShippingPaymentModalVisible(true);
   };
 
+  const closeShippingPaymentModal = () => {
+    setShippingPaymentModalVisible(false);
+    setSelectedShippingPaymentShare(null);
+    setShippingPaymentAmount('');
+    setShippingPaymentMethod('');
+    setShippingPaymentReference('');
+    setShippingPaymentPaidByCustomerId(null);
+    setShippingPaymentNotes('');
+    setShippingPaymentRegisteredAt('');
+  };
+
   const handleRegisterShippingPayment = async () => {
     if (!detail || !selectedShippingPaymentShare) return;
+    if (shippingPaymentDisabledReason) {
+      setNotice({ tone: 'warning', title: 'Pago de envio bloqueado', message: shippingPaymentDisabledReason });
+      return;
+    }
     const amount = Number(shippingPaymentAmount);
     if (!Number.isFinite(amount) || amount <= 0) {
       setNotice({
@@ -412,7 +474,7 @@ export default function ShipmentDetailScreen() {
         registeredAt: shippingPaymentRegisteredAt.trim() || null,
       });
       setShippingPayments(response);
-      setShippingPaymentModalVisible(false);
+      closeShippingPaymentModal();
       setNotice({ tone: 'success', title: 'Pago de envío registrado' });
     } catch (error) {
       setNotice({
@@ -426,6 +488,10 @@ export default function ShipmentDetailScreen() {
   };
 
   const openCancelPaymentModal = (payment: ShipmentShippingPaymentLine) => {
+    if (shippingPaymentDisabledReason) {
+      setNotice({ tone: 'warning', title: 'Cancelacion bloqueada', message: shippingPaymentDisabledReason });
+      return;
+    }
     setSelectedShippingPayment(payment);
     setShippingPaymentCancelReason('');
     setCancelPaymentModalVisible(true);
@@ -433,6 +499,10 @@ export default function ShipmentDetailScreen() {
 
   const handleCancelShippingPayment = async () => {
     if (!detail || !selectedShippingPayment) return;
+    if (shippingPaymentDisabledReason) {
+      setNotice({ tone: 'warning', title: 'Cancelacion bloqueada', message: shippingPaymentDisabledReason });
+      return;
+    }
     setIsWorking(true);
     try {
       const response = await cancelShipmentShippingPayment(detail.id, selectedShippingPayment.id, {
@@ -454,6 +524,11 @@ export default function ShipmentDetailScreen() {
 
   const handleShipmentAction = async (action: 'dispatch' | 'receive' | 'cancel' | 'reopen') => {
     if (!detail || !currentUserId) return;
+    const actionBlockReason = action === 'dispatch' ? dispatchDisabledReason : action === 'receive' ? confirmDisabledReason : undefined;
+    if (actionBlockReason) {
+      setNotice({ tone: 'warning', title: 'Accion bloqueada', message: actionBlockReason });
+      return;
+    }
     setIsWorking(true);
     try {
       let updated: ShipmentDetail;
@@ -553,8 +628,28 @@ export default function ShipmentDetailScreen() {
               {shipmentStatusLabel(detail.status)} - {logisticsStatus(detail, shippingPayments)}
             </AppText>
           </View>
-          <AppButton title="Editar datos de envío" variant="cta" onPress={openLogisticsModal} disabled={!canManageShipments} />
+          <AppButton
+            title="Editar datos de envío"
+            variant="cta"
+            onPress={openLogisticsModal}
+            disabled={Boolean(logisticsDisabledReason)}
+            disabledReason={logisticsDisabledReason}
+          />
         </View>
+
+        {detail.blockedReason ? (
+          <View
+            style={[
+              styles.notice,
+              { backgroundColor: theme.colors.warningBackground, borderColor: theme.colors.warning },
+            ]}
+          >
+            <AppText bold>Bloqueo operativo</AppText>
+            <AppText variant="caption" color={theme.colors.textSecondary}>
+              {detail.blockedReason}
+            </AppText>
+          </View>
+        ) : null}
 
         {detail.logisticsWarning ? (
           <View
@@ -696,7 +791,8 @@ export default function ShipmentDetailScreen() {
             title="Repartir costo"
             variant="secondary"
             onPress={openShareModal}
-            disabled={!canManageShipments || !detail || detail.status === 'CANCELLED' || (shippingPayments?.payments.length ?? 0) > 0}
+            disabled={Boolean(costShareDisabledReason)}
+            disabledReason={costShareDisabledReason}
           />
         </View>
 
@@ -799,7 +895,8 @@ export default function ShipmentDetailScreen() {
                     title="Registrar pago"
                     variant="cta"
                     onPress={() => openShippingPaymentModal(share)}
-                    disabled={!canManageShipments || numberOrZero(share.balanceAmount) <= 0 || detail?.status === 'CANCELLED'}
+                    disabled={Boolean(shippingPaymentDisabledReason) || numberOrZero(share.balanceAmount) <= 0}
+                    disabledReason={shippingPaymentDisabledReason || 'Esta parte del envio no tiene saldo pendiente.'}
                   />
                 </View>
 
@@ -837,7 +934,8 @@ export default function ShipmentDetailScreen() {
                             title="Cancelar"
                             variant="danger"
                             onPress={() => openCancelPaymentModal(payment)}
-                            disabled={!canManageShipments}
+                            disabled={Boolean(shippingPaymentDisabledReason)}
+                            disabledReason={shippingPaymentDisabledReason}
                           />
                         ) : null}
                       </View>
@@ -865,16 +963,18 @@ export default function ShipmentDetailScreen() {
         </AppText>
         <View style={styles.actions}>
           <AppButton
-            title="Despachar"
+            title="Marcar enviado"
             variant="cta"
             onPress={() => void handleShipmentAction('dispatch')}
-            disabled={!canManageShipments || detail.status !== 'OPEN'}
+            disabled={Boolean(dispatchDisabledReason)}
+            disabledReason={dispatchDisabledReason}
           />
           <AppButton
             title="Confirmar recibido"
             variant="primary"
             onPress={() => void handleShipmentAction('receive')}
-            disabled={!canManageShipments || detail.status !== 'OUT_FOR_DELIVERY'}
+            disabled={Boolean(confirmDisabledReason)}
+            disabledReason={confirmDisabledReason}
           />
           <AppButton
             title="Reabrir"
@@ -980,10 +1080,10 @@ export default function ShipmentDetailScreen() {
     <AppBottomModal
       visible={shippingPaymentModalVisible}
       title="Registrar pago de envío"
-      onClose={() => setShippingPaymentModalVisible(false)}
+      onClose={closeShippingPaymentModal}
       footer={
         <View style={styles.modalFooter}>
-          <AppButton title="Cancelar" variant="neutral" onPress={() => setShippingPaymentModalVisible(false)} />
+          <AppButton title="Cancelar" variant="neutral" onPress={closeShippingPaymentModal} />
           <AppButton
             title="Registrar pago de envío"
             variant="cta"
@@ -1038,7 +1138,14 @@ export default function ShipmentDetailScreen() {
       footer={
         <View style={styles.modalFooter}>
           <AppButton title="Volver" variant="neutral" onPress={() => setCancelPaymentModalVisible(false)} />
-          <AppButton title="Cancelar pago" variant="danger" loading={isWorking} onPress={() => void handleCancelShippingPayment()} />
+          <AppButton
+            title="Cancelar pago"
+            variant="danger"
+            loading={isWorking}
+            onPress={() => void handleCancelShippingPayment()}
+            disabled={Boolean(shippingPaymentDisabledReason)}
+            disabledReason={shippingPaymentDisabledReason}
+          />
         </View>
       }
     >

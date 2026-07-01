@@ -202,11 +202,7 @@ public class ShipmentService {
         assertCanManageShipments();
         Shipment shipment = findShipment(shipmentId);
 
-        if (shipment.getStatus() == ShipmentStatus.CANCELLED
-                || shipment.getStatus() == ShipmentStatus.DELIVERED
-                || shipment.getStatus() == ShipmentStatus.CLOSED_WITH_INCIDENTS) {
-            throw new IllegalArgumentException("No se puede modificar el reparto de un envio finalizado o cancelado.");
-        }
+        validateShipmentAllowsCostShareUpdate(shipment);
         List<ShipmentPayment> existingShippingPayments = shipmentPaymentRepository.findByShipmentIdOrderByRegisteredAtDescIdDesc(shipmentId);
         if (existingShippingPayments != null && !existingShippingPayments.isEmpty()) {
             throw new IllegalArgumentException("No se puede modificar el reparto porque ya existen pagos de envio registrados o cancelados.");
@@ -244,9 +240,7 @@ public class ShipmentService {
     public ShipmentPaymentsResponse registerShippingPayment(Long shipmentId, RegisterShipmentPaymentRequest request) {
         assertCanManageShipments();
         Shipment shipment = findShipment(shipmentId);
-        if (shipment.getStatus() == ShipmentStatus.CANCELLED) {
-            throw new IllegalArgumentException("No se pueden registrar pagos de envio en un envio cancelado.");
-        }
+        validateShipmentAllowsShippingPaymentChange(shipment, "No se pueden registrar pagos de envio en un envio finalizado o cancelado.");
         if (request == null) {
             throw new IllegalArgumentException("La solicitud de pago de envio es obligatoria.");
         }
@@ -298,7 +292,8 @@ public class ShipmentService {
 
     public ShipmentPaymentsResponse cancelShippingPayment(Long shipmentId, Long paymentId, CancelShipmentPaymentRequest request) {
         assertCanManageShipments();
-        findShipment(shipmentId);
+        Shipment shipment = findShipment(shipmentId);
+        validateShipmentAllowsShippingPaymentChange(shipment, "No se pueden cancelar pagos de envio en un envio finalizado o cancelado.");
         ShipmentPayment payment = shipmentPaymentRepository.findByShipmentIdAndId(shipmentId, paymentId)
                 .orElseThrow(() -> new IllegalArgumentException("Pago de envio no encontrado."));
         if (payment.getStatus() == ShipmentPaymentStatus.CANCELLED) {
@@ -317,11 +312,7 @@ public class ShipmentService {
         assertCanManageShipments();
         Shipment shipment = findShipment(shipmentId);
 
-        if (shipment.getStatus() == ShipmentStatus.CANCELLED
-                || shipment.getStatus() == ShipmentStatus.DELIVERED
-                || shipment.getStatus() == ShipmentStatus.CLOSED_WITH_INCIDENTS) {
-            throw new IllegalArgumentException("No se pueden editar datos logisticos de un envio finalizado o cancelado.");
-        }
+        validateShipmentAllowsLogisticsUpdate(shipment);
 
         if (request.getRealShippingCost() != null && request.getRealShippingCost().signum() < 0) {
             throw new IllegalArgumentException("El costo real del envio no puede ser negativo.");
@@ -483,6 +474,8 @@ public class ShipmentService {
             throw new IllegalArgumentException("Captura la guia o referencia antes de marcar como enviado.");
         }
 
+        validateShippingReadyForOperationalAdvance(shipment, packages, "marcar como enviado");
+
         if (shipment.getReadyAt() == null) {
             shipment.setReadyAt(LocalDateTime.now());
         }
@@ -519,6 +512,13 @@ public class ShipmentService {
 
         if (request.getStatus() == ShipmentPackageStatus.PENDING) {
             throw new IllegalArgumentException("status no puede ser PENDING");
+        }
+
+        if (request.getStatus() == ShipmentPackageStatus.DELIVERED) {
+            validateShippingReadyForOperationalAdvance(
+                    shipment,
+                    shipmentPackageRepository.findByShipmentIdOrderByIdAsc(shipmentId),
+                    "confirmar recibido");
         }
 
         ShipmentPackage shipmentPackage = shipmentPackageRepository.findByShipmentIdAndId(shipmentId, shipmentPackageId)
@@ -606,6 +606,8 @@ public class ShipmentService {
         if (packages.isEmpty()) {
             throw new IllegalArgumentException("El envio no tiene paquetes relacionados.");
         }
+
+        validateShippingReadyForOperationalAdvance(shipment, packages, "confirmar recibido");
 
         List<ShipmentPackage> pendingPackages = packages.stream()
                 .filter(sp -> sp.getStatus() == ShipmentPackageStatus.PENDING)
@@ -914,54 +916,36 @@ public class ShipmentService {
     private ShipmentPaymentsResponse toShippingPaymentsResponse(Shipment shipment,
             List<ShipmentCostShare> shares,
             List<ShipmentPayment> payments) {
-        Map<Long, String> packageReferences = resolvePackageReferences(shares);
-        Map<Long, String> customerNames = resolveCustomerNames(shares);
+        List<ShipmentCostShare> safeShares = shares != null ? shares : List.of();
+        List<ShipmentPayment> safePayments = payments != null ? payments : List.of();
+        Map<Long, String> packageReferences = resolvePackageReferences(safeShares);
+        Map<Long, String> customerNames = resolveCustomerNames(safeShares);
         Map<Long, List<ShipmentPayment>> paymentsByShare = new HashMap<>();
-        for (ShipmentPayment payment : payments) {
+        for (ShipmentPayment payment : safePayments) {
             paymentsByShare.computeIfAbsent(payment.getCostShareId(), key -> new ArrayList<>()).add(payment);
         }
 
-        List<ShipmentPaymentShareResponse> shareResponses = shares.stream()
+        List<ShipmentPaymentShareResponse> shareResponses = safeShares.stream()
                 .map(share -> toShippingPaymentShareResponse(share,
                         packageReferences,
                         customerNames,
                         paymentsByShare.getOrDefault(share.getId(), List.of())))
                 .toList();
 
-        BigDecimal assignedTotal = shareResponses.stream()
-                .map(ShipmentPaymentShareResponse::getAssignedAmount)
-                .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add)
-                .setScale(2, RoundingMode.HALF_UP);
-        BigDecimal paidTotal = shareResponses.stream()
-                .map(ShipmentPaymentShareResponse::getPaidAmount)
-                .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add)
-                .setScale(2, RoundingMode.HALF_UP);
-        BigDecimal shippingBalance = assignedTotal.subtract(paidTotal).setScale(2, RoundingMode.HALF_UP);
+        ShippingPaymentState paymentState = resolveShippingPaymentState(shipment, safeShares, safePayments);
 
-        BigDecimal realShippingCost = normalizeMoney(shipment.getRealShippingCost());
-        BigDecimal absorbedAmount = BigDecimal.ZERO.setScale(2);
-        BigDecimal overAssignedAmount = BigDecimal.ZERO.setScale(2);
-        if (realShippingCost != null) {
-            int comparison = assignedTotal.compareTo(realShippingCost);
-            if (comparison < 0) {
-                absorbedAmount = realShippingCost.subtract(assignedTotal).setScale(2, RoundingMode.HALF_UP);
-            } else if (comparison > 0) {
-                overAssignedAmount = assignedTotal.subtract(realShippingCost).setScale(2, RoundingMode.HALF_UP);
-            }
-        }
-
-        List<ShipmentPaymentLineResponse> paymentResponses = payments.stream()
+        List<ShipmentPaymentLineResponse> paymentResponses = safePayments.stream()
                 .map(payment -> toShipmentPaymentLineResponse(payment, packageReferences, customerNames))
                 .toList();
 
         return new ShipmentPaymentsResponse(
                 shipment.getId(),
-                realShippingCost,
-                assignedTotal,
-                paidTotal,
-                shippingBalance,
-                absorbedAmount,
-                overAssignedAmount,
+                paymentState.realShippingCost,
+                paymentState.assignedTotal,
+                paymentState.paidTotal,
+                paymentState.shippingBalance,
+                paymentState.absorbedAmount,
+                paymentState.overAssignedAmount,
                 shareResponses,
                 paymentResponses
         );
@@ -1013,6 +997,49 @@ public class ShipmentService {
                 payment.getCancelledBy(),
                 payment.getCancelReason()
         );
+    }
+
+    private ShippingPaymentState resolveShippingPaymentState(Shipment shipment) {
+        List<ShipmentCostShare> shares = shipmentCostShareRepository.findByShipmentIdOrderByIdAsc(shipment.getId());
+        List<ShipmentPayment> payments = shipmentPaymentRepository.findByShipmentIdOrderByRegisteredAtDescIdDesc(shipment.getId());
+        return resolveShippingPaymentState(shipment, shares, payments);
+    }
+
+    private ShippingPaymentState resolveShippingPaymentState(Shipment shipment,
+            List<ShipmentCostShare> shares,
+            List<ShipmentPayment> payments) {
+        List<ShipmentCostShare> safeShares = shares != null ? shares : List.of();
+        List<ShipmentPayment> safePayments = payments != null ? payments : List.of();
+        BigDecimal assignedTotal = safeShares.stream()
+                .map(ShipmentCostShare::getAssignedAmount)
+                .map(this::normalizeMoneyOrZero)
+                .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal paidTotal = safePayments.stream()
+                .filter(payment -> payment.getStatus() == ShipmentPaymentStatus.REGISTERED)
+                .map(ShipmentPayment::getAmount)
+                .map(this::normalizeMoneyOrZero)
+                .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal shippingBalance = assignedTotal.subtract(paidTotal).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal realShippingCost = normalizeMoney(shipment.getRealShippingCost());
+        BigDecimal absorbedAmount = BigDecimal.ZERO.setScale(2);
+        BigDecimal overAssignedAmount = BigDecimal.ZERO.setScale(2);
+        if (realShippingCost != null) {
+            int comparison = assignedTotal.compareTo(realShippingCost);
+            if (comparison < 0) {
+                absorbedAmount = realShippingCost.subtract(assignedTotal).setScale(2, RoundingMode.HALF_UP);
+            } else if (comparison > 0) {
+                overAssignedAmount = assignedTotal.subtract(realShippingCost).setScale(2, RoundingMode.HALF_UP);
+            }
+        }
+        return new ShippingPaymentState(
+                realShippingCost,
+                assignedTotal,
+                paidTotal,
+                shippingBalance,
+                absorbedAmount,
+                overAssignedAmount);
     }
 
     private BigDecimal sumRegisteredPaymentsForShare(List<ShipmentPayment> payments, Long costShareId) {
@@ -1398,6 +1425,29 @@ public class ShipmentService {
         return null;
     }
 
+    private static class ShippingPaymentState {
+        private final BigDecimal realShippingCost;
+        private final BigDecimal assignedTotal;
+        private final BigDecimal paidTotal;
+        private final BigDecimal shippingBalance;
+        private final BigDecimal absorbedAmount;
+        private final BigDecimal overAssignedAmount;
+
+        private ShippingPaymentState(BigDecimal realShippingCost,
+                                     BigDecimal assignedTotal,
+                                     BigDecimal paidTotal,
+                                     BigDecimal shippingBalance,
+                                     BigDecimal absorbedAmount,
+                                     BigDecimal overAssignedAmount) {
+            this.realShippingCost = realShippingCost;
+            this.assignedTotal = assignedTotal;
+            this.paidTotal = paidTotal;
+            this.shippingBalance = shippingBalance;
+            this.absorbedAmount = absorbedAmount;
+            this.overAssignedAmount = overAssignedAmount;
+        }
+    }
+
     private static class LogisticsView {
         private final String recipientName;
         private final String recipientPhone;
@@ -1506,7 +1556,7 @@ public class ShipmentService {
                 attentionReason,
                 resolveNextStep(shipment, packages, attentionReason),
                 shipment.getStatus() == ShipmentStatus.OPEN && blockedReason == null,
-                shipment.getStatus() == ShipmentStatus.OUT_FOR_DELIVERY && !packages.isEmpty(),
+                shipment.getStatus() == ShipmentStatus.OUT_FOR_DELIVERY && !packages.isEmpty() && blockedReason == null,
                 blockedReason
         );
     }
@@ -1543,6 +1593,14 @@ public class ShipmentService {
             return "Falta guia";
         }
 
+        if (shipment.getStatus() == ShipmentStatus.OPEN) {
+            return resolveShippingOperationalBlockReason(shipment, packages, "marcar como enviado");
+        }
+
+        if (shipment.getStatus() == ShipmentStatus.OUT_FOR_DELIVERY) {
+            return resolveShippingOperationalBlockReason(shipment, packages, "confirmar recibido");
+        }
+
         return null;
     }
 
@@ -1565,6 +1623,77 @@ public class ShipmentService {
             return "Captura la guia o referencia antes de marcar como enviado.";
         }
 
+        if (shipment.getStatus() == ShipmentStatus.OPEN) {
+            return resolveShippingOperationalBlockReason(shipment, packages, "marcar como enviado");
+        }
+
+        if (shipment.getStatus() == ShipmentStatus.OUT_FOR_DELIVERY) {
+            return resolveShippingOperationalBlockReason(shipment, packages, "confirmar recibido");
+        }
+
+        return null;
+    }
+
+    private void validateShipmentAllowsLogisticsUpdate(Shipment shipment) {
+        if (shipment.getStatus() != ShipmentStatus.OPEN) {
+            throw new IllegalArgumentException("Solo se pueden editar datos logisticos de un envio en preparacion.");
+        }
+    }
+
+    private void validateShipmentAllowsCostShareUpdate(Shipment shipment) {
+        if (shipment.getStatus() != ShipmentStatus.OPEN) {
+            throw new IllegalArgumentException("Solo se puede modificar el reparto de un envio en preparacion.");
+        }
+    }
+
+    private void validateShipmentAllowsShippingPaymentChange(Shipment shipment, String message) {
+        if (shipment.getStatus() == ShipmentStatus.DELIVERED
+                || shipment.getStatus() == ShipmentStatus.CLOSED_WITH_INCIDENTS
+                || shipment.getStatus() == ShipmentStatus.CANCELLED) {
+            throw new IllegalArgumentException(message);
+        }
+    }
+
+    private void validateShippingReadyForOperationalAdvance(Shipment shipment,
+            List<ShipmentPackage> packages,
+            String actionText) {
+        String blockedReason = resolveShippingOperationalBlockReason(shipment, packages, actionText);
+        if (blockedReason != null) {
+            throw new IllegalArgumentException(blockedReason);
+        }
+    }
+
+    private String resolveShippingOperationalBlockReason(Shipment shipment,
+            List<ShipmentPackage> packages,
+            String actionText) {
+        BigDecimal realShippingCost = normalizeMoney(shipment.getRealShippingCost());
+        if (realShippingCost == null) {
+            return "Define el costo real del envio antes de " + actionText + ".";
+        }
+        if (realShippingCost.compareTo(BigDecimal.ZERO) <= 0) {
+            return null;
+        }
+
+        List<ShipmentCostShare> shares = shipmentCostShareRepository.findByShipmentIdOrderByIdAsc(shipment.getId());
+        List<ShipmentCostShare> safeShares = shares != null ? shares : List.of();
+        if (safeShares.isEmpty()) {
+            return "Reparte el costo de envio antes de " + actionText + ".";
+        }
+
+        List<Long> sharedPackageIds = safeShares.stream()
+                .map(ShipmentCostShare::getCustomerPackageId)
+                .toList();
+        boolean missingPackageShare = packages.stream()
+                .anyMatch(shipmentPackage -> !sharedPackageIds.contains(shipmentPackage.getCustomerPackageId()));
+        if (missingPackageShare) {
+            return "Reparte el costo de envio para todos los paquetes antes de " + actionText + ".";
+        }
+
+        ShippingPaymentState paymentState = resolveShippingPaymentState(shipment, safeShares,
+                shipmentPaymentRepository.findByShipmentIdOrderByRegisteredAtDescIdDesc(shipment.getId()));
+        if (paymentState.shippingBalance.compareTo(BigDecimal.ZERO) > 0) {
+            return "No se puede " + actionText + " porque existe saldo de envio pendiente.";
+        }
         return null;
     }
 

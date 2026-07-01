@@ -138,7 +138,7 @@ class ShipmentServiceTests {
         assertEquals("PKG-4", response.getPrimaryPackageFolio());
         assertEquals("Cliente QA", response.getCustomerName());
         assertEquals("5555555555", response.getCustomerPhone());
-        assertEquals("Marcar enviado", response.getNextStep());
+        assertEquals("Reparte el costo de envio antes de marcar como enviado.", response.getNextStep());
         assertEquals("Calle del envio 12, Centro", response.getDestinationSummary());
         assertEquals("Reparto local", response.getShippingCarrier());
         assertEquals(new BigDecimal("80.00"), response.getShippingCostAmount());
@@ -360,6 +360,7 @@ class ShipmentServiceTests {
     void dispatchAllowsMixedLegacyPackagesWhenShipmentHasExplicitDestination() {
         Shipment shipment = carrierShipment("GUIA-123");
         shipment.setDestinationSummary("Destino comun del envio compartido");
+        shipment.setRealShippingCost(BigDecimal.ZERO);
         ShipmentPackage firstPackageLine = shipmentPackage();
         ShipmentPackage secondPackageLine = shipmentPackage();
         setId(secondPackageLine, 21L);
@@ -397,6 +398,7 @@ class ShipmentServiceTests {
     @Test
     void dispatchUsesPackageTrackingNumberWhenShipmentGuideIsMissing() {
         Shipment shipment = carrierShipment(null);
+        shipment.setRealShippingCost(BigDecimal.ZERO);
         ShipmentPackage shipmentPackage = shipmentPackage();
         CustomerPackage customerPackage = readyCustomerPackage("478521678");
         DispatchShipmentRequest request = new DispatchShipmentRequest();
@@ -472,6 +474,7 @@ class ShipmentServiceTests {
     void confirmReceivedUpdatesShipmentAndPackageWithoutTouchingPayments() {
         Shipment shipment = carrierShipment("478521678");
         shipment.setStatus(ShipmentStatus.OUT_FOR_DELIVERY);
+        shipment.setRealShippingCost(BigDecimal.ZERO);
         ShipmentPackage shipmentPackage = shipmentPackage();
         CustomerPackage customerPackage = readyCustomerPackage("478521678");
         customerPackage.setStatus(CustomerPackageStatus.SHIPPED);
@@ -517,6 +520,7 @@ class ShipmentServiceTests {
     void confirmReceivedBlocksCodPackagesToAvoidImplicitPayments() {
         Shipment shipment = carrierShipment("478521678");
         shipment.setStatus(ShipmentStatus.OUT_FOR_DELIVERY);
+        shipment.setRealShippingCost(BigDecimal.ZERO);
         ShipmentPackage shipmentPackage = shipmentPackage();
         shipmentPackage.setPaymentMode(ShipmentPackagePaymentMode.COD);
         ConfirmShipmentReceivedRequest request = new ConfirmShipmentReceivedRequest();
@@ -686,7 +690,7 @@ class ShipmentServiceTests {
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.updateCostShares(2L, request));
 
-        assertEquals("No se puede modificar el reparto de un envio finalizado o cancelado.", ex.getMessage());
+        assertEquals("Solo se puede modificar el reparto de un envio en preparacion.", ex.getMessage());
         verify(shipmentCostShareRepository, never()).saveAll(any());
     }
 
@@ -822,7 +826,7 @@ class ShipmentServiceTests {
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.registerShippingPayment(2L, request));
 
-        assertEquals("No se pueden registrar pagos de envio en un envio cancelado.", ex.getMessage());
+        assertEquals("No se pueden registrar pagos de envio en un envio finalizado o cancelado.", ex.getMessage());
         verify(shipmentPaymentRepository, never()).save(any());
     }
 
@@ -980,6 +984,204 @@ class ShipmentServiceTests {
 
         verify(tenantAccessGuard).requireBranch(10L, "El envio no pertenece a la sucursal activa");
         assertEquals(new BigDecimal("60.00"), response.getShippingBalance());
+    }
+
+    @Test
+    void dispatchBlocksWithoutRealShippingCost() {
+        Shipment shipment = carrierShipment("GUIA-123");
+        ShipmentPackage shipmentPackage = shipmentPackage();
+        CustomerPackage customerPackage = readyCustomerPackage("GUIA-123");
+        DispatchShipmentRequest request = new DispatchShipmentRequest();
+        request.setDispatchedByUserId(77L);
+
+        when(currentUser.getUserId()).thenReturn(77L);
+        when(repository.findById(2L)).thenReturn(Optional.of(shipment));
+        when(shipmentPackageRepository.findByShipmentIdOrderByIdAsc(2L)).thenReturn(List.of(shipmentPackage));
+        when(customerPackageRepository.findById(4L)).thenReturn(Optional.of(customerPackage));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.dispatch(2L, request));
+
+        assertEquals("Define el costo real del envio antes de marcar como enviado.", ex.getMessage());
+        verify(repository, never()).save(shipment);
+    }
+
+    @Test
+    void dispatchBlocksWithoutCostSharesWhenShippingCostIsPositive() {
+        Shipment shipment = carrierShipment("GUIA-123");
+        shipment.setRealShippingCost(new BigDecimal("120.00"));
+        ShipmentPackage shipmentPackage = shipmentPackage();
+        CustomerPackage customerPackage = readyCustomerPackage("GUIA-123");
+        DispatchShipmentRequest request = new DispatchShipmentRequest();
+        request.setDispatchedByUserId(77L);
+
+        when(currentUser.getUserId()).thenReturn(77L);
+        when(repository.findById(2L)).thenReturn(Optional.of(shipment));
+        when(shipmentPackageRepository.findByShipmentIdOrderByIdAsc(2L)).thenReturn(List.of(shipmentPackage));
+        when(customerPackageRepository.findById(4L)).thenReturn(Optional.of(customerPackage));
+        when(shipmentCostShareRepository.findByShipmentIdOrderByIdAsc(2L)).thenReturn(List.of());
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.dispatch(2L, request));
+
+        assertEquals("Reparte el costo de envio antes de marcar como enviado.", ex.getMessage());
+        verify(repository, never()).save(shipment);
+    }
+
+    @Test
+    void dispatchBlocksWhenShippingBalanceIsPending() {
+        Shipment shipment = carrierShipment("GUIA-123");
+        shipment.setRealShippingCost(new BigDecimal("120.00"));
+        ShipmentPackage shipmentPackage = shipmentPackage();
+        CustomerPackage customerPackage = readyCustomerPackage("GUIA-123");
+        ShipmentCostShare share = costShare(30L, 4L, 8L, "120.00");
+        DispatchShipmentRequest request = new DispatchShipmentRequest();
+        request.setDispatchedByUserId(77L);
+
+        when(currentUser.getUserId()).thenReturn(77L);
+        when(repository.findById(2L)).thenReturn(Optional.of(shipment));
+        when(shipmentPackageRepository.findByShipmentIdOrderByIdAsc(2L)).thenReturn(List.of(shipmentPackage));
+        when(customerPackageRepository.findById(4L)).thenReturn(Optional.of(customerPackage));
+        when(shipmentCostShareRepository.findByShipmentIdOrderByIdAsc(2L)).thenReturn(List.of(share));
+        when(shipmentPaymentRepository.findByShipmentIdOrderByRegisteredAtDescIdDesc(2L)).thenReturn(List.of());
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.dispatch(2L, request));
+
+        assertEquals("No se puede marcar como enviado porque existe saldo de envio pendiente.", ex.getMessage());
+        verify(repository, never()).save(shipment);
+    }
+
+    @Test
+    void dispatchAllowsWhenAssignedShippingIsFullyPaid() {
+        Shipment shipment = carrierShipment("GUIA-123");
+        shipment.setRealShippingCost(new BigDecimal("120.00"));
+        ShipmentPackage shipmentPackage = shipmentPackage();
+        CustomerPackage customerPackage = readyCustomerPackage("GUIA-123");
+        ShipmentCostShare share = costShare(30L, 4L, 8L, "120.00");
+        ShipmentPayment payment = shippingPayment(90L, 30L, 4L, 8L, "120.00", ShipmentPaymentStatus.REGISTERED);
+        DispatchShipmentRequest request = new DispatchShipmentRequest();
+        request.setDispatchedByUserId(77L);
+
+        when(currentUser.getUserId()).thenReturn(77L);
+        when(repository.findById(2L)).thenReturn(Optional.of(shipment));
+        when(shipmentPackageRepository.findByShipmentIdOrderByIdAsc(2L)).thenReturn(List.of(shipmentPackage));
+        when(customerPackageRepository.findById(4L)).thenReturn(Optional.of(customerPackage));
+        when(shipmentCostShareRepository.findByShipmentIdOrderByIdAsc(2L)).thenReturn(List.of(share));
+        when(shipmentPaymentRepository.findByShipmentIdOrderByRegisteredAtDescIdDesc(2L)).thenReturn(List.of(payment));
+        when(repository.save(shipment)).thenReturn(shipment);
+        when(customerPackageRepository.save(customerPackage)).thenReturn(customerPackage);
+
+        ShipmentDetailResponse response = service.dispatch(2L, request);
+
+        assertEquals(ShipmentStatus.OUT_FOR_DELIVERY.name(), response.getStatus());
+        assertEquals(CustomerPackageStatus.SHIPPED, customerPackage.getStatus());
+    }
+
+    @Test
+    void dispatchAllowsWhenStoreAbsorbsCost() {
+        Shipment shipment = carrierShipment("GUIA-123");
+        shipment.setRealShippingCost(new BigDecimal("120.00"));
+        ShipmentPackage shipmentPackage = shipmentPackage();
+        CustomerPackage customerPackage = readyCustomerPackage("GUIA-123");
+        ShipmentCostShare share = costShare(30L, 4L, 8L, "0.00");
+        DispatchShipmentRequest request = new DispatchShipmentRequest();
+        request.setDispatchedByUserId(77L);
+
+        when(currentUser.getUserId()).thenReturn(77L);
+        when(repository.findById(2L)).thenReturn(Optional.of(shipment));
+        when(shipmentPackageRepository.findByShipmentIdOrderByIdAsc(2L)).thenReturn(List.of(shipmentPackage));
+        when(customerPackageRepository.findById(4L)).thenReturn(Optional.of(customerPackage));
+        when(shipmentCostShareRepository.findByShipmentIdOrderByIdAsc(2L)).thenReturn(List.of(share));
+        when(shipmentPaymentRepository.findByShipmentIdOrderByRegisteredAtDescIdDesc(2L)).thenReturn(List.of());
+        when(repository.save(shipment)).thenReturn(shipment);
+        when(customerPackageRepository.save(customerPackage)).thenReturn(customerPackage);
+
+        ShipmentDetailResponse response = service.dispatch(2L, request);
+
+        assertEquals(ShipmentStatus.OUT_FOR_DELIVERY.name(), response.getStatus());
+        assertEquals(CustomerPackageStatus.SHIPPED, customerPackage.getStatus());
+    }
+
+    @Test
+    void confirmReceivedBlocksWhenShippingBalanceIsPending() {
+        Shipment shipment = carrierShipment("GUIA-123");
+        shipment.setStatus(ShipmentStatus.OUT_FOR_DELIVERY);
+        shipment.setRealShippingCost(new BigDecimal("60.00"));
+        ShipmentPackage shipmentPackage = shipmentPackage();
+        ShipmentCostShare share = costShare(30L, 4L, 8L, "60.00");
+        ConfirmShipmentReceivedRequest request = new ConfirmShipmentReceivedRequest();
+        request.setDeliveryConfirmedByUserId(77L);
+
+        when(currentUser.getUserId()).thenReturn(77L);
+        when(repository.findById(2L)).thenReturn(Optional.of(shipment));
+        when(shipmentPackageRepository.findByShipmentIdOrderByIdAsc(2L)).thenReturn(List.of(shipmentPackage));
+        when(shipmentCostShareRepository.findByShipmentIdOrderByIdAsc(2L)).thenReturn(List.of(share));
+        when(shipmentPaymentRepository.findByShipmentIdOrderByRegisteredAtDescIdDesc(2L)).thenReturn(List.of());
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.confirmReceived(2L, request));
+
+        assertEquals("No se puede confirmar recibido porque existe saldo de envio pendiente.", ex.getMessage());
+        verifyNoInteractions(paymentService);
+    }
+
+    @Test
+    void updateLogisticsBlocksOutForDeliveryShipment() {
+        Shipment shipment = carrierShipment("GUIA-123");
+        shipment.setStatus(ShipmentStatus.OUT_FOR_DELIVERY);
+        UpdateShipmentLogisticsRequest request = new UpdateShipmentLogisticsRequest();
+        request.setDestinationSummary("Nuevo destino");
+
+        when(currentUser.getUserId()).thenReturn(77L);
+        when(repository.findById(2L)).thenReturn(Optional.of(shipment));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.updateLogistics(2L, request));
+
+        assertEquals("Solo se pueden editar datos logisticos de un envio en preparacion.", ex.getMessage());
+        verify(repository, never()).save(shipment);
+    }
+
+    @Test
+    void updateCostSharesBlocksOutForDeliveryShipment() {
+        Shipment shipment = carrierShipment("GUIA-123");
+        shipment.setStatus(ShipmentStatus.OUT_FOR_DELIVERY);
+        ShipmentCostShareRequest request = new ShipmentCostShareRequest();
+        request.setShareMethod(ShipmentCostShareMethod.STORE_ABSORBED);
+
+        when(currentUser.getUserId()).thenReturn(77L);
+        when(repository.findById(2L)).thenReturn(Optional.of(shipment));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.updateCostShares(2L, request));
+
+        assertEquals("Solo se puede modificar el reparto de un envio en preparacion.", ex.getMessage());
+        verify(shipmentCostShareRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void registerShippingPaymentBlocksFinalShipment() {
+        Shipment shipment = carrierShipment("GUIA-123");
+        shipment.setStatus(ShipmentStatus.DELIVERED);
+        RegisterShipmentPaymentRequest request = shippingPaymentRequest(30L, "10.00");
+
+        when(currentUser.getUserId()).thenReturn(77L);
+        when(repository.findById(2L)).thenReturn(Optional.of(shipment));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.registerShippingPayment(2L, request));
+
+        assertEquals("No se pueden registrar pagos de envio en un envio finalizado o cancelado.", ex.getMessage());
+        verify(shipmentPaymentRepository, never()).save(any());
+    }
+
+    @Test
+    void cancelShippingPaymentBlocksFinalShipment() {
+        Shipment shipment = carrierShipment("GUIA-123");
+        shipment.setStatus(ShipmentStatus.CLOSED_WITH_INCIDENTS);
+
+        when(currentUser.getUserId()).thenReturn(77L);
+        when(repository.findById(2L)).thenReturn(Optional.of(shipment));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.cancelShippingPayment(2L, 90L, new CancelShipmentPaymentRequest()));
+
+        assertEquals("No se pueden cancelar pagos de envio en un envio finalizado o cancelado.", ex.getMessage());
+        verify(shipmentPaymentRepository, never()).save(any());
     }
     private Branch branch() {
         Branch branch = new Branch();
