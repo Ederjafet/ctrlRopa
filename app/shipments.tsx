@@ -14,8 +14,10 @@ import {
 import {
   createShipment,
   getShipmentsByBranch,
+  getShippingBalances,
   Shipment,
   ShipmentDeliveryType,
+  ShipmentShippingBalance,
   shipmentDeliveryTypeLabel,
   shipmentStatusLabel,
 } from '@/services/shipmentService';
@@ -23,6 +25,9 @@ import { getSession, UserSession } from '@/services/sessionStorage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+
+type ShipmentView = 'operation' | 'shippingBalances';
+type ShippingBalanceFilter = 'all' | 'pending' | 'partial' | 'paid' | 'overpaid';
 
 type ShipmentFilter =
   | 'all'
@@ -65,6 +70,14 @@ const FILTERS: { key: ShipmentFilter; label: string }[] = [
   { key: 'history', label: 'Historial' },
 ];
 
+const SHIPPING_BALANCE_FILTERS: { key: ShippingBalanceFilter; label: string }[] = [
+  { key: 'all', label: 'Todos' },
+  { key: 'pending', label: 'Pendientes' },
+  { key: 'partial', label: 'Parciales' },
+  { key: 'paid', label: 'Pagados' },
+  { key: 'overpaid', label: 'Sobrepagados' },
+];
+
 function money(value?: number | null) {
   return `$${Number(value ?? 0).toFixed(2)} MXN`;
 }
@@ -96,6 +109,30 @@ function packageDeliveryTypeLabel(type?: string | null) {
   if (type === 'CUSTOMER_PROVIDED_LABEL') return 'Cliente envia guia';
   if (type === 'COLLECT_SHIPPING') return 'Envio por cobrar';
   return type || 'Sin tipo';
+}
+
+function shippingBalanceStatusLabel(status?: string | null) {
+  if (status === 'NO_COST') return 'Sin costo';
+  if (status === 'PENDING') return 'Pendiente';
+  if (status === 'PARTIAL') return 'Parcial';
+  if (status === 'PAID') return 'Pagado';
+  if (status === 'OVERPAID') return 'Sobrepagado';
+  return status || 'Sin estado';
+}
+
+function shippingBalanceStatusTone(status?: string | null): 'default' | 'warning' | 'success' | 'info' {
+  if (status === 'PENDING' || status === 'PARTIAL') return 'warning';
+  if (status === 'PAID' || status === 'NO_COST') return 'success';
+  if (status === 'OVERPAID') return 'info';
+  return 'default';
+}
+
+function getShippingBalanceFilterGroup(balance: ShipmentShippingBalance): ShippingBalanceFilter {
+  if (balance.paymentStatus === 'PENDING') return 'pending';
+  if (balance.paymentStatus === 'PARTIAL') return 'partial';
+  if (balance.paymentStatus === 'PAID' || balance.paymentStatus === 'NO_COST') return 'paid';
+  if (balance.paymentStatus === 'OVERPAID') return 'overpaid';
+  return 'all';
 }
 
 function logisticsSourceLabel(source?: string | null) {
@@ -214,7 +251,10 @@ export default function ShipmentsScreen() {
   const [session, setSession] = useState<UserSession | null>(null);
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [readyPackages, setReadyPackages] = useState<CustomerPackageDetail[]>([]);
+  const [shippingBalances, setShippingBalances] = useState<ShipmentShippingBalance[]>([]);
+  const [activeView, setActiveView] = useState<ShipmentView>('operation');
   const [activeFilter, setActiveFilter] = useState<ShipmentFilter>('all');
+  const [activeBalanceFilter, setActiveBalanceFilter] = useState<ShippingBalanceFilter>('all');
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isPreparingPackage, setIsPreparingPackage] = useState(false);
@@ -235,12 +275,14 @@ export default function ShipmentsScreen() {
       }
 
       setSession(currentSession);
-      const [shipmentData, readyPackageData] = await Promise.all([
+      const [shipmentData, readyPackageData, shippingBalanceData] = await Promise.all([
         getShipmentsByBranch(currentSession.branchId),
         getReadyCustomerPackagesForShipment(currentSession.branchId),
+        getShippingBalances(currentSession.branchId),
       ]);
       setShipments(shipmentData);
       setReadyPackages(readyPackageData);
+      setShippingBalances(shippingBalanceData);
     } catch (error: any) {
       Alert.alert('Envios', error.message || 'No se pudieron cargar los envios.');
     } finally {
@@ -346,6 +388,37 @@ export default function ShipmentsScreen() {
       return matchesFilter && matchesSearch;
     });
   }, [activeFilter, inboxItems, search]);
+
+  const filteredShippingBalances = useMemo(() => {
+    const term = normalize(search);
+
+    return shippingBalances.filter((balance) => {
+      const filterGroup = getShippingBalanceFilterGroup(balance);
+      const matchesFilter = activeBalanceFilter === 'all' || filterGroup === activeBalanceFilter;
+      const matchesSearch = !term || normalize([
+        balance.shipmentFolio,
+        balance.shipmentStatus,
+        balance.customerName,
+        balance.packageCount,
+        balance.paymentStatus,
+      ].join(' ')).includes(term);
+      return matchesFilter && matchesSearch;
+    });
+  }, [activeBalanceFilter, search, shippingBalances]);
+
+  const shippingBalanceSummary = useMemo(() => {
+    const pendingRows = shippingBalances.filter((balance) => Number(balance.pendingShippingBalance ?? 0) > 0);
+    const paidRows = shippingBalances.filter((balance) => balance.paymentStatus === 'PAID' || balance.paymentStatus === 'NO_COST');
+    const pendingTotal = pendingRows.reduce((sum, balance) => sum + Number(balance.pendingShippingBalance ?? 0), 0);
+    const paidTotal = shippingBalances.reduce((sum, balance) => sum + Number(balance.paidShippingAmount ?? 0), 0);
+
+    return {
+      pendingCount: pendingRows.length,
+      pendingTotal,
+      paidCount: paidRows.length,
+      paidTotal,
+    };
+  }, [shippingBalances]);
 
   const summary = useMemo(() => {
     const readyCount = readyPackages.length;
@@ -470,6 +543,36 @@ export default function ShipmentsScreen() {
     );
   };
 
+  const renderAmountSummaryCard = (label: string, value: string, tone: 'default' | 'warning' | 'success' | 'info') => {
+    const toneColor =
+      tone === 'warning'
+        ? theme.colors.warning
+        : tone === 'success'
+          ? theme.colors.success
+          : tone === 'info'
+            ? theme.colors.info
+            : theme.colors.accent;
+
+    return (
+      <View
+        key={label}
+        style={[
+          styles.summaryCard,
+          {
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.border,
+          },
+        ]}
+      >
+        <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+          {label}
+        </AppText>
+        <AppText variant="title" color={toneColor} numberOfLines={1}>
+          {value}
+        </AppText>
+      </View>
+    );
+  };
   const renderFilterChip = (filter: { key: ShipmentFilter; label: string }) => {
     const selected = activeFilter === filter.key;
 
@@ -498,6 +601,33 @@ export default function ShipmentsScreen() {
     );
   };
 
+  const renderBalanceFilterChip = (filter: { key: ShippingBalanceFilter; label: string }) => {
+    const selected = activeBalanceFilter === filter.key;
+
+    return (
+      <Pressable
+        key={filter.key}
+        onPress={() => setActiveBalanceFilter(filter.key)}
+        style={({ pressed }) => [
+          styles.filterChip,
+          {
+            backgroundColor: selected ? theme.colors.optionPressedBackground : theme.colors.surface,
+            borderColor: selected ? theme.colors.accent : theme.colors.border,
+            opacity: pressed ? 0.75 : 1,
+          },
+        ]}
+      >
+        <AppText
+          variant="caption"
+          bold={selected}
+          color={selected ? theme.colors.accent : theme.colors.mutedText}
+          numberOfLines={1}
+        >
+          {filter.label}
+        </AppText>
+      </Pressable>
+    );
+  };
   const renderReadyPackageCard = (item: InboxReadyItem) => {
     const customerPackage = item.customerPackage;
     const hasGuide = Boolean(customerPackage.trackingNumber?.trim());
@@ -616,6 +746,83 @@ export default function ShipmentsScreen() {
     );
   };
 
+  const renderShippingBalanceCard = (balance: ShipmentShippingBalance) => {
+    const tone = shippingBalanceStatusTone(balance.paymentStatus);
+    const toneColor =
+      tone === 'warning'
+        ? theme.colors.warning
+        : tone === 'success'
+          ? theme.colors.success
+          : tone === 'info'
+            ? theme.colors.info
+            : theme.colors.accent;
+
+    return (
+      <View
+        key={balance.shipmentId}
+        style={[
+          styles.inboxCard,
+          {
+            backgroundColor: theme.colors.surface,
+            borderColor: Number(balance.pendingShippingBalance ?? 0) > 0 ? theme.colors.warning : theme.colors.border,
+          },
+        ]}
+      >
+        <View style={styles.cardMain}>
+          <View style={styles.cardTitleRow}>
+            <View style={styles.cardTitleBlock}>
+              <AppText variant="caption" color={theme.colors.mutedText} bold>
+                Saldo de envio
+              </AppText>
+              <AppText bold numberOfLines={1}>
+                {balance.shipmentFolio || `Envio #${balance.shipmentId}`}
+              </AppText>
+              <AppText variant="caption" color={theme.colors.mutedText} numberOfLines={1}>
+                {balance.customerName || 'Cliente no indicado'} - {balance.packageCount ?? 0} paquete{balance.packageCount === 1 ? '' : 's'}
+              </AppText>
+            </View>
+            <View style={[styles.statusBadge, { backgroundColor: theme.colors.surfaceAlt }]}>
+              <AppText variant="caption" color={toneColor} bold numberOfLines={1}>
+                {shippingBalanceStatusLabel(balance.paymentStatus)}
+              </AppText>
+            </View>
+          </View>
+
+          <View style={styles.metaGrid}>
+            <View style={styles.metaCell}>
+              <AppText variant="caption" color={theme.colors.mutedText}>Estado logistico</AppText>
+              <AppText bold>{shipmentStatusLabel(balance.shipmentStatus)}</AppText>
+            </View>
+            <View style={styles.metaCell}>
+              <AppText variant="caption" color={theme.colors.mutedText}>Costo real</AppText>
+              <AppText bold numberOfLines={1}>{balance.realShippingCost != null ? money(balance.realShippingCost) : 'Sin costo'}</AppText>
+            </View>
+            <View style={styles.metaCell}>
+              <AppText variant="caption" color={theme.colors.mutedText}>Asignado</AppText>
+              <AppText bold numberOfLines={1}>{money(balance.assignedShippingAmount)}</AppText>
+            </View>
+            <View style={styles.metaCell}>
+              <AppText variant="caption" color={theme.colors.mutedText}>Pagado</AppText>
+              <AppText bold numberOfLines={1}>{money(balance.paidShippingAmount)}</AppText>
+            </View>
+            <View style={styles.metaCell}>
+              <AppText variant="caption" color={theme.colors.mutedText}>Saldo</AppText>
+              <AppText bold color={Number(balance.pendingShippingBalance ?? 0) > 0 ? theme.colors.warning : theme.colors.success} numberOfLines={1}>
+                {money(balance.pendingShippingBalance)}
+              </AppText>
+            </View>
+            <View style={styles.metaCell}>
+              <AppText variant="caption" color={theme.colors.mutedText}>Absorbido</AppText>
+              <AppText bold numberOfLines={1}>{money(balance.absorbedAmount)}</AppText>
+            </View>
+          </View>
+        </View>
+        <View style={styles.cardActions}>
+          <AppButton title="Ver envio" variant="secondary" onPress={() => openShipmentDetail(balance.shipmentId)} />
+        </View>
+      </View>
+    );
+  };
   const renderShipmentCard = (item: InboxShipmentItem) => {
     const shipment = item.shipment;
     const isOpen = shipment.status === 'OPEN';
@@ -827,6 +1034,10 @@ export default function ShipmentsScreen() {
     activeFilter === 'all' && !search.trim()
       ? 'No hay paquetes listos para envio. Cuando un paquete este pagado y marcado como listo, aparecera aqui.'
       : 'No hay envios con este filtro o busqueda.';
+  const balanceEmptyMessage =
+    activeBalanceFilter === 'all' && !search.trim()
+      ? 'No hay saldos de envio para mostrar.'
+      : 'No hay envios para este filtro de pago o busqueda.';
 
   return (
     <>
@@ -838,41 +1049,89 @@ export default function ShipmentsScreen() {
         compactHeader
         rightContent={renderHeaderActions()}
       >
-        <View style={styles.summaryGrid}>
-          {renderSummaryCard('Listos para envio', summary.readyCount, 'info')}
-          {renderSummaryCard('Pendientes de guia', summary.pendingGuideCount, 'warning')}
-          {renderSummaryCard('En preparacion', summary.preparingCount, 'default')}
-          {renderSummaryCard('Enviados', summary.shippedCount, 'info')}
-          {renderSummaryCard('Entregados', summary.deliveredCount, 'success')}
-          {renderSummaryCard('Con atencion', summary.attentionCount, 'warning')}
+        <View style={styles.filterRow}>
+          <AppButton title="Operacion" variant={activeView === 'operation' ? 'primary' : 'secondary'} onPress={() => setActiveView('operation')} />
+          <AppButton title="Saldos de envio" variant={activeView === 'shippingBalances' ? 'primary' : 'secondary'} onPress={() => setActiveView('shippingBalances')} />
         </View>
 
-        <View style={styles.filterRow}>{FILTERS.map(renderFilterChip)}</View>
+        {activeView === 'operation' ? (
+          <>
+            <View style={styles.summaryGrid}>
+              {renderSummaryCard('Listos para envio', summary.readyCount, 'info')}
+              {renderSummaryCard('Pendientes de guia', summary.pendingGuideCount, 'warning')}
+              {renderSummaryCard('En preparacion', summary.preparingCount, 'default')}
+              {renderSummaryCard('Enviados', summary.shippedCount, 'info')}
+              {renderSummaryCard('Entregados', summary.deliveredCount, 'success')}
+              {renderSummaryCard('Con atencion', summary.attentionCount, 'warning')}
+            </View>
 
-        <AppInput
-          label="Buscar en bandeja"
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Cliente, paquete, guia, paqueteria o telefono"
-          autoCapitalize="none"
-        />
+            <View style={styles.filterRow}>{FILTERS.map(renderFilterChip)}</View>
 
-        {isLoading ? <ActivityIndicator /> : null}
+            <AppInput
+              label="Buscar en bandeja"
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Cliente, paquete, guia, paqueteria o telefono"
+              autoCapitalize="none"
+            />
 
-        {!isLoading && filteredInboxItems.length === 0 ? (
-          <AppCard variant="subtle">
-            <AppText bold>Sin resultados</AppText>
-            <AppText color={theme.colors.mutedText}>{emptyMessage}</AppText>
-          </AppCard>
-        ) : null}
+            {isLoading ? <ActivityIndicator /> : null}
 
-        {!isLoading ? (
-          <View style={styles.inboxList}>
-            {filteredInboxItems.map((item) =>
-              item.kind === 'readyPackage' ? renderReadyPackageCard(item) : renderShipmentCard(item)
-            )}
-          </View>
-        ) : null}
+            {!isLoading && filteredInboxItems.length === 0 ? (
+              <AppCard variant="subtle">
+                <AppText bold>Sin resultados</AppText>
+                <AppText color={theme.colors.mutedText}>{emptyMessage}</AppText>
+              </AppCard>
+            ) : null}
+
+            {!isLoading ? (
+              <View style={styles.inboxList}>
+                {filteredInboxItems.map((item) =>
+                  item.kind === 'readyPackage' ? renderReadyPackageCard(item) : renderShipmentCard(item)
+                )}
+              </View>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <AppCard variant="subtle">
+              <AppText bold>Saldos de envio</AppText>
+              <AppText color={theme.colors.mutedText}>
+                Estos importes corresponden solo al envio. No modifican ni representan saldo de mercancia.
+              </AppText>
+            </AppCard>
+
+            <View style={styles.summaryGrid}>
+              {renderSummaryCard('Envios con saldo pendiente', shippingBalanceSummary.pendingCount, 'warning')}
+              {renderAmountSummaryCard('Total saldo pendiente', money(shippingBalanceSummary.pendingTotal), 'warning')}
+              {renderSummaryCard('Envios pagados', shippingBalanceSummary.paidCount, 'success')}
+              {renderAmountSummaryCard('Total pagado de envio', money(shippingBalanceSummary.paidTotal), 'success')}
+            </View>
+
+            <View style={styles.filterRow}>{SHIPPING_BALANCE_FILTERS.map(renderBalanceFilterChip)}</View>
+
+            <AppInput
+              label="Buscar en saldos"
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Envio, cliente, estado o paquete"
+              autoCapitalize="none"
+            />
+
+            {isLoading ? <ActivityIndicator /> : null}
+
+            {!isLoading && filteredShippingBalances.length === 0 ? (
+              <AppCard variant="subtle">
+                <AppText bold>Sin resultados</AppText>
+                <AppText color={theme.colors.mutedText}>{balanceEmptyMessage}</AppText>
+              </AppCard>
+            ) : null}
+
+            {!isLoading ? (
+              <View style={styles.inboxList}>{filteredShippingBalances.map(renderShippingBalanceCard)}</View>
+            ) : null}
+          </>
+        )}
       </AppShellPage>
 
       <AppBottomModal

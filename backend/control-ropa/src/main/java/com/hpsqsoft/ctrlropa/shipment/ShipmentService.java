@@ -179,6 +179,15 @@ public class ShipmentService {
                 .map(this::toResponse)
                 .toList();
     }
+    @Transactional(readOnly = true)
+    public List<ShipmentShippingBalanceResponse> findShippingBalancesByBranch(Long branchId) {
+        assertCanManageShipments();
+        tenantAccessGuard.requireBranch(branchId, "La sucursal de envios no pertenece al tenant activo");
+        return repository.findByBranchIdOrderByCreatedAtDesc(branchId)
+                .stream()
+                .map(this::toShippingBalanceResponse)
+                .toList();
+    }
 
     public ShipmentDetailResponse addPackage(Long shipmentId, AddShipmentPackageRequest request) {
         assertCanManageShipments();
@@ -1425,6 +1434,15 @@ public class ShipmentService {
         return null;
     }
 
+    private static class CustomerSummary {
+        private final Long customerId;
+        private final String customerName;
+
+        private CustomerSummary(Long customerId, String customerName) {
+            this.customerId = customerId;
+            this.customerName = customerName;
+        }
+    }
     private static class ShippingPaymentState {
         private final BigDecimal realShippingCost;
         private final BigDecimal assignedTotal;
@@ -1561,6 +1579,94 @@ public class ShipmentService {
         );
     }
 
+    private ShipmentShippingBalanceResponse toShippingBalanceResponse(Shipment shipment) {
+        List<ShipmentPackage> packages = shipmentPackageRepository.findByShipmentIdOrderByIdAsc(shipment.getId());
+        List<ShipmentCostShare> shares = shipmentCostShareRepository.findByShipmentIdOrderByIdAsc(shipment.getId());
+        List<ShipmentPayment> payments = shipmentPaymentRepository.findByShipmentIdOrderByRegisteredAtDescIdDesc(shipment.getId());
+        ShippingPaymentState paymentState = resolveShippingPaymentState(shipment, shares, payments);
+
+        BigDecimal assigned = normalizeMoneyOrZero(paymentState.assignedTotal);
+        BigDecimal paid = normalizeMoneyOrZero(paymentState.paidTotal);
+        BigDecimal pending = assigned.subtract(paid).setScale(2, RoundingMode.HALF_UP);
+        if (pending.signum() < 0) {
+            pending = BigDecimal.ZERO.setScale(2);
+        }
+        BigDecimal overpaid = paid.compareTo(assigned) > 0
+                ? paid.subtract(assigned).setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2);
+        CustomerSummary customerSummary = resolveShipmentCustomerSummary(packages);
+
+        return new ShipmentShippingBalanceResponse(
+                shipment.getId(),
+                shipment.getFolio(),
+                shipment.getStatus() != null ? shipment.getStatus().name() : null,
+                customerSummary.customerId,
+                customerSummary.customerName,
+                (long) packages.size(),
+                paymentState.realShippingCost,
+                assigned,
+                paid,
+                pending,
+                paymentState.absorbedAmount,
+                paymentState.overAssignedAmount,
+                overpaid,
+                resolveShippingBalancePaymentStatus(paymentState.realShippingCost, assigned, paid),
+                shipment.getCreatedAt(),
+                shipment.getDispatchedAt(),
+                shipment.getReceivedAt()
+        );
+    }
+
+    private CustomerSummary resolveShipmentCustomerSummary(List<ShipmentPackage> packages) {
+        Long customerId = null;
+        String customerName = null;
+        List<Long> customerIds = new ArrayList<>();
+
+        for (ShipmentPackage shipmentPackage : packages) {
+            CustomerPackage customerPackage = customerPackageRepository.findById(shipmentPackage.getCustomerPackageId()).orElse(null);
+            if (customerPackage == null || customerPackage.getCustomer() == null) {
+                continue;
+            }
+            Long currentCustomerId = customerPackage.getCustomer().getId();
+            if (currentCustomerId != null && !customerIds.contains(currentCustomerId)) {
+                customerIds.add(currentCustomerId);
+            }
+            if (customerId == null) {
+                customerId = currentCustomerId;
+                customerName = customerPackage.getCustomer().getName();
+            }
+        }
+
+        if (customerName != null && customerIds.size() > 1) {
+            customerName = customerName + " + " + (customerIds.size() - 1) + " clientes";
+        }
+        return new CustomerSummary(customerId, customerName);
+    }
+
+    private String resolveShippingBalancePaymentStatus(BigDecimal realShippingCost, BigDecimal assigned, BigDecimal paid) {
+        BigDecimal safeAssigned = normalizeMoneyOrZero(assigned);
+        BigDecimal safePaid = normalizeMoneyOrZero(paid);
+        BigDecimal safeRealCost = normalizeMoney(realShippingCost);
+
+        if (safePaid.compareTo(safeAssigned) > 0) {
+            return "OVERPAID";
+        }
+        if ((safeRealCost == null || safeRealCost.compareTo(BigDecimal.ZERO) == 0)
+                && safeAssigned.compareTo(BigDecimal.ZERO) == 0
+                && safePaid.compareTo(BigDecimal.ZERO) == 0) {
+            return "NO_COST";
+        }
+        if (safeAssigned.compareTo(BigDecimal.ZERO) == 0) {
+            return "PAID";
+        }
+        if (safePaid.compareTo(BigDecimal.ZERO) == 0) {
+            return "PENDING";
+        }
+        if (safePaid.compareTo(safeAssigned) < 0) {
+            return "PARTIAL";
+        }
+        return "PAID";
+    }
     private BigDecimal resolvePackageShippingAmount(CustomerPackage customerPackage) {
         if (!customerPackage.isShippingCostConfirmed()
                 || customerPackage.isShippingCostWaived()

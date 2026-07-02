@@ -1183,6 +1183,89 @@ class ShipmentServiceTests {
         assertEquals("No se pueden cancelar pagos de envio en un envio finalizado o cancelado.", ex.getMessage());
         verify(shipmentPaymentRepository, never()).save(any());
     }
+    @Test
+    void findShippingBalancesReportsNoCostWithoutAssignmentOrPayment() {
+        ShipmentShippingBalanceResponse response = shippingBalanceReport(null, null, List.of());
+
+        assertEquals("NO_COST", response.getPaymentStatus());
+        assertEquals(null, response.getRealShippingCost());
+        assertEquals(new BigDecimal("0.00"), response.getAssignedShippingAmount());
+        assertEquals(new BigDecimal("0.00"), response.getPaidShippingAmount());
+        assertEquals(new BigDecimal("0.00"), response.getPendingShippingBalance());
+        assertEquals(1L, response.getPackageCount());
+        assertEquals("Cliente QA", response.getCustomerName());
+        verify(tenantAccessGuard).requireBranch(10L, "La sucursal de envios no pertenece al tenant activo");
+        verifyNoInteractions(paymentService);
+    }
+
+    @Test
+    void findShippingBalancesReportsPendingBalance() {
+        ShipmentShippingBalanceResponse response = shippingBalanceReport("120.00", "120.00", List.of());
+
+        assertEquals("PENDING", response.getPaymentStatus());
+        assertEquals(new BigDecimal("120.00"), response.getRealShippingCost());
+        assertEquals(new BigDecimal("120.00"), response.getAssignedShippingAmount());
+        assertEquals(new BigDecimal("0.00"), response.getPaidShippingAmount());
+        assertEquals(new BigDecimal("120.00"), response.getPendingShippingBalance());
+        verifyNoInteractions(paymentService);
+    }
+
+    @Test
+    void findShippingBalancesReportsPartialPayment() {
+        ShipmentPayment payment = shippingPayment(90L, 30L, 4L, 8L, "50.00", ShipmentPaymentStatus.REGISTERED);
+
+        ShipmentShippingBalanceResponse response = shippingBalanceReport("120.00", "120.00", List.of(payment));
+
+        assertEquals("PARTIAL", response.getPaymentStatus());
+        assertEquals(new BigDecimal("50.00"), response.getPaidShippingAmount());
+        assertEquals(new BigDecimal("70.00"), response.getPendingShippingBalance());
+        verifyNoInteractions(paymentService);
+    }
+
+    @Test
+    void findShippingBalancesReportsPaidShipping() {
+        ShipmentPayment payment = shippingPayment(90L, 30L, 4L, 8L, "120.00", ShipmentPaymentStatus.REGISTERED);
+
+        ShipmentShippingBalanceResponse response = shippingBalanceReport("120.00", "120.00", List.of(payment));
+
+        assertEquals("PAID", response.getPaymentStatus());
+        assertEquals(new BigDecimal("120.00"), response.getPaidShippingAmount());
+        assertEquals(new BigDecimal("0.00"), response.getPendingShippingBalance());
+        verifyNoInteractions(paymentService);
+    }
+
+    @Test
+    void findShippingBalancesReportsOverpaidShipping() {
+        ShipmentPayment payment = shippingPayment(90L, 30L, 4L, 8L, "150.00", ShipmentPaymentStatus.REGISTERED);
+
+        ShipmentShippingBalanceResponse response = shippingBalanceReport("120.00", "120.00", List.of(payment));
+
+        assertEquals("OVERPAID", response.getPaymentStatus());
+        assertEquals(new BigDecimal("150.00"), response.getPaidShippingAmount());
+        assertEquals(new BigDecimal("0.00"), response.getPendingShippingBalance());
+        assertEquals(new BigDecimal("30.00"), response.getOverpaidAmount());
+        verifyNoInteractions(paymentService);
+    }
+
+    @Test
+    void findShippingBalancesReportsStoreAbsorbedDifference() {
+        ShipmentShippingBalanceResponse response = shippingBalanceReport("120.00", "0.00", List.of());
+
+        assertEquals(new BigDecimal("120.00"), response.getAbsorbedAmount());
+        assertEquals(new BigDecimal("0.00"), response.getOverassignedAmount());
+        assertEquals(new BigDecimal("0.00"), response.getPendingShippingBalance());
+        verifyNoInteractions(paymentService);
+    }
+
+    @Test
+    void findShippingBalancesReportsOverassignedDifference() {
+        ShipmentShippingBalanceResponse response = shippingBalanceReport("120.00", "150.00", List.of());
+
+        assertEquals(new BigDecimal("0.00"), response.getAbsorbedAmount());
+        assertEquals(new BigDecimal("30.00"), response.getOverassignedAmount());
+        assertEquals(new BigDecimal("150.00"), response.getPendingShippingBalance());
+        verifyNoInteractions(paymentService);
+    }
     private Branch branch() {
         Branch branch = new Branch();
         branch.setId(10L);
@@ -1291,6 +1374,27 @@ class ShipmentServiceTests {
         return payment;
     }
 
+    private ShipmentShippingBalanceResponse shippingBalanceReport(String realShippingCost,
+            String assignedAmount,
+            List<ShipmentPayment> payments) {
+        Shipment shipment = carrierShipment("GUIA-123");
+        if (realShippingCost != null) {
+            shipment.setRealShippingCost(new BigDecimal(realShippingCost));
+        }
+        ShipmentPackage shipmentPackage = shipmentPackage();
+        List<ShipmentCostShare> shares = assignedAmount == null
+                ? List.of()
+                : List.of(costShare(30L, 4L, 8L, assignedAmount));
+
+        when(currentUser.getUserId()).thenReturn(77L);
+        when(repository.findByBranchIdOrderByCreatedAtDesc(10L)).thenReturn(List.of(shipment));
+        when(shipmentPackageRepository.findByShipmentIdOrderByIdAsc(2L)).thenReturn(List.of(shipmentPackage));
+        when(shipmentCostShareRepository.findByShipmentIdOrderByIdAsc(2L)).thenReturn(shares);
+        when(shipmentPaymentRepository.findByShipmentIdOrderByRegisteredAtDescIdDesc(2L)).thenReturn(payments);
+        when(customerPackageRepository.findById(4L)).thenReturn(Optional.of(readyCustomerPackage(4L, 8L, "PKG-4", "GUIA-123")));
+
+        return service.findShippingBalancesByBranch(10L).get(0);
+    }
     private CustomerPackageItem packageItem(String price) {
         Item item = new Item();
         item.setPrice(new BigDecimal(price));

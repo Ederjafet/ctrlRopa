@@ -232,6 +232,27 @@ export type ShipmentShippingPaymentsResponse = {
   payments: ShipmentShippingPaymentLine[];
 };
 
+export type ShipmentShippingBalancePaymentStatus = 'NO_COST' | 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERPAID' | string;
+
+export type ShipmentShippingBalance = {
+  shipmentId: number;
+  shipmentFolio?: string | null;
+  shipmentStatus?: ShipmentStatus | string | null;
+  customerId?: number | null;
+  customerName?: string | null;
+  packageCount?: number | null;
+  realShippingCost?: number | null;
+  assignedShippingAmount?: number | null;
+  paidShippingAmount?: number | null;
+  pendingShippingBalance?: number | null;
+  absorbedAmount?: number | null;
+  overassignedAmount?: number | null;
+  overpaidAmount?: number | null;
+  paymentStatus?: ShipmentShippingBalancePaymentStatus | null;
+  createdAt?: string | null;
+  dispatchedAt?: string | null;
+  deliveredAt?: string | null;
+};
 export type RegisterShipmentShippingPaymentRequest = {
   costShareId?: number | null;
   packageId?: number | null;
@@ -251,6 +272,10 @@ export type CancelShipmentShippingPaymentRequest = {
 
 export async function getShipmentsByBranch(branchId: number): Promise<Shipment[]> {
   return apiRequest<Shipment[]>(`/api/shipments/branch/${branchId}`);
+}
+
+export async function getShippingBalances(branchId: number): Promise<ShipmentShippingBalance[]> {
+  return apiRequest<ShipmentShippingBalance[]>(`/api/shipments/branch/${branchId}/shipping-balances`);
 }
 
 export async function getShipmentDetail(id: number): Promise<ShipmentDetail> {

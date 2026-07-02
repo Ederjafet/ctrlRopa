@@ -20,6 +20,29 @@ El objetivo no es construir reportes financieros generales ni modificar el Centr
 
 Decision inicial: `GO_SCOPE`.
 
+## SHIP-F-MVP-A implementado
+
+El MVP-A implementa el primer reporte operativo dentro de `Envios` sin tocar Paquetes, Centro del negocio ni reportes financieros generales.
+
+Alcance aplicado:
+
+- Endpoint read-only `GET /api/shipments/branch/{branchId}/shipping-balances`.
+- DTO `ShipmentShippingBalanceResponse` por envio.
+- Calculo por envio de costo real, asignado, pagado, saldo pendiente, absorbido, sobreasignado y sobrepago.
+- Estado operativo de pago: `NO_COST`, `PENDING`, `PARTIAL`, `PAID`, `OVERPAID`.
+- Vista `Saldos de envio` dentro de `/shipments` con resumen, filtros locales y lista compacta.
+- Servicio frontend `getShippingBalances(branchId)`.
+- Tests backend focalizados en calculos de saldo/pago de envio.
+
+Reglas preservadas:
+
+- Los pagos de envio se leen desde `ShipmentPayment` y solo cuentan pagos `REGISTERED`.
+- No se usa `PaymentService` ni pagos de mercancia.
+- No se modifica saldo de mercancia, Paquetes ni Centro del negocio.
+- Se conserva `MANAGE_SHIPMENTS` como permiso del MVP.
+
+Documento de implementacion: `docs/shipments/APP_MODA_SHIP_F_MVP_A.md`.
+
 ## Contexto validado
 
 SHIP-D y SHIP-E ya dejaron implementada la separacion conceptual:

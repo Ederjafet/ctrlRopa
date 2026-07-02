@@ -34,6 +34,10 @@ public class ShipmentController {
     public List<ShipmentResponse> findByBranch(@PathVariable Long branchId) {
         return service.findByBranch(branchId);
     }
+    @GetMapping("/branch/{branchId}/shipping-balances")
+    public List<ShipmentShippingBalanceResponse> findShippingBalancesByBranch(@PathVariable Long branchId) {
+        return service.findShippingBalancesByBranch(branchId);
+    }
 
     @PostMapping("/{id}/packages")
     public ShipmentDetailResponse addPackage(@PathVariable Long id,
